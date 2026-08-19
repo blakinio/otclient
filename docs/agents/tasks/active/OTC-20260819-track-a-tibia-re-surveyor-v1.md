@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260819-track-a-tibia-re-surveyor-v1
-status: implementing
+status: validating
 agent: ChatGPT
 project_lane: otclient
 lane: P0-STATE
@@ -62,7 +62,7 @@ current_client_version_token: "15.32"
 current_client_size: 52109920
 current_client_sha256: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
 invocation_started_at: 2026-08-19T13:45:00+02:00
-last_progress_at: 2026-08-19T13:45:00+02:00
+last_progress_at: 2026-08-19T14:08:00+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: draft
 terminal_ci_wait_started_at: null
@@ -73,7 +73,7 @@ repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 0
 stall_warnings: 0
 current_blocker: current KasmVNC client is unique and readable, but canonical runtime-registration.json is absent so live GUI anti-idle input is not currently authorized
-next_action: implement the deterministic survey/coverage bundle and a fail-closed keepalive module that refuses input unless fresh canonical mutation authority is externally proven
+next_action: run the exact remote Surveyor implementation against otclient-track-a-kasmvnc DISPLAY=:1; keepalive must fail closed unless registration/Gate A/Gate B/supervisor authority is proven at that moment
 ---
 
 # TIBIA-RE Surveyor v1
@@ -102,3 +102,21 @@ Implementation must preserve that contract but fail closed: an unregistered/read
 - unit-test coverage parsing, evidence indexing, runtime normalization and all keepalive allow/refuse paths;
 - run the surveyor against the current `otclient-track-a-kasmvnc` session;
 - do not login, read credentials, transact, attach/inject, mutate process memory or bypass canonical runtime admission.
+
+## Pre-live recovery checkpoint
+
+```yaml
+phase: pre_live_current_session_validation
+exact_remote_implementation_head: 04ea2f1287cb85e9e1b22eacb7cbbff225513f82
+last_verified_result: 13 focused unit tests PASS; repository-only local bundle emits exactly 169 rows and canonical counts 14/95/56/4
+current_gate: fresh read-only KasmVNC runtime probe plus keepalive authority decision
+pending_external_state: revalidate current container/PID/start/SHA/window uniqueness and canonical registration/lease immediately before the run
+wait_started_at: null
+deadline: null
+check_generation: pre_live_1
+ci_observations: 0
+terminal_ci_observations: 0
+identical_failure_retries: 0
+repair_cycles: 0
+next_action: run the exact remote Surveyor from the Synology Docker host against otclient-track-a-kasmvnc DISPLAY=:1 and persist only sanitized outputs
+```

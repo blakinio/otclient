@@ -13,7 +13,7 @@ base_branch: main
 base_main: 82e5f435c3aa4172115bf7f6a0cd7a5cc6da3d50
 current_main_observed: cf90b84442dda730bdab93d8aa9f3236b7532ad8
 created: 2026-08-19T09:35:00+02:00
-updated: 2026-08-19T09:45:00+02:00
+updated: 2026-08-19T09:49:00+02:00
 risk: low
 execution_mode: github_only
 execution_reason: deterministic current-package static census and evidence processing; physical session is not required
@@ -110,14 +110,30 @@ Draft PR: 558
 producer workflow: Track A creature combat static G0
 producer run/job: 32228647135 / 95993567735
 producer source head: 2df47c74c8140d458d8fb37bb6cee68b527c0cc8
-producer state at 2026-08-19T09:44+02:00: IN_PROGRESS
+producer state on resume: IN_PROGRESS at dependency-install step
 source-head CI run: 32228647686
 source-head CI / Required: SUCCESS
 source-head Track A governance: SUCCESS (run 32228647177)
-report checkpoint head before this task-state update: 5accacb38d798699db2d773a015c85c23a4a0097
+latest material report head: bcd7ef8eb1442564909ee3ab56c2a2bea3a26d33
 ```
 
-The current producer is a deliberate external operation from the unchanged workflow source head. Do not rerun or duplicate it merely because the branch later receives report/task checkpoint commits.
+The current producer is a deliberate external operation from the unchanged workflow source head. Do not rerun or duplicate it merely because the branch later receives report/task checkpoint commits. Its in-progress job logs were not yet available through the GitHub API.
+
+## Predeclared status rules
+
+The researcher report now fixes the row decision rules before the producer artifact is read:
+
+```text
+D01-D05 remain PARTIAL from static G0 alone.
+D06 may move NOT_STARTED -> PARTIAL only with directly enumerated current-package HUD/status-effect ownership.
+D07 may move NOT_STARTED -> PARTIAL only with directly enumerated current-package battle-list/filter/sort/secondary-list ownership.
+D08 remains PARTIAL from static G0 alone.
+C15-C17 remain PARTIAL from static G0 alone.
+No D01-D08/C15-C17 row may become DONE from this producer.
+Lexical strings alone cannot cause a status transition.
+```
+
+This precommit is intended to reduce confirmation bias when the artifact is inspected.
 
 ## Acceptance inventory
 
@@ -127,7 +143,7 @@ The current producer is a deliberate external operation from the unchanged workf
 - [ ] D01-D08 and C15-C17 findings are classified as FACT / INFERENCE / UNKNOWN without runtime overclaim.
 - [ ] Negative scope control proves no credentials, login, gameplay, runtime observation, client execution, client mutation, or raw-client artifact retention.
 - [ ] Temporary producer workflow is removed before the final research head.
-- [x] Task-owned report path contains the trusted S8/S9 baseline and explicit current-producer evidence boundary.
+- [x] Task-owned report path contains the trusted S8/S9 baseline, current-provenance boundary and predeclared classification rules.
 - [ ] Final task-owned evidence path contains enough information for a fresh coordinator to audit without chat history.
 - [ ] Exact-head repository checks are recorded for the final Draft head.
 
@@ -151,11 +167,11 @@ physical_e2e_reason: static reverse-engineering evidence package with runtime_ac
 ```yaml
 recovery:
   policy_version: 1
-  generation: 2
+  generation: 3
   session_id: 20260819-creature-combat-g0
   session_started_at: 2026-08-19T09:35:00+02:00
-  checkpointed_at: 2026-08-19T09:45:00+02:00
-  last_progress_at: 2026-08-19T09:45:00+02:00
+  checkpointed_at: 2026-08-19T09:49:00+02:00
+  last_progress_at: 2026-08-19T09:49:00+02:00
   phase: producer-wait
   exact_head: checkpoint-commit-created-by-this-update
   pull_request: 558
@@ -171,14 +187,14 @@ recovery:
   status: waiting
   safe_to_resume: true
   resume_condition: workflow run 32228647135 reaches a terminal state
-  next_action: Inspect run 32228647135 and its compact artifact. If successful and raw-client retention is false, persist exact current-package evidence, finalize FACT/INFERENCE/UNKNOWN classifications and row consequences, then delete the temporary producer workflow before final exact-head validation.
+  next_action: Inspect run 32228647135 and its compact artifact. If successful and raw-client retention is false, persist exact current-package evidence, apply the predeclared row rules, then delete the temporary producer workflow before final exact-head validation. If the producer times out or fails in dependency installation, inspect the terminal error and repair the producer with a dependency-light hosted implementation rather than blindly rerunning it.
 ```
 
 ## Invocation counters
 
 ```yaml
-invocation_started_at: 2026-08-19T09:41:00+02:00
-last_progress_at: 2026-08-19T09:45:00+02:00
+invocation_started_at: 2026-08-19T09:47:00+02:00
+last_progress_at: 2026-08-19T09:49:00+02:00
 ci_checks_for_current_head: 2
 ci_check_generation: producer-source-head
 terminal_ci_wait_started_at: null

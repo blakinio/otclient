@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260819-track-a-economy-panels-runtime-readonly
-status: in_progress
+status: blocked
 agent: ChatGPT
 session_id: chatgpt-economy-panels-runtime-20260819-resume-v3
 session_role: researcher
@@ -8,12 +8,12 @@ project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: runtime_read_only_semantic_validation
-phase: bounded_gui_safe_navigation
+phase: bounded_gui_safe_partial_complete
 branch: research/OTC-20260819-track-a-economy-panels-runtime-readonly
 base_branch: main
-base_main: f13179df4aa99a946faf6ec9635d5d40370c6ff3
+base_main: 5ce628b7e565eb17876b76305af6a6086ed7f258
 risk: medium
-updated: 2026-08-19T11:25:28+02:00
+updated: 2026-08-19T11:59:05+02:00
 policy_version: 2
 execution_mode: remote-desktop-commander-synology
 execution_class: synology_physical_runtime
@@ -66,7 +66,16 @@ native_login_structural_discriminators:
   gameserver_game_session_validated_hits: 1
   worldmap_handler_validated_hits: 1
 credential_reentry_needed: false
-panel_observation_after_preflight: READY_FOR_BOUNDED_GUI_SAFE_NAVIGATION
+panel_observation_after_preflight: PARTIAL_LIVE_PASS_G25_G28_G30_G31
+group_results:
+  G24_market: NOT_REACHED
+  G25_store_coin_history: LIVE_READ_ONLY_PASS
+  G26_daily_reward: NOT_REACHED
+  G27_reward_wall_resting_returner: NOT_REACHED
+  G28_character_premium: LIVE_PARTIAL_PASS_BLESSINGS_NOT_REACHED
+  G29_character_auction_trade: NOT_REACHED
+  G30_world_transfer_main_character_store_surface: LIVE_READ_ONLY_PASS
+  G31_generic_modal_flow: LIVE_PASS
 raw_capture_retained: false
 owned_paths:
   - docs/agents/tasks/active/OTC-20260819-track-a-economy-panels-runtime-readonly.md
@@ -103,11 +112,14 @@ acceptance:
   - inspect/capture only sanitized panel state and close/back out without confirming transactional actions
   - persist only sanitized evidence; no account secrets or unnecessary personal data
   - leave researcher output at Draft PR for coordinator review
-last_completed_step: fresh exact-client re-admission found one current helper-enabled PID 11365 at IN_GAME with zero persistent secret environment and three independent native structural discriminators each returning exactly one validated current-SHA object; credential re-entry is not needed
-blocker: none
-next_action: open the currently visible Store surface with one bounded reversible GUI action, capture and classify only read-only state, then continue to other panels only where an equally safe non-transactional navigation path is visible and unambiguous
+last_completed_step: bounded tooltip-confirmed GUI navigation proved Store and Coin History request state (G25), current-build Cyclopedia Character plus Premium Features surfaces (partial G28), Store Extras World Transfer/Main Character Change service catalogue (G30), and a real generic message dialog from the Coin History read (G31); exact PID 11365 and all three structural in-game discriminators remained stable after the sequence; no credentials, gameplay movement, process control or economy/account transaction occurred
+evidence:
+  - docs/agents/evidence/OTC-20260819-track-a-economy-panels-runtime-readonly/20260819-gui-safe-semantic-observation.md
+blocker: BOUNDED_GUI_ONLY_SURFACES_EXHAUSTED_FOR_REMAINING_G24_G26_G27_G29_AND_G28_BLESSINGS
+blocker_detail: no direct unambiguous transaction-free entry to those remaining surfaces was established from the bounded current visible toolbar, Store and Cyclopedia window; forcing further coverage would require guessing shortcuts, gameplay/context navigation, logout/account-state navigation, or another authority expansion not granted to #550
+next_action: preserve the current partial live evidence for coordinator review; continue G24/G26/G27/G29/G28-Blessings only after a separately explicit authority/context change that keeps transaction-producing actions prohibited
 ---
 
-# TIBIA-RE-ECONOMY-PANELS — live SAFE_READ continuation
+# TIBIA-RE-ECONOMY-PANELS — live GUI-safe continuation
 
-The owner explicitly resumed #528 and #550 and preserved the existing consent. #550 now has bounded authority for reversible GUI-safe panel navigation only. Authentication remains the responsibility of #528, and the current exact client is already structurally in-game, so no credential re-entry is required. Transaction-producing actions remain prohibited.
+The owner explicitly resumed #528 and #550 and preserved the existing consent. The current exact client was already structurally in-game, so #550 used no credentials. Bounded reversible GUI-safe navigation established live current-build evidence for G25, partial G28, G30 Store account-service UI and G31. The remaining groups were not forced outside the no-gameplay/no-transaction boundary and remain unresolved rather than being inferred absent.

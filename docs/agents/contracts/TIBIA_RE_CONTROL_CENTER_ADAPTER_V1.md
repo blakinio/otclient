@@ -2,7 +2,7 @@
 
 ```yaml
 contract_id: TIBIA-RE-CONTROL-CENTER-ADAPTER-V1
-version: 1.1
+version: 1.2
 major_version: 1
 status: hardened_design_baseline
 producer_repository: blakinio/otclient
@@ -16,7 +16,7 @@ Define the stable semantic boundary between the Control Center domain/Scenario E
 
 This contract deliberately excludes client-specific function addresses, UI coordinates, raw keycodes, QMeta IDs, vtables, packet opcodes and wire layouts from common scenarios.
 
-Normative execution/concurrency/idempotency/cancellation/budget/privacy rules live in `TIBIA_RE_CONTROL_CENTER_EXECUTION_V1.md` and apply to every implementation of this adapter contract.
+Normative concurrency, dispatch-commit, STOP, idempotency, budget, privacy, artifact and restart semantics live in `TIBIA_RE_CONTROL_CENTER_EXECUTION_V1.md` and apply to every implementation of this adapter contract.
 
 ## 1. Version negotiation
 
@@ -46,11 +46,9 @@ AdapterIdentity:
 
 `adapter_generation` changes whenever adapter process/runtime binding state changes in a way that can invalidate queued assumptions.
 
-A changed `adapter_generation`, `runtime_instance_id` or `session_epoch` invalidates pending mutation dispatch unless the scenario explicitly revalidates and creates a new action.
+A changed `adapter_generation`, `runtime_instance_id` or `session_epoch` invalidates pending mutation dispatch unless a new action is created after revalidation.
 
 ## 3. Generic capability model
-
-Generic semantic support is independent for reads and actions:
 
 ```yaml
 Capability:
@@ -62,11 +60,11 @@ Capability:
   notes: string | null
 ```
 
-`read_supported=true` never implies `action_supported=true`.
+Read support never implies action support.
 
 ### 3.1 Official-client evidence extension
 
-Only `OFFICIAL_TIBIA` uses the Track A RE maturity extension:
+Only `OFFICIAL_TIBIA` uses Track A RE maturity:
 
 ```yaml
 OfficialEvidenceExtension:
@@ -76,9 +74,9 @@ OfficialEvidenceExtension:
   evidence_refs: [string]
 ```
 
-The gate meanings are inherited from `OTCLIENT_TIBIA_RE_EXPERIMENT_EXECUTION_MODEL.md`.
+Gate meanings come from `OTCLIENT_TIBIA_RE_EXPERIMENT_EXECUTION_MODEL.md`.
 
-`OTERYN_V2` and `FAKE_TEST` must not be forced to claim Track A R/A evidence grades.
+`OTERYN_V2` and `FAKE_TEST` do not pretend to have Track A R/A evidence grades.
 
 ## 4. Normalized runtime status
 
@@ -97,7 +95,7 @@ RuntimeStatus:
   reasons: [string]
 ```
 
-For `OFFICIAL_TIBIA`, `MUTATION_ALLOWED` is informational status only. It is never standing dispatch authority. The exact operation/target must still pass current Track A authority inside the final dispatch boundary.
+For `OFFICIAL_TIBIA`, `MUTATION_ALLOWED` is informational status only. It never represents standing authority for a later action.
 
 ## 5. Snapshot model
 
@@ -141,21 +139,22 @@ GameSnapshot:
     stale_fields: [string]
 ```
 
-Unknown data remains `null`/unknown. Adapters must never synthesize plausible values for UI completeness.
+Unknown data remains unknown/null. Adapters never synthesize plausible values for UI completeness.
 
 ## 6. Dispatch fence
 
-Every action binds immutable expected execution fences:
+Every action binds immutable Control Center execution fences:
 
 ```yaml
 DispatchFence:
+  expected_backend_epoch: string
   expected_control_generation: integer
   expected_adapter_generation: string
   expected_runtime_instance_id: string | null
   expected_session_epoch: string | null
 ```
 
-Official Track A lease/registration/Gate/target identity fields remain official-adapter internals and are validated from current trusted-base sources at final dispatch. They do not become generic scenario fields.
+Official Track A lease/registration/Gate/target identity facts remain official-adapter internals and are re-read from current trusted-base authority sources at final dispatch. They are not serialized into generic scenario files.
 
 ## 7. Semantic action request
 
@@ -174,9 +173,9 @@ ActionRequest:
   max_effect: object
 ```
 
-`action_id` is the idempotency key for one logical action and is governed by the execution contract.
+`action_id` is the mandatory idempotency key for one logical action attempt.
 
-`max_effect` is the engine-computed conservative maximum plausible effect reservation for applicable side-effect-budget dimensions.
+`max_effect` is the conservative maximum plausible effect already admitted/reserved by the engine for each applicable budget dimension.
 
 Initial semantic action kinds:
 
@@ -208,25 +207,49 @@ open_panel
 close_panel
 ```
 
-Login/credential-bearing operations are not ordinary action payloads. A future session-capability request may invoke an independently approved external ingress, but credentials must never be serialized into `ActionRequest`, events or artifacts.
+Login/credential-bearing operations are not ordinary action payloads. Credentials must never be serialized into `ActionRequest`, Event or run artifact objects.
 
-## 8. Action lifecycle
+## 8. Execution context and one-shot dispatch commit
 
-Logical lifecycle:
+Mutation-capable adapter execution receives a coordinator-owned execution context conceptually equivalent to:
+
+```text
+ExecutionContext:
+  cancellation_token
+  commit_dispatch() -> DispatchCommitResult
+```
+
+`commit_dispatch()` is one-shot and owned by the `MutationCoordinator`.
+
+It performs the execution contract's final local dispatch-gate checks and durable write-ahead transition to `DISPATCH_COMMITTED/POSSIBLY_DISPATCHED` plus `AT_RISK` budget state.
+
+An adapter **must not cross its physical irreversible mutation boundary unless `commit_dispatch()` returned COMMITTED for that exact action**.
+
+Calling `commit_dispatch()` twice returns/refuses deterministically and never creates a second logical dispatch.
+
+For `OFFICIAL_TIBIA`, the adapter must:
+
+1. obtain/enter the current canonical Track A guarded mutation boundary using existing infrastructure;
+2. revalidate current Track A identity/authority/input-lock requirements as required by trusted base;
+3. while that external guard remains continuously held, invoke `commit_dispatch()` immediately before the physical effect;
+4. if commit succeeds, cross the physical irreversible boundary exactly once while the external guard is still held;
+5. keep the existing whole-lifetime supervisor/guard semantics for mutation descendants.
+
+This prevents a separate advisory preflight from becoming authority and avoids holding the local dispatch gate while waiting for external Track A locks/guards.
+
+## 9. Action lifecycle
+
+Required logical states:
 
 ```text
 CREATED
 VALIDATED
 RESERVED
+WAITING_AUTHORITY
+DISPATCH_COMMITTED
 DISPATCHING
-DISPATCHED
 CONFIRMING
 CONFIRMED
-```
-
-Terminal/exceptional states:
-
-```text
 REFUSED
 CANCELLED_BEFORE_DISPATCH
 CANCELLED_AFTER_DISPATCH
@@ -237,9 +260,11 @@ TIMED_OUT_AFTER_DISPATCH
 AMBIGUOUS
 ```
 
-`AMBIGUOUS` means the platform cannot prove whether the external side effect occurred and must never trigger automatic mutation retry.
+`DISPATCH_COMMITTED` means possible external side effect must be assumed after crash/uncertain completion.
 
-## 9. Action result
+`AMBIGUOUS` is never automatically retried.
+
+## 10. Action result
 
 ```yaml
 ActionResult:
@@ -247,8 +272,9 @@ ActionResult:
   action_id: string
   lifecycle_state: string
   status: PASS | FAIL | REFUSED | TIMEOUT | CANCELLED | AMBIGUOUS | UNKNOWN
-  dispatch_state: NOT_DISPATCHED | DISPATCHED | POSSIBLY_DISPATCHED
+  dispatch_state: NOT_DISPATCHED | POSSIBLY_DISPATCHED | DISPATCHED
   authoritative_confirmation: PROVEN | DERIVED | NOT_AVAILABLE | UNKNOWN
+  backend_epoch: string
   control_generation: integer
   adapter_generation: string
   runtime_instance_id: string | null
@@ -262,13 +288,15 @@ ActionResult:
   safe_message: string | null
 ```
 
-`dispatch_state=NOT_DISPATCHED` is required when refusal/failure is proven before the irreversible boundary.
+`dispatch_state=NOT_DISPATCHED` requires positive proof that the physical irreversible boundary was not crossed.
 
-A successful local function/UI call is not automatically `PASS`; PASS requires the scenario's declared success evidence.
+If dispatch commit succeeded but the implementation cannot prove whether the physical effect happened, report `POSSIBLY_DISPATCHED`/`AMBIGUOUS`.
 
-## 10. Required adapter operations
+A successful local function/UI call is not automatically PASS; PASS requires the scenario's declared evidence.
 
-The domain-level adapter surface is logically:
+## 11. Required adapter operations
+
+Logical surface:
 
 ```text
 identity() -> AdapterIdentity
@@ -276,16 +304,18 @@ capabilities() -> CapabilitySet
 runtime_status() -> RuntimeStatus
 snapshot(request) -> GameSnapshot
 preflight(action_request) -> PreflightResult
-execute(action_request, cancellation_token) -> ActionResult
+execute(action_request, execution_context) -> ActionResult
 wait_for(condition, timeout, cancellation_token) -> WaitResult
 capture_start(policy) -> CaptureSession
 capture_stop(capture_session) -> CaptureSummary
 emergency_stop(reason) -> StopResult
 ```
 
-### 10.1 Preflight semantics
+The concrete language/API may differ, but semantic responsibilities cannot be bypassed.
 
-`preflight()` is advisory/diagnostic only. It may reject impossible work early but never grants standing dispatch authority.
+### 11.1 Preflight
+
+`preflight()` is advisory/diagnostic only.
 
 ```yaml
 PreflightResult:
@@ -300,15 +330,15 @@ PreflightResult:
   reason_codes: [string]
 ```
 
-### 10.2 Execute semantics
+A `true` result never authorizes future dispatch.
 
-`execute()` is the only adapter operation permitted to cross a semantic mutation boundary and must implement or delegate to the execution contract's `atomic_dispatch` semantics.
+### 11.2 Execute
 
-Immediately before irreversible mutation, it revalidates the complete `DispatchFence`, cancellation generation, idempotency ledger/budget reservation through the caller/coordinator, and for `OFFICIAL_TIBIA` all current Track A authority/identity/input-lock requirements inside the existing guarded mutation boundary.
+`execute()` is the only semantic adapter operation that may cross a mutation boundary.
 
-A prior `preflight.allowed_now=true` is never sufficient.
+It must use the supplied one-shot `commit_dispatch()` immediately before physical mutation. If final fences, durable commit or external authority fail, execute returns a no-dispatch/refusal result and does not mutate.
 
-## 11. Typed scenario step contract
+## 12. Typed scenario step contract
 
 A step is exactly one of:
 
@@ -332,7 +362,7 @@ checkpoint:
   label: string
 ```
 
-Typed predicate baseline:
+Predicate baseline:
 
 ```yaml
 Predicate:
@@ -346,11 +376,11 @@ Rules:
 
 - unknown never silently equals a concrete value;
 - mutation-safety predicates cannot use `ACCEPT`;
-- assertions default to `FAIL` on unknown;
+- assertions default `FAIL` on unknown;
 - waits may use `WAIT` until timeout;
-- stable `step_id` is derived deterministically during validation.
+- stable `step_id` is deterministic during validation.
 
-## 12. Side-effect budget
+## 13. Side-effect budget
 
 ```yaml
 SideEffectBudget:
@@ -365,25 +395,21 @@ SideEffectBudget:
   max_irreversible_changes: integer
 ```
 
-The normative ledger/accounting rules are in the execution contract.
+Normative reservation, `AT_RISK`, committed and uncertain accounting is in the execution contract.
 
-If an action cannot provide a conservative maximum plausible effect for every applicable hard budget, it is refused before dispatch.
+If an action cannot provide a safe maximum plausible effect for every applicable hard budget, refuse before dispatch.
 
-Timeout/failure/cancellation after possible dispatch consumes the conservative uncertain reservation for future admission.
+## 14. Cancellation and STOP ALL
 
-## 13. Cancellation and STOP ALL
+Cancellation is mandatory at every bounded wait/dispatch boundary.
 
-Cancellation is mandatory at every engine wait and dispatch boundary.
+`STOP ALL` linearizes against `commit_dispatch()` through the same coordinator `dispatch_gate`.
 
-`STOP ALL` uses the execution contract's linearizable `control_generation` transition.
+The adapter's `emergency_stop()` is cooperative cancellation/cleanup assistance only. It does not create a second STOP authority or independently kill the official client.
 
-The adapter's `emergency_stop()` is cooperative cleanup/cancellation assistance only. It must not create a second global STOP implementation or independently kill the official client.
+A stale old-backend/old-generation completion may be retained as evidence but cannot advance current execution.
 
-A stale-generation completion may be recorded as evidence but cannot advance a newer run.
-
-## 14. Normalized event envelope
-
-Every emitted event uses:
+## 15. Normalized event envelope
 
 ```yaml
 Event:
@@ -398,11 +424,12 @@ Event:
   source_sequence_scope: string | null
   ordering_confidence: KNOWN | PARTIAL | UNKNOWN
   late: bool
+  backend_epoch: string
+  control_generation: integer
   adapter_id: string
   adapter_generation: string
   runtime_instance_id: string | null
   session_epoch: string | null
-  control_generation: integer
   run_id: string | null
   experiment_id: string | null
   step_id: string | null
@@ -412,13 +439,13 @@ Event:
   payload: object
 ```
 
-`ingest_seq` is recorder persistence order only. It must not be represented as proof of source causality.
+`ingest_seq` is persistence order, not proof of source causality.
 
-`SECRET_REJECTED` contains metadata about rejection only; never the secret value, hash or reversible derivative.
+`SECRET_REJECTED` records rejection metadata only, never value/hash/reversible derivative.
 
-## 15. Causal event payload extension
+## 16. Causal event extension
 
-For causal Track A RE, preserve when observable:
+For causal Track A RE preserve when observable:
 
 ```yaml
 message_direction: CLIENT_TO_SERVER | SERVER_TO_CLIENT | LOCAL | null
@@ -435,9 +462,9 @@ semantic_delta: object | null
 evidence_ref: string | null
 ```
 
-These fields implement the requirements of `OTCLIENT_TIBIA_RE_EXPERIMENT_EXECUTION_MODEL.md` without implying that every event source can populate every field.
+These fields preserve the normative experiment model without requiring every producer to know every field.
 
-## 16. Network event minimum
+## 17. Network event minimum
 
 ```yaml
 payload:
@@ -452,44 +479,42 @@ payload:
 
 Default is `NONE`.
 
-`message_type` is present only when structurally known. Do not guess it from timing alone.
+`message_type` is populated only when structurally known. No timing-based guesses.
 
 Raw payload fallback is forbidden. Auth/session-secret-bearing payloads are forbidden in persistent artifacts.
 
-## 17. Privacy construction boundary
+## 18. Privacy construction boundary
 
-Secret/personal classification occurs before normal event/error/artifact construction.
+Secret/personal classification occurs before normal Event/Error/Artifact construction.
 
 Requirements:
 
 - arbitrary exception/repr/debug output is untrusted and not directly persisted;
-- `safe_message` must be sanitized/reviewed safe text;
-- environment-variable values are never copied into normal evidence;
+- `safe_message` is reviewed/static or sanitized safe text;
+- environment-variable values are never copied into evidence;
 - login/auth capture is structural only;
 - trace strings are filtered before Event creation;
-- private chat is omitted/redacted before Event creation unless explicitly generated test text is permitted;
-- screenshots with uncertain login/auth content use a quarantine/refusal path outside normal run artifacts;
+- private chat is omitted/redacted before Event creation unless deliberately generated test text is permitted;
+- screenshots with uncertain login/auth content use quarantine/refusal outside normal run artifacts;
 - export-time redaction is defense in depth only.
 
-## 18. Run finalization and late events
-
-Run lifecycle:
+## 19. Run finalization and late events
 
 ```text
 ACTIVE -> CLOSING -> FINALIZED
 ```
 
-During bounded `CLOSING`, sources may emit `late=true` events and watermarks where available.
+Bounded `CLOSING` may admit `late=true` events/source watermarks.
 
-Late events cannot rewrite an already terminal action result or restart execution.
+Late events cannot rewrite a terminal action result, resume execution or authorize retry.
 
-After `FINALIZED`, additional evidence is append-only supplement material referencing the original run.
+After FINALIZED, later accepted evidence is append-only supplement material referencing the original run.
 
-## 19. Browser/CLI Control API semantics
+## 20. Browser/CLI Control API semantics
 
-Browser and CLI must call the same backend domain operations.
+Browser and CLI call the same backend domain service.
 
-Minimum logical operations:
+Minimum logical API:
 
 ```text
 GET  /v1/status
@@ -508,48 +533,48 @@ POST /v1/reset-stop
 GET  /v1/events
 ```
 
-Exact HTTP spelling may differ if one equivalent versioned API is chosen, but semantics must include:
+Equivalent versioned spelling is allowed, but semantics require:
 
-- bounded request bodies/collections;
-- bounded streams/history;
-- idempotency for mutation-capable POSTs;
-- duplicate-request result replay;
+- bounded requests/collections/streams/history;
+- mutation idempotency key;
+- duplicate request result replay;
 - deterministic malformed-input errors;
 - no raw adapter/action bypass;
 - loopback default;
-- fail-closed remote-exposure policy.
+- fail-closed remote exposure policy.
 
-## 20. Official-client safety invariants
+## 21. Official-client safety invariants
 
-For `adapter_kind=OFFICIAL_TIBIA`:
+For `OFFICIAL_TIBIA`:
 
-- visible process/window is not authority;
+- visible client/window is not authority;
 - stale lease/registration/generation cannot authorize dispatch;
-- changed boot/PID/start/executable/window/display/session/runtime identity refuses stale work;
+- changed boot/PID/start/executable/window/display/session/runtime identity rejects stale work;
 - read-only admission never escalates to mutation;
-- final mutation validation occurs inside the current canonical Track A guarded mutation boundary;
-- GUI input uses the current shared lock/guard contract;
+- current external Track A guard remains held continuously across `commit_dispatch()` and physical mutation;
+- final Track A authority/identity checks happen inside that guarded boundary;
+- GUI input uses the current shared lock/guard;
 - action parity/evidence gates remain external proof requirements;
-- credentials/login secrets never cross this semantic adapter contract;
-- authority loss prevents subsequent mutation steps;
+- credentials/login secrets never cross this semantic contract;
+- authority loss blocks subsequent mutation;
 - ambiguous possible dispatch is not automatically retried.
 
-## 21. Oteryn-v2 invariants
+## 22. Oteryn-v2 invariants
 
-For `adapter_kind=OTERYN_V2`:
+For `OTERYN_V2`:
 
-- implementation belongs to a separate task/PR in `blakinio/Oteryn-v2`;
-- it integrates with Oteryn's accepted `ADR-0007` E2E architecture or a versioned cross-repo semantic boundary;
-- it exposes semantic test intent without adding Tibia wire compatibility;
+- implementation is a separate task/PR in `blakinio/Oteryn-v2`;
+- integrate with Oteryn accepted ADR-0007 E2E architecture or a versioned cross-repo semantic boundary;
+- expose semantic test intent without Tibia wire compatibility;
 - server-authoritative outcomes remain authoritative;
-- test hooks cannot create an unauthenticated production control surface;
-- production-default builds exclude/disable test-only mutation/control hooks according to Oteryn governance;
-- comparison uses normalized semantics, not raw packet/internal-layout equality;
-- generic capability support is used without pretending Oteryn has Track A R/A maturity.
+- test hooks do not create unauthenticated production control;
+- production-default build excludes/locks down test-only control under Oteryn policy;
+- use generic capability support, not Track A R/A grades;
+- compare normalized semantics, not raw protocol/internal layouts.
 
-## 22. Differential comparison contract
+## 23. Differential comparison contract
 
-Comparison profiles classify fields using:
+Comparison classes:
 
 ```text
 EXACT
@@ -561,7 +586,7 @@ REFERENCE_ONLY
 NOT_COMPARABLE
 ```
 
-Default baseline:
+Baseline:
 
 ```text
 position                 NORMALIZED_EXACT
@@ -574,7 +599,7 @@ containers                ORDERED_EQUIVALENT when order/index is semantic
 equipment                 NORMALIZED_EXACT
 cooldown_state            NORMALIZED_EXACT
 cooldown_timing           TOLERANCE
-visual_effect_semantics   REFERENCE_ONLY unless both sides expose stable semantics
+visual_effect_semantics   REFERENCE_ONLY unless both expose stable semantics
 pixel/frame output        NOT_COMPARABLE by default
 latency                   TOLERANCE or REFERENCE_ONLY
 protocol bytes            NOT_COMPARABLE
@@ -582,9 +607,9 @@ internal object layout    NOT_COMPARABLE
 renderer implementation  NOT_COMPARABLE
 ```
 
-A field is a mismatch only when both sides claim the field observable/supported at the same normalized checkpoint, neither is UNKNOWN and the candidate violates the declared comparison rule.
+Mismatch requires both sides to support/observe the field at the same normalized checkpoint, neither value UNKNOWN, and candidate violation of the selected rule.
 
-Coverage-gap classifications include:
+Coverage states include:
 
 ```text
 NOT_OBSERVABLE_REFERENCE
@@ -594,8 +619,8 @@ UNKNOWN_CANDIDATE
 NOT_COMPARABLE
 ```
 
-## 23. Compatibility
+## 24. Compatibility
 
-Major version 1 remains additive-only. Removing/renaming required fields, action kinds or safety semantics requires a new major contract and migration plan.
+Major version 1 is additive-only. Removing/renaming required fields, action kinds or safety semantics requires a new major contract and migration plan.
 
-The execution contract is normative for concurrency/safety. An adapter that advertises Adapter v1 but cannot implement the required Execution v1 major must be refused by the Scenario Engine.
+An adapter that claims Adapter v1 but cannot implement Execution v1's durable dispatch-commit semantics must be refused by the Scenario Engine.

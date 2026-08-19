@@ -30,6 +30,10 @@ independent_audit_validator: existing-runtime-adoption-final-validator-v4
 independent_audit_result: PASS
 independent_audit_review: 4972825295
 independent_audit_open_material_findings: 0
+closeout_audit_validator: existing-runtime-adoption-closeout-validator-v1
+closeout_audit_result: PASS
+closeout_audit_review: 4972860845
+closeout_audit_open_material_findings: 0
 prior_material_findings_resolved:
   - title_derived_ingame_removed_structural_bridge_required
   - docker_runtime_identity_and_adoption_provenance_persisted
@@ -71,6 +75,8 @@ Adoption itself does not launch, log in, stop, signal, attach to, inject into or
 Final exact source head `cd42e8a651a9ce93ce404b018cb91341637bb4c0` passed 17/17 transition tests, 6/6 Kasm-probe tests, Python compilation, workflow YAML parsing, `git diff --check`, Track A runtime governance and fresh independent exact-head audit `existing-runtime-adoption-final-validator-v4` with zero open material findings.
 
 GitHub exact-head runs were all successful: CI `32259893496` including required job `96090611438`, canonical-live governance `32259893074`, canonical XRes identity `32259893065`, and Track A agent runtime governance `32259893088`.
+
+Lifecycle-only closeout audit `existing-runtime-adoption-closeout-validator-v1` independently verified the active-task deletion, completed archive, terminal fields, diff check and Track A governance with zero material findings; review `4972860845` records that result.
 
 ## E2E and authority boundary
 

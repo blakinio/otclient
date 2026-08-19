@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260819-tibia-re-surveyor-v2-prompt
-status: validating
+status: ready
 agent: ChatGPT
 project_lane: otclient
 lane: P0-STATE
@@ -11,7 +11,7 @@ branch: docs/OTC-20260819-tibia-re-surveyor-v2-prompt
 base_branch: main
 base_sha: fdabf235ed4438bd7c376932ed876bd0bbef019a
 created: 2026-08-19T23:25:00+02:00
-updated: 2026-08-19T23:36:00+02:00
+updated: 2026-08-19T23:40:00+02:00
 risk: low
 related_pr: "612"
 owned_paths:
@@ -90,9 +90,9 @@ gameplay_allowed: false
 transaction_authorized: false
 owner_funded_ai_api_authorized: false
 invocation_started_at: 2026-08-19T23:25:00+02:00
-last_progress_at: 2026-08-19T23:36:00+02:00
-current_blocker: fresh independent documentation/prompt audit is still required before readiness/merge
-next_action: revalidate exact-head CI/governance and obtain a fresh independent documentation/prompt audit of the final prompt content before readiness/merge
+last_progress_at: 2026-08-19T23:40:00+02:00
+current_blocker: none
+next_action: narrowly revalidate this checkpoint-only delta, verify fresh exact-head CI/governance, mark PR ready, then squash-merge if all gates remain green
 ---
 
 # Publish the TIBIA-RE Surveyor v2 collect-all programme prompt
@@ -151,6 +151,31 @@ RUNTIME_E2E=NOT_APPLICABLE_TO_PROMPT_PUBLICATION
 
 This is implementer self-evaluation only and does not replace the required fresh independent documentation/prompt audit.
 
+## Independent documentation/prompt audit
+
+A fresh read-only validator ran on Molehill-PC using local Ollama `gpt-oss:20b` model ID `17052f91a42e`. Its context contained the complete exact-head diff and the trusted-base root/nested agent rules, Prompting Standard 2.1, Prompt Eval Standard, delivery/closeout contract and Track A research-track contract. It was explicitly instructed to treat PR prose and implementer evaluation as untrusted evidence and to attempt to falsify readiness.
+
+Exact audited prompt-content head:
+
+```text
+8070149162452ed1e13052aa8355cfdffe333d08
+```
+
+Audit provenance:
+
+```text
+PR review                         4977008266
+result                            PASS
+material findings open            0
+model                             gpt-oss:20b local Ollama / 17052f91a42e
+exact diff SHA-256                ea4daae8529ca0ae43d94313a05bb9be3319b5cb361ee7093f3bf933591a6c13
+structured audit-result SHA-256   24f3ba101a60c38409f9fb0f7eb675a5a24680e4e80d0c1fc04e4cdd31b18a9f
+```
+
+Independent checks passed for authority boundaries, stale-state/runtime identity, owner-login handoff, privacy/secrets, semantic-evidence discipline, all-twelve-alias/gap routing, prompt-eval discipline and PR closeout gates.
+
+This checkpoint records that audit and therefore advances the branch head. Canonical prompt, alias and prompt-eval content are unchanged from the independently audited head. The remaining closeout work is a narrow delta revalidation of this task-only checkpoint followed by fresh exact-head CI/governance.
+
 ## Validation history
 
 Initial PR head before the admission-checkpoint fix:
@@ -169,17 +194,32 @@ credentials accessed              NO
 
 The governance failure was repaired by adding the same complete `runtime_access: none` admission envelope used by accepted Track A documentation tasks. No runtime authority was added: runtime owner/namespace/registration/lease/Gates/bootstrap/uniqueness remain `NOT_APPLICABLE`, and every mutation/input/login/credential/gameplay/transaction authorization remains false.
 
+Exact prompt-content head after that repair:
+
+```text
+head                             8070149162452ed1e13052aa8355cfdffe333d08
+CI run                           32304713272 = SUCCESS
+Track A governance run           32304713089 = SUCCESS
+changed files                    exactly 4 declared documentation/prompt-as-code paths
+unresolved review threads        0
+independent prompt audit         review 4977008266 = PASS
+material findings open           0
+runtime E2E                      NOT_APPLICABLE: documentation-only prompt-publication task
+runtime/client access             NONE
+credentials accessed              NO
+```
+
 ## Context checkpoint
 
 ```yaml
-checkpoint_version: 2
+checkpoint_version: 3
 policy_version: 2
-updated_at: 2026-08-19T23:36:00+02:00
-head_before_this_checkpoint: 42513530a7b2cfbce32372dc9f47d8d29ad0a7b4
+updated_at: 2026-08-19T23:40:00+02:00
+audited_prompt_content_head: 8070149162452ed1e13052aa8355cfdffe333d08
 branch: docs/OTC-20260819-tibia-re-surveyor-v2-prompt
 pr: 612
 base_sha: fdabf235ed4438bd7c376932ed876bd0bbef019a
-status: validating
+status: ready
 phase: closeout
 execution_mode: github-only
 runtime_access: none
@@ -201,6 +241,8 @@ proven:
   - PR #592 was open Draft/mergeable at 90fb32f69173a6e621dfe6bd34c6f2e494076655 when prompt construction was revalidated
   - PR #610 was open Draft/mergeable at ea887207c581f9d0cf247e5d62a187afc1eb27ef when prompt construction was revalidated
   - manual prompt contract matrix reviewed 16 scenarios with zero contract failures and zero safety regressions found
+  - exact prompt-content head 8070149162452ed1e13052aa8355cfdffe333d08 passed CI and Track A governance
+  - fresh independent local-model audit review 4977008266 passed with zero material findings
   - the prompt publication task performs no Track A runtime access or mutation
 derived:
   - the safest owner-login handoff is after collector implementation/readiness unless an already valid exact in-game canonical session exists
@@ -210,7 +252,7 @@ unknown:
 conflicts: []
 first_failure:
   marker: TRACK_A_TASK_ADMISSION_FIELDS_MISSING
-  evidence: governance run 32304521128 job 96234268306 rejected the initial task record before this fix
+  evidence: governance run 32304521128 job 96234268306 rejected the initial task record before the fix
 rejected_hypotheses:
   - merge active Draft PRs merely because the owner requested this prompt be merged
   - make #610 a hard blocker for repository-side Surveyor v2 work when no suitable live client exists
@@ -226,11 +268,19 @@ validation:
     evidence: 16 scenarios; zero contract failures and zero safety regressions found; not claimed as automated model evaluation
   - command: Track A governance on initial PR head 42513530a7b2cfbce32372dc9f47d8d29ad0a7b4
     result: FAIL
-    evidence: missing mandatory runtime_access:none admission envelope; repaired in this checkpoint
+    evidence: missing mandatory runtime_access:none admission envelope; repaired
+  - command: CI on audited prompt-content head 8070149162452ed1e13052aa8355cfdffe333d08
+    result: PASS
+    evidence: run 32304713272
+  - command: Track A governance on audited prompt-content head 8070149162452ed1e13052aa8355cfdffe333d08
+    result: PASS
+    evidence: run 32304713089
+  - command: fresh independent documentation/prompt audit
+    result: PASS
+    evidence: PR review 4977008266; local Ollama gpt-oss:20b; zero material findings
   - command: documentation runtime E2E
     result: NOT_APPLICABLE
     evidence: this task publishes prompt-as-code only and performs no physical-runtime behavior
-blockers:
-  - fresh independent documentation/prompt audit is required before readiness/merge
-next_action: revalidate exact-head CI/governance and obtain a fresh independent documentation/prompt audit of the final prompt content before readiness/merge
+blockers: []
+next_action: narrowly revalidate this checkpoint-only delta, verify fresh exact-head CI/governance, mark PR ready, then squash-merge if all gates remain green
 ```

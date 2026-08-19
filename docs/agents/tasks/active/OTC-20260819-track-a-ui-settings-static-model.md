@@ -12,11 +12,11 @@ implementation_authorized: false
 run_scope: single_task
 researcher_delivery: draft_pr_only
 promotion_authority: coordinator_only
-base_main: be07623155ac81fa69d618cf277232f6825a7d9e
+base_main: cf90b84442dda730bdab93d8aa9f3236b7532ad8
 branch: docs/OTC-20260819-track-a-ui-settings-static-model
 session_role: coordinator
 execution_mode: chat_github
-execution_reason: source research is complete; independent coordinator audit accepted the bounded slice with one repaired fullscreen-evidence classification and is freezing the final head for exact-head validation
+execution_reason: source research is complete; independent coordinator audit accepted the bounded slice with one repaired fullscreen-evidence classification and exact-head validation is being refreshed after the merged CI infrastructure repair #554
 context_pressure: medium
 context_growth: stable
 estimate_confidence: high
@@ -141,7 +141,9 @@ changed files = exactly 7 task-owned paths
 review threads = 0
 ```
 
-The coordinator edit changes only the task record and `runtime-settings-persistence.md` classification/evidence wording. Final exact-head checks must now run on the new frozen head.
+Coordinator correction head `ffcc0341f65d1f7ea3a20e435a973233675bc061` passed Track A governance `32224439969` and the UI/settings static model `32224439999`. Its generic CI run `32224440219` became infrastructure-stalled for more than one hour inside dependency-install steps without a test failure.
+
+PR #554 subsequently merged as `cf90b84442dda730bdab93d8aa9f3236b7532ad8` and specifically made Fast Checks dependency-light/scoped. This checkpoint update is a safe synchronize commit so the same corrected #544 slice is revalidated against that fixed CI implementation. No research claim, runtime authority, product code or #536 coverage path changes in this refresh.
 
 ## Durable evidence
 
@@ -154,4 +156,4 @@ The coordinator edit changes only the task record and `runtime-settings-persiste
 
 ## Next action
 
-Freeze the resulting exact PR head; verify emitted Track A/static-model/CI checks and zero review threads. If all gates remain green, coordinator marks #544 Ready and squash-merges the accepted corrected slice. Then archive this task, release ownership and persist terminal source/merge evidence in a lifecycle-only closeout PR.
+Freeze the resulting synchronized exact PR head; verify emitted Track A/static-model/CI checks and zero review threads. If all gates remain green, coordinator marks #544 Ready and squash-merges the accepted corrected slice. Then archive this task, release ownership and persist terminal source/merge evidence in a lifecycle-only closeout PR.

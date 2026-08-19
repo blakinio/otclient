@@ -1,0 +1,76 @@
+{
+  "schema": "track-a-inventory-containers-current-package-static-revalidation-v1",
+  "task": "OTC-20260819-track-a-inventory-containers-runtime",
+  "alias": "TIBIA-RE-INVENTORY-CONTAINERS",
+  "trusted_main": "2e572789a2bc4b64c5e906c4515c15c625f6bc9e",
+  "fence_merge_pr": 555,
+  "fence_merge_commit": "2e572789a2bc4b64c5e906c4515c15c625f6bc9e",
+  "execution": {
+    "runtime_access": "none",
+    "client_executed": false,
+    "login": false,
+    "credentials_used": false,
+    "gui_input": false,
+    "process_mutation": false,
+    "static_public_package_only": true,
+    "raw_proprietary_client_retained": false,
+    "raw_binary_committed_or_uploaded": false
+  },
+  "current_public_package": {
+    "packed_size": 10214529,
+    "packed_sha256": "1fc26d66cef90723d29293f177fcff41c8e937e7aac830f08e82c2f4c69eb354",
+    "unpacked_size": 52109920,
+    "unpacked_sha256": "ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8",
+    "elf_build_id": "d803d9695868713ef6ab0c3cf65f91212c9c6a62",
+    "embedded_version_token": "15.32",
+    "lzma_envelope": {"offset": 45, "lc": 3, "lp": 0, "pb": 2, "dict_size": 33554432}
+  },
+  "selected_anchor_revalidation": {
+    "rows_passed": 14,
+    "rows_total": 14,
+    "all_selected_anchors_present": true,
+    "rows": {
+      "D09": {"pass":"9/9","anchors":{"GameserverMessageSetInventory":"0x1ccd274","GameserverMessageDeleteInventory":"0x1ccd2de","GameserverMessagePlayerInventory":"0x1ccd34e","receivedSetInventoryMessage":"0x1cea810","receivedDeleteInventoryMessage":"0x1ceb372","receivedPlayerInventoryMessage":"0x1cec8af","handleSetInventoryMessage":"0x1ccd23f","handleDeleteInventoryMessage":"0x1ccd2a6","handlePlayerInventoryMessage":"0x1ccd316"}},
+      "D10": {"pass":"7/7","anchors":{"tibia::container::TInventoryContainer":"0x1d12e20","tibia::gamewindow::TPlayerInventoryAndStatusController":"0x1d12de0","inventoryChanged":"0x1d13db6","onInventoryChanged":"0x1d139a5","onSlotClicked":"0x1d0315c","onSlotStartDrag":"0x1d031b3","onSlotDragDropped":"0x1d031cb"}},
+      "D11": {"pass":"4/4","anchors":{"inventoryChanged":"0x1d13db6","onInventoryChanged":"0x1d139a5","onPlayerDataChanged":"0x1caae1e","tibia::gamewindow::TPlayerInventoryAndStatusController":"0x1d12de0"}},
+      "D12": {"pass":"4/4","anchors":{"tibia::qmlcomponents::TAppearanceTypeHelperQmlService":"0x1fe7bc0","getObjectAppearanceTypeNameForID":"0x1ff4b9a","getObjectAppearanceTypeDescriptionForID":"0x1ff4bbf","getObjectAppearanceTypeIDByName":"0x1ff4be7"}},
+      "D13": {"pass":"6/6","anchors":{"tibia::container::TObjectAppearanceInstanceInfoStorage":"0x1d632a0","tibia::container::TObjectCountStorage":"0x1d45bc0","tibia::gamewindow::TItemInfoDialogController":"0x1d39c40","tibia::qmlcomponents::TObjectAppearanceInstanceInfoQmlType":"0x1c8c600","objectInfosChanged":"0x1d635eb","objectCountsChanged":"0x1d45c96"}},
+      "D14": {"pass":"6/6","anchors":{"tibia::proficiency::TProficiencyStorage":"0x1cb89e0","tibia::proficiency::TProficiencyProtocolMessageHandler":"0x1ccc2c0","receivedWeaponProficiencyMessage":"0x1cedb2c","receivedWeaponProficiencyNotificationMessage":"0x1cee733","onObjectProficiencyXPChanged":"0x1d96db1","onProficiencyDataChanged":"0x1caaddf"}},
+      "D15": {"pass":"4/4","anchors":{"tibia::container::TContainerStorage":"0x1d034e0","tibia::gamewindow::TContainerStorageController":"0x1c8d160","containerUpdated":"0x1d0362c","containerRemoved":"0x1c97ff9"}},
+      "D16": {"pass":"9/9","anchors":{"GameserverMessageCreateInContainer":"0x1ccd561","GameserverMessageChangeInContainer":"0x1ccd475","GameserverMessageDeleteInContainer":"0x1ccd4eb","receivedCreateInContainerMessage":"0x1ceb20a","receivedChangeInContainerMessage":"0x1ceb282","receivedDeleteInContainerMessage":"0x1ceb2fa","handleCreateInContainerMessage":"0x1ccd527","handleChangeInContainerMessage":"0x1ccd43b","handleDeleteInContainerMessage":"0x1ccd4b1"}},
+      "D17": {"pass":"7/7","anchors":{"sendCloseContainerMessage":"0x1cccf95","sendUpContainerMessage":"0x1ccd000","requestCloseContainer":"0x1ccd8c2","requestUpContainer":"0x1ccd903","requestNextPageForContainer":"0x1ccd916","requestPreviousPageForContainer":"0x1ccd932","sendOpenParentContainer":"0x1ccfaee"}},
+      "D18": {"pass":"5/5","anchors":{"sendGetObjectInfoMessage":"0x1ccd0d0","requestGetObjectsInfo":"0x1ccd969","requestGetObjectInfo":"0x1ccda1b","requestSortContainer":"0x1ccda77","sendContainerActionMessage":"0x1ccd138"}},
+      "D19": {"pass":"7/7","anchors":{"tibia::gamewindow::TStashDialogController":"0x1c90dc0","GameserverMessageStash":"0x1ccd62c","receivedStashMessage":"0x1ced8d4","handleStashMessage":"0x1ccd5fe","requestShowOrRefreshStashDialog":"0x1ccd1cc","requestCloseStashDialog":"0x1ccd1ec","sendStashAction":"0x1ccf95b"}},
+      "D20": {"pass":"9/9","anchors":{"tibia::gamewindow::TDepotSearchWidgetController":"0x1d0b640","tibia::container::TDepotSearchDetailListStorage":"0x1d4e580","GameserverMessageDepotSearchResult":"0x1ccd791","GameserverMessageDepotSearchDetailList":"0x1ccd80b","GameserverMessageCloseDepotSearch":"0x1ccd888","sendOpenDepotSearch":"0x1ccf9b6","sendCloseDepotSearch":"0x1ccfa1d","sendDepotSearchType":"0x1ccfa87","sendDepotSearchRetrieve":"0x1ccfb61"}},
+      "D21": {"pass":"8/8","anchors":{"tibia::quickloot::TManagedContainerStorage":"0x1d418c0","tibia::quickloot::TManagedContainersProtocolMessageHandler":"0x1ccc000","GameserverMessageUpdateManagedContainers":"0x1cdb342","GameserverMessageSpecialContainersAvailable":"0x1ccd709","receivedUpdateManagedContainersMessage":"0x1ced609","handleUpdateManagedContainersMessage":"0x1cdb302","handleSpecialContainersAvailableMessage":"0x1ccd6c6","GameclientMessageManagedContainer":"0x1cdb259"}},
+      "D22": {"pass":"7/7","anchors":{"tibia::quickloot::TQuickLootGameActionHandler":"0x1cf4020","tibia::quickloot::TQuickLootBlackWhitelistStorage":"0x1dab520","tibia::gamewindow::TLootContainerQMLInfo":"0x1d41a00","tibia::gamewindow::TManageLootContainerDialogController":"0x1c90cc0","GameclientMessageQuickLoot":"0x1cdb1fd","GameclientMessageQuickLootBlackWhitelist":"0x1cdb2ba","onQuickLootBlackWhitelistConfigurationChanged":"0x1cdb36b"}}
+    }
+  },
+  "deep_static_facts": {
+    "D13": {
+      "container_slot_fields": ["slotID","objectID","objectCount","upgradeTier","liquidType","hookDirection","decoItemObjectID"],
+      "inspect_object_fields": ["objectName","objectInformation","appearanceID","objectCount","objectUpgradeTier","slotID","hasProficiency"],
+      "additional_literals": ["proficiencyXP","proficiencyLevel","hasProficiencyMastery","remainingDurationMilliseconds","totalDurationMilliseconds","market_stats_charges","market_stats_tier"]
+    },
+    "D20": {"depot_filter_fields":["showLockerOnlyChanged","filterChanged","typeIdEnumValue","filterByLevel","filterByVocation","onlyOneHandWeapons","onlyTwoHandWeapons"]},
+    "D21_D22": {
+      "managed_and_loot_fields_actions": ["managedContainersUpdated","useMainBackpackAsFallbackChanged","isLootContainerSetChanged","lootContainerAppearanceTypeIDChanged","isObtainContainerSetChanged","obtainContainerAppearanceTypeIDChanged","requestSelectLootContainer","requestClearLootContainer","requestOpenLootContainer","requestSelectObtainContainer","requestClearObtainContainer","requestOpenObtainContainer","categoryName","isLockedByPremium","isLootContainerSet","lootContainerAppearanceTypeID","isObtainContainerSet","obtainContainerAppearanceTypeID"],
+      "quickloot_action_context": ["TGameActionSelectLootContainer","TGameActionQuickLoot","handleSetLootContainerFallbackAction","TGameActionSetLootContainerFallback","handleAddToBlackWhitelistStatusAction","TGameActionToggleBlackWhitelistStatus","handleRemoveFromBlackWhitelistStatusAction"]
+    }
+  },
+  "classification": {
+    "current_package_identity": "FACT",
+    "selected_D09_D22_structural_anchor_persistence": "FACT",
+    "current_QML_model_action_lexical_metadata": "FACT",
+    "architectural_continuity_from_historical_g0": "INFERENCE_SUPPORTED_NOT_IDENTITY_PROOF",
+    "full_historical_QMeta_address_or_count_equivalence": "NOT_CLAIMED",
+    "queue_to_handler_to_storage_controller_causal_wiring": "UNKNOWN",
+    "exact_subtype_charge_duration_normalization": "UNKNOWN",
+    "authoritative_live_values_and_effects": "NOT_OBSERVED",
+    "per_action_serialization_and_server_effect": "NOT_OBSERVED"
+  },
+  "live_continuation": {
+    "same_invocation_live_use_after_fence_merge": "PROHIBITED_BY_PR555_ACCEPTANCE_CONTRACT",
+    "next_required_step": "fresh later-invocation trusted-main read plus Track A admission before any live observation or stimulus"
+  }
+}

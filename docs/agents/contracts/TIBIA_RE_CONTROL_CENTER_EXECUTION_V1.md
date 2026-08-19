@@ -2,7 +2,7 @@
 
 ```yaml
 contract_id: TIBIA-RE-CONTROL-CENTER-EXECUTION-V1
-version: 1.3
+version: 1.4
 major_version: 1
 status: normative_design
 producer_repository: blakinio/otclient
@@ -205,13 +205,14 @@ Outside dispatch gate:
 
 1. validate scenario/action;
 2. resolve capability;
-3. compute Scenario-v1 EffectBound and reserve budget;
-4. run advisory preflight;
-5. wait for/acquire external authority guard;
-6. acquire required GUI/input lock;
-7. prepare before-state evidence.
+3. compute Scenario-v1 EffectBound and reserve external-effect budget;
+4. verify the run monotonic runtime deadline has not expired;
+5. run advisory preflight;
+6. wait for/acquire external authority guard;
+7. acquire required GUI/input lock;
+8. prepare before-state evidence.
 
-Every wait is bounded/cancellation-aware. Preparation never grants standing dispatch permission.
+Every wait is bounded/cancellation-aware and cannot extend the run deadline. Preparation never grants standing dispatch permission.
 
 For Official Tibia, Track A guard remains continuously held through final current Track A checks, local commit and physical effect.
 
@@ -221,8 +222,8 @@ For Official Tibia, Track A guard remains continuously held through final curren
 prepare outside dispatch_gate
 -> hold required external authority guard
 -> enter dispatch_gate
--> revalidate all final fences
--> atomically/durably transition ActionLedger + BudgetLedger to possible-dispatch/at-risk
+-> revalidate all final fences including runtime deadline
+-> atomically/durably transition ActionLedger + external-effect BudgetLedger to possible-dispatch/at-risk
 -> durability barrier succeeds
 -> exit dispatch_gate
 -> with external authority guard still held, cross physical irreversible boundary exactly once
@@ -238,11 +239,12 @@ Inside dispatch gate verify immediately before commit:
 5. durable + in-memory STOP/recovery-required/cancellation state;
 6. adapter generation;
 7. runtime/session fences;
-8. valid budget reservation;
-9. current semantic capability;
-10. current external authority;
-11. current input lock where required;
-12. all current Official Tibia Track A final identity/authority requirements under the existing guard.
+8. run runtime deadline not expired;
+9. valid external-effect budget reservation;
+10. current semantic capability;
+11. current external authority;
+12. current input lock where required;
+13. all current Official Tibia Track A final identity/authority requirements under the existing guard.
 
 Durable commit minimum:
 
@@ -311,7 +313,7 @@ No third dispatch outcome exists.
 
 If STOP persistence fails and the backend subsequently crashes, the already-durable Artifact-v1 `active_backend_epoch` from backend activation causes the next backend to classify the prior lifetime as unclean and enter recovery-required/mutation-disabled state. Thus a storage failure cannot turn process restart into an implicit reset.
 
-STOP cannot promise rollback and grants no gameplay/process-control authority. Repeating STOP while already latched is idempotent with respect to external gameplay effects; it may return the existing durable STOP result rather than invent another mutation.
+STOP cannot promise rollback and grants no gameplay/process-control authority. Repeating STOP while already latched is idempotent with respect to external gameplay effects; Control API request replay semantics additionally bind a repeated transport request to its original transition identity/result.
 
 ## 15. Emergency-stop boundary
 
@@ -343,9 +345,9 @@ Generation overflow or missing/corrupt contradictory ControlState fails closed a
 
 ## 17. Pause/resume
 
-Pause stops scheduling new steps but does not suspend external authority expiry, identities, clocks or an already committed action.
+Pause stops scheduling new steps but does not suspend external authority expiry, identities, clocks or an already committed action. It also does not pause or extend the run's monotonic runtime deadline.
 
-Resume revalidates backend/control/adapter/runtime/session fences and declared predicates. Changed runtime/session invalidates pending mutation by default.
+Resume revalidates backend/control/adapter/runtime/session fences, run deadline and declared predicates. Changed runtime/session or expired deadline invalidates pending mutation by default.
 
 Every later mutation is freshly authorized at final commit.
 
@@ -358,8 +360,8 @@ Startup order before mutation admission:
 1. load/validate backend-global Artifact-v1 ControlState and RequestLedger plus relevant per-run safety state;
 2. if the loaded `active_backend_epoch` names a prior backend, classify that prior lifetime as unclean and set/preserve `recovery_required=true`;
 3. durably write current `active_backend_epoch=<new backend_epoch>` while preserving STOP/recovery truth;
-4. recover Action/Budget/RequestLedger state conservatively;
-5. only when `stop_latched=false`, `recovery_required=false`, safety state is consistent and all other local/external gates pass may mutation admission become possible.
+4. recover Action/Budget/RequestLedger state conservatively, including the original run activation/deadline rather than granting fresh runtime time;
+5. only when `stop_latched=false`, `recovery_required=false`, safety state is consistent, the run deadline is valid for any considered pending work and all other local/external gates pass may mutation admission become possible.
 
 A durable `stop_latched=true` survives the new backend epoch and remains STOPPED until explicit reset. Restart is never an implicit reset. A prior unclean backend also blocks mutation until explicit recovery/reset. A previously initialized store with missing/corrupt/contradictory ControlState fails closed. A brand-new store must durably create its initial current-backend-active ControlState before mutation can be admitted.
 
@@ -371,20 +373,35 @@ POSSIBLY_DISPATCHED
 CONFIRMED
 ```
 
-- no durable commit -> NOT_DISPATCHED; reconsider only via explicit recovery + fresh validation;
+- no durable commit -> NOT_DISPATCHED; reconsider only via explicit recovery + fresh validation and within the original run deadline;
 - durable possible-dispatch without terminal proof -> AMBIGUOUS;
 - confirmed terminal authoritative result -> recover `CONFIRMED` without redispatch;
 - missing/corrupt/contradictory safety state -> fail closed.
 
-Artifact-v1 safety-state precedence applies. Recovery never weakens STOP/recovery-required state and never auto-resumes a mutation run.
+Artifact-v1 safety-state precedence applies. Recovery never weakens STOP/recovery-required state, never extends the original runtime budget and never auto-resumes a mutation run.
 
 ### 18.1 Clean shutdown marker
 
 After new mutation admission is closed and all required global/per-run safety state is durably flushed, a graceful shutdown may durably write `active_backend_epoch=null`. It must preserve `stop_latched` and `recovery_required` values. Failure to persist the clean-shutdown marker is safe: the next backend treats the prior lifetime as unclean and requires recovery rather than assuming clean state.
 
-## 19. BudgetLedger
+## 19. Runtime deadline and external-effect BudgetLedger
 
-Per hard dimension:
+Scenario-v1 `max_runtime_seconds` is enforced as one monotonic run deadline:
+
+```text
+runtime_deadline = checked_add(run_started_monotonic, max_runtime_seconds)
+```
+
+Rules:
+
+- derive the deadline once at run activation; overflow fails closed;
+- every wait is capped by the earlier of its own timeout and the run deadline;
+- pause, backend restart and external-authority waiting do not freeze or extend the deadline;
+- deadline expiry stops new scheduling/dispatch and produces the scenario/run timeout path;
+- elapsed runtime is not moved through `reserved/at_risk/committed/uncertain`, because time passage is not an ambiguous external effect;
+- crash/recovery preserves the original run activation/deadline for any recovery decision; it never grants a fresh runtime window.
+
+External-effect dimensions use:
 
 ```text
 limit
@@ -414,10 +431,9 @@ Reconciliation:
 - duplicate same action ID -> no additional accounting;
 - retry action -> fresh reservation.
 
-Minimum dimensions:
+Core v1 external-effect dimensions:
 
 ```text
-max_runtime_seconds
 max_actions
 max_movement_tiles
 max_spells
@@ -428,7 +444,7 @@ max_tibia_coins
 max_irreversible_changes
 ```
 
-TC/irreversible default zero. Unbounded hard effect -> refuse.
+`max_actions` counts semantic actions that can cross an external-effect boundary, as defined by Scenario-v1 EffectBound; it is not a count of parser/refusal attempts. TC/irreversible default zero. Unbounded hard external effect -> refuse.
 
 ## 20. Capture-control boundary
 
@@ -565,9 +581,10 @@ Use deterministic manual clock/state scheduler and deterministic durability stor
 - STOP persistence/restart/reset durability failures;
 - backend-active marker write/clean-shutdown failures;
 - unclean backend recovery-required semantics;
+- runtime deadline expiry/overflow and pause/restart non-extension;
 - STOP while waiting for authority;
 - duplicate actions;
-- budgets;
+- external-effect budgets;
 - passive/invasive capture distinction;
 - multi-clock/late events;
 - secret rejection;
@@ -589,24 +606,27 @@ At minimum:
 8. STOP linearizes while another action waits for external authority;
 9. dispatch-journal failure/timeout -> no effect;
 10. crash after durable commit -> AMBIGUOUS/no retry;
-11. budget reserve/at-risk/commit/uncertain semantics;
+11. external-effect budget reserve/at-risk/commit/uncertain semantics;
 12. arithmetic overflow fails closed;
-13. pause/resume stale identity refusal;
-14. restart fresh epoch/stale callback refusal;
-15. durable STOP latch survives restart and still refuses mutation;
-16. reset durability failure leaves STOP/recovery blocking mutation;
-17. missing/corrupt initialized ControlState fails closed;
-18. backend activation marker must be durable before mutation admission;
-19. crash with prior active-backend marker makes next backend recovery-required;
-20. STOP persistence failure followed by crash cannot reopen mutation;
-21. clean-shutdown marker failure causes conservative recovery-required next start;
-22. invasive capture hidden in read path refused;
-23. emergency-stop mutation attempt refused;
-24. multi-clock ordering truthfulness;
-25. late event cannot rewrite terminal result;
-26. secret construction barriers;
-27. artifact safety-state precedence/finalization;
-28. `CONFIRMED` is terminal and duplicate callbacks cannot redispatch or rewrite it.
+13. runtime deadline expires while waiting and prevents later dispatch;
+14. pause does not extend runtime deadline;
+15. restart/recovery does not grant a fresh runtime deadline;
+16. pause/resume stale identity refusal;
+17. restart fresh epoch/stale callback refusal;
+18. durable STOP latch survives restart and still refuses mutation;
+19. reset durability failure leaves STOP/recovery blocking mutation;
+20. missing/corrupt initialized ControlState fails closed;
+21. backend activation marker must be durable before mutation admission;
+22. crash with prior active-backend marker makes next backend recovery-required;
+23. STOP persistence failure followed by crash cannot reopen mutation;
+24. clean-shutdown marker failure causes conservative recovery-required next start;
+25. invasive capture hidden in read path refused;
+26. emergency-stop mutation attempt refused;
+27. multi-clock ordering truthfulness;
+28. late event cannot rewrite terminal result;
+29. secret construction barriers;
+30. artifact safety-state precedence/finalization;
+31. `CONFIRMED` is terminal and duplicate callbacks cannot redispatch or rewrite it.
 
 Scenario/Artifact/Control API contracts add their own deterministic acceptance tests.
 
@@ -614,4 +634,4 @@ Scenario/Artifact/Control API contracts add their own deterministic acceptance t
 
 Execution major version 1 is additive-only.
 
-Changing mutation-run ownership, dispatch ordering, STOP linearization/durability, backend activation/recovery markers, durability-before-effect, idempotency, budget ambiguity, secret construction boundary or restart fencing requires a new major version or separately reviewed compatible extension.
+Changing mutation-run ownership, dispatch ordering, STOP linearization/durability, backend activation/recovery markers, runtime-deadline semantics, durability-before-effect, idempotency, external-effect budget ambiguity, secret construction boundary or restart fencing requires a new major version or separately reviewed compatible extension.

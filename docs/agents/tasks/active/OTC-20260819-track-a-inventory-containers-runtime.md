@@ -1,12 +1,12 @@
 ---
 task_id: OTC-20260819-track-a-inventory-containers-runtime
-status: validating
+status: ready
 agent: ChatGPT
 project_lane: otclient
 lane: P0-STATE
 track_id: official-client-re
 task_kind: discovery
-phase: source_ready_for_independent_audit_and_clean_promotion
+phase: final_exact_head_validation_merge_archive
 branch: research/OTC-20260819-track-a-inventory-containers-runtime
 base_branch: main
 risk: medium
@@ -15,12 +15,6 @@ owned_paths:
   - docs/agents/evidence/OTC-20260819-track-a-inventory-containers-runtime/**
 modules_touched:
   - track-a-research-evidence
-reuses:
-  - docs/agents/evidence/OTC-20260818-track-a-s5-container-inbound-static/result.json
-  - docs/agents/evidence/OTC-20260818-track-a-s7-inventory-equipment-static/result.json
-  - docs/agents/evidence/OTC-20260818-track-a-s9-action-control-static-census/result.json
-  - docs/agents/evidence/OTC-20260815-track-a-coverage-registry-audit/runtime_type_semantics.jsonl
-  - docs/agents/contracts/TRACK_A_KASMVNC_RUNTIME_ACCESS_V1.md
 track_a_runtime_agent_admission_version: 1
 execution_class: github_hosted
 runtime_access: none
@@ -41,8 +35,6 @@ credentials_allowed: false
 login_allowed: false
 gameplay_allowed: false
 owner_funded_ai_api_authorized: false
-fence_merge_pr: 555
-fence_merge_commit: 2e572789a2bc4b64c5e906c4515c15c625f6bc9e
 current_client_version_token: '15.32'
 current_client_size: 52109920
 current_client_sha256: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
@@ -58,76 +50,81 @@ raw_proprietary_client_retained: false
 raw_runtime_capture_retained: false
 e2e_result: NOT_APPLICABLE
 e2e_reason: bounded reverse-engineering evidence task; no product feature or authorized state-changing live journey is delivered by this task; authenticated live semantics remain explicitly outside the bounded result
+source_pr: 559
+independent_source_audit_review: 4970813830
+independent_source_audit_decision: ACCEPT_WITH_EDIT
+independent_source_audit_semantic_findings_open: 0
+independent_source_audit_finding: INV-AUD-001
+independent_source_audit_finding_state: RESOLVED_BY_CLEAN_RESTACK
+git_diff_whitespace_repair: APPLIED_TO_THREE_EVIDENCE_MARKDOWN_FILES
 invocation_started_at: 2026-08-19T10:45:00+02:00
-last_progress_at: 2026-08-19T11:25:00+02:00
+last_progress_at: 2026-08-19T11:59:00+02:00
+foreground_budget_minutes: 60
+foreground_budget_state: EXHAUSTED_ROTATE_REQUIRED
 ci_checks_for_current_head: 0
-ci_check_generation: source-audit
+ci_check_generation: final-source
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 0
-current_blocker: INDEPENDENT_AUDIT_AND_CLEAN_PROMOTION_NOT_YET_COMPLETE
-next_action: run a fresh validator-role audit from primary exact-build evidence, then promote accepted task-owned blobs on a one-commit current-main branch
+current_blocker: FOREGROUND_INVOCATION_BUDGET_EXHAUSTED_AFTER_FINAL_EVIDENCE_REPAIR
+next_action: refresh current main, clean-restack the repaired task-owned blobs as one commit, run fail-fast exact-head audit including git diff --check, then complete exact-head CI/review hygiene/squash-merge and mandatory archive closeout
 ---
 
 # TIBIA-RE-INVENTORY-CONTAINERS
 
-## Bounded acceptance
+## Durable result
 
-This task owns D09-D22 inventory/equipment/container research evidence. Its bounded completion criterion is a current-build, evidence-separated structural/causal checkpoint; it does not redefine the broader programme's authenticated live-value, serialization or restart-stability acceptance criteria.
+The bounded D09-D22 research implementation is complete. All fourteen rows remain recommended `PARTIAL`; none is falsely promoted to `DONE`.
 
-Source researcher PR: #559.
-
-## Implementation result
-
-Current exact client:
+Exact current client:
 
 ```text
 version token: 15.32
 size:          52109920
 sha256:        ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
-ELF build ID:  d803d9695868713ef6ab0c3cf65f91212c9c6a62
+ELF Build ID:  d803d9695868713ef6ab0c3cf65f91212c9c6a62
 ```
 
-Completed source evidence now proves:
+Verified task evidence proves:
 
 - 14/14 selected D09-D22 current-build anchor sets;
-- 21/21 selected current QMeta types independently recovered;
-- direct current queue→container-handler routing for the documented inventory/container/stash/depot/managed families;
-- container open/close/create/change/delete handler→`TContainerStorage` mutations and storage signal emissions;
-- direct `TContainerStorage`→`TContainerStorageController` connections for update/remove/manual-sort;
+- 21/21 selected QMeta types recovered independently from the current ELF;
+- direct queue→container-handler routing for documented inventory/container/stash/depot/managed families;
+- open/close/create/change/delete handler→`TContainerStorage` mutation and storage signal emission;
+- direct `TContainerStorage`→`TContainerStorageController` update/remove/manual-sort connections;
 - Set/DeleteInventory→`TInventoryContainer::inventoryChanged`;
 - direct `inventoryChanged`→`TPlayerInventoryAndStatusController::onInventoryChanged`.
 
-All fourteen rows remain recommended `PARTIAL`; no row is `DONE`.
-
-Primary final result:
+Primary evidence:
 
 - `docs/agents/evidence/OTC-20260819-track-a-inventory-containers-runtime/result.md`
 - `docs/agents/evidence/OTC-20260819-track-a-inventory-containers-runtime/result.json`
+- `docs/agents/evidence/OTC-20260819-track-a-inventory-containers-runtime/20260819-current-qmeta-recovery.md`
+- `docs/agents/evidence/OTC-20260819-track-a-inventory-containers-runtime/20260819-current-queue-handler-routing.md`
 - `docs/agents/evidence/OTC-20260819-track-a-inventory-containers-runtime/20260819-current-state-propagation-routing.md`
-- `docs/agents/evidence/OTC-20260819-track-a-inventory-containers-runtime/current_state_propagation_routing.json`
+- corresponding machine-readable JSON evidence.
 
-## Passive runtime phase
+## Passive runtime evidence
 
-A fresh later invocation successfully persisted `runtime_access: read_only`, proved one unique exact-current client on `otclient-track-a-kasmvnc / DISPLAY=:1`, and captured one passive X11 frame. The client was at the login screen, so no D09-D22 state was visible.
+A fresh later invocation proved one unique exact-current client on `otclient-track-a-kasmvnc / DISPLAY=:1`. One read-only X11 observation showed the login screen, so authenticated inventory/container state was unavailable.
 
-No GUI input, credentials, login, gameplay, process mutation, debugger/injection or item/container stimulus was performed. Raw screenshots and task-local raw current-client copies were deleted and cleanup was verified.
+No GUI input, credentials, login, gameplay, debugger/injection, process mutation or item/container stimulus was performed. Raw current-client task copies and passive screenshots were deleted; cleanup was independently rechecked.
 
-The task has now reduced itself back to `runtime_access: none`; no runtime ownership remains claimed.
+## Independent audit state
 
-## Remaining programme work, not hidden by this closeout
+Fresh validator role `inventory-containers-fresh-validator-role-v1` independently re-read primary current-binary anchors and exact runtime identity. Semantic material findings: `0`. Review `4970813830` classified source #559 `ACCEPT_WITH_EDIT` solely because the source branch was then diverged from current main (`INV-AUD-001`). The branch was subsequently clean-restacked one commit ahead / zero behind, resolving that finding.
 
-The bounded result does not prove authenticated live inventory/container values, full `PlayerInventory` bulk normalization, exact subtype/charge/duration semantics, per-action serialization/server acknowledgements, or restart/relogin stability. These remain explicit programme-level live/stability gaps and are not grounds to falsify this bounded static/causal research checkpoint as `DONE`.
+A later exact-head validator rechecked primary causal anchors and cleanup successfully but exposed trailing whitespace in three Markdown evidence files. Those files have now been normalized, and stale earlier downstream-UNKNOWN wording has been reconciled with the stronger state-propagation checkpoint.
 
-## Closeout path
+Because this foreground invocation exceeded the repository's mandatory 60-minute anti-stall budget immediately after that repair, final exact-head validation/CI/merge cannot legally be started in this invocation. This is a rotation boundary, not a research blocker.
 
-Source implementation is coherent. Before `completed`, repository policy still requires:
+## Remaining programme gaps
 
-1. fresh independent validator-role audit of the exact source evidence/diff;
-2. clean one-commit promotion from current `main` containing only accepted task-owned evidence/archive paths;
-3. exact-head CI and zero unresolved review threads;
-4. source #559 closed superseded after successful promotion;
-5. lifecycle-only archive/ownership release if the promotion record cannot contain terminal merge facts.
+The bounded task does not claim authenticated live values, full `PlayerInventory` bulk normalization, exact subtype/charge/duration semantics, per-action serialization/server acknowledgements, or restart/relogin stability. Those remain explicit broader programme gaps.
+
+## Single continuation action
+
+On the next fresh invocation: refresh trusted `main`, clean-restack the repaired task-owned blobs as one commit, run fail-fast exact-head audit with `git diff --check`, then finish CI, review hygiene, squash merge #559, and the mandatory archive/ownership-release closeout.

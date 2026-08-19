@@ -3,13 +3,11 @@
 Date: 2026-08-19 (Europe/Warsaw)  
 Task: `OTC-20260819-track-a-ui-settings-static-model`  
 Alias: `TIBIA-RE-UI-SETTINGS`  
-Researcher delivery: Draft-only; coordinator-only promotion
+Coordinator disposition: **ACCEPT_WITH_EDITS**
 
-## Scope and subject fence
+## Scope and exact subject fence
 
-This report closes the researcher's remaining causal settings-persistence discriminator on the official native Linux Tibia client. The positive experiment ran on the Synology host through a task-owned `ephemeral_isolated` runtime, not the canonical KasmVNC/login session.
-
-Exact official-client subject:
+This report records one bounded causal reversible persistence experiment on the official native Linux Tibia client plus the corrected interpretation of the earlier fullscreen candidate.
 
 ```yaml
 client_size: 52109920
@@ -18,37 +16,29 @@ elf_build_id: d803d9695868713ef6ab0c3cf65f91212c9c6a62
 packed_sha256: 1fc26d66cef90723d29293f177fcff41c8e937e7aac830f08e82c2f4c69eb354
 runtime_base_main: 5940913a325288cfd9985be54af1a56b65e5560e
 runner: synology-otclient-01
-machine: bc3917480db1
-runtime_access: ephemeral_isolated
+runtime_access_during_experiment: ephemeral_isolated
 canonical_state_access: NONE
 login_attempted: false
 credentials_used: false
 gameplay_attempted: false
 ```
 
-`main` advanced after the runtime experiment to `6071b237d70a11ab10e5050cc23730162b0e7e0b` via #551. #551 changed only world-minimap evidence/report/archive paths and does not overlap this task.
+The experiment used a task-owned HOME/display, not the canonical KasmVNC/login session. Every GUI stimulus used the shared `/tmp/otclient-track-a-gui-input.lock`.
 
-## Positive causal experiment: Master Volume
+## Evidence classes used here
 
-The selected reversible option was the pre-login Options-page **Master Volume** slider. It was chosen because it is non-network-critical, non-renderer-critical, does not require an account or character, has direct visual readback, and has an exact inverse back to the original value.
+- **FACT — coordinator independently verified**: direct deterministic repository/workflow evidence or primary Remote Desktop Commander command/result history was re-read by the coordinator.
+- **SOURCE OBSERVATION**: researcher-captured visual UI readback recorded during the experiment; the coordinator verified the surrounding runtime/input/persistence sequence but did not independently re-read the temporary image pixels after those images were deleted.
+- **INFERENCE**: conclusion from accepted facts, not a broader per-setting rule.
+- **UNKNOWN**: not established and must not be generalized.
 
-The shared physical input lock `/tmp/otclient-track-a-gui-input.lock` was held for every mouse/keyboard stimulus.
+## Master Volume causal persistence
 
-### FACT — baseline
+### FACT — isolated runtime and baseline persistence object
 
-A new isolated runtime was created with:
+Primary Remote Desktop Commander history independently confirms the task-owned isolated runtime, exact current-client identity, unique task process/window, display `:271`, baseline window size `1020x650`, no canonical-state access, no login/credentials/gameplay, and use of the shared GUI-input lock.
 
-```text
-namespace: /home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260819-track-a-ui-settings-static-model/ephemeral-9999001-1-v2
-display: :271
-window: 2097169
-initial exact-client PID: 22149
-baseline window size: 1020x650
-```
-
-The real Welcome/Login UI was visible; no account login was performed. Opening the visible Options button showed **Master Volume: 100%**.
-
-The copied runtime's baseline persistence file was:
+The copied runtime baseline persistence file was:
 
 ```text
 .local/share/CipSoft GmbH/Tibia/packages/Tibia/conf/clientoptions.json
@@ -56,96 +46,76 @@ size: 158761
 sha256: b545e59f01e908b12c878753b0f49514854c601d5e83159a5da8d0ae8b491251
 ```
 
-### FACT — reversible write and immediate readback
+### FACT — committed semantic file delta
 
-A slider click changed the real Options UI from **100%** to **43%**. The on-screen readback immediately displayed `Master Volume: 43%`.
-
-Clicking `Apply` preserved the 43% UI value but did not yet change the known persistence file. Clicking `OK` committed the option and changed `conf/clientoptions.json` to:
+Primary command/result history independently confirms a real slider mutation followed by `Apply` and then `OK`. `Apply` did not change the known persistence file; `OK` changed it to:
 
 ```text
 size: 158758
 sha256: d84081c78d634ca69897dd3eb15a5257f1445b3ba7f034e4fd449275e0538309
 ```
 
-A bounded JSON diff against the untouched exact source-package baseline identified exactly two sound/volume fields changed by this persisted state:
+A bounded JSON diff against the untouched exact source-package baseline identified exactly these two option changes:
 
 ```text
 options.soundMasterVolume:    100 -> 43
 options.soundMasterVolumeOld: 100 -> 43
+UI_SETTINGS_VOLUME_JSON_DIFF_COUNT=2
 ```
 
-No full configuration content, credential material or private account state was emitted.
+No complete config, credential or private account material is persisted in this evidence record.
 
-### FACT — first restart persistence
+### FACT — persistence across restart
 
-The client was closed through the real pre-login Exit control. The task-owned Xvfb/WARP/HOME remained alive for the persistence restart.
+The client was cleanly closed and restarted with the same isolated HOME. Primary history independently confirms the replacement exact-client process/window and that, after restart, both semantic JSON fields remained `43`.
 
-The exact same client was launched again with the same isolated HOME:
+Whole-file hashes changed during normal startup/exit bookkeeping, so whole-file equality is deliberately not used as the semantic persistence criterion.
+
+### FACT — inverse rollback and second restart
+
+The same option was changed back through the UI and committed with `OK`. Primary history independently confirms:
 
 ```text
-exact-client PID: 23325
-window: 2097169
-window size: 1020x650
+options.soundMasterVolume: 100
+options.soundMasterVolumeOld: 100
 ```
 
-After restart, the real Options UI displayed **Master Volume: 43%**. The persisted JSON fields were still semantically 43/43. The file-level SHA changed during normal startup/exit bookkeeping, so whole-file hash equality is intentionally **not** used as the semantic persistence criterion; the exact option fields and UI readback are.
+After another clean restart with the same isolated HOME, both fields still read `100`.
 
-This establishes the causal chain:
+### SOURCE OBSERVATION — UI readback
+
+The researcher recorded visual UI readbacks consistent with the accepted semantic chain:
 
 ```text
-UI Master Volume 100
--> UI write 43
+Master Volume 100%
+-> slider write 43%
+-> immediate UI readback 43%
+-> restart UI readback 43%
+-> inverse write/readback 100%
+-> second restart UI readback 100%
+```
+
+Temporary observation images were deleted during cleanup and are not durable artifacts, so the coordinator does not elevate the pixel-level readback above the source-observation class. The durable JSON/restart/rollback evidence is independently verified.
+
+### Accepted causal topology
+
+For this exact current build and this concrete sound option, the evidence establishes:
+
+```text
+pre-login Options / Sound / Master Volume stimulus
 -> OK commit
--> clientoptions.json soundMasterVolume = 43
--> clean client restart with same HOME
--> UI Master Volume 43
+-> packages/Tibia/conf/clientoptions.json
+-> options.soundMasterVolume + options.soundMasterVolumeOld
+-> values survive clean restart
+-> inverse commit restores both fields
+-> restored values survive a second restart
 ```
 
-### FACT — exact rollback and second restart
-
-The same Options slider was returned to **100%**. The immediate UI readback showed `Master Volume: 100%`.
-
-After `OK`, the persistence file was:
-
-```text
-size: 158771
-sha256: 168ba60edfd417b66bd9980e0a6c38ddc1c7092cac3f42a157b0c15ad52ea02c
-options.soundMasterVolume: 100
-options.soundMasterVolumeOld: 100
-```
-
-After a clean exit, both fields remained 100. The exact same client was launched a third time with the same isolated HOME:
-
-```text
-exact-client PID: 23714
-window: 2097169
-window size: 1020x650
-```
-
-Final restart readback:
-
-```text
-UI Master Volume: 100%
-options.soundMasterVolume: 100
-options.soundMasterVolumeOld: 100
-```
-
-Therefore the full reversible acceptance chain is proven for this setting:
-
-```text
-safe read 100
--> reversible UI write 43
--> immediate UI readback 43
--> persistence sink + exact fields identified
--> restart readback 43
--> inverse UI write 100
--> persisted fields restored 100/100
--> second restart readback 100
-```
+This is runtime-backed `PARTIAL` evidence for H11 and H14. It is not evidence that all audio/settings fields use the same sink or save timing.
 
 ## Cleanup and side-effect boundary
 
-After final readback, the task-owned runtime was stopped by its cleanup trap. Direct terminal verification returned:
+Primary history independently verifies terminal cleanup:
 
 ```text
 UI_SETTINGS_MANUAL_MARKER_PROCESS_COUNT=0
@@ -155,19 +125,18 @@ UI_SETTINGS_V2_CLEANUP=COMPLETE
 UI_SETTINGS_HOST_SCREENSHOT_TEMP_CLEANUP=COMPLETE
 ```
 
-Temporary XWD/JPEG observation files were deleted from the Synology host and were not committed. No canonical Track A registration, lease, KasmVNC state, account login, credential, character/world state, purchase, transfer, gameplay action or shared source-package mutation was used.
+No canonical registration/lease/KasmVNC state, account session, purchase/transfer/gameplay state or shared source-package bytes were mutated.
 
-## Negative controls and superseded discriminators
+## Fullscreen / Alt+Return — corrected negative control
 
-### FACT — fullscreen persistence candidate disproven
+### FACT
 
-`Alt+Return` / `ToggleFullscreen` was tested first because static evidence exposed that action. After removing dynamic cache false positives, run `32221978132`, physical job `95974034787`, produced:
+Run `32221978132`, physical job `95974034787`, established the exact copied client and isolated display and emitted:
 
 ```text
 UI_SETTINGS_V2_CURRENT_EXACT_SOURCE_PACKAGE=PASS
 UI_SETTINGS_V2_COPIED_CLIENT_FENCE=PASS
 UI_SETTINGS_V2_XVFB_EMPTY_DISPLAY=PASS
-UI_SETTINGS_V2_CLIENT_START_1=PASS;PID=21428;START_TICKS=73847371
 UI_SETTINGS_V2_BASELINE_WINDOW_SIZE=1020x650
 UI_SETTINGS_V5_INPUT_1_ALT_RETURN_SENT=PASS
 UI_SETTINGS_V5_POST_STOP_CANDIDATE_DELTA_COUNT=0
@@ -175,39 +144,76 @@ UI_SETTINGS_V5_SEMANTIC_NEGATIVE=NO_PERSISTENCE_CANDIDATE_DELTA_AFTER_ALT_RETURN
 UI_SETTINGS_V2_CLEANUP=COMPLETE
 ```
 
-**DISPROVEN for this pre-login isolated state:** `Alt+Return` is not a useful persistence discriminator. This does not disprove the existence of fullscreen UI behavior in other runtime/window-manager contexts.
+Earlier restart-stable JSON candidates under `packages/Tibia/cache/` were correctly rejected as dynamic background cache false positives.
 
-### FACT — cache false positives rejected
+### Material audit correction `UISET-AUD-001`
 
-Earlier run `32221521375`, job `95972797342`, initially found three restart-stable JSON files after fullscreen input, but all were under `packages/Tibia/cache/` (`boostedcreature.json`, `eventschedule.json`, `onlinenumbers.json`) and did not respond to inverse input. They were classified as dynamic background cache and excluded before the terminal fullscreen negative control.
+The prior report called fullscreen persistence **DISPROVEN**. That is too strong.
+
+Independent coordinator inspection of the experiment harness found that v2 contained an immediate `await_size_change` verification after `toggle_fullscreen_locked`, while v5/v6 cut that effect check and only performed candidate-file scans after sending `Alt+Return`.
+
+Therefore v6 proves:
+
+```text
+Alt+Return command sent
+AND
+no observed non-cache candidate-file delta in the scan
+```
+
+but it does **not** prove:
+
+```text
+fullscreen state actually changed
+```
+
+Correct terminal classification:
+
+```yaml
+fullscreen_persistence_discriminator: INCONCLUSIVE
+observed_candidate_file_delta: NONE
+fullscreen_effect_proven: false
+fullscreen_persistence_disproven: false
+```
+
+The fullscreen path remains useful negative/harness evidence, not a semantic disproof.
 
 ## Model consequence
 
 ### FACT
 
-For the exact current official client build above, the following concrete high-level topology is now proven for Master Volume:
-
-```text
-pre-login Options UI / Sound / Master Volume
--> persisted option state
--> packages/Tibia/conf/clientoptions.json
--> options.soundMasterVolume
--> options.soundMasterVolumeOld
--> reload on next client start
-```
-
-The same setting has a demonstrated exact rollback path.
+`packages/Tibia/conf/clientoptions.json` is a proven persistence sink for the exact Master Volume option on this build, with exact fields `options.soundMasterVolume` and `options.soundMasterVolumeOld` surviving restart and rollback.
 
 ### INFERENCE
 
-This is strong runtime evidence for H11 (audio/sound settings) and H14 (options persistence). It also converts the earlier static `clientoptions.json` artifact from an unresolved persistence candidate into a proven persistence sink for at least this concrete sound option.
+Together with the dedicated current-build static model, this supports:
+
+```text
+H07 Action-bar assignment model:          NOT_STARTED -> PARTIAL
+H08 Hotkey configuration/use mode:        NOT_STARTED -> PARTIAL
+H09 Multi-action/cooldown model:          NOT_STARTED -> PARTIAL
+H10 Graphics options/settings model:      NOT_STARTED -> PARTIAL
+H11 Audio options/settings model:         NOT_STARTED -> PARTIAL (runtime strengthened)
+H12 Interface/sidebar/UI settings model:  NOT_STARTED -> PARTIAL
+H13 Gameplay/control settings model:      NOT_STARTED -> PARTIAL
+H14 Persistence/profile/migration model:  NOT_STARTED -> PARTIAL (runtime strengthened)
+```
+
+These are task-local coordinator dispositions under PR #536's status semantics. This task does not edit PR #536.
 
 ### UNKNOWN
 
-This experiment does **not** prove that every H10-H13 option uses `clientoptions.json`, nor that all UI settings share the same save timing (`Apply` versus `OK`/close), profile/migration rules, character-specific configuration behavior, or QSettings relationship. Those claims remain setting-specific until separately tested.
+- whether all H10-H13 settings use `clientoptions.json`;
+- per-setting Apply/OK/immediate save timing;
+- complete profile/migration semantics;
+- character-specific versus global option partition;
+- relationship between `QSettings` and `clientoptions.json` for user-visible settings;
+- runtime semantics for H10/H12/H13 beyond their dedicated static package;
+- fullscreen persistence behavior.
 
-## Researcher coverage recommendation — no self-promotion
+No H07-H14 row is `DONE` from this task.
 
-**RECOMMENDATION:** coordinator/fresh-validator review may promote H11/H14 from static-only evidence to causal runtime-backed evidence for the Master Volume persistence path. H10-H13 should not be globally marked complete merely because one sound option is proven.
+## Audit disposition
 
-The researcher does not modify the canonical coverage matrix and does not merge its own Draft PR.
+Fresh coordinator review: `4969134238` on source head `7861752c312f77fad0cde28c44c8745aa2806909`.
+
+`UISET-AUD-001` is repaired by this file. Open material findings after this edit: `0`.

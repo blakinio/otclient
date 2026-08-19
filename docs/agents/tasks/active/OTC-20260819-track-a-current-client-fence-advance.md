@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260819-track-a-current-client-fence-advance
-status: validating
+status: waiting
 agent: ChatGPT
 session_id: chatgpt-track-a-fence-advance-20260819
 session_role: implementer
@@ -8,12 +8,12 @@ project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: governance_fence_advance
-phase: final_exact_head_ci_and_independent_audit
+phase: restack_required_after_main_ci_fix
 branch: docs/OTC-20260819-track-a-current-client-fence-advance
 base_branch: main
 base_main: 82e5f435c3aa4172115bf7f6a0cd7a5cc6da3d50
 risk: high
-updated: 2026-08-19T09:22:11+02:00
+updated: 2026-08-19T09:54:31+02:00
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
@@ -32,6 +32,22 @@ bootstrap: NOT_APPLICABLE
 target_uniqueness: NOT_APPLICABLE
 mutation_authorized: false
 physical_e2e_required: false
+observed_main_after_ready: cf90b84442dda730bdab93d8aa9f3236b7532ad8
+main_change_pr: 554
+main_change_reason: CI dependency-light/scoped fast-check fix; invalidates current-main freshness and likely resolves the external dependency-install stall
+last_exact_audited_head: 6b2162ca7afca1d95c711756d680a633c5e0fcfe
+last_exact_audit_review: 4969512522
+last_exact_audit_result: PASS
+last_exact_audit_material_findings_open: 0
+ready_state_reached: true
+auto_merge_was_enabled: true
+auto_merge_disabled_after_main_move: true
+draft_ci_run: 32228123889
+ready_ci_run: 32229321224
+ready_ci_state_at_checkpoint: pending_fast_checks_dependency_install
+terminal_ci_check_generation: ready
+terminal_ci_checks_for_current_generation: 2
+anti_stall_result: WAITING_MAIN_RESTACK_REQUIRED
 preliminary_independent_audit_head: 7c1c3658a9525761faba5a31c67e2e2f52e08957
 preliminary_independent_audit_result: PASS
 preliminary_independent_audit_material_findings_open: 0
@@ -96,9 +112,9 @@ new_runtime_fence:
   version: '15.32'
   size: 52109920
   sha256: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
-last_completed_step: exact-head 651944994... passed the fresh deterministic validator, and full diff review then found only closeout prose hygiene: stale adoption-time heading, changelog placement and missing EOF newline; these are corrected in the final candidate without changing fence semantics
+last_completed_step: exact-final head 6b2162ca... passed fresh independent audit with zero findings and Track A governance, then PR #554 moved main to cf90b844... with a CI dependency-light fix; auto-merge was disabled immediately because freshness was invalidated
 local_validation: git diff --check PASS; Track A static governance PASS; Python py_compile PASS; normalized bash syntax PASS; YAML parse PASS
-next_action: freeze this task-only checkpoint update as the final candidate head, require exact-head GitHub CI/Track A governance plus a repeat fresh-context validator on that exact SHA, then mark PR #555 Ready and squash-merge only if main freshness/review hygiene remain clean
+next_action: in a later invocation, re-read trusted main@cf90b844..., restack PR #555 onto current main, rerun branch-bound governance and fresh exact-head independent audit/CI, then re-enable protected auto-merge only if review hygiene and main freshness are clean
 ---
 
 # Track A current official-client fence advance

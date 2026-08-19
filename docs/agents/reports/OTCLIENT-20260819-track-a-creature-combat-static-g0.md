@@ -10,161 +10,253 @@ alias_primary_coverage: D01-D08, C15-C17
 execution_class: github_hosted
 runtime_access: none
 physical_e2e_required: false
-producer_run: 32228647135
-producer_job: 95993567735
-producer_state_at_checkpoint: in_progress
+producer_head: bb0dc3a44a6e5daca2f81817696f91043f8c03d5
+producer_run: 32230171183
+producer_job: 95998084380
+producer_result: success
+artifact_id: 9356949168
+artifact_digest: sha256:d08fba81bbb41ef2f18e6967163ad59c6883b31392836104253c2a4e2f8abbf7
 ```
 
-## Scope
+## Result
 
-This is a bounded current-package static researcher package. It revalidates creature/battle/combat structural surfaces on the current public native-Linux package and targets the previously missing dedicated G0 evidence for `D06` and `D07`.
-
-It does not claim runtime combat semantics, server acceptance, live target causality, authoritative live creature values, or attack/follow effects. Those remain gated by `LIVE-STATE` / `LIVE-ACTION` and a separately admitted physical-runtime task where required.
-
-## Trusted baseline before this G0
-
-The canonical coverage snapshot used by PR #536 classifies:
+This bounded researcher package revalidated creature/battle/combat structural surfaces on the current public native-Linux package and closed the dedicated static-evidence gap for `D06` and `D07`.
 
 ```text
-D01 PARTIAL  creature-family inbound queue boundaries
-D02 PARTIAL  queue -> non-QMeta creature handler dispatch
-D03 PARTIAL  creature handler -> model/storage mutation
-D04 PARTIAL  central creature registry/lifecycle
-D05 PARTIAL  creature health/outfit/speed/skull/party/marks/light/type/unpass
-D06 NOT_STARTED creature HUD names/icons/status effects
-D07 NOT_STARTED battle-list filters/sorting/secondary lists
-D08 PARTIAL  battle target / first-next target selection
-C15 PARTIAL  attack
-C16 PARTIAL  follow
-C17 PARTIAL  cancel attack/follow target
+D06 Creature HUD names/icons/status effects        NOT_STARTED -> PARTIAL
+D07 Battle-list filters/sorting/secondary lists   NOT_STARTED -> PARTIAL
 ```
 
-No row is promoted by this checkpoint while the current-package producer is still running.
+All other owned rows remain `PARTIAL`. No row becomes `DONE` from this static package, and no shared PR #536 coverage path is edited by the researcher.
 
-## Historical exact-build evidence consumed read-only
+Runtime combat semantics, server acceptance, live target causality, authoritative creature values and attack/follow/cancel effects remain `UNKNOWN`/unproven where the row requires `LIVE-STATE` or `LIVE-ACTION`.
 
-### S8 creature inbound
+## Producer history and repair evidence
 
-Historical exact-build S8 proved, for `15.32.df7b29` only:
+The first producer generation `32228647135 / 95993567735` was cancelled while Ubuntu `apt-get` remained in dependency installation for the job timeout. No current package was fetched in that generation; cleanup confirmed no client artifact was retained.
+
+The dependency-light repair removed `apt-get`. Generation `32230003488 / 95997593305` then proved:
 
 ```text
-TProtocolMessageQueue
-  13 creature-family receive signals
-
-TCreatureProtocolMessageHandler
-  QMeta object present, 0 QMeta methods / 0 signals
-
-TCreature
-  positionWasUpdated + mark/party/inspection signals
-
-TCreatureStorage
-  playerAdded / creatureUpdated / creatureAppearanceUpdated
-
-TCreaturesGameActionHandler
-  sendAttack / sendFollow / sendLookAtCreature / party actions
+PYELFTOOLS_IMPORT=PASS
+CURRENT_PACKAGE_FENCE=PASS
+current QMeta enumeration=PASS
 ```
 
-S8 also proved a negative QMeta result: no suffix-matched `handleXMessage` method closed the queue-to-handler edge. Therefore `D02`/`D03` remain structurally incomplete; absence from QMeta is not absence of a non-QMeta implementation.
+It failed only because `set -o pipefail` treated the intentional `sort -u | head` truncation SIGPIPE as a pipeline error. Cleanup succeeded and retained no raw client.
 
-### S9 action/control
+The second narrow repair removed that truncating pipeline shape. Final generation `32230171183 / 95998084380` passed every producer step, including cleanup and compact artifact upload.
 
-Historical exact-build S9 catalogued:
+## Current package fence
 
 ```text
-TCreaturesGameActionHandler
-  -> attack, follow, look-at-creature, inspect, party actions
-
-TInternalGameActionRouter
-  -> internal and cross-router game-action publication/handling
+PACKED_SHA256=1fc26d66cef90723d29293f177fcff41c8e937e7aac830f08e82c2f4c69eb354
+PACKED_SIZE=10214529
+UNPACKED_SHA256=ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
+UNPACKED_SIZE=52109920
+CURRENT_PACKAGE_FENCE=PASS
+RAW_CLIENT_RETAINED=false
 ```
 
-S9 explicitly left these unproven:
+The downloaded evidence ZIP independently hashes to exactly the GitHub artifact digest and contains only:
 
 ```text
-action QMeta signal -> exact receiver/protocol object = UNKNOWN unless separately proven
-per-action protocol producer -> serialized message = UNKNOWN
-per-action server acceptance/effect = NOT_OBSERVED
+creature-combat-qmeta.txt
+fence.txt
+protocol-strings.txt
+semantic-strings.txt
 ```
 
-This G0 preserves those boundaries and does not overlap PR #539/S10 action-protocol ownership.
+## Current-build creature graph
 
-## Current-package provenance boundary
+### Creature model/storage/action
 
-PR #555 is still unmerged and is therefore read-only provenance context, not authority for this task. Its independently reproduced public-package candidate is:
+Current QMeta directly establishes:
 
 ```text
-packed_size     10214529
-packed_sha256   1fc26d66cef90723d29293f177fcff41c8e937e7aac830f08e82c2f4c69eb354
-unpacked_size   52109920
-unpacked_sha256 ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
-elf_build_id    d803d9695868713ef6ab0c3cf65f91212c9c6a62
-version_token   15.32
+tibia::creatures::TCreature
+  positionWasUpdated
+  playerKillerMarkChanged
+  playerGuildFlagChanged
+  playerPartyFlagChanged
+  inspectionStateChanged
+
+tibia::creatures::TCreatureProtocolMessageHandler
+  0 QMeta methods / 0 signals
+
+tibia::creatures::TCreatureStorage
+  playerAdded
+  creatureUpdated
+  creatureAppearanceUpdated
+
+tibia::creatures::TCreaturesGameActionHandler
+  publishGameAction
+  sendAttack
+  sendFollow
+  sendLookAtCreature
+  sendInspectPlayer
+  party/share-experience actions
 ```
 
-The producer must independently reproduce the packed/unpacked hash+size fence before any current-package static fact is admitted. The task does not inherit PR #555 runtime authority or governance changes.
+Current generated-message strings additionally retain `GameserverMessageCreatureData`, `CreatureUpdate`, `CreatureHealth`, `CreatureLight`, `CreatureMarks`, `CreatureOutfit`, `CreatureParty`, `CreatureSkull`, `CreatureSpeed`, `CreatureType`, `CreatureUnpass`, plus `GameclientMessageAttack` and `GameclientMessageFollow`.
 
-## Current-package producer contract
+For the server creature families, the artifact also retains `TProtocolMessageQueue::registerServerMessage<...>` instantiations.
 
-Run `32228647135` is intentionally GitHub-hosted and disposable. The workflow must:
+This strengthens current-build structural provenance for `D01`, `D04`, `D05`, `C15` and `C16`, but does not prove runtime values or action effects.
 
-1. fetch the public Linux package through the existing WARP pattern;
-2. fail closed against the expected packed/unpacked package fingerprint;
-3. enumerate creature/battle/combat QMeta class/method ownership without the disproven world/minimap per-method jump-target heuristic;
-4. retain relevant protocol and neutral semantic strings only;
-5. delete packed and unpacked proprietary client bytes before upload;
-6. upload only compact text evidence.
+### D06 — Creature HUD
 
-At this checkpoint, the producer is still running. Current-package QMeta/protocol/string findings are therefore `UNKNOWN` until its artifact is available and inspected.
-
-## Predeclared classification rules
-
-These rules are fixed before reading the producer artifact to reduce confirmation bias:
+Current QMeta directly establishes:
 
 ```text
-D01-D05: remain PARTIAL even if current-package names/QMeta revalidate; LIVE-STATE and exact non-QMeta code/dataflow remain required.
-D06: may move NOT_STARTED -> PARTIAL only if a dedicated current-package HUD/status-effect surface is directly enumerated.
-D07: may move NOT_STARTED -> PARTIAL only if a dedicated current-package battle-list/filter/sort/secondary-list surface is directly enumerated.
-D08: remains PARTIAL even if target-selection surfaces revalidate; LIVE-ACTION remains required.
-C15-C17: remain PARTIAL even if attack/follow/cancel surfaces revalidate; action->protocol->effect causality remains required.
-No D01-D08/C15-C17 row can become DONE from this static G0 alone.
+tibia::worldmap::TCreatureHUDOverlayController
+  refreshCreatureHUDs
+  update
+
+tibia::worldmap::TCreatureHUDQmlRenderInfo
+  nameChanged
+  healthPercentChanged
+  manaPercentChanged
+  manaShieldPercentChanged
+  healthColorChanged
+  showCreatureNameChanged
+  showHealthBarChanged
+  showManaBarChanged
+  showManaShieldBarChanged
+  horizontalCreatureIconsChanged
+  verticalCreatureIconsChanged
+  fiendishMonsterChanged
+  showBarsChanged
+  showArcsChanged
+  scaleFactorChanged
+  comboPointsOrSereneStateChanged
+  playerStatesChanged
+  showSpecialConditionsChanged
+  statusEffectsChanged
 ```
 
-A lexical string without direct class/method ownership is corroboration only and cannot by itself cause a status transition.
+The neutral static corpus also contains `CreatureHUD.qml` and the matching HUD type names.
 
-## Expected evidence questions
+**FACT:** name, health, icon, special-condition and status-effect HUD surfaces exist in the exact current package.
 
-The final producer artifact is intended to answer, at a static-only boundary:
+**INFERENCE:** this dedicated current-build evidence is sufficient for `D06 NOT_STARTED -> PARTIAL` under the PR #536 status contract.
 
-- which current-package creature model/storage/controller QMeta surfaces exist;
-- whether current-package creature HUD name/icon/status-effect surfaces are directly enumerated;
-- which current-package battle-list controller/model/filter/sort/secondary-list surfaces are directly enumerated;
-- which target-selection, attack/follow/cancel structural surfaces exist;
-- which neutral generated-message/protocol names corroborate creature-state and combat families.
+**UNKNOWN:** authoritative provider/storage, status-effect schema/IDs, icon ordering and causal live updates remain unproven.
 
-It is not sufficient to answer:
+### D07 — Battle lists
 
-- authoritative live creature identity/value storage;
-- queue -> non-QMeta handler executable dataflow;
-- handler -> model mutation dataflow;
-- live battle-list membership/filter results;
-- attack/follow/cancel runtime causality;
-- server acceptance or side effects.
+Current QMeta directly establishes:
+
+```text
+tibia::gamewindow::TBattleListController
+  onFilterButtonsVisibleClicked
+  isFilterActive
+  toggleFilter
+  requestOpenSecondaryBattleList
+  requestMakePrimary
+  onCurrentlyHoveredCreatureChanged
+  onCreatureClicked
+  onCreatureTargetSelected
+
+tibia::gamewindow::TBattleListControllerStorage
+  battleListRemovedFromStorage
+  widgetVisible
+  widgetHidden
+  triggerUpdate
+  onLoginRampUpFinished
+  onBattleListClosed
+
+tibia::gamewindow::TBattleListDataModel
+
+tibia::gamewindow::TBattleListGameActionHandler
+  handleAttackFirstTargetGameAction
+  handleAttackNextTargetGameAction
+  handleAttackPreviousTargetGameAction
+  attackFirstTarget
+  attackNextOrPreviousTarget
+  filterDrawCommands
+  sortDrawCommands
+```
+
+Neutral current-package strings also include `BattleListWidgetOptions`, `EBattleListWidgetFilterKey`, `TBattleListDataModelSortFilterProxy`, `OpenSecondaryBattleList` and the dedicated secondary-battle-list game-action type.
+
+**FACT:** dedicated filter, sort, secondary-list and target-selection structural surfaces exist in the exact current package.
+
+**INFERENCE:** this is sufficient for `D07 NOT_STARTED -> PARTIAL`.
+
+**UNKNOWN:** exact filter enum meanings, sort criteria/tie-breaking, live membership and secondary-list persistence remain unproven.
+
+## D08 / C15-C17 action boundary
+
+Current-package evidence includes:
+
+```text
+TBattleListController::onCreatureTargetSelected
+TBattleListGameActionHandler::attackFirstTarget
+TBattleListGameActionHandler::attackNextOrPreviousTarget
+TCreaturesGameActionHandler::sendAttack
+TCreaturesGameActionHandler::sendFollow
+GameclientMessageAttack
+GameclientMessageFollow
+```
+
+Neutral strings retain `AttackFirstTarget`, `AttackNextTarget`, `AttackPreviousTarget` and their game-action types.
+
+This strengthens current-build structural evidence for `D08`, `C15` and `C16`, but those rows remain `PARTIAL` because target/action -> exact receiver/protocol serialization -> server/client effect is not proven here.
+
+No dedicated current-build cancel-attack/follow structural name was recovered by this bounded filter. That absence is not negative proof. `C17` therefore remains `PARTIAL` from prior evidence without a new current-build semantic promotion.
+
+## Row-by-row disposition
+
+```text
+D01 PARTIAL -> PARTIAL
+D02 PARTIAL -> PARTIAL
+D03 PARTIAL -> PARTIAL
+D04 PARTIAL -> PARTIAL
+D05 PARTIAL -> PARTIAL
+D06 NOT_STARTED -> PARTIAL
+D07 NOT_STARTED -> PARTIAL
+D08 PARTIAL -> PARTIAL
+C15 PARTIAL -> PARTIAL
+C16 PARTIAL -> PARTIAL
+C17 PARTIAL -> PARTIAL
+```
+
+Exact remaining gates:
+
+```text
+D01-D05: LIVE-STATE plus exact non-QMeta dispatch/dataflow where applicable
+D06: authoritative HUD provider/schema + causal live state
+D07: exact filter/sort semantics + live membership/persistence
+D08/C15/C16: LIVE-ACTION action->protocol->effect causality
+C17: dedicated current-build cancel discriminator + LIVE-ACTION
+```
 
 ## Safety and isolation
 
 ```yaml
 client_executed: false
 runtime_observed: false
+synology_runtime_observed: false
+kasmvnc_observed: false
 credentials_accessed: false
 login_attempted: false
 gameplay_performed: false
+attack_or_follow_stimulus: false
+process_memory_accessed: false
 client_byte_mutation: false
-raw_client_artifact_allowed: false
-shared_runtime_mutation: false
+raw_client_uploaded: false
+raw_client_retained: false
 ```
 
-PR #528/#550 physical runtime, PR #536 shared coverage paths, PR #539/S10 paths and PR #540 spawn/mechanics paths are read-only dependencies and are not modified by this researcher.
+PR #528/#550 physical runtime, PR #536 shared coverage files, PR #539/S10 paths and PR #540 spawn/mechanics paths were not modified.
 
-## Pending finalization
+E2E: `NOT_APPLICABLE` — this is a static `runtime_access: none` reverse-engineering package. Physical combat E2E would be a separate later task under current runtime admission and ownership.
 
-After producer completion, this report must be updated with exact run/artifact identity, current-package fence, sanitized class/method/message findings, FACT/INFERENCE/UNKNOWN classifications, row-by-row coverage consequence and exact remaining discriminators. The temporary producer workflow must then be deleted before final Draft-head validation.
+## Durable evidence
+
+- `docs/agents/evidence/OTC-20260819-track-a-creature-combat-static-g0/20260819-current-package-creature-combat.md`
+- final successful run `32230171183`, job `95998084380`, artifact `9356949168`
+- artifact SHA-256 `d08fba81bbb41ef2f18e6967163ad59c6883b31392836104253c2a4e2f8abbf7`
+
+The temporary producer workflow was removed before final Draft-head validation. Researcher delivery remains Draft-only and not canonically promoted until coordinator review.

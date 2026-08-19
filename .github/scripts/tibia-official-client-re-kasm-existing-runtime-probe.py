@@ -20,14 +20,18 @@ WINDOW_RE = re.compile(r'^\s*(0x[0-9a-fA-F]+)\s+"(Tibia(?: - .+)?)":')
 BRIDGE_SOCKET = "/tmp/otclient-native-login-current-sha/bridge.sock"
 BRIDGE_TARGETS = ("player_protocol_handler", "gameserver_game_session", "worldmap_handler")
 BRIDGE_SCRIPT = r"""
-import json, socket, sys
+import json, socket, struct, sys
 path = sys.argv[1]
-commands = ["PING"] + ["DISCOVER " + name for name in sys.argv[2:]]
+expected_pid = int(sys.argv[2])
+commands = ["PING"] + ["DISCOVER " + name for name in sys.argv[3:]]
 rows = []
 for command in commands:
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     sock.settimeout(12)
     sock.connect(path)
+    peer_pid, _, _ = struct.unpack("3i", sock.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, struct.calcsize("3i")))
+    if peer_pid != expected_pid:
+        raise RuntimeError(f"bridge_peer_pid_mismatch:{peer_pid}!={expected_pid}")
     sock.sendall((command + "\n").encode())
     data = b""
     while b"\n" not in data and len(data) < 65536:
@@ -73,8 +77,14 @@ def candidate_rows(container_id: str, runner: Callable[[Sequence[str]], str] = r
 for d in /proc/[0-9]*; do
   [ -r "$d/stat" ] || continue
   pid=${d#/proc/}
+  comm=$(cat "$d/comm" 2>/dev/null || true)
   exe=$(readlink -f "$d/exe" 2>/dev/null || true)
-  [ -n "$exe" ] || continue
+  if [ -z "$exe" ]; then
+    case "$comm" in
+      client|Tibia*) printf '%s\tUNREADABLE\tUNREADABLE\tUNREADABLE\tUNREADABLE\n' "$pid"; continue ;;
+      *) continue ;;
+    esac
+  fi
   base=${exe##*/}
   case "$base:$exe" in
     client:*|*:*Tibia*) ;;
@@ -153,7 +163,7 @@ def structural_state(container_id: str, pid: int, runtime: dict[str, Any], runne
         return "UNKNOWN", "NO_STRUCTURAL_BRIDGE"
     if present != "PRESENT":
         raise ProbeError("bridge_presence_invalid")
-    raw = runner(["docker", "exec", container_id, "python3", "-c", BRIDGE_SCRIPT, BRIDGE_SOCKET, *BRIDGE_TARGETS])
+    raw = runner(["docker", "exec", container_id, "python3", "-c", BRIDGE_SCRIPT, BRIDGE_SOCKET, str(pid), *BRIDGE_TARGETS])
     try:
         rows = json.loads(raw)
     except json.JSONDecodeError as exc:

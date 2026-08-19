@@ -5,54 +5,96 @@ Source Draft: PR #546
 Source validated head: `54dca602dfa38f1cc347716cf0f701b22c3fe6e9`  
 Trusted promotion base: `main@f41102ca88f152d6e0bc502d72455354db536334`  
 Promotion PR: #547  
-Decision: **ACCEPT_CORRECTED_STATIC_ECONOMY_CENSUS**
+Decision: **ACCEPT_WITH_EDITS**
 
-## Independent review
+## Fresh independent review
 
-The coordinator independently re-read the retained S1 C2S/S2C registries, `protocol-handler-code-xrefs.tsv`, the S1 exact fence, the 2026-08-14 capability census, PR #293 and its archived task, current PR #536 ownership, Track A runtime admission, and current Remote Desktop Commander state.
+The promotion was independently falsified against current repository evidence rather than trusting source-Draft or prior coordinator prose.
 
-Two material source-Draft defects were found and corrected before promotion:
+Re-read evidence:
 
-1. missing mandatory `runtime_access: none` admission fields plus an inconsistent `mutation_authorized: true` value;
-2. an unsupported same-exact-binary claim despite conflicting capability-census SHA metadata.
+- `docs/agents/reports/OTCLIENT-20260818-track-a-s1-unfiltered-static-census.md`;
+- complete S1 C2S/S2C generated-message registries;
+- complete `protocol-handler-code-xrefs.tsv`;
+- `docs/agents/reports/OTCLIENT-20260814-official-client-capability-census.md` at source base and source head;
+- merged PR #293 and archived task `OTC-20260814-official-client-capability-experiment-sweep`;
+- source task admission fields at exact #546 head;
+- PR #536 ownership boundary;
+- exact-head CI/governance for source #546.
 
-The promotion was then rebased onto current `main@f41102ca88f152d6e0bc502d72455354db536334` after PR #548 archived the now-merged parallel-runtime-prompt task. The #548 change does not overlap these four promotion/archive paths.
+## Material audit finding and repair
+
+```yaml
+finding_id: ECON-PROMO-AUD-001
+severity: medium
+confidence: high
+evidence:
+  capability_census_at_source_base: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+  capability_census_at_source_head: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+  pr_293_researched_binary: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+impact: source/promotion claimed a digest-provenance conflict that does not exist in the authoritative files
+disposition: fixed
+verification: false conflict removed from all promotion-owned durable surfaces
+```
+
+The source Draft's admission defect is independently confirmed repaired at its exact head: `runtime_access: none`, all canonical gates `NOT_APPLICABLE`, `mutation_authorized: false`, with no login/credential/GUI/gameplay/process-control/transaction authority.
+
+The promotion is based on current `main@f41102ca88f152d6e0bc502d72455354db536334`; the #548 lifecycle merge does not overlap these promotion paths.
 
 ## Current alias contract after PR #543
 
-PR #543 is merged on the promotion base and makes `TIBIA-RE-ECONOMY-PANELS` a canonical researcher alias whose full mission includes read-only account/economy panel state and confirmation-boundary research for G24-G31. Its strict safety boundary still forbids spending, transfers, market commitments, reward claims, auction commitments, world transfer and main-character-change confirmation.
-
-This promotion closes only the already-created bounded **static census subtask** `OTC-20260819-track-a-economy-panels-static-census`. It does **not** mark the full alias runtime mission or G24-G31 coverage as DONE. A separately admitted runtime continuation remains required for live panel/confirmation-boundary proof. That continuation cannot be executed in the present session because fresh Remote Desktop Commander revalidation reports `synology-otclient-01` offline/unreachable.
+`TIBIA-RE-ECONOMY-PANELS` is now canonical on `main`. This promotion closes only the bounded static census subtask. It does **not** mark the full runtime mission or G24-G31 semantic coverage DONE. Live read-only panel/confirmation-boundary proof remains separate future work under then-current Track A admission and safety rules.
 
 ## Promoted facts
 
-- S1 exact binary: `15.32.df7b29`, size `51965216`, SHA256 `e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe`.
-- Exact S1 generated-message names for the bounded G24-G31 surface where present.
-- Exact S1 handler-type direct code-to-string xrefs, all with `semantic_dispatcher_edge_proven=false`.
-- The capability census records the listed UI/controller leads, but its header SHA conflicts with PR #293/archive metadata; those leads remain provenance-fenced, not exact-S1-hash proof.
+For the retained S1 exact binary:
+
+```yaml
+version: 15.32.df7b29
+size: 51965216
+sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+generated_messages_total: 349
+client_to_server: 160
+server_to_client: 189
+received_message_strings: 189
+protocol_handler_type_xrefs: 47
+```
+
+Fresh re-read of the raw registries confirms all G24-G31 generated-message names promoted by this package where stated. Fresh re-read of `protocol-handler-code-xrefs.tsv` confirms the eight retained handler-type rows and that every one remains only `DIRECT_CODE_TO_STRING_XREF` with `semantic_dispatcher_edge_proven=false`.
+
+The canonical capability-census report is fenced to the same exact historical SHA as S1 and PR #293. Its economy/account UI/controller observations are retained as static exact-build report leads only. They do not establish live GUI behavior, message-specific dispatch, handler/storage causality, ABI, confirmation semantics, or server-side effects.
+
+No dedicated G30 World Transfer/Main Character Change generated-message name was found in the bounded 160/189 registry review.
 
 ## Not promoted
 
-Live GUI semantics, message-specific dispatch edges, wire payloads/encoding, handler-to-storage/controller causality, dedicated G30 transport mapping, transaction confirmation semantics, and server-side transactional effects remain UNKNOWN or untested.
+```text
+live GUI semantics
+message-specific dispatcher edges
+wire payloads/encoding
+handler-to-storage/controller causality
+transaction confirmation semantics
+server-side transactional effects
+current runtime/device reachability
+```
 
 ## Runtime/safety
 
-Fresh Remote Desktop Commander revalidation reports `synology-otclient-01` offline and its MCP endpoint unreachable. The static subtask is `runtime_access: none` with `physical_e2e_required: false`, so physical runtime is not a closeout gate for this subtask.
+This promotion is `runtime_access: none`, `mutation_authorized: false`, `physical_e2e_required: false`. It does not depend on mutable Remote Desktop Commander reachability and performs no official-client runtime operation.
 
-No login, credentials, GUI input, process control, gameplay, purchase/sale, market mutation, coin transfer, reward claim, auction/trade commitment, world transfer, main-character change or due-payment action occurred.
+No login, credentials, GUI input, process control, gameplay, purchase/sale, market mutation, coin transfer, reward claim, auction/trade commitment, world transfer, main-character change or due-payment action is authorized or performed by this promotion.
 
 ## Source validation
 
 ```yaml
 source_head: 54dca602dfa38f1cc347716cf0f701b22c3fe6e9
-source_base: a1368bbecd5b6a6bc2447d2c7debb1141efc2dcb
 source_changed_files: 2
-source_scope_only: true
 Track_A_governance_run: 32219366592
 Track_A_governance_result: success
 CI_run: 32219366648
 CI_result: success
-open_material_findings_after_correction: 0
+source_admission_repair_verified: true
+promotion_material_findings_open_after_repair: 0
 ```
 
-Shared matrix/checklist PR #536 remains untouched. After promotion PR #547 merges, source Draft PR #546 is to be closed unmerged as superseded. The full canonical alias then remains blocked at its runtime continuation boundary until the physical runtime can be freshly reached and admitted.
+Shared matrix/checklist PR #536 remains untouched. After promotion PR #547 merges, source Draft PR #546 is to be closed unmerged as superseded.

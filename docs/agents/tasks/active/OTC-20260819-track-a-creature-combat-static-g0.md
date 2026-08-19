@@ -1,18 +1,19 @@
 ---
 task_id: OTC-20260819-track-a-creature-combat-static-g0
-status: investigating
+status: waiting
 agent: chatgpt-gpt-5.6-sol
 session_id: 20260819-creature-combat-g0
 session_role: researcher
 project_lane: otclient
 lane: P0-STATE
 task_kind: discovery
-phase: investigate
+phase: producer-wait
 branch: research/OTC-20260819-track-a-creature-combat-static-g0
 base_branch: main
 base_main: 82e5f435c3aa4172115bf7f6a0cd7a5cc6da3d50
+current_main_observed: cf90b84442dda730bdab93d8aa9f3236b7532ad8
 created: 2026-08-19T09:35:00+02:00
-updated: 2026-08-19T09:35:00+02:00
+updated: 2026-08-19T09:44:00+02:00
 risk: low
 execution_mode: github_only
 execution_reason: deterministic current-package static census and evidence processing; physical session is not required
@@ -52,6 +53,8 @@ owned_paths:
 reuses:
   - docs/agents/prompts/OTCLIENT_TIBIA_RE_PARALLEL_RUNTIME_AGENT_PROMPTS_V1.md
   - docs/agents/reports/OTCLIENT-20260814-official-client-capability-census.md
+  - docs/agents/reports/OTCLIENT-20260818-track-a-s8-creature-inbound-static.md
+  - docs/agents/reports/OTCLIENT-20260818-track-a-s9-action-control-static-census.md
   - docs/agents/programs/OTCLIENT_TIBIA_RE_EXPERIMENT_SWEEP.md
 depends_on:
   - PR #536 coverage matrix as read-only status vocabulary
@@ -65,6 +68,7 @@ related_prs:
   - 540
   - 550
   - 555
+  - 558
 ---
 
 # Track A creature/combat static G0
@@ -99,6 +103,22 @@ The official Linux client may be fetched and decompressed only inside an ephemer
 
 Shared canonical coverage/knowledge files, PR #536 paths, PR #539/S10 paths, PR #528/#550 runtime state, and PR #540 spawn/mechanics paths are read-only dependencies and not owned by this researcher.
 
+## Producer checkpoint
+
+```text
+Draft PR: 558
+producer workflow: Track A creature combat static G0
+producer run/job: 32228647135 / 95993567735
+producer source head: 2df47c74c8140d458d8fb37bb6cee68b527c0cc8
+producer state at 2026-08-19T09:44+02:00: IN_PROGRESS
+source-head CI run: 32228647686
+source-head CI / Required: SUCCESS
+source-head Track A governance: SUCCESS (run 32228647177)
+current task branch head after durable report checkpoint: 5accacb38d798699db2d773a015c85c23a4a0097
+```
+
+The current producer is a deliberate external operation from the unchanged workflow source head. Do not rerun or duplicate it merely because the branch later receives report/task checkpoint commits.
+
 ## Acceptance inventory
 
 - [ ] Fresh current public Linux package is fetched in a GitHub-hosted ephemeral job and exact packed/unpacked identity is fenced.
@@ -107,7 +127,8 @@ Shared canonical coverage/knowledge files, PR #536 paths, PR #539/S10 paths, PR 
 - [ ] D01-D08 and C15-C17 findings are classified as FACT / INFERENCE / UNKNOWN without runtime overclaim.
 - [ ] Negative scope control proves no credentials, login, gameplay, runtime observation, client execution, client mutation, or raw-client artifact retention.
 - [ ] Temporary producer workflow is removed before the final research head.
-- [ ] Task-owned report/evidence paths contain enough information for a fresh coordinator to audit without chat history.
+- [x] Task-owned report path contains the trusted S8/S9 baseline and explicit current-producer evidence boundary.
+- [ ] Final task-owned evidence path contains enough information for a fresh coordinator to audit without chat history.
 - [ ] Exact-head repository checks are recorded for the final Draft head.
 
 ## Delivery classification
@@ -120,7 +141,7 @@ feature_scope:
   frontend_required: false
   integration_required: false
   e2e_required: false
-implementation_status: research_in_progress
+implementation_status: research_waiting_for_static_producer
 physical_e2e: NOT_APPLICABLE
 physical_e2e_reason: static reverse-engineering evidence package with runtime_access none
 ```
@@ -130,36 +151,39 @@ physical_e2e_reason: static reverse-engineering evidence package with runtime_ac
 ```yaml
 recovery:
   policy_version: 1
-  generation: 1
+  generation: 2
   session_id: 20260819-creature-combat-g0
   session_started_at: 2026-08-19T09:35:00+02:00
-  checkpointed_at: 2026-08-19T09:35:00+02:00
-  last_progress_at: 2026-08-19T09:35:00+02:00
-  phase: investigate
-  exact_head: task-claim-commit
-  pull_request: none
-  active_operation: none
-  external_run_ids: []
-  operation_started_at: null
+  checkpointed_at: 2026-08-19T09:44:00+02:00
+  last_progress_at: 2026-08-19T09:44:00+02:00
+  phase: producer-wait
+  exact_head: 5accacb38d798699db2d773a015c85c23a4a0097
+  pull_request: 558
+  active_operation: github-hosted current-package static producer
+  external_run_ids:
+    - 32228647135
+    - 32228647686
+    - 32228647177
+  operation_started_at: 2026-08-19T09:36:00+02:00
   wait_deadline_at: null
-  check_generation: null
-  checks_used: 0
-  status: active
+  check_generation: producer-source-head
+  checks_used: 2
+  status: waiting
   safe_to_resume: true
-  resume_condition: branch and owned paths remain non-overlapping
-  next_action: Open the Draft PR, then add and run the bounded GitHub-hosted current-package creature/combat static producer.
+  resume_condition: workflow run 32228647135 reaches a terminal state
+  next_action: Inspect run 32228647135 and its compact artifact. If successful and raw-client retention is false, persist exact current-package evidence, finalize FACT/INFERENCE/UNKNOWN classifications and row consequences, then delete the temporary producer workflow before final exact-head validation.
 ```
 
 ## Invocation counters
 
 ```yaml
-invocation_started_at: 2026-08-19T09:35:00+02:00
-last_progress_at: 2026-08-19T09:35:00+02:00
-ci_checks_for_current_head: 0
-ci_check_generation: draft
+invocation_started_at: 2026-08-19T09:41:00+02:00
+last_progress_at: 2026-08-19T09:44:00+02:00
+ci_checks_for_current_head: 2
+ci_check_generation: producer-source-head
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
-unchanged_state_checks: 0
+unchanged_state_checks: 2
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 0

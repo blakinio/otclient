@@ -11,9 +11,9 @@ task_kind: e2e
 phase: closeout
 branch: runtime/OTC-20260818-native-login-to-ingame-e2e-v3
 base_branch: main
-base_main: e4357137e47836d67eb19ceb13a8e313f69bf778
+base_main: aaf6706cfcd02e70511e5fa7e9ef9b0d7e1f0d12
 risk: critical
-updated: 2026-08-19T11:26:00+02:00
+updated: 2026-08-19T12:36:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260818-native-login-to-ingame-e2e.md
   - docs/agents/evidence/OTC-20260818-native-login-to-ingame-e2e/**
@@ -124,14 +124,23 @@ proof_point_worldmap_handler_validated_hits: 1
 character_actually_logged_into_game: true
 causal_proof: COMPLETE
 structural_in_game: PASS_3_OF_3
-currently_logged_in: false
-post_handoff_session_stability: FAIL_NOT_RETAINED
+currently_logged_in: UNKNOWN_CURRENT_GOVERNED_STATE
+post_handoff_session_stability: FAIL_NOT_RETAINED_AT_TERMINAL_CHECK
 post_handoff_pid: 11365
+latest_unadmitted_diagnostic_observation: PID_11365_IN_GAME_3_OF_3_AT_2026-08-19T11_59_PLUS02
+latest_unadmitted_diagnostic_promotion_status: NOT_ADMISSION_GRADE
+credential_reentry_after_terminal_proof: false
 post_handoff_player_protocol_handler_validated_hits: 0
 post_handoff_gameserver_game_session_validated_hits: 0
 post_handoff_worldmap_handler_validated_hits: 0
 post_handoff_stability_is_original_success_gate: false
-main_reconciliation_target: e4357137e47836d67eb19ceb13a8e313f69bf778
+main_reconciliation_target: aaf6706cfcd02e70511e5fa7e9ef9b0d7e1f0d12
+closeout_reconcile_merge: 0a839f5d6a01690b8600057eae9532516055d251
+closeout_reconcile_behind_after_merge: 0
+pre_blocker_record_exact_head_ci_run: 32242937598
+pre_blocker_record_exact_head_governance_run: 32242937431
+pre_blocker_record_exact_head_native_auth_validation_run: 32242937489
+pre_blocker_record_exact_head_checks_result: PASS
 pre_reconcile_head: 5ff501a783956c114aaa2d911a16f3b72e21e82e
 pre_reconcile_merge_base: 066a5ba8b1811ef61d3aa8ac2ff3fc3601fe7b9d
 pre_reconcile_ahead_by: 158
@@ -147,18 +156,22 @@ exact_head_ci_initial_failure_remediation: task_record_enum_only
 exact_head_ci_other_runs:
   - 'CI 32239529635: PASS'
   - 'Track A native auth bridge validation 32239529337: PASS'
-independent_audit_result: PENDING_REQUIRED
-independent_validator: null
-material_findings_open: UNKNOWN_UNTIL_INDEPENDENT_AUDIT
-final_exact_head_ci: PENDING_RERUN_AFTER_ENUM_REMEDIATION
+independent_audit_result: BLOCKED_EXTERNAL_REAUTH_REQUIRED
+independent_validator: gpt-5.3-codex-spark_via_spark-review-runner_ATTEMPTED_NO_MODEL_RESPONSE
+material_findings_open: UNKNOWN_NO_AUDIT_RESPONSE
+final_exact_head_ci: PENDING_AFTER_SPARK_AUTH_BLOCKER_RECORD_COMMIT
 review_threads_open: 0
 pr_528_state: DRAFT_OPEN
 pr_528_merged: false
 direct_codex_spark_authorized: true
 direct_codex_spark_model: gpt-5.3-codex-spark
 direct_codex_spark_used: false
-direct_codex_spark_unavailable_reason: no approved managed Codex/Spark invocation tool is exposed in this session
-next_action: Verify the remediation head CI/governance, then obtain a fresh independent post-implementation audit on that exact head before readiness or merge.
+direct_codex_spark_invocation_attempted: true
+direct_codex_spark_attempt_head: 0a839f5d6a01690b8600057eae9532516055d251
+direct_codex_spark_attempt_cli: codex-cli-0.147.0
+direct_codex_spark_attempt_result: NO_MODEL_RESPONSE_AUTH_401
+direct_codex_spark_unavailable_reason: repository-approved spark-review-runner is present, but ChatGPT-managed Codex authentication returned HTTP 401 token_invalidated and refresh_token_invalidated before any model response; owner reauthentication is required
+next_action: Owner reauthenticate ChatGPT Codex on spark-review-runner; then rerun the exact gpt-5.3-codex-spark independent audit on the then-current exact PR head, repair any material findings, rerun exact-head CI/governance/native-auth validation, and only then consider readiness/merge. Do not repeat the credential-bearing game login E2E.
 ---
 
 # OTCLIENT-TIBIA-RE-NATIVE-LOGIN-TO-INGAME — closeout checkpoint

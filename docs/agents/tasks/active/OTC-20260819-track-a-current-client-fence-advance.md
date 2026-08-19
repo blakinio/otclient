@@ -96,7 +96,7 @@ new_runtime_fence:
   version: '15.32'
   size: 52109920
   sha256: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
-last_completed_step: candidate governance/enforcement implementation is bounded to 15 declared paths; provenance evidence formatting/hash corrected; fresh detached-worktree validator on 7c1c3658... independently re-fetched the public package and reported PASS with zero material findings
+last_completed_step: exact-head 651944994... passed the fresh deterministic validator, and full diff review then found only closeout prose hygiene: stale adoption-time heading, changelog placement and missing EOF newline; these are corrected in the final candidate without changing fence semantics
 local_validation: git diff --check PASS; Track A static governance PASS; Python py_compile PASS; normalized bash syntax PASS; YAML parse PASS
 next_action: freeze this task-only checkpoint update as the final candidate head, require exact-head GitHub CI/Track A governance plus a repeat fresh-context validator on that exact SHA, then mark PR #555 Ready and squash-merge only if main freshness/review hygiene remain clean
 ---

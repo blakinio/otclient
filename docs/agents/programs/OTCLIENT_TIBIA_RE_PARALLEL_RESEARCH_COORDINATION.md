@@ -132,7 +132,7 @@ A green workflow is not by itself a `FACT` about Tibia semantics. Technical exec
 
 Unless the current canonical programme intentionally advances to another build, build-specific experiments must verify current official native Linux client identity before analysis/runtime promotion.
 
-Current research fence at adoption time:
+Current research fence:
 
 ```text
 canonical version mapping: 15.32

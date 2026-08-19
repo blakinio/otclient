@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260819-tibia-re-control-center-independent-audit-prompt
-status: in_progress
+status: validating
 agent: ChatGPT
 project_lane: otclient
 lane: P0-AUDIT-PROMPT
@@ -55,9 +55,9 @@ transaction_authorized: false
 owner_funded_ai_api_authorized: false
 owner_current_instruction: save the prepared independent audit prompt for the TIBIA RE Control Center project to blakinio/otclient and merge it under repository governance
 invocation_started_at: 2026-08-19T15:34:00+02:00
-last_progress_at: 2026-08-19T15:34:00+02:00
-current_blocker: null
-next_action: add the canonical read-only independent audit prompt, open a draft PR, validate exact head, self-review, and merge if all gates pass
+last_progress_at: 2026-08-19T15:38:00+02:00
+current_blocker: exact-head CI and Track A governance must revalidate the final task-checkpoint head before readiness
+next_action: verify exact-head CI/governance, current-main freshness and review-thread state, then mark ready and merge if all gates remain green
 ---
 
 # Control Center independent audit prompt publication
@@ -82,3 +82,37 @@ Documentation only. No runtime observation, no client execution, no GUI input, n
 - at least 18 concrete falsification scenarios are required;
 - Package A implementation-readiness is a mandatory verdict;
 - exact-head CI/governance and full changed-file self-review pass before merge.
+
+## Validation history
+
+First exact-head publication checkpoint `d803c710e2ee54aafcf79777385f8f187f36734a`:
+
+```yaml
+changed_files:
+  - docs/agents/prompts/TIBIA_RE_CONTROL_CENTER_INDEPENDENT_AUDIT.md
+  - docs/agents/tasks/active/OTC-20260819-tibia-re-control-center-independent-audit-prompt.md
+CI: 32259151619 SUCCESS
+track_a_governance: 32259151861 SUCCESS
+runtime_access: none
+client_executed: false
+credentials_accessed: false
+runtime_actions: false
+oteryn_v2_writes: false
+```
+
+## Self-review
+
+Full diff review found only the two declared documentation paths and no implementation, workflow, runtime, Surveyor, module catalogue or Oteryn-v2 changes.
+
+The prompt:
+
+- is explicitly read-only and independent;
+- makes historical SHAs discovery hints rather than trusted current facts;
+- requires current-main/open-PR/active-task revalidation;
+- covers the merged Control Center design, current Surveyor state, Track A authority/runtime infrastructure and current Oteryn-v2 architecture;
+- requires explicit authority/cancellation/concurrency/privacy falsification;
+- preserves semantic rather than raw-wire Oteryn comparison;
+- requires 18 named failure scenarios, P0-P3 severity and Package A readiness;
+- does not authorize Codex, owner-funded AI, runtime access, credentials, login, gameplay or repository mutation by the auditor.
+
+No material self-review finding remains.

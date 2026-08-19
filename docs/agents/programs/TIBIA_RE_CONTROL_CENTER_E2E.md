@@ -4,8 +4,8 @@
 programme: TIBIA-RE-CONTROL-CENTER-E2E
 repository: blakinio/otclient
 track: official-client-re
-status: design_baseline
-version: 1.0
+status: hardened_design_baseline
+version: 1.1
 runtime_access_of_this_document: none
 future_official_client_runtime: Track A canonical live runtime only
 future_oteryn_runtime: separate adapter task in blakinio/Oteryn-v2
@@ -15,307 +15,244 @@ future_oteryn_runtime: separate adapter task in blakinio/Oteryn-v2
 
 Build one reusable research and E2E platform that can:
 
-1. observe the official Tibia Linux client under the existing Track A governance model;
-2. execute bounded, explicitly declared research actions when current mutation authority exists;
-3. correlate actions with runtime state, network metadata, targeted traces and screenshots;
-4. produce compact machine-readable evidence bundles for later agents;
-5. later run the same semantic scenarios against the Oteryn v2 Rust client through a separate adapter;
-6. compare official-client and Oteryn outcomes at the semantic state-transition level.
+1. observe the official Tibia Linux client under existing Track A governance;
+2. execute bounded semantic research actions only when current external mutation authority exists at the final dispatch boundary;
+3. correlate controlled stimuli with runtime state, network metadata, targeted traces and screenshots without confusing temporal ordering with causality;
+4. produce deterministic, privacy-safe, machine-readable per-run evidence bundles;
+5. expose the same domain semantics to browser and direct-machine CLI operation;
+6. later run the same semantic scenarios against the Oteryn v2 Rust client through a separately governed adapter;
+7. compare official-client and Oteryn outcomes at normalized semantic state-transition checkpoints.
 
-The platform is a research/test harness. It is not the game client, does not become a protocol authority, and does not grant itself runtime, login, credential or mutation permissions.
+The Control Center is a research/test harness. It is not the game client, not a protocol authority, not a Track A lease/registration authority and not an Oteryn server authority.
 
-## 2. Existing systems to reuse
-
-Do not create replacements for these systems:
-
-- `docs/agents/programs/OTCLIENT_TIBIA_RE_EXPERIMENT_EXECUTION_MODEL.md` — normative experiment/evidence methodology;
-- Track A canonical lease, registration, Gate A/Gate B, target-uniqueness and whole-lifetime supervision contracts;
-- `tools/tibia_runtime_bridge/**` — runtime identity/bridge work where its current contract applies;
-- open Draft PR #592 `tools/tibia_re_surveyor/**` — evidence/coverage/runtime-snapshot Surveyor, if and when it is merged or otherwise explicitly consumed from an accepted exact head;
-- shared GUI-input lock and heartbeat contracts already defined by Track A.
-
-PR #592 is currently an open Draft and is not treated as merged capability by this design.
-
-## 3. Product shape
-
-The project has one backend and two operator surfaces.
+Normative separation:
 
 ```text
-                 TIBIA RE CONTROL CENTER
-                          |
-            +-------------+-------------+
-            |                           |
-        Browser UI                    CLI
-            |                           |
-            +-------------+-------------+
-                          |
-                     Control API
-                          |
-          +---------------+----------------+
-          |               |                |
-     Scenario Engine   Recorder       Safety Controller
-          |               |                |
-          +---------------+----------------+
-                          |
-                     Adapter API
-                 +--------+--------+
-                 |                 |
-         Official Tibia         Oteryn v2
-            Adapter              Adapter
-                 |                 |
-          Track A runtime      Rust client
+scenario validity
+!= capability support
+!= evidence maturity
+!= observation freshness
+!= mutation authority
 ```
 
-The GUI and CLI never talk directly to the official client. Every operation flows through the Scenario Engine and Safety Controller.
+No local configuration, UI state, CLI option, cached status or prior preflight can create mutation authority.
 
-## 4. Deployment modes
+## 2. Normative document stack
 
-### 4.1 Direct-machine mode
+The implementation must read these as one design package:
 
-Run the backend on the machine hosting the Track A environment. The operator may use:
+1. `docs/agents/programs/OTCLIENT_TIBIA_RE_EXPERIMENT_EXECUTION_MODEL.md` — causal RE/evidence methodology;
+2. `docs/agents/contracts/TIBIA_RE_CONTROL_CENTER_EXECUTION_V1.md` — normative concurrency, dispatch, STOP ALL, idempotency, budget, recorder, privacy and recovery semantics;
+3. `docs/agents/contracts/TIBIA_RE_CONTROL_CENTER_ADAPTER_V1.md` — semantic adapter data/API boundary;
+4. this programme — product architecture and phasing;
+5. `docs/agents/prompts/TIBIA_RE_CONTROL_CENTER_MVP.md` — bounded implementation procedure.
 
-- CLI for deterministic scripted runs;
-- the browser UI opened locally on the same desktop/KasmVNC session.
+When a future official-client implementation interacts with Track A, the current trusted-base Track A admission/lease/registration/Gate A/rebind/Gate B/target-identity/GUI-lock/whole-lifetime-supervisor contracts take precedence over any stale example in this programme.
 
-The initial implementation should prefer loopback-only Control API binding. A LAN/public bind is a separate security-sensitive task and must not be enabled by convenience defaults.
+## 3. Existing systems to reuse
 
-### 4.2 Browser mode
+Do not create replacements for:
 
-The same web UI is served by the Control Center backend. For the first Track A implementation, remote visual access may use the existing KasmVNC desktop rather than exposing a new network service.
+- Track A canonical lease manager;
+- authoritative runtime registration;
+- Gate A, generation rebind and Gate B;
+- canonical target-uniqueness proof;
+- cancellation-safe whole-lifetime mutation supervisor/guard;
+- shared GUI input lock/guard;
+- shared activity heartbeat where applicable;
+- `tools/tibia_runtime_bridge/**` for current runtime identity/bridge behavior where its contract applies;
+- Track A evidence/capability registries;
+- Surveyor #592 outputs/interfaces after an exact accepted producer state exists;
+- Oteryn v2's accepted native E2E architecture, currently owned by `docs/architecture/ADR-0007-native-end-to-end-test-platform.md` in `blakinio/Oteryn-v2`.
 
-If a later task exposes the Control API beyond loopback, it must define authentication, TLS/transport, origin policy, bind-address policy, rate/bounds and shutdown behavior before deployment.
+Control Center may normalize and reference those systems. It must not become their second source of truth.
 
-## 5. UI information architecture
+## 4. Product architecture
 
-The approved visual direction is a dense desktop research console optimized for high information density rather than a consumer dashboard.
-
-### 5.1 Always-visible top status bar
+There is one backend domain path and two operator surfaces.
 
 ```text
-TIBIA RE CONTROL CENTER
-RUNTIME | CLIENT | RECORDER | AUTHORITY | SESSION       STOP ALL | PAUSE
+                       TIBIA RE CONTROL CENTER
+
+              Browser UI                 CLI
+                   \                     /
+                    \                   /
+                     v                 v
+                    Versioned Control API
+                             |
+                             v
+                   Control Domain Service
+                             |
+                    +--------+---------+
+                    |                  |
+                 Run Manager        Read Models
+                    |
+                    v
+                Scenario Engine
+                    |
+          +---------+---------+----------------+
+          |                   |                |
+       Recorder        MutationCoordinator   Artifact Store
+          |                   |
+          |             Safety Controller
+          |                   |
+          +-------------------+
+                    |
+                    v
+               Adapter Contract
+                 /          \
+                /            \
+       Official Tibia       Oteryn v2
+          Adapter             Adapter
+             |                   |
+     current Track A       Oteryn QA-E2E
+       infrastructure        integration
 ```
 
-Required states:
+### 4.1 Hard architectural invariants
 
-- `RUNTIME`: OFFLINE / DEGRADED / ONLINE;
-- `CLIENT`: NOT_FOUND / LOGIN_SCREEN / CHARACTER_SELECTION / IN_GAME / UNKNOWN;
-- `RECORDER`: STOPPED / RECORDING / ERROR;
-- `AUTHORITY`: READ_ONLY / MUTATION_ALLOWED / EXPIRED / UNKNOWN;
-- `SESSION`: elapsed research-session time and session epoch.
+- Browser and CLI never call adapters directly.
+- Quick Actions are one-step scenarios, not a second mutation path.
+- The Scenario Engine never stores standing Track A mutation authority.
+- The `MutationCoordinator` owns local serialization/idempotency/cancellation generations only; it does not own Track A authority.
+- The Safety Controller is a consumer/facade over external authority and safety checks, not a new lease manager.
+- The Recorder observes and preserves evidence but cannot grant capability or authority.
+- The Artifact Store owns per-run evidence only; it does not promote Track A capability/evidence registries.
+- The Comparator compares normalized semantics only.
 
-`AUTHORITY` must be visually prominent. A stale or unknown authority state disables every mutating control.
+## 5. Mutation dispatch architecture
 
-`STOP ALL` is always visible. It cancels queued/in-flight harness actions and capture tasks. It must not kill the official client unless separate current process-control authority explicitly permits that effect.
+Every adapter instance has one local `MutationCoordinator` as defined by `TIBIA_RE_CONTROL_CENTER_EXECUTION_V1.md`.
 
-### 5.2 Main tabs
+Mutation is admitted only through one final logical operation:
 
 ```text
-Main
-Runtime
-Movement
-Healing
-Spells
-Consumables
-Combat
-Targeting
-Inventory
-Containers
-Equipment
-Chat
-Conditions
-Scenarios
-Recorder
-Network
-Experiments
-Compare
-Logger
+atomic_dispatch(action, dispatch_fence, cancellation_token)
 ```
 
-Tabs may be hidden only when their capability is structurally unavailable; unavailable research support should normally remain visible as `UNSUPPORTED`, `NOT_PROVEN` or `READ_ONLY`, not silently disappear.
+Immediately before crossing the irreversible adapter boundary it must revalidate:
 
-### 5.3 Main screen layout
+- action idempotency ledger;
+- current Control Center cancellation/control generation;
+- runtime/session/adapter fences;
+- side-effect budget reservation;
+- capability support;
+- current external authority;
+- required input lock;
+- all official-client Track A fences for `OFFICIAL_TIBIA`.
 
-Left column:
+An earlier scenario check or adapter `preflight()` may reject work early but can never authorize final dispatch.
 
-- Quick Activator: Recorder, Runtime Trace, Network Capture, State Capture, Screenshots;
-- research suite toggles: Movement, Healing, Combat, Inventory, Containers, Equipment, Chat;
-- Profile/Target;
-- Session Info.
+The official adapter must reuse the current Track A whole-lifetime guarded mutation boundary so authority validation and irreversible dispatch cannot be separated by an unguarded TOCTOU window.
 
-Center top:
+## 6. STOP ALL and cancellation model
 
-- Character State: HP, MP, soul, capacity, stamina, level, speed, position and only other values with a declared source/confidence;
-- Conditions;
-- Current Actions;
-- Target Info.
+`STOP ALL` is a safety state transition, not a best-effort UI command.
 
-Center middle:
+Its linearization point is the increment/latch of the Control Center `control_generation` under the same local coordinator synchronization domain used to admit dispatch.
 
-- Quick Actions row. Every button creates a one-step experiment; there are no unrecorded manual mutation shortcuts.
-
-Initial visible actions:
+Required result:
 
 ```text
-Move N/E/S/W
-Turn N/E/S/W
-Cast selected healing spell
-Cast selected offensive spell
-Use selected potion
-Eat selected food
-Open selected container
-Say controlled test text
-Attack selected target
-Follow selected target
-Look at selected object
+STOP linearizes before dispatch -> mutation does not start
+Dispatch linearizes before STOP -> action is already-dispatched and handled conservatively
 ```
 
-Center bottom:
+There is no valid state in which STOP linearizes first and a stale-generation mutation then begins.
 
-- Engine Benchmark;
-- Live Events with filters;
-- Active Scenario with step list, status, duration and progress;
-- actions: Pause Scenario / Abort Scenario.
+`STOP ALL`:
 
-Right column:
+- rejects new mutations;
+- cancels queued old-generation work;
+- signals cooperative cancellation to waits/captures/in-flight adapters;
+- prevents not-yet-dispatched work from crossing the irreversible boundary;
+- rejects stale completions as control input;
+- emits terminal evidence;
+- cleans only harness-owned resources;
+- never kills the official client without separate current process-control authority.
 
-- Mini Map observation panel;
-- Backpack/container observation panel;
-- Battle List/target observation panel;
-- Shortcuts/Hotkeys configured as research actions rather than raw keyboard macros.
+STOP remains latched until explicit local reset and fresh status/authority revalidation.
 
-### 5.4 Read-only behavior
+## 7. Concurrency model
 
-When authority is `READ_ONLY`, `EXPIRED` or `UNKNOWN`:
+Default policy is conservative:
 
-- observation/capture controls remain available only if current read authority permits them;
-- all action buttons are disabled;
-- scenario runs containing mutations are rejected before dispatch;
-- the UI shows the exact failing gate/category;
-- no UI state may imply that checking a box created authority.
+- one mutation-capable action per adapter at a time;
+- no two operator surfaces can create parallel mutation implementations;
+- concurrent read-only runs are permitted only where every involved source is proven concurrency-safe;
+- unknown concurrency safety means serialize;
+- scenarios never own permanent adapter authority;
+- adapter restart/generation change invalidates pending mutation work.
 
-## 6. Core components
+## 8. Deployment modes
 
-### 6.1 Control API
+### 8.1 Direct-machine mode
+
+The backend runs on the machine hosting the applicable test/runtime environment. CLI and local browser use the same backend/domain service.
+
+### 8.2 Browser mode
+
+The backend serves the same Control API plus thin web UI.
+
+Initial API exposure is loopback-only. KasmVNC may provide remote visual access to the desktop without exposing a new Control API network surface.
+
+A future non-loopback deployment requires a separate accepted security design covering authentication, authorization, TLS/transport, origins, Host policy, CSRF/replay concerns, bind policy, rate/bounds and shutdown. Remote exposure must not be enabled by a convenience `0.0.0.0` flag alone.
+
+## 9. Control API
+
+The domain API is versioned and transport-neutral. Package B should expose `/v1` or an equivalent explicit version.
 
 Responsibilities:
 
-- expose current normalized status;
-- start/stop/pause/resume scenario runs;
-- submit one-step experiments;
-- stream normalized events;
-- enumerate capabilities/scenarios/runs;
-- request safe artifact export;
-- expose emergency-stop state.
+- status and freshness;
+- capabilities and evidence maturity;
+- scenarios and validation;
+- run lifecycle;
+- one-step experiments;
+- STOP/reset/pause/resume/abort;
+- bounded event streaming/polling;
+- run/artifact inspection and safe export.
 
-The API is transport-neutral at the domain layer. The browser transport is an implementation detail.
+Required properties:
 
-### 6.2 Scenario Engine
+- bounded request bodies and collections;
+- bounded run/event history and subscribers;
+- explicit idempotency key for mutation-capable requests;
+- duplicate POST/result-replay semantics from the execution contract;
+- deterministic malformed-input errors;
+- no raw action/debug bypass endpoint;
+- explicit shutdown behavior.
+
+## 10. Scenario Engine
+
+The engine owns deterministic scenario semantics, not external authority.
 
 Responsibilities:
 
-- validate schema;
-- evaluate preconditions;
-- resolve adapter capabilities;
-- acquire/validate required authority through Safety Controller;
-- enforce side-effect budgets and action counts;
-- execute one action at a time;
-- capture before/after snapshots;
-- wait for bounded conditions;
+- parse/version/validate scenarios;
+- assign deterministic stable step IDs;
+- resolve required semantic capabilities;
+- evaluate typed predicates/preconditions;
+- reserve/check budgets;
+- schedule one action through the coordinator;
+- capture before/after checkpoints;
+- perform bounded waits;
 - evaluate assertions;
-- apply abort conditions;
-- emit deterministic run/step results.
+- enforce abort conditions;
+- propagate failures deterministically;
+- implement explicit pause/resume semantics;
+- emit reproducible run/step states.
 
-A GUI button such as `Exura` is represented as a single-step scenario, not a separate execution path.
+Unknown values never silently satisfy mutation-safety predicates.
 
-### 6.3 Safety Controller
+Mutation retries default to zero. An action with possible external side effect that becomes `AMBIGUOUS` is never automatically retried.
 
-Responsibilities:
-
-- treat Track A admission as external authority, never as a UI preference;
-- validate current authority immediately before every mutating step;
-- preserve lease/generation/registration/target-identity fences required by the current Track A contracts;
-- use the shared GUI input lock where input is involved;
-- stop mutation on generation change, target identity change, unknown state or authority expiry;
-- enforce scenario effect budgets;
-- implement emergency cancellation and deterministic cleanup.
-
-No scenario configuration may weaken a Track A gate.
-
-### 6.4 Recorder
-
-Normalized event classes:
-
-```text
-SYSTEM
-AUTHORITY
-ACTION
-TRACE
-NET
-STATE
-SCREEN
-SNAPSHOT
-ASSERTION
-RESULT
-ERROR
-```
-
-All events share:
-
-- research session epoch;
-- monotonic timestamp;
-- sequence number;
-- run ID;
-- experiment/step ID when applicable;
-- source adapter;
-- sensitivity classification.
-
-The recorder must preserve the causal-recorder requirements of `OTCLIENT_TIBIA_RE_EXPERIMENT_EXECUTION_MODEL.md`.
-
-### 6.5 Artifact Store
-
-Canonical per-run logical layout:
-
-```text
-runs/<run-id>/
-  manifest.json
-  scenario.yaml
-  events.jsonl
-  actions.jsonl
-  state/
-  network/
-  traces/
-  screenshots/
-  result.json
-  report.md
-  agent_bundle.json
-```
-
-Large/raw artifacts remain outside Git unless existing evidence policy explicitly permits them. Git evidence contains normalized results, hashes, exact provenance and minimum necessary excerpts.
-
-### 6.6 Comparator
-
-The comparator operates on semantic snapshots and normalized transitions rather than raw protocol byte equality.
-
-Examples:
-
-```text
-movement position delta       EXACT
-HP/mana transition            EXACT or declared tolerance
-condition transition          EXACT
-container contents            semantic set/order policy
-cooldown timing               bounded tolerance
-visual effect                 structural/semantic observation
-protocol bytes                NOT a cross-client parity requirement
-```
-
-This is required because Oteryn v2 owns `protocol-oteryn` and is not expected to reproduce third-party wire bytes.
-
-## 7. Scenario model
+## 11. Scenario model
 
 Every scenario declares at minimum:
 
 ```yaml
+schema_version: 1
 id:
 name:
 adapter_requirements:
@@ -328,23 +265,43 @@ expected_result:
 privacy_policy:
 ```
 
+Typed predicate baseline:
+
+```yaml
+field: player.hp
+op: LT
+value: 100
+unknown_policy: FAIL
+```
+
+Allowed operators and UNKNOWN behavior are normative in the execution contract.
+
 Example:
 
 ```yaml
+schema_version: 1
 id: healing-basic-001
 name: Basic healing experiment
 adapter_requirements:
-  actions: [cast_spell, use_consumable]
+  read: [player_state]
+  actions: [cast_spell]
 preconditions:
-  client_state: IN_GAME
-  hp_percent_below: 90
+  - field: client_state
+    op: EQ
+    value: IN_GAME
+    unknown_policy: FAIL
+  - field: player.hp_percent
+    op: LT
+    value: 90
+    unknown_policy: FAIL
 side_effect_budget:
   max_runtime_seconds: 60
-  max_actions: 10
-  max_spells: 3
-  max_consumables: 2
+  max_actions: 3
+  max_spells: 1
+  max_consumables: 0
   max_gold: 0
   max_tibia_coins: 0
+  max_irreversible_changes: 0
 capture_policy:
   state: true
   events: true
@@ -352,30 +309,37 @@ capture_policy:
   network: metadata
   traces: targeted
 steps:
-  - snapshot: before
+  - snapshot:
+      name: before
   - action:
       kind: cast_spell
-      spell: exura
-  - wait:
-      condition: hp_changed
+      parameters:
+        spell: exura
       timeout_ms: 3000
-  - snapshot: after_spell
+  - wait:
+      condition:
+        field: player.hp
+        op: CHANGED
+        unknown_policy: WAIT
+      timeout_ms: 3000
+  - snapshot:
+      name: after
 abort_conditions:
   - authority_lost
   - target_identity_changed
   - client_not_in_game
   - timeout
 expected_result:
-  hp_delta: positive
+  - field: player.hp
+    op: GT
+    value_from_snapshot: before.player.hp
 privacy_policy:
   secret_material: reject
 ```
 
-A scenario may intentionally be read-only. Mutation is not implied by the presence of an action name in the catalogue.
+## 12. Atomic semantic action catalogue
 
-## 8. Atomic action catalogue
-
-The common semantic catalogue should start with:
+Scenario files express intent, never implementation details.
 
 ```text
 SYSTEM
@@ -383,7 +347,7 @@ wait
 checkpoint
 
 SESSION
-login_request         capability only; credentials handled outside scenario payload
+login_request         capability only; credentials stay outside scenario payload
 enter_game_request    capability only
 logout
 
@@ -424,182 +388,421 @@ open_panel
 close_panel
 ```
 
-Actions are semantic intents. Adapters decide how they map to their client without leaking implementation-specific call addresses, UI coordinates or protocol bytes into scenario files.
+Adapters may implement these via GUI input, semantic bridge calls or other separately approved mechanisms, but coordinates, keycodes, QMeta IDs, function addresses, vtables, opcodes and wire layouts do not leak into common scenarios.
 
-## 9. Capture and privacy policy
+## 13. Side-effect budgets
 
-Default capture policy is minimum necessary:
+Budgets are hard admission constraints, not decorative metadata.
 
-- state: normalized semantic fields;
-- network: direction/type/size/sequence/correlation metadata by default;
-- trace: only declared targets;
-- screenshots: bounded checkpoints;
-- message text: redact or omit unless deliberately generated test text is required;
-- identities: anonymize/hash when identity is not the hypothesis;
-- credentials/session/auth secrets: never persist.
-
-Login/auth capture is structural only. Email, password, 2FA, cookies, tickets, session tokens, secret-bearing memory and secret-bearing packet material must not enter run artifacts.
-
-## 10. Official Tibia adapter
-
-The official-client adapter is a Track A consumer. It may provide:
+Each run maintains a monotonic ledger per dimension:
 
 ```text
-runtime_status
-snapshot
-capabilities
-execute semantic action
-wait_for condition
-authority_status
-start/stop capture
-emergency_stop
+limit
+reserved
+committed
+uncertain
 ```
 
-Implementation may combine approved mechanisms such as runtime bridge, normal GUI input, semantic bridge methods or targeted instrumentation, but each mechanism remains subject to its own current evidence gate and Track A authorization.
+Before dispatch the engine reserves the maximum plausible effect. After dispatch it releases, commits or moves the conservative maximum to `uncertain` according to the proven outcome.
 
-The adapter must report capability maturity separately for observation and action. A static or read capability does not imply mutation support.
+A timeout/failure/cancellation after possible dispatch is treated as consumed/uncertain for future admission.
 
-## 11. Oteryn v2 adapter boundary
+If a hard budget cannot be safely bounded or measured for an action, that scenario/action is refused.
 
-The canonical Rust client is in `blakinio/Oteryn-v2`, not the historical `otclient/oteryn-client` subtree.
+Minimum dimensions:
 
-A future separate Oteryn-v2 task should implement the same semantic adapter contract through test-owned interfaces in that repository. It must not add Tibia protocol compatibility merely to satisfy this harness.
+- runtime;
+- action attempts;
+- movement tiles;
+- spells;
+- consumables;
+- moved items/stack amount at risk;
+- gold;
+- Tibia Coins;
+- irreversible changes.
 
-Expected integration model:
+TC and irreversible-change budgets default to zero for research scenarios unless separately and explicitly authorized.
+
+## 14. Action lifecycle and restart behavior
+
+The Control Center distinguishes at least:
 
 ```text
-blakinio/otclient
-  Control Center / scenario definitions / official reference evidence
-          |
-          | semantic E2E adapter contract
-          v
-blakinio/Oteryn-v2
-  apps/client + test-control adapter
+CREATED
+VALIDATED
+RESERVED
+DISPATCHING
+DISPATCHED
+CONFIRMING
+CONFIRMED
+REFUSED
+CANCELLED_BEFORE_DISPATCH
+CANCELLED_AFTER_DISPATCH
+FAILED_BEFORE_DISPATCH
+FAILED_AFTER_DISPATCH
+TIMED_OUT_BEFORE_DISPATCH
+TIMED_OUT_AFTER_DISPATCH
+AMBIGUOUS
 ```
 
-Cross-repository changes require separate tasks/branches/PRs and a shared coordination ID under each repository's current governance.
+Backend restart never auto-resumes mutation.
 
-## 12. Engine benchmark
+If the backend cannot prove whether an action crossed the irreversible boundary, recovery classifies it `AMBIGUOUS` unless authoritative reconciliation proves the exact outcome. `AMBIGUOUS` is not retried automatically.
 
-The Main UI records per-run timings when available:
+## 15. Recorder and causal evidence
+
+The unified `events.jsonl` order is recorder ingestion order, not proof that independent sources share one clock.
+
+Every event preserves:
+
+- ingest sequence;
+- ingestion monotonic timestamp;
+- source timestamp when available;
+- source clock domain;
+- source-local sequence and scope when available;
+- ordering confidence;
+- run/experiment/step identity;
+- runtime/session fences;
+- sensitivity classification.
+
+For causal Track A work it additionally preserves the fields required by `OTCLIENT_TIBIA_RE_EXPERIMENT_EXECUTION_MODEL.md`, including stimulus ID, direction, lane/message sequence/type, observable thread/handler/object identity, before/after state hashes, semantic delta and evidence reference.
+
+Negative/no-stimulus controls remain mandatory where causal promotion requires them.
+
+Correlation is not automatically causal proof.
+
+## 16. Late events and finalization
+
+Run state:
 
 ```text
-state read
-screen capture
-network correlation
-runtime trace
-adapter dispatch
-state confirmation
-total step latency
+ACTIVE -> CLOSING -> FINALIZED
 ```
 
-These values are diagnostics, not correctness proof. No fixed performance claim may be made without a named runtime and evidence.
+After execution ends, a bounded drain records late source events and watermarks where available. Late events may enrich evidence but cannot rewrite a terminal action result or restart execution.
 
-## 13. MVP phases
+After finalization, later accepted evidence is append-only supplemental evidence referencing the original run; historical results are not silently rewritten.
 
-### P0 — Surveyor foundation
+## 17. Artifact Store
 
-Consume #592 only after its exact accepted state is known. Do not copy its implementation.
+Per-run logical layout:
 
-### P1 — Read-only Control Center
+```text
+runs/<run-id>/
+  manifest.json
+  scenario.yaml
+  events.jsonl
+  actions.jsonl
+  state/
+  network/
+  traces/
+  screenshots/
+  result.json
+  report.md
+  agent_bundle.json
+```
+
+Rules:
+
+- stage then finalize atomically where supported;
+- incomplete/crashed runs remain explicitly incomplete;
+- `result.json`/manifest PASS is written only after ledgers/events are flushed;
+- artifacts include schema versions, scenario hash, adapter identity/version, generation/fence summary, budget/action ledger summary and artifact hashes;
+- large/raw evidence stays outside Git unless current policy explicitly permits it;
+- Control Center does not overwrite Surveyor/Track A capability registries.
+
+## 18. Privacy and secret exclusion
+
+Mandatory invariant:
+
+> Secret-class data never enters the normal Event, Artifact, Error, Report or AgentBundle object graph.
+
+Redaction/classification happens before ordinary object creation. Export-time redaction is defense in depth only.
+
+Never persist:
+
+- email/password/2FA;
+- auth/session tokens;
+- cookies/tickets;
+- encryption/RSA secret material;
+- secret-bearing memory or packet payloads;
+- environment-variable values;
+- unnecessary private chat/personal data.
+
+Arbitrary exception/debug/repr text is untrusted. Persistent errors use stable reason codes, reviewed static text and explicitly classified safe fields.
+
+Screenshots are accepted only when capture context is known non-secret or after an explicit quarantine/sanitization path. Login/auth screens are not normal run artifacts.
+
+## 19. Network capture
+
+Default persistent network capture is metadata-only:
+
+```text
+direction
+connection/session lane
+source-local sequence when available
+message type only when structurally known
+size
+correlation ID
+payload_capture=NONE
+```
+
+There is no raw-payload fallback.
+
+A future sanitized payload mode requires a separate approved policy proving that secret-class bytes are excluded before persistence.
+
+## 20. UI information architecture
+
+The UI is a dense desktop research console.
+
+Always-visible status:
+
+```text
+RUNTIME | CLIENT | RECORDER | AUTHORITY | CAPABILITY | EVIDENCE | FRESHNESS | SESSION
+STOP ALL | PAUSE
+```
+
+`AUTHORITY`, `CAPABILITY`, `EVIDENCE` and `FRESHNESS` are separate concepts and must not be collapsed into one green/red badge.
+
+Required tabs:
+
+```text
+Main
+Runtime
+Movement
+Healing
+Spells
+Consumables
+Combat
+Targeting
+Inventory
+Containers
+Equipment
+Chat
+Conditions
+Scenarios
+Recorder
+Network
+Experiments
+Compare
+Logger
+```
+
+Unknown/unproven state renders as `UNKNOWN`, `UNSUPPORTED`, `NOT_PROVEN`, `STALE` or another truthful explicit state. Never render fabricated sample gameplay data as live state.
+
+Quick Actions always create one-step experiments:
+
+```text
+snapshot before
+-> semantic action
+-> bounded wait/assertion
+-> snapshot after
+-> result
+```
+
+There are no unrecorded manual mutation shortcuts.
+
+## 21. Official Tibia adapter
+
+The official adapter is an `EXTEND_EXISTING` Track A consumer.
+
+It may combine approved mechanisms from:
+
+- `tools/tibia_runtime_bridge/**`;
+- normal GUI input under the shared input lock;
+- stable semantic bridge methods;
+- bounded targeted instrumentation.
+
+Each mechanism remains subject to its current proof/action maturity and current Track A authorization.
+
+Official adapter capability reporting has two layers:
+
+1. generic semantic `read_supported` / `action_supported`;
+2. official-only RE maturity extension `R0-R4` / `A0-A4` plus evidence refs.
+
+Read support never implies action support.
+
+## 22. Surveyor boundary
+
+Surveyor is integrated only after an exact accepted producer state exists.
+
+Package C pins:
+
+```text
+surveyor_schema_version
+producer_commit
+producer_interface
+```
+
+Schema mismatch degrades Surveyor-dependent panels to explicit `INCOMPATIBLE/UNAVAILABLE`; it does not trigger copied internal logic or fabricated data.
+
+## 23. Oteryn v2 adapter boundary
+
+Canonical Oteryn code is in `blakinio/Oteryn-v2`.
+
+A future Oteryn adapter is implemented through a separate Oteryn task/branch/PR and must integrate with that repository's accepted native E2E architecture (`ADR-0007`) or a deliberately versioned cross-repository semantic boundary.
+
+It must not:
+
+- add Tibia wire compatibility to satisfy this harness;
+- create a second Oteryn E2E scenario authority;
+- create authentication/session authority;
+- mutate server-authoritative state through hidden client hooks;
+- expose unauthenticated production control.
+
+Oteryn retains `protocol-oteryn`; client sends intent; server remains authoritative.
+
+## 24. Differential E2E
+
+Comparison profiles are explicit and versioned.
+
+Default classifications:
+
+```text
+position                 NORMALIZED_EXACT
+hp                       NORMALIZED_EXACT
+mana                     NORMALIZED_EXACT
+conditions               SET_EQUIVALENT or profile NORMALIZED_EXACT
+target_state              NORMALIZED_EXACT
+inventory                 NORMALIZED_EXACT
+containers                ORDERED_EQUIVALENT when order/index is semantic
+equipment                 NORMALIZED_EXACT
+cooldown_state            NORMALIZED_EXACT
+cooldown_timing           TOLERANCE
+visual_effect_semantics   REFERENCE_ONLY unless both expose stable semantics
+pixel/frame output        NOT_COMPARABLE by default
+latency                   TOLERANCE or REFERENCE_ONLY
+protocol bytes            NOT_COMPARABLE
+internal object layout    NOT_COMPARABLE
+renderer implementation  NOT_COMPARABLE
+```
+
+A mismatch exists only if both sides support/observe the same normalized field at the same semantic checkpoint, neither value is UNKNOWN and the candidate violates the selected equivalence/tolerance rule.
+
+Missing official observation is a coverage gap, not proof of Oteryn failure.
+
+## 25. Implementation phases
+
+The previous P1-before-P2 UI ordering is superseded. Core semantics and recorder primitives precede operator UI and all real actions.
+
+### P0 — Contracts and falsification baseline
+
+- hardened architecture;
+- execution safety contract;
+- semantic adapter contract;
+- implementation prompt;
+- independent audit prompt.
+
+### P1 — Package A control-core
+
+No network listener and `runtime_access: none`.
 
 Deliver:
 
-- backend process;
-- loopback Control API;
-- browser UI matching the dense approved layout;
-- CLI status/session/run inspection;
-- live normalized event stream;
-- read-only runtime/survey data;
-- artifact browser/export;
-- no mutating action dispatch.
+- typed models;
+- scenario parser/validator;
+- deterministic predicates/step IDs;
+- run/action lifecycle;
+- MutationCoordinator;
+- cancellation generation/STOP semantics;
+- idempotency ledger;
+- budget ledger;
+- Recorder primitives and multi-clock event model;
+- privacy constructors;
+- artifact staging/finalization model;
+- deterministic fake adapter/manual clock;
+- complete race/restart/privacy tests.
 
-### P2 — Scenario Engine and one-step experiments
+### P2 — Package B loopback Control API + browser + CLI
 
-Deliver:
+Consume merged Package A. Browser and CLI are thin clients over one backend. No official-client mutation.
 
-- scenario schema/validator;
-- preconditions/assertions/timeouts/budgets;
-- Manual Quick Action -> one-step experiment mapping;
-- cancellation/STOP ALL;
-- fake adapter and deterministic tests;
-- still no real official-client mutation until P3 authority integration is proven.
+### P3 — Package C Surveyor/read-only integration
 
-### P3 — Official-client bounded actions
+Only after an accepted exact Surveyor schema/interface exists. Add read-only Track A/survey views and evidence references.
 
-Integrate current Track A authority and begin with the smallest proven action set such as turn/move or another already-supported semantic action. Every action requires reference-path parity and the applicable action evidence gate.
+### P4 — Package D official Track A mutation adapter
 
-### P4 — Recorder expansion
+Separate runtime-sensitive task. Integrate only the smallest already-proven action surface through current Track A authority/guard infrastructure.
 
-Add bounded network correlation, targeted traces, state/screenshot checkpoints and compact agent bundles.
+### P5 — Recorder/capture expansion
 
-### P5 — Research suites
+Add bounded network metadata, targeted traces and screenshot checkpoints for real actions. Recorder core already exists from P1; this phase adds runtime-specific producers, not the first recorder semantics.
 
-Add suites only as capability evidence exists:
+### P6 — Research suites
 
-- movement;
-- healing/spells/consumables;
-- inventory/containers;
-- combat/targeting;
-- chat;
-- equipment/conditions.
+Add feature families only as read/action evidence exists.
 
-### P6 — Oteryn v2 adapter
+### P7 — Package E Oteryn v2 adapter
 
-Separate repository task/PR in `blakinio/Oteryn-v2`; no implementation in the frozen historical Rust subtree here.
+Separate Oteryn-v2 repository task/PR aligned with ADR-0007.
 
-### P7 — Differential E2E
+### P8 — Differential E2E
 
-Run the same semantic scenario against official reference and Oteryn, compare normalized outcomes, and produce machine-readable mismatch reports usable by Oteryn CI/release gates where that repository explicitly adopts them.
+Run the same semantic scenarios against official reference and Oteryn and emit versioned mismatch/coverage reports.
 
-## 14. MVP acceptance target
+## 26. Package A implementation-readiness gate
 
-The first useful operator release should support:
+Package A may start only when a fresh independent audit can answer YES to:
+
+> Can a competent implementation agent implement Package A solely from repository documentation without inventing concurrency, authority, cancellation, retry, budget, privacy, event-ordering, artifact or recovery semantics?
+
+Minimum required falsification coverage is normative in `TIBIA_RE_CONTROL_CENTER_EXECUTION_V1.md` and the independent-audit prompt.
+
+## 27. First useful operator release
+
+Expected after Packages A-C:
 
 ```text
 Browser GUI                          YES
 CLI                                  YES
+Loopback versioned Control API       YES
 Read-only runtime status             YES
+Capability/evidence/freshness views  YES
 Live normalized event stream         YES
 Scenario catalogue/browser           YES
-One-step experiment model            YES
+Fake one-step experiments             YES
 STOP ALL / bounded cancellation       YES
 Artifact/run browser                  YES
 agent_bundle.json                     YES
-real official-client mutation         NO until P3 gates are separately proven
-Oteryn adapter                        NO until P6 separate repo task
+real official-client mutation         NO until Package D separately admitted
+Oteryn adapter                        NO until separate Oteryn task
 ```
 
-## 15. Non-goals
+## 28. Non-goals
 
-The Control Center must not:
+Control Center must not:
 
-- replace Track A admission/lease/registration mechanisms;
+- replace Track A admission/lease/registration/supervisor systems;
 - infer authority from a visible process/window;
 - persist credentials or secret-bearing auth/session data;
-- expose an unauthenticated remote-control service by default;
-- turn UI toggles into permission grants;
-- implement a second Tibia game protocol stack as part of the harness;
-- make the historical `oteryn-client/**` subtree canonical again;
-- claim official-vs-Oteryn byte-level protocol parity;
-- automatically promote RE coverage from correlation alone.
+- expose unauthenticated remote control by default;
+- turn UI toggles into authority;
+- create a raw gameplay automation bypass around Scenario Engine/Recorder;
+- implement a second Tibia protocol stack for the harness;
+- claim byte-level official-vs-Oteryn parity;
+- claim causal RE proof from timestamp correlation alone;
+- make historical `oteryn-client/**` canonical;
+- create a second Oteryn E2E platform.
 
-## 16. Implementation language guidance
+## 29. Implementation language guidance
 
-For the official Track A side, Python is the preferred initial orchestration language because the Surveyor/runtime tooling is already Python and this minimizes bridge duplication. The web UI should remain a thin browser client using ordinary HTML/CSS/JavaScript unless repository inspection proves an existing approved frontend stack should be reused.
+Python remains the preferred first orchestration language on the official Track A side because current Surveyor/runtime tooling is Python and reuse minimizes bridge duplication.
 
-This is guidance, not permission to add dependencies. The implementation task must inspect current dependency/test policy and justify every new runtime dependency.
+The web UI should remain thin HTML/CSS/JavaScript unless current repository evidence justifies another existing stack.
 
-## 17. Required first implementation split
+This is guidance only. Every dependency remains subject to current repository dependency/test policy.
 
-Do not implement P1-P7 in one PR. The recommended first implementation package is:
+## 30. Required package split
+
+Do not collapse the programme into one PR.
 
 ```text
-Task A: control-core contracts + fake adapter + deterministic tests
-Task B: read-only HTTP/UI/CLI consuming Task A
-Task C: Surveyor integration after #592 accepted state is known
-Task D: Track A mutation adapter only after a current runtime/action admission task exists
-Task E: Oteryn-v2 adapter as a separate cross-repository task
+Package A  control-core + Recorder primitives + fake adapter + deterministic tests
+Package B  loopback Control API + browser + CLI
+Package C  accepted Surveyor/read-only integration
+Package D  separately admitted official Track A mutation adapter
+Package E  separately governed Oteryn-v2 adapter
 ```
 
-Shared public contracts have one producer at a time. Later workers consume the merged producer rather than redefining it.
+Shared public contracts have one producer at a time. Later workers consume merged contracts rather than redefining them.

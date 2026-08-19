@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260819-track-a-secret-vault-bootstrap
-status: implementing
+status: validating
 agent: ChatGPT
 branch: ci/OTC-20260819-track-a-secret-vault-bootstrap
 base_branch: main
@@ -21,19 +21,28 @@ mutation_authorized: vault_state_only
 
 Objective: seed `TIBIA_TEST_EMAIL` and `TIBIA_TEST_PASSWORD` from GitHub Actions Secrets into an encrypted machine-local vault on `synology-otclient-01`, without persisting plaintext credentials or exposing them in logs, argv, artifacts, repository files, or the Tibia client environment.
 
-Design:
+Implemented design:
 
-- persistent encrypted CMS envelope under the self-hosted runner `/work` volume;
-- RSA private key generated only on Synology and stored mode `0600`;
-- repository Secrets consumed only by a bounded self-hosted seeding step with shell tracing disabled;
+- persistent encrypted CMS envelope under `/work/_otclient_tibia_re_state/secret-vault` in the self-hosted runner Docker volume;
+- RSA-4096 private key generated only on Synology, mode `0600`; vault directory mode `0700`;
+- Secrets consumed only by the bounded self-hosted seed step with shell tracing disabled and core dumps disabled;
 - plaintext credential frame exists only in process memory during sealing/use;
-- later consumers decrypt directly to memory and create a sealed memfd for the existing native-auth transport;
-- this task does not perform login and does not expand PR #528 runtime admission.
+- `secret_vault.decrypt_to_sealed_memfd()` decrypts directly to memory and returns a fully sealed anonymous memfd for the existing native-auth transport;
+- final workflow is `workflow_dispatch` only; the temporary branch push trigger was removed after the first successful seed;
+- this task performs no Tibia login and does not expand PR #528 runtime admission.
 
-Acceptance:
+Verified 2026-08-19:
 
-1. runner path and OpenSSL availability verified;
-2. workflow seeds vault without printing secret values;
-3. dummy local round-trip validates encryption/decryption and exact credential frame format;
-4. final workflow is manual `workflow_dispatch` only after initial seeding;
-5. no plaintext credential file is created.
+```text
+runner: synology-otclient-01
+runner container: otclient-synology-runner
+persistent mount: /work -> Docker volume otclient-runner_runner_work
+bootstrap job result: SUCCESS
+vault directory mode: 700
+private key mode: 600
+CMS envelope mode: 600
+SECRET_VAULT_VERIFY=PASS
+plaintext credential file created: NO
+```
+
+A normal Synology or runner-container restart reuses the encrypted vault from the persistent Docker volume and does not require GitHub Secrets again. A destructive rebuild that removes that volume requires one manual `Track A secret vault bootstrap` workflow dispatch to reseed the machine-local vault.

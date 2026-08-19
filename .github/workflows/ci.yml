@@ -26,6 +26,7 @@ jobs:
       compile: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'merge_group') && 'true' || steps.filter.outputs.compile }}
       fast: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'merge_group') && 'true' || steps.filter.outputs.fast }}
       lua: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'merge_group') && 'true' || steps.filter.outputs.lua }}
+      analysis: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'merge_group') && 'true' || steps.filter.outputs.analysis }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
@@ -48,7 +49,6 @@ jobs:
               - "vcpkg-configuration.json"
               - "CMakeLists.txt"
               - "CMakePresets.json"
-              - ".github/workflows/ci.yml"
               - ".github/workflows/reusable-build-linux.yml"
             fast:
               - "src/**"
@@ -78,9 +78,20 @@ jobs:
               - "vcpkg-configuration.json"
               - "CMakeLists.txt"
               - "CMakePresets.json"
-              - ".github/workflows/ci.yml"
               - ".github/workflows/reusable-build-linux.yml"
               - ".github/workflows/reusable-tests-lua.yml"
+            analysis:
+              - "src/**"
+              - "tests/**"
+              - "modules/**"
+              - "mods/**"
+              - "data/**"
+              - "**/*.lua"
+              - "**/*.cpp"
+              - "**/*.cc"
+              - "**/*.cxx"
+              - "**/*.h"
+              - "**/*.hpp"
 
   checks:
     name: Fast Checks
@@ -91,6 +102,8 @@ jobs:
       checks: write
       pull-requests: read
     uses: ./.github/workflows/reusable-checks.yml
+    with:
+      run_analysis: ${{ needs.changes.outputs.analysis == 'true' }}
 
   tests-lua:
     name: Lua Syntax
@@ -232,6 +245,7 @@ jobs:
               "compile": outputs.get("compile"),
               "fast": outputs.get("fast"),
               "lua": outputs.get("lua"),
+              "analysis": outputs.get("analysis"),
           }
           for scope, value in scopes.items():
               if value not in {"true", "false"}:

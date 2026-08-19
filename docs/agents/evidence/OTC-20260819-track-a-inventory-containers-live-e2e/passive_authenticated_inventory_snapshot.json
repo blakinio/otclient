@@ -1,0 +1,64 @@
+{
+  "schema": "track-a-inventory-containers-passive-live-v1",
+  "task": "OTC-20260819-track-a-inventory-containers-live-e2e",
+  "source_pr": 582,
+  "trusted_main": "5d1a09dcb5b3abc22d341951b81d557495d755a6",
+  "runtime_access": "read_only",
+  "target": {
+    "container": "otclient-track-a-kasmvnc",
+    "display": ":1",
+    "pid": 11365,
+    "client_count_in_target": 1,
+    "other_host_client_candidates": 0,
+    "client_size": 52109920,
+    "client_sha256": "ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8",
+    "window_title_pattern": "Tibia - <character>",
+    "target_uniqueness": "PROVEN"
+  },
+  "controller_plane": {
+    "canonical_registration": "ABSENT",
+    "stale_lease_generation": 16,
+    "stale_lease_owner_task": "OTC-20260818-native-login-to-ingame-e2e",
+    "stale_lease_expired_before_preflight": true,
+    "stale_lease_owner_archived_released": true,
+    "canonical_mutation_authorized": false
+  },
+  "passive_frame": {
+    "geometry": "3440x1229",
+    "state": "IN_GAME",
+    "world_view_rendered": true,
+    "equipment_panel_visible": true,
+    "open_container_title": "Backpack",
+    "open_container_visible_slots": 8,
+    "open_container_visible_occupied_slots": 6,
+    "open_container_visible_empty_slots": 2,
+    "visible_stack_counts": [50, 8, 7],
+    "capacity_value_visible": 410,
+    "soul_value_visible": 100,
+    "hp_value_visible": "155/155",
+    "mana_value_visible": "60/60"
+  },
+  "coverage_effect": {
+    "D10": "AUTHENTICATED_VISIBLE_EQUIPMENT_STATUS_VALUE_SNAPSHOT",
+    "D13": "AUTHENTICATED_VISIBLE_STACK_COUNT_VALUES",
+    "D15": "AUTHENTICATED_OPEN_BACKPACK_CONTAINER_SNAPSHOT",
+    "D09": "AUTHENTICATED_INVENTORY_SURFACE_VISIBLE_NO_MESSAGE_EVENT_CORRELATION",
+    "D11": "STATIC_CAUSAL_ROUTE_PLUS_AUTHENTICATED_VISIBLE_ENDPOINT_NO_CHANGE_EVENT",
+    "D16": "NO_STIMULUS_NO_RUNTIME_PROPAGATION_EVENT",
+    "D17_D22": "NOT_OBSERVED_IN_THIS_FRAME"
+  },
+  "safety": {
+    "gui_input_sent": false,
+    "credentials_accessed": false,
+    "login_performed": false,
+    "process_mutation": false,
+    "gameplay_action_sent": false,
+    "transaction_performed": false,
+    "raw_frame_committed_or_uploaded": false
+  },
+  "fact_boundary": {
+    "fact": "Exact-current unique client and the listed rendered UI values are directly observed.",
+    "inference": "The authenticated visible backpack/equipment UI is consistent with the previously proven current-build storage/controller architecture.",
+    "unknown": "No inbound message event, storage mutation event, serialization, server acknowledgement, or restart/relogin causality is established by this passive frame."
+  }
+}

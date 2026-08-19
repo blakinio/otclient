@@ -23,84 +23,38 @@ env:
   AUTH_SOCKET: /tmp/otclient-native-login-current-sha/auth.sock
   CHARACTER_SOCKET: /tmp/otclient-native-login-current-sha/character.sock
   CLIENT_VERSION: 15.32.current.ed5469
+  TARGETS: player_protocol_handler,30bf620,tibia::game::TPlayerProtocolMessageHandler;gameserver_game_session,30aff80,tibia::game::TGameserverGameSession;worldmap_handler,30c01d0,tibia::worldmap::TWorldmapProtocolMessageHandler
 
 jobs:
   execute:
     runs-on: [otclient, synology]
-    timeout-minutes: 12
+    timeout-minutes: 7
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-
-      - name: Re-prove current binary and rebuild helper set
+      - name: Verify exact client and persisted current-SHA helper set
         shell: bash
         run: |
           set +x
           set -Eeuo pipefail
           unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
           [[ "$RUNNER_NAME" == synology-otclient-01 ]]
-          docker inspect "$CONTAINER" >/dev/null
           test "$(docker inspect "$CONTAINER" --format '{{.State.Status}}')" = running
-          work="$RUNNER_TEMP/native-login-rebuild"
-          rm -rf "$work"; mkdir -m700 -p "$work"
-          docker cp "$CONTAINER:$CLIENT" "$work/client"
-          trap 'rm -rf "$work"' EXIT
-          test "$(stat -c %s "$work/client")" = "$EXPECTED_SIZE"
-          echo "$EXPECTED_SHA  $work/client" | sha256sum -c -
-          python3 tools/tibia_runtime_bridge/current_sha_native_login_gate.py "$work/client" "$work/gates.env"
-          . "$work/gates.env"
-          test -n "$TARGETS"; test -n "$CHARACTER_CONTROLLER_VPTR"
-
-          cp tools/tibia_runtime_bridge/experimental_auth.cpp "$work/auth-current.cpp"
-          python3 - "$work/auth-current.cpp" <<'PY'
-          import pathlib,sys
-          p=pathlib.Path(sys.argv[1]); s=p.read_text()
-          replacements={
-            'constexpr std::uint64_t kClientSize = 51965216;':'constexpr std::uint64_t kClientSize = 52109920;',
-            'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe':'ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8',
-            'constexpr std::uintptr_t kGameClientVptrOffset = 0x3076908;':'constexpr std::uintptr_t kGameClientVptrOffset = 0x30adce8;',
-            'constexpr std::uintptr_t kColdAuthTargetOffset = 0xd06850;':'constexpr std::uintptr_t kColdAuthTargetOffset = 0xd196f0;',
-            '0x48, 0x83, 0xc4, 0x48, 0x5b, 0x5d, 0xe9, 0x2d,\n    0x38, 0x9e, 0xff, 0x0f, 0x1f, 0x44, 0x00, 0x00,':'0x48, 0x83, 0xc4, 0x48, 0x5b, 0x5d, 0xe9, 0x3d,\n    0x60, 0x9c, 0xff, 0x0f, 0x1f, 0x44, 0x00, 0x00,'
-          }
-          for a,b in replacements.items():
-            if a not in s: raise SystemExit('auth source fence missing: '+a[:40])
-            s=s.replace(a,b,1)
-          p.write_text(s)
-          PY
-
-          build="$work/build"; mkdir -m700 "$build"
-          if command -v g++ >/dev/null && pkg-config --exists Qt6Core 2>/dev/null; then
-            cxx=g++
-            qtc="$(pkg-config --cflags Qt6Core)"; qtl="$(pkg-config --libs Qt6Core)"
-            $cxx -std=c++20 -fPIC -shared -O2 -Wall -Wextra -Wpedantic $qtc tools/tibia_runtime_bridge/bridge.cpp -o "$build/bridge.so" $qtl -ldl -pthread
-            $cxx -std=c++20 -fPIC -shared -O2 -Wall -Wextra -Wpedantic $qtc "$work/auth-current.cpp" -o "$build/auth.so" $qtl -ldl -pthread
-            $cxx -std=c++20 -fPIC -shared -O2 -Wall -Wextra -Wpedantic $qtc tools/tibia_runtime_bridge/experimental_character_control_current.cpp -o "$build/character.so" $qtl -ldl -pthread
-            $cxx -std=c++20 -O2 -Wall -Wextra -Wpedantic tools/tibia_runtime_bridge/current_sha_secret_ingress.cpp -o "$build/secret-ingress"
-          else
-            docker run --rm --volumes-from otclient-synology-runner ubuntu:24.04 bash -lc "apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends g++ pkg-config qt6-base-dev >/dev/null && cxx=g++ && qtc=\"\$(pkg-config --cflags Qt6Core)\" && qtl=\"\$(pkg-config --libs Qt6Core)\" && \$cxx -std=c++20 -fPIC -shared -O2 \$qtc '$GITHUB_WORKSPACE/tools/tibia_runtime_bridge/bridge.cpp' -o '$build/bridge.so' \$qtl -ldl -pthread && \$cxx -std=c++20 -fPIC -shared -O2 \$qtc '$work/auth-current.cpp' -o '$build/auth.so' \$qtl -ldl -pthread && \$cxx -std=c++20 -fPIC -shared -O2 \$qtc '$GITHUB_WORKSPACE/tools/tibia_runtime_bridge/experimental_character_control_current.cpp' -o '$build/character.so' \$qtl -ldl -pthread && \$cxx -std=c++20 -O2 '$GITHUB_WORKSPACE/tools/tibia_runtime_bridge/current_sha_secret_ingress.cpp' -o '$build/secret-ingress'"
-          fi
-          test -s "$build/bridge.so"; test -s "$build/auth.so"; test -s "$build/character.so"; test -x "$build/secret-ingress"
-          docker exec -u 0 "$CONTAINER" mkdir -p "$TASK_ROOT"
-          docker cp "$build/bridge.so" "$CONTAINER:$TASK_ROOT/bridge.so"
-          docker cp "$build/auth.so" "$CONTAINER:$TASK_ROOT/auth.so"
-          docker cp "$build/character.so" "$CONTAINER:$TASK_ROOT/character.so"
-          docker cp "$build/secret-ingress" "$CONTAINER:$TASK_ROOT/secret-ingress"
-          docker exec -u 0 "$CONTAINER" chown -R kasm-user:kasm-user "$TASK_ROOT"
-          docker exec -u 0 "$CONTAINER" chmod 700 "$TASK_ROOT" "$TASK_ROOT/secret-ingress"
-          docker exec -u 0 "$CONTAINER" chmod 600 "$TASK_ROOT/bridge.so" "$TASK_ROOT/auth.so" "$TASK_ROOT/character.so"
-          printf '%s\n' "$TARGETS" > "$RUNNER_TEMP/native-login-targets"
-          echo CURRENT_HELPER_REBUILD=PASS
+          test "$(docker exec -u kasm-user "$CONTAINER" stat -c %s "$CLIENT")" = "$EXPECTED_SIZE"
+          got="$(docker exec -u kasm-user "$CONTAINER" sha256sum "$CLIENT" | awk '{print $1}')"
+          test "$got" = "$EXPECTED_SHA"
+          for f in bridge.so auth.so character.so secret-ingress; do
+            docker exec -u kasm-user "$CONTAINER" test -s "$TASK_ROOT/$f"
+          done
+          docker exec -u kasm-user "$CONTAINER" strings "$TASK_ROOT/auth.so" | grep -qx "$EXPECTED_SHA"
+          docker exec -u kasm-user "$CONTAINER" strings "$TASK_ROOT/character.so" | grep -qx "$EXPECTED_SHA"
+          echo CURRENT_HELPER_SET=PASS
           echo SECRET_ACCESS=false
 
-      - name: Relaunch only exact current client with verified helper preload
+      - name: Relaunch the single exact client with helper preload
         shell: bash
         run: |
           set +x
           set -Eeuo pipefail
           unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
-          targets="$(cat "$RUNNER_TEMP/native-login-targets")"
           readarray -t pids < <(docker exec -i -u kasm-user -e CLIENT="$CLIENT" "$CONTAINER" python3 - <<'PY'
           import os,pathlib
           expected=os.path.realpath(os.environ['CLIENT'])
@@ -114,7 +68,7 @@ jobs:
           test "${#pids[@]}" = 1
           old_pid="${pids[0]}"; [[ "$old_pid" =~ ^[0-9]+$ ]]
           docker exec -u kasm-user "$CONTAINER" kill -TERM "$old_pid"
-          for _ in $(seq 1 50); do docker exec "$CONTAINER" test ! -d "/proc/$old_pid" && break; sleep .1; done
+          for _ in $(seq 1 60); do docker exec "$CONTAINER" test ! -d "/proc/$old_pid" && break; sleep .1; done
           docker exec "$CONTAINER" test ! -d "/proc/$old_pid"
           docker exec -u kasm-user "$CONTAINER" rm -f "$BRIDGE_SOCKET" "$AUTH_SOCKET" "$CHARACTER_SOCKET"
           client_dir="${CLIENT%/client}"
@@ -127,7 +81,7 @@ jobs:
             -e OTCLIENT_TIBIA_RE_CHARACTER_SOCKET="$CHARACTER_SOCKET" \
             -e OTCLIENT_TIBIA_RE_CLIENT_VERSION="$CLIENT_VERSION" \
             -e OTCLIENT_TIBIA_RE_BINARY_SHA256="$EXPECTED_SHA" \
-            -e OTCLIENT_TIBIA_RE_TARGETS="$targets" \
+            -e OTCLIENT_TIBIA_RE_TARGETS="$TARGETS" \
             "$CONTAINER" sh -lc "cd '$client_dir' && exec ./client"
           for _ in $(seq 1 120); do
             ok=true
@@ -139,16 +93,19 @@ jobs:
           runtime_pid="$(docker exec -i -u kasm-user -e SOCKET="$BRIDGE_SOCKET" "$CONTAINER" python3 - <<'PY'
           import json,os,socket,struct
           s=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM); s.settimeout(5); s.connect(os.environ['SOCKET'])
-          pid,uid,gid=struct.unpack('3i',s.getsockopt(socket.SOL_SOCKET,socket.SO_PEERCRED,12)); s.sendall(b'PING\n'); raw=b''
+          pid,uid,gid=struct.unpack('3i',s.getsockopt(socket.SOL_SOCKET,socket.SO_PEERCRED,12)); assert uid==os.geteuid()
+          s.sendall(b'PING\n'); raw=b''
           while b'\n' not in raw: raw+=s.recv(4096)
-          d=json.loads(raw.split(b'\n',1)[0]); assert d.get('ok') and d.get('pid')==pid; print(pid)
+          d=json.loads(raw.split(b'\n',1)[0]); assert d.get('ok') and d.get('pid')==pid
+          assert d.get('client_sha256')=='ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8'
+          assert d.get('client_size')==52109920
+          print(pid)
           PY
           )"
           [[ "$runtime_pid" =~ ^[0-9]+$ ]]
           printf '%s\n' "$runtime_pid" > "$RUNNER_TEMP/native-login-pid"
           echo HELPER_RUNTIME_RELAUNCH=PASS
           echo SECRET_ACCESS=false
-          echo LOGIN=false
 
       - name: Bounded one-shot native authentication
         shell: bash
@@ -164,7 +121,7 @@ jobs:
           unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
           echo NATIVE_AUTH_ONE_SHOT=DISPATCHED
 
-      - name: Confirm unique native character
+      - name: Confirm singleton character through native model
         shell: bash
         run: |
           set +x

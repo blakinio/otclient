@@ -1,16 +1,16 @@
 ---
 task_id: OTC-20260819-track-a-economy-panels-runtime-readonly
-status: promotion_pending
-session_role: coordinator
+status: completed
+session_role: released
 project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: runtime_read_only_semantic_validation
-phase: coordinator-promotion
+phase: closed
 source_pr: 550
 source_branch: research/OTC-20260819-track-a-economy-panels-runtime-readonly
 source_head: 32294c6491e56447c2b5f82112f3c65bd9732d81
-source_disposition: close_unmerged_after_promotion
+source_disposition: closed_unmerged_superseded
 coordinator_review: 4971299542
 coordinator_decision: ACCEPT_WITH_EDITS
 open_material_findings_after_repair: 0
@@ -18,9 +18,17 @@ bounded_task_result: BLOCKED_RUNTIME_ADMISSION_UNAVAILABLE
 canonical_live_G24_G31_status_delta: NONE
 diagnostic_gui_observations_promoted: false
 promotion_base: ec936a7670a5db0c56099000b7f01c35ff119c1f
-promotion_pr: pending
-promotion_head: pending
-promotion_merge: pending
+promotion_pr: 579
+promotion_head: 827840899fd3b4fcb4948b75a5e6b479bf5a3204
+promotion_merge: bc6c14c972181fc73209cd20d95cad43f80fd3c9
+promotion_merge_method: squash
+promotion_changed_paths: 6
+promotion_ahead_by: 3
+promotion_behind_by: 0
+promotion_ci_run: 32244909100
+promotion_ci_result: SUCCESS
+promotion_review: 4971322909
+promotion_review_threads_open: 0
 runtime_access: none
 runtime_owner_task: NOT_APPLICABLE
 runtime_namespace: NOT_APPLICABLE
@@ -33,14 +41,23 @@ process_control_authorized: false
 transaction_authorized: false
 physical_e2e_required: true
 physical_e2e_result: NOT_ACHIEVED_PROMOTION_GRADE
-ownership_release_state: pending_promotion_merge
+e2e_result: BLOCKED_BY_INVALID_RUNTIME_ADMISSION
+ownership_released: true
 ---
 
-# TIBIA-RE-ECONOMY-PANELS — bounded runtime-readonly archive checkpoint
+# TIBIA-RE-ECONOMY-PANELS — terminal bounded runtime-readonly archive
 
-## Terminal bounded result
+## Terminal disposition
 
-Source #550 is accepted for terminal closeout as a bounded research attempt that hit a valid fail-closed runtime-admission blocker.
+The bounded #550 economy-panels runtime-readonly task is completed and ownership is released. It closes as a **blocked research result**, not as successful promotion-grade live validation of G24-G31.
+
+Source PR #550 was preserved as provenance and closed unmerged as superseded. Clean coordinator promotion PR #579 squash-merged to `main` as:
+
+```text
+bc6c14c972181fc73209cd20d95cad43f80fd3c9
+```
+
+## Canonical bounded result
 
 ```yaml
 bounded_task_result: BLOCKED_RUNTIME_ADMISSION_UNAVAILABLE
@@ -48,26 +65,29 @@ canonical_live_G24_G31_status_delta: NONE
 physical_e2e_promotion_grade: NOT_ACHIEVED
 ```
 
-This task does **not** mark G24-G31 PASS or DONE.
+No G24-G31 live row becomes PASS or DONE from this task.
 
-## Why diagnostic GUI observations do not promote
+## Governance defect and correction
 
-The GUI sequence was executed while the task used the unsupported Track A value:
+The GUI sequence was executed while the source task used the unsupported Track A admission value:
 
 ```text
 runtime_access=bounded_gui_readonly_navigation
 ```
 
-Workflow run `32240817177` failed the deterministic admission-policy audit exactly on that unsupported value. After discovery, the source corrected itself to `runtime_access:none`, disabled GUI input and recorded the earlier observations as diagnostic-only.
+Workflow run `32240817177` failed the deterministic admission-policy audit exactly on that unsupported value. The source correctly reclassified all affected GUI semantics as diagnostic-only and then changed its task state fail-closed to `runtime_access:none`, `gui_input_authorized:false`, and `mutation_authorized:false`.
 
-Final source head `32294c6491e56447c2b5f82112f3c65bd9732d81` passed:
+The corrected final source head `32294c6491e56447c2b5f82112f3c65bd9732d81` passed:
 
 ```text
 Track A governance 32242818055 = SUCCESS
 CI                 32242818269 = SUCCESS
+review threads = 0
 ```
 
 ## Diagnostic group disposition
+
+The following retained facts are intentionally **not promotion-grade**:
 
 ```yaml
 G24_market: NOT_REACHED
@@ -80,25 +100,37 @@ G30_world_transfer_main_character_store_surface: DIAGNOSTIC_OBSERVED_NOT_PROMOTA
 G31_generic_modal_flow: DIAGNOSTIC_OBSERVED_NOT_PROMOTABLE
 ```
 
-`NOT_REACHED` is not evidence that a feature is absent.
+`NOT_REACHED` is not evidence of feature absence.
 
 ## Safety result
 
-No credential re-entry or economy/account transaction is promoted or claimed. The retained evidence records no purchase, market-offer mutation, Tibia Coin transfer, reward claim, auction/trade commit, world-transfer commit, main-character-change commit, gameplay movement or process control. Temporary raw screenshots were deleted and are not committed.
+The retained source evidence records no credential re-entry, purchase, market-offer create/accept/cancel, Tibia Coin transfer, reward claim, character auction/trade commitment, world-transfer commitment, main-character-change commitment, due-payment action, gameplay movement, or process control. Temporary screenshots were deleted and are not committed.
 
-Coordinator closeout performs no live runtime operation.
+Coordinator audit/promotion/closeout performed no live runtime observation, GUI input, login, credential use, gameplay or economy/account transaction.
 
-## Dependency update
+## Independent coordinator audit
 
-Native-login task #528 is now terminal and ownership is released. That removes an old ownership dependency for future work, but does not retroactively legalize #550's invalidly admitted GUI sequence. Any future economy-panel live advancement must start from then-current main under a separately valid Track A admission and minimally revalidate the relevant panel semantics.
+Coordinator review `4971299542` classified source #550 `ACCEPT_WITH_EDITS` for bounded terminal closeout. The audit directly verified the governance failure log, final corrected task state, final exact-head CI/governance success and the source evidence's diagnostic boundaries.
 
-## Lifecycle
+The coordinator did **not** independently re-observe the source controller-plane snapshot under `runtime_access:none`; it is retained only as diagnostic historical provenance. The durable promotion decision depends on the proven invalid admission of the GUI sequence and the absence of any later valid minimal revalidation.
 
-Because source #550 is stale in Git ancestry, accepted evidence is promoted through a clean current-main branch rather than direct source merge.
+## Dependency update and future gate
 
-After clean promotion merges:
+Native-login #528 is now completed and ownership released. That removes one historical ownership conflict for future work, but does not retroactively validate #550's diagnostic sequence.
 
-1. close source #550 unmerged as superseded;
-2. finalize this archive to `status: completed`, `session_role: released`, `ownership_released: true`;
-3. preserve `canonical_live_G24_G31_status_delta: NONE`;
-4. do not perform new GUI input, login or economy transaction merely for closeout.
+Future promotion-grade G24-G31 live semantics require a separately admitted Track A runtime task from then-current `main`, followed by minimal revalidation under a supported and actually satisfied admission class. Such future work is a new programme gate and is not a blocker on closing this bounded #550 attempt.
+
+## Promotion validation
+
+Exact promotion head `827840899fd3b4fcb4948b75a5e6b479bf5a3204` passed:
+
+```text
+CI                     32244909100 = SUCCESS
+promotion review       4971322909
+open review threads    0
+ahead_by               3
+behind_by              0
+changed paths          6
+```
+
+The promotion contains only retained evidence, coordinator audit and this archive. No runtime workflow or behavioral code was merged.

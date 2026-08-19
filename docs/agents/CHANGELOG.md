@@ -50,4 +50,4 @@ Curated behavior/architecture log for discovery; not a replacement for Git histo
 - Runtime Lua syntax checks are scoped to `data`, `modules`, and `mods` after merged PR #2.
 - Reusable client unit/integration/Lua test foundation was merged in PR #3: message builders, fake resources/state, test environment, tile/thing builders, Lua runner/contracts, OTML fixtures, protocol loopback.
 - Standalone agent handoff is active in PR #4 and must be reconciled with this system.
-- Client-assets auto-install retains strict hashes, extraction and OTC-standard final paths.
+- Client-assets auto-install retains strict hashes and OTC-standard final paths.

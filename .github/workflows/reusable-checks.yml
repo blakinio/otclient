@@ -2,6 +2,12 @@ name: Reusable Fast Checks
 
 on:
   workflow_call:
+    inputs:
+      run_analysis:
+        description: Run informational C++/Lua static analysis for code-affecting changes
+        required: false
+        type: boolean
+        default: true
 
 permissions: {}
 
@@ -18,10 +24,12 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Install validation dependencies
+      - name: Install yamllint without apt
+        shell: bash
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libxml2-utils shellcheck yamllint
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check --no-input --user yamllint
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Run yamllint
         shell: bash
@@ -32,27 +40,35 @@ jobs:
             echo "No tracked YAML files found."
             exit 1
           fi
-          yamllint -c .yamllint.yaml "${yaml_files[@]}"
+          "$HOME/.local/bin/yamllint" -c .yamllint.yaml "${yaml_files[@]}"
 
       - name: Run actionlint from pinned source
         env:
           ACTIONLINT_COMMIT: 914e7df21a07ef503a81201c76d2b11c789d3fca  # v1.7.12
-        run: go run "github.com/rhysd/actionlint/cmd/actionlint@${ACTIONLINT_COMMIT}"
-
-      - name: Validate XML syntax
         shell: bash
         run: |
           set -euo pipefail
-          mapfile -d '' xml_files < <(git ls-files -z '*.xml')
-          if (( ${#xml_files[@]} == 0 )); then
-            echo "No tracked XML files found."
-            exit 0
-          fi
-          printf '%s\0' "${xml_files[@]}" | xargs -0 -n 1 xmllint --noout
+          go run "github.com/rhysd/actionlint/cmd/actionlint@${ACTIONLINT_COMMIT}"
+
+      - name: Validate XML syntax without apt
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import subprocess
+          import xml.etree.ElementTree as ET
+
+          files = subprocess.check_output(
+              ["git", "ls-files", "*.xml"], text=True
+          ).splitlines()
+          for path in files:
+              ET.parse(path)
+          print(f"Validated {len(files)} tracked XML files")
+          PY
 
   analysis:
     name: Informational static analysis
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    if: inputs.run_analysis && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     permissions:
       contents: read

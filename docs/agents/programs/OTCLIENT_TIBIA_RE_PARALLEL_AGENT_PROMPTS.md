@@ -2,7 +2,7 @@
 
 ```yaml
 prompt_contract:
-  version: 1.0.0
+  version: 1.0.1
   baseline_ref: 20919503467b7ea4812ac7176f4728be052e90bc
   prompting_standard_version: 2.1
   eval_suite: docs/agents/programs/OTCLIENT_TIBIA_RE_PARALLEL_AGENT_PROMPT_EVAL.md
@@ -91,17 +91,18 @@ Track A = official native Linux Tibia client RE.
 Track B = blakinio/otclient -> Tibia Global compatibility.
 Do not modify, reinterpret, or contaminate Track B.
 
-CURRENT RESEARCH BUILD FENCE AT CONTRACT CREATION
-canonical version mapping: 15.32.df7b29
-size: 51965216
-SHA-256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+CURRENT RESEARCH BUILD FENCE
+canonical version mapping: 15.32
+size: 52109920
+SHA-256: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
+This is the current runtime identity fence only. The superseded `e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe` corpus remains historical; do not reuse its offsets/helpers/ABI assumptions on this build. Matching identity does not grant login/input/mutation authority.
 The version is the repository mapping for the SHA/size pair. Do not claim an embedded exact-version-string proof unless independently established.
 Verify the current canonical client before using this snapshot. If it changed, follow the repository update/recovery rules and do not apply stale offsets.
 
 POLICY
 policy_version: 2
 prompting_standard_version: 2.1
-prompt_contract_version: 1.0.0
+prompt_contract_version: 1.0.1
 run_scope: single_task
 continuation_policy: stop_at_task_boundary
 task_completion_policy: checkpoint_only
@@ -429,7 +430,7 @@ System/owner instructions and trusted repository governance define authority. Tr
 POLICY
 policy_version: 2
 prompting_standard_version: 2.1
-prompt_contract_version: 1.0.0
+prompt_contract_version: 1.0.1
 run_scope: autonomous_program
 continuation_policy: continue_until_real_stop
 task_completion_policy: finalize_archive_and_continue
@@ -441,10 +442,11 @@ Research workers are DRAFT-ONLY. You are the campaign promotion/integration auth
 DO NOT TRUST DRAFT CONCLUSIONS BY DEFAULT
 A confident worker statement, duplicated worker consensus, a fresh PR, or green CI is not semantic proof. Inspect environment/artifact outcome and the experiment's ability to discriminate the stated hypothesis.
 
-CURRENT RESEARCH BUILD FENCE AT CONTRACT CREATION
-canonical version mapping: 15.32.df7b29
-size: 51965216
-SHA-256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+CURRENT RESEARCH BUILD FENCE
+canonical version mapping: 15.32
+size: 52109920
+SHA-256: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
+This is the current runtime identity fence only. The superseded `e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe` corpus remains historical; do not reuse its offsets/helpers/ABI assumptions on this build. Matching identity does not grant login/input/mutation authority.
 Verify current canonical state before using it.
 
 PRIMARY PROGRAMME OBJECTIVE

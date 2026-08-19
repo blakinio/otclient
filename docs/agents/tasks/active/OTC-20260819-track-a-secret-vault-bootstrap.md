@@ -12,8 +12,19 @@ owned_paths:
   - tools/tibia_runtime_bridge/secret_vault.py
   - docs/agents/tasks/active/OTC-20260819-track-a-secret-vault-bootstrap.md
 runtime_access: none
+runtime_owner_task: OTC-20260819-track-a-secret-vault-bootstrap
+runtime_namespace: none
+canonical_registration: NOT_APPLICABLE
+canonical_lease_generation: NOT_APPLICABLE
+registration_lease_generation: NOT_APPLICABLE
+gate_a: NOT_APPLICABLE
+generation_rebind: NOT_APPLICABLE
+gate_b: NOT_APPLICABLE
+bootstrap: NOT_APPLICABLE
+target_uniqueness: PROVEN
 credentials_allowed: repository_secrets_only_for_vault_seeding
 login_allowed: false
+gameplay_allowed: false
 mutation_authorized: vault_state_only
 ---
 
@@ -30,6 +41,8 @@ Implemented design:
 - `secret_vault.decrypt_to_sealed_memfd()` decrypts directly to memory and returns a fully sealed anonymous memfd for the existing native-auth transport;
 - final workflow is `workflow_dispatch` only; the temporary branch push trigger was removed after the first successful seed;
 - this task performs no Tibia login and does not expand PR #528 runtime admission.
+
+Admission classification: `runtime_access: none`. The workflow mutates only its task-owned encrypted vault state and does not observe, attach to, start, stop, register, lease, or otherwise operate the canonical Tibia runtime. Therefore canonical registration, lease generation, Gate A/rebind/Gate B and bootstrap are `NOT_APPLICABLE`; the vault target is unique to this task.
 
 Verified 2026-08-19:
 

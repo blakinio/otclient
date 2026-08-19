@@ -1,0 +1,227 @@
+name: Track A auth session coordinator audit
+
+on:
+  push:
+    branches:
+      - docs/OTC-20260819-track-a-auth-session-coordinator-audit
+    paths:
+      - .github/workflows/track-a-auth-session-coordinator-audit.yml
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/track-a-auth-session-coordinator-audit.yml
+
+permissions:
+  contents: read
+
+env:
+  EXPECTED_PACKED_SHA256: 1fc26d66cef90723d29293f177fcff41c8e937e7aac830f08e82c2f4c69eb354
+  EXPECTED_PACKED_SIZE: '10214529'
+  EXPECTED_UNPACKED_SHA256: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
+  EXPECTED_UNPACKED_SIZE: '52109920'
+  EXPECTED_BUILD_ID: d803d9695868713ef6ab0c3cf65f91212c9c6a62
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Prepare deterministic tooling
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          command -v curl
+          command -v readelf
+          python3 -m pip install --disable-pip-version-check --no-input --user 'pyelftools==0.32' 'capstone==5.0.6'
+          python3 - <<'PY'
+          import capstone, elftools
+          print('COORD_TOOLING=PASS')
+          print('CAPSTONE_VERSION=' + capstone.__version__)
+          PY
+
+      - name: Fetch exact package and emit independent control-flow evidence
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          r="$RUNNER_TEMP/auth-session-coordinator-audit"
+          mkdir -p "$r/bin" "$r/state" "$r/client" "$r/evidence"
+          trap 'rm -rf "$r/client" "$r/state" "$r/bin"' EXIT
+
+          cd "$r/bin"
+          curl --connect-timeout 10 --max-time 60 --retry 3 -fsSL \
+            -o wgcf https://github.com/ViRb3/wgcf/releases/download/v2.2.32/wgcf_2.2.32_linux_amd64
+          echo '2ff97f2201972ce582a424455d50a3719a380eef0cd1f3144f7779348e122a2c  wgcf' | sha256sum -c -
+          curl --connect-timeout 10 --max-time 60 --retry 3 -fsSL \
+            -o wireproxy.tgz https://github.com/windtf/wireproxy/releases/download/v1.1.3/wireproxy_linux_amd64.tar.gz
+          echo 'e88c1d090740373fc606c1bafd81d9a5eadc642cce5667616e20e9d7a444f51c  wireproxy.tgz' | sha256sum -c -
+          mkdir wp
+          tar -xzf wireproxy.tgz -C wp
+          cp "$(find wp -type f -name wireproxy -print -quit)" wireproxy
+          chmod 755 wgcf wireproxy
+
+          cd "$r/state"
+          timeout 30 "$r/bin/wgcf" register --accept-tos >/dev/null
+          timeout 30 "$r/bin/wgcf" generate >/dev/null
+          printf 'WGConfig = %s\n\n[Socks5]\nBindAddress = 127.0.0.1:25347\n' "$r/state/wgcf-profile.conf" > wireproxy.conf
+          "$r/bin/wireproxy" -c wireproxy.conf >"$r/wireproxy.log" 2>&1 &
+          wp_pid=$!
+          trap 'kill "$wp_pid" 2>/dev/null || true; rm -rf "$r/client" "$r/state" "$r/bin"' EXIT
+          for _ in $(seq 1 20); do
+            if curl --socks5-hostname 127.0.0.1:25347 --connect-timeout 5 --max-time 10 -fsS \
+              https://www.cloudflare.com/cdn-cgi/trace >"$r/trace" 2>/dev/null; then
+              break
+            fi
+            sleep 2
+          done
+          grep -Eq '^warp=(on|plus)$' "$r/trace"
+
+          u=https://static.tibia.com/launcher/tibiaclient-linux-current/bin/client.lzma
+          curl --socks5-hostname 127.0.0.1:25347 --connect-timeout 10 --max-time 90 --retry 3 \
+            --compressed -fL -A 'Mozilla/5.0 (X11; Linux x86_64)' -e "$u" -H 'Accept: */*' \
+            "$u" -o "$r/client/client.lzma"
+          test "$(stat -c %s "$r/client/client.lzma")" = "$EXPECTED_PACKED_SIZE"
+          actual_packed="$(sha256sum "$r/client/client.lzma" | awk '{print $1}')"
+          test "$actual_packed" = "$EXPECTED_PACKED_SHA256"
+
+          python3 - "$r/client/client.lzma" "$r/client/client" "$r/evidence/audit.txt" <<'PY'
+          import hashlib, lzma, pathlib, struct, sys
+          from capstone import Cs, CS_ARCH_X86, CS_MODE_64
+          from elftools.elf.elffile import ELFFile
+          from elftools.elf.relocation import RelocationSection
+
+          packed_path = pathlib.Path(sys.argv[1])
+          client_path = pathlib.Path(sys.argv[2])
+          evidence_path = pathlib.Path(sys.argv[3])
+          packed = packed_path.read_bytes()
+          prop = packed[32]
+          lc = prop % 9
+          rest = prop // 9
+          lp = rest % 5
+          pb = rest // 5
+          dict_size = int.from_bytes(packed[33:37], 'little')
+          raw = lzma.decompress(packed[45:], format=lzma.FORMAT_RAW,
+              filters=[{'id': lzma.FILTER_LZMA1, 'dict_size': dict_size, 'lc': lc, 'lp': lp, 'pb': pb}])
+          assert len(raw) == 52109920
+          assert hashlib.sha256(raw).hexdigest() == 'ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8'
+          client_path.write_bytes(raw)
+
+          with client_path.open('rb') as fh:
+              elf = ELFFile(fh)
+              sections = [(int(s['sh_offset']), int(s['sh_size']), int(s['sh_addr']), int(s['sh_flags']), s['sh_type'], s.name)
+                          for s in elf.iter_sections()]
+              relocs = {}
+              for sec in elf.iter_sections():
+                  if isinstance(sec, RelocationSection):
+                      for rel in sec.iter_relocations():
+                          e = rel.entry
+                          if int(e['r_info_type']) == 8 and 'r_addend' in e:
+                              relocs[int(e['r_offset'])] = int(e['r_addend'])
+
+          def file_off(va, size=1):
+              for off, sec_size, addr, flags, sec_type, name in sections:
+                  if sec_type != 'SHT_NOBITS' and addr <= va and va + size <= addr + sec_size:
+                      return off + va - addr
+              raise ValueError(hex(va))
+
+          def executable(va):
+              return any((flags & 4) and addr <= va < addr + sec_size
+                         for off, sec_size, addr, flags, sec_type, name in sections)
+
+          def u32(va): return struct.unpack_from('<I', raw, file_off(va, 4))[0]
+          def i32(va): return struct.unpack_from('<i', raw, file_off(va, 4))[0]
+
+          def qstr(base, index):
+              entry = base + index * 8
+              rel, n = u32(entry), u32(entry + 4)
+              assert n <= 512
+              return raw[file_off(base + rel, n):file_off(base + rel, n) + n].decode('utf-8')
+
+          metas = []
+          for obj in sorted(relocs):
+              if not all(obj + d in relocs for d in (8,16,24)):
+                  continue
+              try:
+                  sd, mdva, sm = relocs[obj+8], relocs[obj+16], relocs[obj+24]
+                  h = [u32(mdva + 4*i) for i in range(14)]
+                  rev, cls_idx, _, _, mc, mdata, _, _, _, _, _, _, _, sc = h
+                  if not (5 <= rev <= 20 and 0 <= sc <= mc <= 512 and mdata >= 14 and executable(sm)):
+                      continue
+                  cls = qstr(sd, cls_idx)
+                  methods=[]
+                  for idx in range(mc):
+                      row = mdva + 4*(mdata + idx*6)
+                      name=qstr(sd,u32(row)); argc=u32(row+4); params=u32(row+8); flags=u32(row+16)
+                      if argc > 32: raise ValueError
+                      p=[u32(mdva + 4*(params+j)) for j in range(argc+1)]
+                      methods.append((idx,name,argc,flags,p))
+                  metas.append((cls,obj,sd,mdva,sm,mc,sc,methods))
+              except Exception:
+                  continue
+          dedup={}
+          for m in metas: dedup[(m[3],m[0])] = m
+          metas=list(dedup.values())
+
+          wanted = {
+              'tibia::client::TGameClient': ['onRequestLoginWithCredentials','connectClientToGameserverWithExistingCredentials'],
+              'tibia::authentication::TLoginRequestUploader': ['loginSuccessful'],
+              'tibia::gamewindow::TCharacterSelectionController': ['requestCharacterLogin'],
+          }
+          out=[]
+          out.append('COORD_CURRENT_EXACT_CLIENT_SHA=PASS')
+          out.append('COORD_QMETA_COUNT=' + str(len(metas)))
+          md = Cs(CS_ARCH_X86, CS_MODE_64); md.detail=True
+          for cls,names in wanted.items():
+              hits=[m for m in metas if m[0] == cls]
+              assert len(hits)==1, (cls,len(hits))
+              m=hits[0]
+              _,obj,sd,mdva,sm,mc,sc,methods=m
+              out.append(f'CLASS={cls};OBJECT=0x{obj:x};STATIC=0x{sm:x};METHODS={mc};SIGNALS={sc}')
+              for idx,name,argc,flags,params in methods:
+                  if name in names:
+                      role='SIGNAL' if idx < sc else 'METHOD'
+                      out.append(f'QMETA={name};INDEX={idx};ROLE={role};ARGC={argc};FLAGS=0x{flags:x};PARAMS=' + ','.join(hex(x) for x in params))
+              code_off=file_off(sm,1)
+              ins=list(md.disasm(raw[code_off:code_off+0x380],sm))
+              out.append(f'DISASM_BEGIN={cls}')
+              for insn in ins:
+                  out.append(f'0x{insn.address:x}: {insn.mnemonic} {insn.op_str}')
+              out.append(f'DISASM_END={cls}')
+              # Inventory every RIP-relative LEA candidate and its first method_count relative targets.
+              for insn in ins:
+                  if insn.mnemonic != 'lea' or len(insn.operands) < 2:
+                      continue
+                  op=insn.operands[1]
+                  if op.type != 3: # X86_OP_MEM
+                      continue
+                  # capstone x86 RIP register id is rendered via reg_name; avoid hard-coded numeric id.
+                  if md.reg_name(op.mem.base) != 'rip':
+                      continue
+                  table=insn.address+insn.size+op.mem.disp
+                  try:
+                      targets=[table+i32(table+4*i) for i in range(mc)]
+                  except Exception:
+                      continue
+                  exec_count=sum(1 for t in targets if executable(t))
+                  if exec_count == mc:
+                      out.append(f'RIP_TABLE=0x{table:x};LEA=0x{insn.address:x};EXEC_TARGETS={exec_count}/{mc};TARGETS=' + ','.join(f'0x{x:x}' for x in targets))
+
+          evidence_path.write_text('\n'.join(out)+'\n', encoding='utf-8')
+          print('\n'.join(out))
+          PY
+
+          build_id="$(readelf -n "$r/client/client" | awk '/Build ID:/{print $3; exit}')"
+          test "$build_id" = "$EXPECTED_BUILD_ID"
+          printf 'COORD_BUILD_ID=%s\n' "$build_id" | tee -a "$r/evidence/audit.txt"
+
+          rm -f "$r/client/client" "$r/client/client.lzma"
+          test ! -e "$r/client/client"
+          test ! -e "$r/client/client.lzma"
+          printf 'COORD_RAW_CLIENT_RETAINED=false\n' | tee -a "$r/evidence/audit.txt"
+
+      - name: Upload sanitized coordinator evidence
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: auth-session-coordinator-audit-${{ github.run_id }}
+          path: ${{ runner.temp }}/auth-session-coordinator-audit/evidence/audit.txt
+          if-no-files-found: error
+          retention-days: 7

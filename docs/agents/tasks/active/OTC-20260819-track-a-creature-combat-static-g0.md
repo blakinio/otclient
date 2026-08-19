@@ -13,7 +13,7 @@ base_branch: main
 base_main: 82e5f435c3aa4172115bf7f6a0cd7a5cc6da3d50
 current_main_observed: cf90b84442dda730bdab93d8aa9f3236b7532ad8
 created: 2026-08-19T09:35:00+02:00
-updated: 2026-08-19T09:44:00+02:00
+updated: 2026-08-19T09:45:00+02:00
 risk: low
 execution_mode: github_only
 execution_reason: deterministic current-package static census and evidence processing; physical session is not required
@@ -114,7 +114,7 @@ producer state at 2026-08-19T09:44+02:00: IN_PROGRESS
 source-head CI run: 32228647686
 source-head CI / Required: SUCCESS
 source-head Track A governance: SUCCESS (run 32228647177)
-current task branch head after durable report checkpoint: 5accacb38d798699db2d773a015c85c23a4a0097
+report checkpoint head before this task-state update: 5accacb38d798699db2d773a015c85c23a4a0097
 ```
 
 The current producer is a deliberate external operation from the unchanged workflow source head. Do not rerun or duplicate it merely because the branch later receives report/task checkpoint commits.
@@ -154,10 +154,10 @@ recovery:
   generation: 2
   session_id: 20260819-creature-combat-g0
   session_started_at: 2026-08-19T09:35:00+02:00
-  checkpointed_at: 2026-08-19T09:44:00+02:00
-  last_progress_at: 2026-08-19T09:44:00+02:00
+  checkpointed_at: 2026-08-19T09:45:00+02:00
+  last_progress_at: 2026-08-19T09:45:00+02:00
   phase: producer-wait
-  exact_head: 5accacb38d798699db2d773a015c85c23a4a0097
+  exact_head: checkpoint-commit-created-by-this-update
   pull_request: 558
   active_operation: github-hosted current-package static producer
   external_run_ids:
@@ -178,7 +178,7 @@ recovery:
 
 ```yaml
 invocation_started_at: 2026-08-19T09:41:00+02:00
-last_progress_at: 2026-08-19T09:44:00+02:00
+last_progress_at: 2026-08-19T09:45:00+02:00
 ci_checks_for_current_head: 2
 ci_check_generation: producer-source-head
 terminal_ci_wait_started_at: null

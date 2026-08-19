@@ -12,32 +12,32 @@ implementation_authorized: false
 run_scope: single_task
 researcher_delivery: draft_pr_only
 promotion_authority: coordinator_only
-base_main: a1368bbecd5b6a6bc2447d2c7debb1141efc2dcb
+base_main: f41102ca88f152d6e0bc502d72455354db536334
 branch: docs/OTC-20260819-track-a-ui-settings-static-model
 session_id: chatgpt-20260819-ui-settings-002
 session_role: runtime_researcher
 execution_mode: github_actions_synology
-execution_reason: owner requested completion of the same UI/settings task; the remaining acceptance gate requires one bounded real-input persistence proof on a task-owned isolated Synology display
+execution_reason: owner requested completion; static research is complete and the remaining H10/H14 acceptance discriminator is one bounded reversible UI persistence experiment
 decomposition_decision: phased
-decomposition_reason: static discovery is complete; this continuation executes the smallest causal runtime persistence discriminator without using or mutating the canonical session
+decomposition_reason: run 32219692697 proved current exact source availability and isolated admission but exposed a pre-semantic client-process-selection harness defect; repair only that discriminator before retry
 context_pressure: medium
 context_growth: stable
 context_score: 8
 estimate_confidence: medium
 invocation_started_at: 2026-08-19T07:19:00+02:00
-updated_at: 2026-08-19T07:26:00+02:00
-last_progress_at: 2026-08-19T07:26:00+02:00
+updated_at: 2026-08-19T07:35:00+02:00
+last_progress_at: 2026-08-19T07:35:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: runtime_persistence_probe
+ci_check_generation: runtime_persistence_probe_v2
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 0
+repair_cycles_for_current_gate: 1
 context_reconstruction_attempts: 0
 stall_warnings: 0
 session_rotation_count: 1
-heavy_validation_runs: 3
+heavy_validation_runs: 4
 stale_takeover_count: 0
 human_interruptions: 0
 routing_contract: docs/agents/programs/OTCLIENT_TIBIA_RE_HYBRID_EXECUTION_ROUTING.md
@@ -61,29 +61,13 @@ owner_authorization_source: "owner continuation instruction on 2026-08-19: dokon
 
 # OTC-20260819 Track A UI/settings model and persistence proof
 
-## Current objective
+## Authority and live-state refresh
 
-Continue the owner-invoked `TIBIA-RE-UI-SETTINGS` task through the remaining causal acceptance boundary. The static discovery phase is already complete. This phase is limited to one task-owned, reversible settings persistence experiment:
+The owner invoked `TIBIA-RE-UI-SETTINGS` and then explicitly requested `dokoncz zadanie`. The alias package is now promoted on current `main` by merge `b6d4a3276d17c926c5840f82521571fdfaa126a0` (#543); its task archive is current `main@f41102ca88f152d6e0bc502d72455354db536334` (#548). The promoted mission requires settings recovery through reversible write and reload/restart persistence where authority permits, exact before/after and rollback, with shared GUI-input serialization.
 
-```text
-safe read
--> reversible fullscreen toggle
--> immediate readback
--> client restart using the same isolated HOME
--> persisted-state readback
--> exact inverse toggle
--> second restart
--> restored-state readback
--> complete task-owned cleanup
-```
+This researcher remains Draft-only and does not promote or merge its own claims. The runtime experiment is task-owned `ephemeral_isolated`, not canonical reuse/bootstrap/rebind.
 
-The selected stimulus is the current-build global `Alt+Return` / `ToggleFullscreen` action recovered by the static phase. It does not require account login, character selection, world entry, gameplay, credentials, network-setting mutation, purchase, transfer or mutation of the canonical Track A runtime.
-
-## Authority and runtime boundary
-
-The current owner instruction explicitly requests completion of this same task. It authorizes the smallest reversible runtime action required by the task objective, subject to all trusted-base Track A safety rules.
-
-Runtime classification for this phase:
+## Runtime admission
 
 ```yaml
 EXECUTION_CLASS: synology_physical_runtime
@@ -103,82 +87,116 @@ target_uniqueness: PROVEN
 mutation_authorized: true
 ```
 
-The experiment MUST use a run-specific task-owned namespace, display and HOME. The physical runner must be exactly `synology-otclient-01`. No canonical lease, registration, Kasm desktop session or canonical display may be read or written. No login or secret access is allowed. The workflow unsets `TIBIA_TEST_EMAIL` and `TIBIA_TEST_PASSWORD` before every child process launch.
+No canonical Track A registration, lease, KasmVNC session, login session or gameplay state may be read or mutated. Runtime children must unset `TIBIA_TEST_EMAIL` and `TIBIA_TEST_PASSWORD`. No account login, character selection, world entry, purchase, transfer, network-setting mutation or shared-package mutation is authorized.
 
-The experiment may only **copy** a current exact official-client package from one of the trusted source-package locations into its task-owned sandbox. It MUST fail closed if the source-package `bin/client` is not the exact current package already established by static evidence:
+Any GUI stimulus in the physical retry must hold `/tmp/otclient-track-a-gui-input.lock` for the shortest practical interval even though the target display/HOME are isolated.
+
+## Exact current-client fence
 
 ```yaml
 client_size: 52109920
 client_sha256: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
 elf_build_id: d803d9695868713ef6ab0c3cf65f91212c9c6a62
+packed_sha256: 1fc26d66cef90723d29293f177fcff41c8e937e7aac830f08e82c2f4c69eb354
 ```
 
-The trusted-base canonical exact-client fence remains unchanged and is not reinterpreted by this task. This experiment makes no canonical identity, bootstrap or rebind claim.
+The task may only read and copy a source package matching that exact size/SHA into its run-specific HOME. It must never update or patch the shared source package.
 
-## Owned paths
+## Causal experiment
 
-- `.github/workflows/track-a-ui-settings-static-model.yml`
-- `.github/workflows/tibia-official-client-re-ui-settings-persistence.yml` (one-shot physical discriminator; remove after terminal evidence capture)
-- `docs/agents/tasks/active/OTC-20260819-track-a-ui-settings-static-model.md`
-- `docs/agents/evidence/OTC-20260819-track-a-ui-settings-static-model/**`
+Selected setting: promoted current-build default action `Alt+Return` / `ToggleFullscreen`. This is used because it has a direct observable X11 before/after state without login. The experiment has a tested inverse operation and must fail closed unless the final restart returns to the exact baseline window size.
 
-Existing #528 native-login, #539 action-protocol, #475 worldmap, #302 player-position, #536 coverage-matrix and #543 prompt-package paths remain non-owned and must not be edited.
+Required chain:
 
-## Runtime acceptance contract
+```text
+empty isolated display
+-> exact current client identity
+-> baseline window size
+-> acquire shared input lock
+-> one Alt+Return
+-> changed window size readback
+-> release lock
+-> restart same isolated HOME
+-> toggled size reproduced
+-> acquire lock
+-> inverse Alt+Return
+-> baseline size restored
+-> release lock
+-> restart same isolated HOME
+-> baseline size reproduced
+-> task-owned cleanup
+```
 
-The one-shot discriminator must prove all of the following or fail closed:
+Config/settings candidate paths may be compared by path/size/hash only; contents are not emitted.
 
-1. exact runner/repository/base-head admission;
-2. unique task-owned namespace and initially empty selected X11 display;
-3. current exact source-package client SHA/size before any copy;
-4. exact copied client SHA/size inside the task sandbox;
-5. task-owned WARP/SOCKS, Xvfb and contained DRI/toolroot startup without credentials;
-6. exact client starts and one causally attributable large VIEWABLE window appears on the previously empty isolated display;
-7. baseline window size is read before input;
-8. one `Alt+Return` stimulus changes the real window size and immediate readback observes the change;
-9. after terminating only the task-owned client and restarting it with the same isolated HOME, the toggled window size is reproduced;
-10. one inverse `Alt+Return` restores the original window size;
-11. after a second terminate/restart using the same HOME, the original window size is reproduced again;
-12. bounded settings/config candidate file paths and hashes may be compared, but file contents must not be printed;
-13. no credentials/login/gameplay/canonical state access occurs;
-14. all task-owned client/Xvfb/WARP processes and the task namespace are cleaned on every exit path.
+## First physical attempt — negative harness control
 
-A failure to find a current exact source package is a **real environment blocker**, not permission to patch a shared package, mix old resources with a new binary, or use the obsolete trusted canonical binary as a substitute.
+Workflow run `32219692697`:
+
+- admission job `95967731308`: **SUCCESS**;
+- physical runner: `synology-otclient-01`;
+- physical job `95967768412`: **FAILURE before semantic stimulus**;
+- cleanup: `UI_SETTINGS_RUNTIME_CLEANUP=COMPLETE`.
+
+Verified facts before that failure:
+
+```text
+UI_SETTINGS_RUNTIME_ACCESS=ephemeral_isolated
+UI_SETTINGS_CANONICAL_STATE_ACCESS=NONE
+UI_SETTINGS_CREDENTIALS_USED=false
+UI_SETTINGS_LOGIN_ATTEMPTED=false
+UI_SETTINGS_GAMEPLAY_ATTEMPTED=false
+UI_SETTINGS_TOOLROOT=/work/_otclient_tibia_re_state/toolroot
+UI_SETTINGS_CURRENT_EXACT_SOURCE_PACKAGE=PASS
+UI_SETTINGS_WARP=PASS
+UI_SETTINGS_COPIED_CLIENT_FENCE=PASS
+UI_SETTINGS_XVFB_EMPTY_DISPLAY=PASS
+```
+
+No `UI_SETTINGS_CLIENT_START_1=PASS`, baseline window, or input marker was emitted. Therefore the failure is **not** semantic evidence against fullscreen persistence. The v1 harness used the launcher-returned PID as if it were necessarily the durable exact client process and exited under `set -e` before explaining which identity assertion failed.
+
+Repair hypothesis for v2: launch once, then scan only marker-owned processes and select exactly one process whose `/proc/PID/exe`, size and SHA match the copied exact client. Zero or multiple exact candidates fail closed with a sanitized client-log tail. This is a new discriminator, not an identical retry.
 
 ## Completed static phase
 
-Durable evidence already present:
+Durable evidence remains under:
 
 - `docs/agents/evidence/OTC-20260819-track-a-ui-settings-static-model/current-build-static-model.md`
 - `docs/agents/evidence/OTC-20260819-track-a-ui-settings-static-model/h07-h09-actionbar-hotkey-multiaction.md`
 - `docs/agents/evidence/OTC-20260819-track-a-ui-settings-static-model/persistence-xrefs.md`
 - `docs/agents/evidence/OTC-20260819-track-a-ui-settings-static-model/h01-h06-h15-h19-static-refresh.md`
 
-Verified static facts for the current package include dedicated H07-H13 action-bar/hotkey/multi-action/cooldown/graphics/sound/interface/gameplay models, `TClientOptions`/`EClientOption`, one `clientoptions.json` literal with 38 decoded code references, four used `QSettings` read/write/group PLT targets and 51 direct callsites. The static phase did not prove the high-level store relation and did not recover authoritative `QSettings` group/key names.
+Current exact-build static facts include dedicated H07-H13 action-bar/hotkey/multi-action/cooldown/graphics/sound/interface/gameplay models, `TClientOptions`/`EClientOption`, one `clientoptions.json` literal with 38 decoded code references, four used `QSettings` read/write/group PLT targets and 51 direct callsites. Static evidence alone did not establish the high-level persistence store relationship.
 
-Static exact-head validation before this continuation was green on PR #544 head `6bf84d06e17d8838ed5ebcfbe2758499eef89171`:
+## Owned paths
 
-- Track A governance `32195086192` = SUCCESS;
-- UI/settings static model `32195086252` / `95897323380` = SUCCESS;
-- repository CI `32195086335`, `CI / Required` = SUCCESS.
+- `.github/workflows/track-a-ui-settings-static-model.yml`
+- `.github/workflows/tibia-official-client-re-ui-settings-persistence.yml` (failed v1 discriminator; temporary)
+- `.github/workflows/tibia-official-client-re-ui-settings-persistence-v2.yml` (repair discriminator; temporary)
+- `docs/agents/tasks/active/OTC-20260819-track-a-ui-settings-static-model.md`
+- `docs/agents/evidence/OTC-20260819-track-a-ui-settings-static-model/**`
 
-## Current checkpoint
+Existing native-login/action-protocol/worldmap/player-position/full-client-matrix owned paths remain untouched.
+
+## Checkpoint
 
 ```yaml
-STATUS: RUNTIME_PROOF_ADMITTED_NOT_YET_EXECUTED
+STATUS: RUNTIME_PROOF_REPAIR_READY
 ALIAS: TIBIA-RE-UI-SETTINGS
 TASK_ID: OTC-20260819-track-a-ui-settings-static-model
 DRAFT_PR: 544
-BASE_MAIN: a1368bbecd5b6a6bc2447d2c7debb1141efc2dcb
-STATIC_HEAD: 6bf84d06e17d8838ed5ebcfbe2758499eef89171
+BASE_MAIN: f41102ca88f152d6e0bc502d72455354db536334
+PREVIOUS_RUNTIME_RUN: 32219692697
+PREVIOUS_RUNTIME_RESULT: HARNESS_FAILURE_BEFORE_SEMANTIC_STIMULUS
+CURRENT_EXACT_SOURCE_ON_SYNOLOGY: PROVEN
 CURRENT_RUNTIME_ACCESS: ephemeral_isolated
 CANONICAL_STATE_ACCESS: NONE
 LOGIN_ALLOWED: false
 CREDENTIALS_ALLOWED: false
 GAMEPLAY_ALLOWED: false
 SHARED_SOURCE_PACKAGE_MUTATION_ALLOWED: false
-RUNTIME_STIMULUS: Alt+Return ToggleFullscreen exactly once, then exact inverse after persistence proof
-RESTORE_REQUIREMENT: original window mode must survive the final restart before cleanup
+REPAIR: select exactly one marker-owned exact-SHA client process instead of assuming launcher PID; serialize each input with shared GUI lock; emit explicit diagnostics on every pre-semantic refusal
+RESTORE_REQUIREMENT: final restart must reproduce baseline window size before cleanup
 BLOCKERS: []
-NEXT_ACTION: add and execute the one-shot Synology UI-settings persistence discriminator on this branch; if the exact current source package is unavailable or the self-hosted runner cannot execute, persist that exact blocker without weakening the test
+NEXT_ACTION: run v2 discriminator against current-main freshness; persist terminal positive or negative evidence; do not repeat an unchanged failure
 ```

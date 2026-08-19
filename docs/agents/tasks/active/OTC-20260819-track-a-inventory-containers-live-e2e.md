@@ -1,12 +1,12 @@
 ---
 task_id: OTC-20260819-track-a-inventory-containers-live-e2e
-status: investigating
+status: validating
 agent: ChatGPT
 project_lane: otclient
 lane: P0-STATE
 track_id: official-client-re
 task_kind: runtime_semantic_validation
-phase: passive_authenticated_observation
+phase: bounded_blocked_closeout
 branch: research/OTC-20260819-track-a-inventory-containers-live-e2e
 base_branch: main
 base_sha: 5d1a09dcb5b3abc22d341951b81d557495d755a6
@@ -16,17 +16,12 @@ owned_paths:
   - docs/agents/evidence/OTC-20260819-track-a-inventory-containers-live-e2e/**
 modules_touched:
   - track-a-live-inventory-container-evidence
-reuses:
-  - docs/agents/tasks/archive/OTC-20260819-track-a-inventory-containers-runtime.md
-  - docs/agents/evidence/OTC-20260819-track-a-inventory-containers-runtime/**
-  - docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
-  - docs/agents/contracts/TRACK_A_KASMVNC_RUNTIME_ACCESS_V1.md
 track_a_runtime_agent_admission_version: 1
-execution_class: self_hosted_physical_runtime
-runtime_access: read_only
-persistent_session_role: observer
-runtime_owner_task: OTC-20260819-track-a-inventory-containers-live-e2e
-runtime_namespace: synology:otclient-track-a-kasmvnc:display-1:client-11365
+execution_class: github_hosted_closeout_after_physical_read_only_observation
+runtime_access: none
+persistent_session_role: none
+runtime_owner_task: NOT_APPLICABLE
+runtime_namespace: NOT_APPLICABLE
 canonical_registration: ABSENT
 canonical_lease_generation: 16
 registration_lease_generation: NOT_APPLICABLE
@@ -34,7 +29,7 @@ gate_a: NOT_APPLICABLE
 generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
-target_uniqueness: PROVEN
+target_uniqueness: NOT_APPLICABLE
 mutation_authorized: false
 gui_input_authorized: false
 process_control_authorized: false
@@ -44,28 +39,25 @@ gameplay_allowed: false
 transaction_authorized: false
 owner_funded_ai_api_authorized: false
 owner_current_instruction: use the already logged-in client and proceed autonomously; do not perform a new login
-preflight_only_until_target_uniqueness_proven: false
-read_only_container: otclient-track-a-kasmvnc
-read_only_display: ':1'
-read_only_client_pid: 11365
-read_only_client_count_in_target: 1
-read_only_host_other_client_candidates: 0
-read_only_client_size: 52109920
-read_only_client_sha256: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
-read_only_window_title_pattern: Tibia - <character>
-controller_plane_registration_exists: false
-stale_lease_generation: 16
-stale_lease_owner_task: OTC-20260818-native-login-to-ingame-e2e
-stale_lease_expired_before_preflight: true
-stale_lease_owner_archived_released: true
-active_task_runtime_overlap: NONE_FOR_KASMVNC_TARGET
-current_client_version_token: '15.32'
-current_client_size: 52109920
-current_client_sha256: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
+observed_client_pid: 11365
+observed_client_start_ticks: 74970818
+observed_client_size: 52109920
+observed_client_sha256: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
+observed_state: IN_GAME
+passive_live_D10: AUTHENTICATED_VISIBLE_VALUES
+passive_live_D13: AUTHENTICATED_VISIBLE_STACK_COUNTS
+passive_live_D15: AUTHENTICATED_OPEN_BACKPACK
+all_D09_D22_status: 14_PARTIAL_0_DONE
+independent_audit: PASS_WITH_MUTATION_BLOCKER
+physical_e2e_required: true
+physical_e2e_result: PARTIAL_PASSIVE_OBSERVATION_ONLY
+e2e_result: BLOCKED_BY_MISSING_EXISTING_RUNTIME_ADOPTION_PATH
+raw_runtime_capture_retained: false
+runtime_observation_ownership_released: true
 invocation_started_at: 2026-08-19T13:15:00+02:00
-last_progress_at: 2026-08-19T13:22:00+02:00
+last_progress_at: 2026-08-19T13:32:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: draft
+ci_check_generation: source-closeout
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -73,28 +65,47 @@ identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 0
 stall_warnings: 0
-current_blocker: NONE_FOR_READ_ONLY_OBSERVATION; GUI_INPUT_BLOCKED_BY_ABSENT_CANONICAL_REGISTRATION
-next_action: capture a single passive authenticated frame and correlate only visible D09-D22 state; do not send input unless a separately valid canonical admission can be established
+current_blocker: EXISTING_UNREGISTERED_RUNTIME_HAS_NO_REVIEWED_TRUSTED_MAIN_ADOPTION_TRANSITION
+next_action: run exact-head source validation and promote only the bounded passive evidence/blocker through a clean current-main closeout; no further runtime operation in this task
 ---
 
-# TIBIA-RE-INVENTORY-CONTAINERS — authenticated live E2E continuation
+# TIBIA-RE-INVENTORY-CONTAINERS — authenticated live continuation
 
-## Mission
+## Bounded result
 
-Use the owner's already authenticated official Tibia client to close as many remaining D09-D22 live-semantic gaps as can be proven safely. The previously completed `OTC-20260819-track-a-inventory-containers-runtime` task remains terminal provenance and is not reopened.
+The owner's already authenticated client was successfully observed under a valid `read_only` admission. Direct live evidence strengthened D10, D13 and D15 without changing their programme status from `PARTIAL`.
 
-## Fresh read-only admission
+Observed exact client: `PID 11365 / start 74970818 / size 52109920 / SHA ed5469b9...`, `DISPLAY=:1`, unique target, authenticated `IN_GAME` rendering.
 
-Current trusted `main` is `5d1a09dcb5b3abc22d341951b81d557495d755a6`. Non-invasive preflight proved exactly one official `client` in the designated KasmVNC container, no competing host-container client process, live `DISPLAY=:1`, exact current size/SHA, and a main Tibia window with a character-context title. Active-task inspection found no other task owning this KasmVNC target; the only non-`none` Track A task is an unrelated `ephemeral_isolated` Xvfb diagnostic namespace.
+A passive frame and an independent audit frame both showed:
 
-The canonical registration is absent. `lease.json` still records generation 16 for the completed/released native-login task, but its expiry is earlier than this preflight. Therefore this task may observe the proven target read-only, but **cannot** legally send GUI input or reuse/mutate the runtime through the canonical path.
+- capacity `410`, soul `100`;
+- HP `155/155`, mana `60/60`;
+- populated equipment UI;
+- one open `Backpack` container;
+- 8 visible backpack cells, 6 occupied / 2 empty;
+- visible stack counts `50`, `8`, `7`.
 
-## Safety boundary
+No item names/object IDs are inferred from icon appearance.
 
-This task is currently strictly read-only: no keyboard/mouse input, process control, login/relogin, credential access, gameplay action, item movement, container stimulus, transaction, debugger/injection, or client/network mutation.
+## Mutation blocker
 
-If a later separately valid canonical admission becomes possible, only reversible low-risk tests are allowed: ordinary backpack/container open-close/navigation and movement of an explicitly non-valuable test item between safe owned slots/containers. Never sell, destroy, drop, consume, trade, purchase, transfer, claim, spend, or irreversibly modify valuable state.
+The current client is already running while the authoritative `runtime-registration.json` is absent. Trusted-main transition code supports `bootstrap`, `rebind`, and `gate-b` only. Bootstrap refuses an existing official-client candidate; rebind/gate-b require an existing registration. There is no reviewed operation that safely adopts/reconciles this already-running unregistered exact client into canonical mutation authority.
 
-## Target coverage
+The residual generation-16 lease is expired and belongs to the completed/released native-login task. It cannot be reused as authority.
 
-D09-D22 with priority on authenticated live correlation for equipment/slot values, open-container registry, create/change/delete propagation, parent/up/pagination, object-info/sort, stash/depot search, managed/special containers, Quick Loot/Obtain surfaces, while preserving FACT / INFERENCE / UNKNOWN boundaries.
+Therefore no keyboard/mouse input, item movement, container stimulus, stash/depot action, Quick Loot action, process control, or other mutation was sent. The task has now released read-only runtime ownership and returned to `runtime_access:none` for repository closeout.
+
+## Evidence
+
+- `20260819-passive-authenticated-inventory-snapshot.md`
+- `passive_authenticated_inventory_snapshot.json`
+- `20260819-independent-passive-live-audit.md`
+- `result.md`
+- `result.json`
+
+Temporary raw frames/crops were deleted; none is committed or uploaded.
+
+## Next programme gate
+
+A separate runtime-infrastructure task must implement a fail-closed existing-unregistered-runtime reconciliation/adoption transition, receive independent review, merge to trusted `main`, and only then be consumed from a later invocation. The current task cannot create that authority for itself.

@@ -38,7 +38,7 @@ physical_readonly_pid: 19590
 physical_readonly_state: IN_GAME
 physical_readonly_state_evidence: BRIDGE_3_OF_3
 physical_readonly_candidate_count: 1
-current_blocker: EXACT_HEAD_CI
+current_blocker: EXACT_HEAD_CI_AFTER_REOPEN
 ---
 
 # Adoption plain-title compatibility

@@ -1,0 +1,72 @@
+{
+  "schema": "track-a-inventory-containers-current-state-propagation-v1",
+  "task": "OTC-20260819-track-a-inventory-containers-runtime",
+  "client": {
+    "version_token": "15.32",
+    "size": 52109920,
+    "sha256": "ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8",
+    "elf_build_id": "d803d9695868713ef6ab0c3cf65f91212c9c6a62"
+  },
+  "container_storage": {
+    "primary_vptr": "0x30bf7b8",
+    "qmeta": "0x30c3340",
+    "metacall": "0xd0a0c0",
+    "signals": {
+      "containerUpdated": {"index": 0, "argc": 2, "wrapper": "0xd0a010"},
+      "containerRemoved": {"index": 1, "argc": 1, "wrapper": "0xd0a060"},
+      "manualSortModeChanged": {"index": 2, "argc": 0, "wrapper": "0xd0a0a0"}
+    }
+  },
+  "handler_to_storage": [
+    {"handler":"handleContainerMessage","handler_callable":"0xe71ca0","storage_vslot":"0x78","storage_callable":"0xe63410","emits":"containerUpdated","dispatch_site":"0xe73141"},
+    {"handler":"handleCloseContainerMessage_adapter","handler_callable":"0xe5dbf0","storage_vslot":"0x88","storage_callable":"0xe6e9c0","emits":"containerRemoved"},
+    {"handler":"handleChangeInContainerMessage","handler_callable":"0xe704a0","storage_vslot":"0x98","storage_callable":"0xe6ec40","emits":"containerUpdated","dispatch_site":"0xe7056a"},
+    {"handler":"handleDeleteInContainerMessage","handler_callable":"0xe70610","storage_vslot":"0xa0","storage_callable":"0xe6ee10","emits":"containerUpdated","dispatch_site":"0xe706da"},
+    {"handler":"handleCreateInContainerMessage","handler_callable":"0xe70780","storage_vslot":"0xa8","storage_callable":"0xe6f160","emits":"containerUpdated","dispatch_site":"0xe7084a"}
+  ],
+  "storage_to_controller": {
+    "controller_qmeta": "0x30aa940",
+    "controller_metacall": "0xd4c4d0",
+    "connections": [
+      {"signal":"containerUpdated","signal_wrapper":"0xd0a010","slot":"onContainerUpdated","slot_callable":"0x85c7e0","connect_impl":"0x85d48a"},
+      {"signal":"containerRemoved","signal_wrapper":"0xd0a060","slot":"onContainerRemoved","slot_callable":"0x85e1e0","connect_impl":"0x85d52f"},
+      {"signal":"manualSortModeChanged","signal_wrapper":"0xd0a0a0","slot":"onManualSortModeChanged","slot_callable":"0x843850","connect_impl":"0x85d77e"}
+    ]
+  },
+  "inventory": {
+    "inventory_container_vptr": "0x30f2be8",
+    "inventory_container_qmeta": "0x30ce3c0",
+    "inventory_changed_wrapper": "0xd0a2b0",
+    "inventory_mutator_callable": "0xe63ab0",
+    "set_inventory": {"handler_callable":"0xe6ff50","inventory_vslot":"0x60","dispatch_site":"0xe70125","emits":"inventoryChanged"},
+    "delete_inventory": {"handler_callable":"0xe702e0","inventory_vslot":"0x60","dispatch_site":"0xe7034f","emits":"inventoryChanged"},
+    "status_controller": {
+      "qmeta": "0x2f8fc20",
+      "metacall": "0xd9b1c0",
+      "onInventoryChanged_method_index": 20,
+      "onInventoryChanged_callable": "0xf01250",
+      "connect_impl": "0xf02019"
+    }
+  },
+  "classification": {
+    "handler_to_container_storage_mutation": "FACT_CURRENT_BUILD",
+    "container_storage_to_controller_connections": "FACT_CURRENT_BUILD",
+    "set_delete_inventory_to_inventoryChanged": "FACT_CURRENT_BUILD",
+    "inventoryChanged_to_status_controller": "FACT_CURRENT_BUILD",
+    "playerInventory_bulk_value_normalization": "UNKNOWN",
+    "authenticated_live_values": "NOT_OBSERVED",
+    "action_serialization_server_effect": "NOT_OBSERVED",
+    "restart_relogin_stability": "NOT_OBSERVED"
+  },
+  "runtime_observation": {
+    "mode": "read_only",
+    "unique_exact_target": true,
+    "observed_state": "LOGIN_SCREEN",
+    "inventory_container_ui_visible": false,
+    "gui_input": false,
+    "credentials_used": false,
+    "login": false,
+    "gameplay": false,
+    "process_mutation": false
+  }
+}

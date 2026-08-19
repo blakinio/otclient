@@ -70,7 +70,7 @@ A unique X11 `DISPLAY` isolates a virtual X server, windows, focus, screenshots,
 
 By default there is at most **one canonical persistent official-client Tibia Global runtime/session** for Track A at a time. It is a programme resource that may be reused sequentially; mutation control remains exclusive.
 
-### Four distinct transitions
+### Five distinct transitions
 
 Do not collapse controller authority, registration-generation recovery, existing-runtime identity and first creation.
 
@@ -104,6 +104,14 @@ A successful lease `acquire` call does not mean the coordination flock remains c
 These are the final PR #321 cancellation-safe semantics, built on PR #316 child-subreaper supervision and PR #317 descriptor-last-close hardening and freshly archived by PR #322. Standalone `validate` is preflight evidence only and never authorizes detached or otherwise unguarded mutation.
 
 If the manager is unavailable, lease validation fails, or the final supervisor whole-lifetime guarantee cannot be used, canonical mutation is disabled.
+
+#### Existing-runtime adoption — missing registration with one exact pre-existing client
+
+When the authoritative registration is absent **and exactly one already-running exact-fenced official client exists**, create-bootstrap is the wrong transition because its zero-client absence precondition is false. A reviewed existing-runtime adoption transition may instead create the first registration without launching, logging in, stopping, signalling, attaching to, injecting into or otherwise mutating that client.
+
+Adoption is a metadata authority transaction. It requires current Gate A authority plus the continuously held canonical `coordination.lock`; fresh fail-closed inventory of all permitted official-client candidate/session evidence; exactly one exact client; boot/PID/start/exact-fence/display/window proof; a persisted runtime-locator/candidate fingerprint; and repeated stable proof before and after atomic registration commit. The character-bearing window title is hashed identity context only and cannot prove gameplay state. `state: IN_GAME` requires current structural evidence bound to the exact peer; the current Kasm adoption probe uses bridge `PING` plus exactly one validated `player_protocol_handler`, `gameserver_game_session` and `worldmap_handler`, otherwise it records `UNKNOWN`. Ambiguity, a mismatched/unverifiable candidate, registration race, lease change or identity drift fails closed. A post-commit failure removes only the adoption-created registration when it is still byte-for-byte the transaction's own record; it never kills or modifies the pre-existing client.
+
+A successful adoption creates identity evidence, not GUI/gameplay authority. Before any later input or process mutation, a consumer must re-admit from trusted `main`, use `canonical_reuse_or_mutation`, satisfy any required rebind, pass Gate B on the adopted registration and keep the actual mutation inside the final cancellation-safe supervisor.
 
 #### Registration generation rebind — fail closed before Gate B
 

@@ -1,0 +1,665 @@
+name: Track A UI settings persistence discriminator v2
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/tibia-official-client-re-ui-settings-persistence-v2.yml
+      - docs/agents/tasks/active/OTC-20260819-track-a-ui-settings-static-model.md
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-ui-settings-persistence-544-v2
+  cancel-in-progress: true
+
+jobs:
+  admission:
+    name: Admit current-main isolated UI settings proof v2
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact PR head with history
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Revalidate current main and task admission
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git fetch --no-tags origin main
+          live_main="$(git rev-parse origin/main)"
+          task=docs/agents/tasks/active/OTC-20260819-track-a-ui-settings-static-model.md
+          task_main="$(sed -n 's/^base_main: //p' "$task" | head -n1)"
+          [[ -n "$task_main" && "$live_main" == "$task_main" ]] || {
+            echo "UI_SETTINGS_V2_REFUSED=MAIN_MOVED:task=$task_main:live=$live_main" >&2
+            exit 40
+          }
+          grep -Fxq 'runtime_access: ephemeral_isolated' "$task"
+          grep -Fxq 'runtime_owner_task: OTC-20260819-track-a-ui-settings-static-model' "$task"
+          grep -Fxq 'runtime_namespace: ui-settings-persistence-ephemeral' "$task"
+          grep -Fxq 'target_uniqueness: PROVEN' "$task"
+          grep -Fxq 'mutation_authorized: true' "$task"
+          grep -Fxq 'execution_class: synology_physical_runtime' "$task"
+          grep -Fxq 'physical_e2e_required: true' "$task"
+          python3 .github/scripts/test_track_a_agent_runtime_governance.py \
+            --changed-from "$live_main" \
+            --expected-branch "${GITHUB_HEAD_REF}"
+          echo "UI_SETTINGS_V2_LIVE_MAIN=$live_main"
+          echo 'UI_SETTINGS_V2_ADMISSION=PASS'
+
+  persistence:
+    name: Prove fullscreen persistence and exact rollback v2
+    needs: admission
+    runs-on: [otclient, synology]
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Execute repaired task-owned reversible settings experiment
+        shell: bash
+        run: |
+          set +x
+          set -Eeuo pipefail
+          umask 077
+
+          [[ "${RUNNER_NAME:-}" == synology-otclient-01 ]] || {
+            echo "UI_SETTINGS_V2_REFUSED=WRONG_RUNNER:${RUNNER_NAME:-UNKNOWN}" >&2
+            exit 41
+          }
+          [[ "${GITHUB_REPOSITORY:-}" == blakinio/otclient ]]
+
+          live_main="$(git ls-remote https://github.com/blakinio/otclient.git refs/heads/main | awk '{print $1}')"
+          task_file=docs/agents/tasks/active/OTC-20260819-track-a-ui-settings-static-model.md
+          task_main="$(sed -n 's/^base_main: //p' "$task_file" | head -n1)"
+          [[ -n "$live_main" && "$live_main" == "$task_main" ]] || {
+            echo "UI_SETTINGS_V2_REFUSED=MAIN_MOVED:task=$task_main:live=$live_main" >&2
+            exit 42
+          }
+          echo "UI_SETTINGS_V2_LIVE_MAIN=$live_main"
+
+          task='OTC-20260819-track-a-ui-settings-static-model'
+          marker="OTCLIENT_TIBIA_RE_UI_SETTINGS_TASK=$task"
+          role_marker='OTCLIENT_TIBIA_RE_ROLE=client'
+          base="/home/runner/_work/_otclient_tibia_re_state/tasks/$task"
+          root="$base/ephemeral-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-v2"
+          expected_size=52109920
+          expected_sha='ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8'
+          wgcf_ver=2.2.32
+          wgcf_sha='2ff97f2201972ce582a424455d50a3719a380eef0cd1f3144f7779348e122a2c'
+          wp_ver=1.1.3
+          wp_tar_sha='e88c1d090740373fc606c1bafd81d9a5eadc642cce5667616e20e9d7a444f51c'
+          display_number=''
+          display=''
+          warp_port=''
+          wireproxy_pid=''
+          xvfb_pid=''
+          launch_pid=''
+          client_pid=''
+          client_generation=0
+          tool=''
+          dri=''
+          preload=''
+          xdotool=''
+          home=''
+          package=''
+          client=''
+
+          listen() {
+            python3 - "$1" <<'PY'
+          import pathlib, sys
+          port = f'{int(sys.argv[1]):04X}'
+          for name in ('tcp', 'tcp6'):
+              path = pathlib.Path('/proc/net') / name
+              if not path.exists():
+                  continue
+              for row in path.read_text().splitlines()[1:]:
+                  fields = row.split()
+                  if len(fields) > 3 and fields[1].rsplit(':', 1)[-1].upper() == port and fields[3] == '0A':
+                      raise SystemExit(0)
+          raise SystemExit(1)
+          PY
+          }
+
+          marker_owned() {
+            local pid="$1" role="$2"
+            [[ "$pid" =~ ^[1-9][0-9]*$ && -r "/proc/$pid/environ" ]] || return 1
+            grep -azFxq "$marker" "/proc/$pid/environ" || return 1
+            grep -azFxq "OTCLIENT_TIBIA_RE_ROLE=$role" "/proc/$pid/environ"
+          }
+
+          marker_pids() {
+            local envf pid
+            for envf in /proc/[1-9]*/environ; do
+              [[ -r "$envf" ]] || continue
+              grep -azFxq "$marker" "$envf" 2>/dev/null || continue
+              pid="${envf#/proc/}"
+              pid="${pid%/environ}"
+              printf '%s\n' "$pid"
+            done
+          }
+
+          exact_client_pids() {
+            local pid exe size sha
+            while read -r pid; do
+              [[ -n "$pid" && -r "/proc/$pid/environ" ]] || continue
+              grep -azFxq "$role_marker" "/proc/$pid/environ" 2>/dev/null || continue
+              exe="$(readlink -f "/proc/$pid/exe" 2>/dev/null || true)"
+              [[ -n "$exe" && "$exe" == "$(readlink -f "$client")" ]] || continue
+              size="$(stat -Lc %s "/proc/$pid/exe" 2>/dev/null || true)"
+              [[ "$size" == "$expected_size" ]] || continue
+              sha="$(sha256sum "/proc/$pid/exe" 2>/dev/null | awk '{print $1}')"
+              [[ "$sha" == "$expected_sha" ]] || continue
+              printf '%s\n' "$pid"
+            done < <(marker_pids)
+          }
+
+          kill_task_owned_all() {
+            local pid
+            mapfile -t pids < <(marker_pids | sort -nu)
+            for pid in "${pids[@]}"; do
+              [[ -n "$pid" && -r "/proc/$pid/environ" ]] || continue
+              grep -azFxq "$marker" "/proc/$pid/environ" 2>/dev/null || continue
+              kill "$pid" 2>/dev/null || true
+            done
+            sleep .4
+            for pid in "${pids[@]}"; do
+              [[ -n "$pid" && -r "/proc/$pid/environ" ]] || continue
+              grep -azFxq "$marker" "/proc/$pid/environ" 2>/dev/null || continue
+              kill -9 "$pid" 2>/dev/null || true
+            done
+          }
+
+          cleanup() {
+            rc=$?
+            kill_task_owned_all || true
+            if [[ -n "$display_number" && -f "/tmp/.X${display_number}-lock" ]]; then
+              owner="$(tr -cd '0-9' <"/tmp/.X${display_number}-lock" 2>/dev/null || true)"
+              if [[ -n "$owner" && ! -e "/proc/$owner" ]]; then
+                rm -f -- "/tmp/.X${display_number}-lock" "/tmp/.X11-unix/X${display_number}"
+              fi
+            fi
+            rm -rf --one-file-system "$root" 2>/dev/null || true
+            echo 'UI_SETTINGS_V2_CLEANUP=COMPLETE'
+            exit "$rc"
+          }
+          trap cleanup EXIT
+
+          [[ ! -e "$root" ]] || {
+            echo 'UI_SETTINGS_V2_REFUSED=NAMESPACE_EXISTS' >&2
+            exit 43
+          }
+          mkdir -p "$root"
+          chmod 700 "$base" "$root" 2>/dev/null || true
+          echo "UI_SETTINGS_V2_NAMESPACE=$root"
+          echo 'UI_SETTINGS_V2_RUNTIME_ACCESS=ephemeral_isolated'
+          echo 'UI_SETTINGS_V2_CANONICAL_STATE_ACCESS=NONE'
+          echo 'UI_SETTINGS_V2_CREDENTIALS_USED=false'
+          echo 'UI_SETTINGS_V2_LOGIN_ATTEMPTED=false'
+          echo 'UI_SETTINGS_V2_GAMEPLAY_ATTEMPTED=false'
+
+          within_root() {
+            local root_real="$1" path="$2" resolved
+            resolved="$(realpath -e -- "$path" 2>/dev/null)" || return 1
+            case "$resolved" in
+              "$root_real"/*) printf '%s\n' "$resolved" ;;
+              *) return 1 ;;
+            esac
+          }
+
+          tool_complete() {
+            local candidate="$1" real swrast proxy
+            [[ -d "$candidate" && ! -L "$candidate" ]] || return 1
+            real="$(realpath -e -- "$candidate")" || return 1
+            for b in Xvfb xdotool; do
+              [[ -x "$candidate/usr/bin/$b" && ! -L "$candidate/usr/bin/$b" ]] || return 1
+              within_root "$real" "$candidate/usr/bin/$b" >/dev/null || return 1
+            done
+            [[ -d "$candidate/usr/share/X11/xkb" && ! -L "$candidate/usr/share/X11/xkb" ]] || return 1
+            [[ -d "$candidate/usr/lib/x86_64-linux-gnu/dri" && ! -L "$candidate/usr/lib/x86_64-linux-gnu/dri" ]] || return 1
+            swrast="$candidate/usr/lib/x86_64-linux-gnu/dri/swrast_dri.so"
+            [[ -f "$swrast" ]] || return 1
+            within_root "$real" "$swrast" >/dev/null || return 1
+            proxy="$(find "$candidate" -xdev -type f -name libproxychains.so.4 -print -quit 2>/dev/null || true)"
+            [[ -n "$proxy" && -f "$proxy" ]] || return 1
+          }
+
+          for candidate in \
+            '/home/runner/_work/_otclient_tibia_re_state/toolroot' \
+            '/work/_otclient_tibia_re_state/toolroot'; do
+            if tool_complete "$candidate"; then
+              tool="$candidate"
+              break
+            fi
+          done
+          [[ -n "$tool" ]] || {
+            echo 'UI_SETTINGS_V2_REFUSED=TOOLROOT_UNAVAILABLE' >&2
+            exit 44
+          }
+          dri="$tool/usr/lib/x86_64-linux-gnu/dri"
+          preload="$(find "$tool" -xdev -type f -name libproxychains.so.4 -print -quit)"
+          xdotool="$tool/usr/bin/xdotool"
+          xvfb="$tool/usr/bin/Xvfb"
+          echo "UI_SETTINGS_V2_TOOLROOT=$tool"
+
+          source_pkg=''
+          for candidate in \
+            '/home/runner/_work/_otclient_tibia_re_state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia' \
+            '/work/_otclient_tibia_re_state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia'; do
+            source_client="$candidate/bin/client"
+            if [[ -x "$source_client" && ! -L "$source_client" \
+              && "$(stat -c %s "$source_client" 2>/dev/null || true)" == "$expected_size" \
+              && "$(sha256sum "$source_client" 2>/dev/null | awk '{print $1}')" == "$expected_sha" ]]; then
+              source_pkg="$candidate"
+              break
+            fi
+          done
+          [[ -n "$source_pkg" ]] || {
+            echo 'UI_SETTINGS_V2_REFUSED=CURRENT_EXACT_SOURCE_PACKAGE_MISSING' >&2
+            exit 45
+          }
+          echo 'UI_SETTINGS_V2_CURRENT_EXACT_SOURCE_PACKAGE=PASS'
+
+          for n in $(seq 271 290); do
+            if [[ ! -e "/tmp/.X${n}-lock" && ! -e "/tmp/.X11-unix/X${n}" ]]; then
+              display_number="$n"
+              display=":$n"
+              break
+            fi
+          done
+          [[ -n "$display_number" ]] || {
+            echo 'UI_SETTINGS_V2_REFUSED=NO_FREE_DISPLAY' >&2
+            exit 46
+          }
+          echo "UI_SETTINGS_V2_DISPLAY=$display"
+
+          free_port() {
+            local p
+            for p in $(seq "$1" "$2"); do
+              if ! listen "$p"; then printf '%s\n' "$p"; return 0; fi
+            done
+            return 1
+          }
+          warp_port="$(free_port 25570 25610)" || {
+            echo 'UI_SETTINGS_V2_REFUSED=NO_WARP_PORT' >&2
+            exit 47
+          }
+
+          warp="$root/warp"
+          mkdir -p "$warp/bin" "$warp/state"
+          curl -fsSL --retry 3 --connect-timeout 10 -o "$warp/bin/wgcf" \
+            "https://github.com/ViRb3/wgcf/releases/download/v$wgcf_ver/wgcf_${wgcf_ver}_linux_amd64"
+          [[ "$(sha256sum "$warp/bin/wgcf" | awk '{print $1}')" == "$wgcf_sha" ]]
+          chmod 755 "$warp/bin/wgcf"
+          curl -fsSL --retry 3 --connect-timeout 10 -o "$warp/bin/wireproxy.tar.gz" \
+            "https://github.com/windtf/wireproxy/releases/download/v$wp_ver/wireproxy_linux_amd64.tar.gz"
+          [[ "$(sha256sum "$warp/bin/wireproxy.tar.gz" | awk '{print $1}')" == "$wp_tar_sha" ]]
+          mkdir "$warp/unpack"
+          tar -xzf "$warp/bin/wireproxy.tar.gz" -C "$warp/unpack"
+          wp_source="$(find "$warp/unpack" -type f -name wireproxy -print -quit)"
+          [[ -n "$wp_source" ]]
+          install -m755 "$wp_source" "$warp/bin/wireproxy"
+          rm -rf "$warp/unpack"
+          (
+            cd "$warp/state"
+            "$warp/bin/wgcf" register --accept-tos >/dev/null
+            chmod 600 wgcf-account.toml
+            "$warp/bin/wgcf" generate >/dev/null
+            chmod 600 wgcf-profile.conf
+          )
+          cat >"$root/wireproxy.conf" <<EOF
+          WGConfig = $warp/state/wgcf-profile.conf
+          [Socks5]
+          BindAddress = 127.0.0.1:$warp_port
+          EOF
+          "$warp/bin/wireproxy" -n -c "$root/wireproxy.conf" >/dev/null
+          env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD \
+            OTCLIENT_TIBIA_RE_UI_SETTINGS_TASK="$task" OTCLIENT_TIBIA_RE_ROLE=wireproxy \
+            nohup "$warp/bin/wireproxy" -c "$root/wireproxy.conf" >"$root/wireproxy.log" 2>&1 </dev/null &
+          wireproxy_pid=$!
+          for _ in $(seq 1 40); do
+            kill -0 "$wireproxy_pid" 2>/dev/null || {
+              echo 'UI_SETTINGS_V2_REFUSED=WIREPROXY_EXITED' >&2
+              exit 48
+            }
+            listen "$warp_port" && break
+            sleep .25
+          done
+          listen "$warp_port"
+          curl --socks5-hostname "127.0.0.1:$warp_port" -fsS --max-time 15 \
+            https://www.cloudflare.com/cdn-cgi/trace | grep -Eq '^warp=(on|plus)$'
+          echo 'UI_SETTINGS_V2_WARP=PASS'
+
+          home="$root/home"
+          package="$home/.local/share/CipSoft GmbH/Tibia/packages/Tibia"
+          mkdir -p "$(dirname "$package")"
+          cp -a --reflink=auto "$source_pkg" "$package"
+          client="$package/bin/client"
+          [[ -x "$client" && ! -L "$client" ]]
+          [[ "$(stat -c %s "$client")" == "$expected_size" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$expected_sha" ]]
+          echo 'UI_SETTINGS_V2_COPIED_CLIENT_FENCE=PASS'
+
+          metadata="$(dirname "$source_pkg")/../../launchermetadata.json"
+          metadata_target="$(dirname "$(dirname "$package")")/launchermetadata.json"
+          if [[ -f "$metadata" && ! -L "$metadata" ]]; then
+            install -m600 "$metadata" "$metadata_target"
+            echo 'UI_SETTINGS_V2_LAUNCHERMETADATA=COPIED'
+          else
+            echo 'UI_SETTINGS_V2_LAUNCHERMETADATA=SOURCE_ABSENT_OR_UNSAFE'
+          fi
+
+          cat >"$root/proxychains.conf" <<EOF
+          strict_chain
+          proxy_dns
+          remote_dns_subnet 224
+          tcp_read_time_out 15000
+          tcp_connect_time_out 8000
+          [ProxyList]
+          socks5 127.0.0.1 $warp_port
+          EOF
+          chmod 600 "$root/proxychains.conf"
+
+          cat >"$root/x11-window.py" <<'PY'
+          import ctypes, ctypes.util, sys
+          dname = sys.argv[1].encode()
+          mode = sys.argv[2]
+          lib = ctypes.CDLL(ctypes.util.find_library('X11') or 'libX11.so.6')
+          Window = ctypes.c_ulong
+          class Attr(ctypes.Structure):
+              _fields_ = [('x',ctypes.c_int),('y',ctypes.c_int),('width',ctypes.c_int),('height',ctypes.c_int),('border_width',ctypes.c_int),('depth',ctypes.c_int),('visual',ctypes.c_void_p),('root',Window),('klass',ctypes.c_int),('bit_gravity',ctypes.c_int),('win_gravity',ctypes.c_int),('backing_store',ctypes.c_int),('backing_planes',ctypes.c_ulong),('backing_pixel',ctypes.c_ulong),('save_under',ctypes.c_int),('colormap',ctypes.c_ulong),('map_installed',ctypes.c_int),('map_state',ctypes.c_int),('all_event_masks',ctypes.c_long),('your_event_mask',ctypes.c_long),('do_not_propagate_mask',ctypes.c_long),('override_redirect',ctypes.c_int),('screen',ctypes.c_void_p)]
+          lib.XOpenDisplay.argtypes=[ctypes.c_char_p]; lib.XOpenDisplay.restype=ctypes.c_void_p
+          lib.XDefaultRootWindow.argtypes=[ctypes.c_void_p]; lib.XDefaultRootWindow.restype=Window
+          lib.XQueryTree.argtypes=[ctypes.c_void_p,Window,ctypes.POINTER(Window),ctypes.POINTER(Window),ctypes.POINTER(ctypes.POINTER(Window)),ctypes.POINTER(ctypes.c_uint)]; lib.XQueryTree.restype=ctypes.c_int
+          lib.XGetWindowAttributes.argtypes=[ctypes.c_void_p,Window,ctypes.POINTER(Attr)]; lib.XGetWindowAttributes.restype=ctypes.c_int
+          lib.XFree.argtypes=[ctypes.c_void_p]; lib.XCloseDisplay.argtypes=[ctypes.c_void_p]
+          dpy=lib.XOpenDisplay(dname)
+          if not dpy: raise SystemExit(3)
+          root=lib.XDefaultRootWindow(dpy); seen=set(); viewable=[]
+          def walk(win,depth=0):
+              if depth>8 or int(win) in seen: return
+              seen.add(int(win)); rr=Window(); parent=Window(); children=ctypes.POINTER(Window)(); count=ctypes.c_uint()
+              if not lib.XQueryTree(dpy,win,ctypes.byref(rr),ctypes.byref(parent),ctypes.byref(children),ctypes.byref(count)): return
+              try:
+                  for i in range(count.value):
+                      child=children[i]; a=Attr()
+                      if lib.XGetWindowAttributes(dpy,child,ctypes.byref(a)) and a.map_state==2:
+                          viewable.append((a.width*a.height,int(child),a.x,a.y,a.width,a.height))
+                      walk(child,depth+1)
+              finally:
+                  if children: lib.XFree(children)
+          walk(root)
+          if mode=='count': print(len(viewable)); lib.XCloseDisplay(dpy); raise SystemExit(0)
+          if not viewable: lib.XCloseDisplay(dpy); raise SystemExit(1)
+          _,xid,x,y,w,h=max(viewable); print(f'{xid} {x} {y} {w} {h}'); lib.XCloseDisplay(dpy)
+          PY
+
+          cat >"$root/snapshot-settings.py" <<'PY'
+          import hashlib,json,pathlib,re,sys
+          home=pathlib.Path(sys.argv[1]).resolve(); package=pathlib.Path(sys.argv[2]).resolve(); out=pathlib.Path(sys.argv[3])
+          interesting=re.compile(r'(option|setting|config|hotkey|action.?bar|\.ini$|\.conf$|\.cfg$|\.json$)',re.I); result={}
+          for p in home.rglob('*'):
+              try:
+                  if not p.is_file() or p.is_symlink(): continue
+                  r=p.resolve(); size=r.stat().st_size
+                  if size>4*1024*1024: continue
+                  rel=r.relative_to(home).as_posix(); in_package=(package==r or package in r.parents)
+                  if in_package and not interesting.search(rel): continue
+                  if not in_package and '/.cache/' in '/'+rel and not interesting.search(rel): continue
+                  result[rel]={'size':size,'sha256':hashlib.sha256(r.read_bytes()).hexdigest()}
+              except (OSError,ValueError): pass
+          out.write_text(json.dumps(result,sort_keys=True),encoding='utf-8')
+          PY
+
+          cat >"$root/diff-settings.py" <<'PY'
+          import json,sys
+          a=json.load(open(sys.argv[1],encoding='utf-8')); b=json.load(open(sys.argv[2],encoding='utf-8'))
+          changed=[k for k in sorted(set(a)|set(b)) if a.get(k)!=b.get(k)]
+          tag=sys.argv[3]; print(f'UI_SETTINGS_V2_CONFIG_DIFF_{tag}_COUNT={len(changed)}')
+          for i,k in enumerate(changed[:40]):
+              print(f"UI_SETTINGS_V2_CONFIG_DIFF_{tag}={i};PATH={k};BEFORE_SHA256={a.get(k,{}).get('sha256','ABSENT')};AFTER_SHA256={b.get(k,{}).get('sha256','ABSENT')}")
+          PY
+
+          env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD \
+            OTCLIENT_TIBIA_RE_UI_SETTINGS_TASK="$task" OTCLIENT_TIBIA_RE_ROLE=xvfb \
+            HOME="$home" PATH="$tool/usr/bin:$tool/usr/sbin:/usr/bin:/bin" \
+            LD_LIBRARY_PATH="$tool/usr/lib/x86_64-linux-gnu:$tool/lib/x86_64-linux-gnu" \
+            LIBGL_DRIVERS_PATH="$dri" XKB_CONFIG_ROOT="$tool/usr/share/X11/xkb" \
+            nohup "$xvfb" "$display" -screen 0 1920x1080x24 -xkbdir "$tool/usr/share/X11/xkb" \
+            -nolisten tcp -noreset >"$root/xvfb.log" 2>&1 </dev/null &
+          xvfb_pid=$!
+          for _ in $(seq 1 60); do
+            [[ -e "/tmp/.X11-unix/X${display_number}" ]] && break
+            sleep .2
+          done
+          [[ -e "/tmp/.X11-unix/X${display_number}" ]]
+          marker_owned "$xvfb_pid" xvfb
+          pre_count="$(python3 "$root/x11-window.py" "$display" count)"
+          [[ "$pre_count" == 0 ]] || {
+            echo "UI_SETTINGS_V2_REFUSED=DISPLAY_NOT_EMPTY:$pre_count" >&2
+            exit 49
+          }
+          echo 'UI_SETTINGS_V2_XVFB_EMPTY_DISPLAY=PASS'
+
+          emit_client_diagnostics() {
+            echo "UI_SETTINGS_V2_DIAG_LAUNCH_PID=${launch_pid:-NONE}"
+            if [[ -n "${launch_pid:-}" && -e "/proc/$launch_pid" ]]; then
+              echo 'UI_SETTINGS_V2_DIAG_LAUNCH_PID_ALIVE=true'
+            else
+              echo 'UI_SETTINGS_V2_DIAG_LAUNCH_PID_ALIVE=false'
+            fi
+            while read -r pid; do
+              [[ -n "$pid" ]] || continue
+              exe="$(readlink -f "/proc/$pid/exe" 2>/dev/null || true)"
+              size="$(stat -Lc %s "/proc/$pid/exe" 2>/dev/null || true)"
+              echo "UI_SETTINGS_V2_DIAG_MARKER_PID=$pid;EXE=${exe:-UNKNOWN};SIZE=${size:-UNKNOWN}"
+            done < <(marker_pids)
+            if [[ -f "$root/client-${client_generation}.log" ]]; then
+              echo 'UI_SETTINGS_V2_DIAG_CLIENT_LOG_BEGIN'
+              tail -n 100 "$root/client-${client_generation}.log" \
+                | sed -E 's/(email|password|token|cookie|session|authorization)[^[:space:]]*/[redacted]/Ig' \
+                | head -n 100
+              echo 'UI_SETTINGS_V2_DIAG_CLIENT_LOG_END'
+            fi
+          }
+
+          start_client() {
+            client_generation=$((client_generation+1))
+            client_pid=''; launch_pid=''
+            (
+              cd "$package"
+              env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD \
+                OTCLIENT_TIBIA_RE_UI_SETTINGS_TASK="$task" OTCLIENT_TIBIA_RE_ROLE=client \
+                HOME="$home" DISPLAY="$display" \
+                PATH="$tool/usr/bin:$tool/usr/sbin:/usr/bin:/bin" \
+                LD_LIBRARY_PATH="$package/bin/lib:$tool/usr/lib/x86_64-linux-gnu:$tool/usr/lib/x86_64-linux-gnu/libproxy:$tool/lib/x86_64-linux-gnu" \
+                QT_QUICK_BACKEND=software QSG_INFO=1 \
+                XDG_DATA_DIRS="$tool/usr/share:/usr/share" FONTCONFIG_PATH="$tool/etc/fonts" \
+                FONTCONFIG_FILE="$tool/etc/fonts/fonts.conf" LD_PRELOAD="$preload" \
+                PROXYCHAINS_CONF_FILE="$root/proxychains.conf" \
+                nohup "$client" >"$root/client-${client_generation}.log" 2>&1 </dev/null &
+              echo $! >"$root/launch.pid"
+            )
+            launch_pid="$(tr -cd '0-9' <"$root/launch.pid")"
+            [[ -n "$launch_pid" ]]
+            for _ in $(seq 1 80); do
+              mapfile -t exact < <(exact_client_pids | sort -nu)
+              if (( ${#exact[@]} == 1 )); then
+                client_pid="${exact[0]}"
+                break
+              fi
+              if (( ${#exact[@]} > 1 )); then
+                echo "UI_SETTINGS_V2_REFUSED=AMBIGUOUS_EXACT_CLIENTS:${#exact[@]}" >&2
+                emit_client_diagnostics
+                return 61
+              fi
+              sleep .125
+            done
+            if [[ -z "$client_pid" ]]; then
+              echo 'UI_SETTINGS_V2_REFUSED=NO_UNIQUE_EXACT_CLIENT_AFTER_LAUNCH' >&2
+              emit_client_diagnostics
+              return 62
+            fi
+            marker_owned "$client_pid" client || return 63
+            start_ticks="$(awk '{print $22}' "/proc/$client_pid/stat")"
+            echo "UI_SETTINGS_V2_CLIENT_START_${client_generation}=PASS;PID=$client_pid;START_TICKS=$start_ticks"
+          }
+
+          largest_window() { python3 "$root/x11-window.py" "$display" largest; }
+
+          wait_large_window() {
+            local data='' xid x y w h area
+            for _ in $(seq 1 120); do
+              [[ -e "/proc/$client_pid" ]] || return 2
+              data="$(largest_window 2>/dev/null || true)"
+              if [[ -n "$data" ]]; then
+                read -r xid x y w h <<<"$data"
+                if [[ "$w" =~ ^[0-9]+$ && "$h" =~ ^[0-9]+$ ]]; then
+                  area=$((w*h))
+                  if (( area>=100000 )); then printf '%s\n' "$data"; return 0; fi
+                fi
+              fi
+              sleep .25
+            done
+            return 1
+          }
+
+          stop_client() {
+            local pid
+            mapfile -t clients < <(exact_client_pids | sort -nu)
+            for pid in "${clients[@]}"; do
+              [[ -n "$pid" ]] || continue
+              marker_owned "$pid" client || continue
+              kill "$pid" 2>/dev/null || true
+            done
+            for _ in $(seq 1 40); do
+              mapfile -t remaining < <(exact_client_pids | sort -nu)
+              (( ${#remaining[@]} == 0 )) && break
+              sleep .125
+            done
+            mapfile -t remaining < <(exact_client_pids | sort -nu)
+            if (( ${#remaining[@]} != 0 )); then
+              echo "UI_SETTINGS_V2_REFUSED=CLIENT_STOP_FAILED:${#remaining[@]}" >&2
+              return 64
+            fi
+            client_pid=''; launch_pid=''
+            sleep .5
+          }
+
+          verify_target_before_input() {
+            local xid="$1" data current_xid x y w h
+            mapfile -t exact < <(exact_client_pids | sort -nu)
+            (( ${#exact[@]} == 1 )) || return 1
+            [[ "${exact[0]}" == "$client_pid" ]] || return 1
+            data="$(largest_window)" || return 1
+            read -r current_xid x y w h <<<"$data"
+            [[ "$current_xid" == "$xid" ]]
+          }
+
+          toggle_fullscreen_locked() {
+            local xid="$1"
+            exec 9>/tmp/otclient-track-a-gui-input.lock
+            flock -w 30 9 || {
+              echo 'UI_SETTINGS_V2_REFUSED=GUI_INPUT_LOCK_TIMEOUT' >&2
+              exec 9>&-
+              return 65
+            }
+            verify_target_before_input "$xid" || {
+              echo 'UI_SETTINGS_V2_REFUSED=TARGET_CHANGED_UNDER_INPUT_LOCK' >&2
+              flock -u 9; exec 9>&-
+              return 66
+            }
+            DISPLAY="$display" "$xdotool" windowfocus "$xid"
+            DISPLAY="$display" "$xdotool" key --window "$xid" --clearmodifiers alt+Return
+            flock -u 9
+            exec 9>&-
+          }
+
+          await_size_change() {
+            local old="$1" data xid x y w h size
+            for _ in $(seq 1 50); do
+              data="$(largest_window 2>/dev/null || true)"
+              if [[ -n "$data" ]]; then
+                read -r xid x y w h <<<"$data"; size="${w}x${h}"
+                if [[ "$size" != "$old" ]]; then printf '%s\n' "$data"; return 0; fi
+              fi
+              sleep .2
+            done
+            return 1
+          }
+
+          start_client || exit $?
+          baseline="$(wait_large_window)" || {
+            echo 'UI_SETTINGS_V2_REFUSED=BASELINE_WINDOW_MISSING' >&2
+            emit_client_diagnostics
+            exit 51
+          }
+          read -r win x y w h <<<"$baseline"; baseline_size="${w}x${h}"
+          echo "UI_SETTINGS_V2_BASELINE_WINDOW_SIZE=$baseline_size"
+          python3 "$root/snapshot-settings.py" "$home" "$package" "$root/settings-before.json"
+
+          toggle_fullscreen_locked "$win" || exit $?
+          toggled="$(await_size_change "$baseline_size")" || {
+            echo 'UI_SETTINGS_V2_REFUSED=FULLSCREEN_TOGGLE_NO_OBSERVABLE_SIZE_CHANGE' >&2
+            exit 52
+          }
+          read -r win x y w h <<<"$toggled"; toggled_size="${w}x${h}"
+          [[ "$toggled_size" != "$baseline_size" ]]
+          echo "UI_SETTINGS_V2_TOGGLED_WINDOW_SIZE=$toggled_size"
+          echo 'UI_SETTINGS_V2_IMMEDIATE_READBACK=PASS'
+          python3 "$root/snapshot-settings.py" "$home" "$package" "$root/settings-after-toggle.json"
+          python3 "$root/diff-settings.py" "$root/settings-before.json" "$root/settings-after-toggle.json" TOGGLE
+
+          stop_client || exit $?
+          start_client || exit $?
+          restarted="$(wait_large_window)" || {
+            echo 'UI_SETTINGS_V2_REFUSED=FIRST_RESTART_WINDOW_MISSING' >&2
+            emit_client_diagnostics
+            exit 53
+          }
+          read -r win x y w h <<<"$restarted"; restarted_size="${w}x${h}"
+          echo "UI_SETTINGS_V2_RESTARTED_WINDOW_SIZE=$restarted_size"
+          [[ "$restarted_size" == "$toggled_size" ]] || {
+            echo "UI_SETTINGS_V2_REFUSED=PERSISTENCE_MISMATCH:expected=$toggled_size:actual=$restarted_size" >&2
+            exit 54
+          }
+          echo 'UI_SETTINGS_V2_RESTART_PERSISTENCE=PASS'
+          python3 "$root/snapshot-settings.py" "$home" "$package" "$root/settings-after-restart.json"
+
+          toggle_fullscreen_locked "$win" || exit $?
+          restored="$(await_size_change "$toggled_size")" || {
+            echo 'UI_SETTINGS_V2_REFUSED=ROLLBACK_TOGGLE_NO_OBSERVABLE_SIZE_CHANGE' >&2
+            exit 55
+          }
+          read -r win x y w h <<<"$restored"; restored_size="${w}x${h}"
+          echo "UI_SETTINGS_V2_ROLLBACK_IMMEDIATE_WINDOW_SIZE=$restored_size"
+          [[ "$restored_size" == "$baseline_size" ]] || {
+            echo "UI_SETTINGS_V2_REFUSED=ROLLBACK_IMMEDIATE_MISMATCH:expected=$baseline_size:actual=$restored_size" >&2
+            exit 56
+          }
+          echo 'UI_SETTINGS_V2_ROLLBACK_IMMEDIATE=PASS'
+          python3 "$root/snapshot-settings.py" "$home" "$package" "$root/settings-after-rollback.json"
+          python3 "$root/diff-settings.py" "$root/settings-after-toggle.json" "$root/settings-after-rollback.json" ROLLBACK
+
+          stop_client || exit $?
+          start_client || exit $?
+          final="$(wait_large_window)" || {
+            echo 'UI_SETTINGS_V2_REFUSED=FINAL_RESTART_WINDOW_MISSING' >&2
+            emit_client_diagnostics
+            exit 57
+          }
+          read -r win x y w h <<<"$final"; final_size="${w}x${h}"
+          echo "UI_SETTINGS_V2_FINAL_RESTART_WINDOW_SIZE=$final_size"
+          [[ "$final_size" == "$baseline_size" ]] || {
+            echo "UI_SETTINGS_V2_REFUSED=FINAL_RESTORE_MISMATCH:expected=$baseline_size:actual=$final_size" >&2
+            exit 58
+          }
+          echo 'UI_SETTINGS_V2_FINAL_RESTART_RESTORE=PASS'
+          echo 'UI_SETTINGS_V2_PERSISTENCE_E2E=PASS'
+          echo 'UI_SETTINGS_V2_RUNTIME_RESULT=PASS_SAFE_READ_WRITE_READBACK_RESTART_ROLLBACK'

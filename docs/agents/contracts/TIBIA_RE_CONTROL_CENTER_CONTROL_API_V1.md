@@ -16,7 +16,7 @@ Define one bounded, local-only operator transport for the Control Center so brow
 
 This contract covers transport authentication, same-origin/Host policy, request idempotency, replay behavior, bounds, event delivery and shutdown. It does not grant Track A authority and does not authorize remote/LAN control.
 
-Normative execution semantics remain in `TIBIA_RE_CONTROL_CENTER_EXECUTION_V1.md`.
+Normative execution semantics remain in `TIBIA_RE_CONTROL_CENTER_EXECUTION_V1.md`; durable RequestLedger/ControlState topology is normative in `TIBIA_RE_CONTROL_CENTER_ARTIFACT_V1.md`.
 
 ## 2. Threat model
 
@@ -29,6 +29,8 @@ The local API must defend against at least:
 - browser retries/reloads;
 - CLI retries;
 - connection loss after the backend accepted a request;
+- crash after durable request acceptance but before resource creation;
+- crash after resource creation but before a completed response mapping;
 - duplicate tabs/operators;
 - oversized/malformed requests;
 - slow event consumers;
@@ -197,7 +199,7 @@ X-Tibia-RE-Request-Id: <opaque non-secret ID>
 - `request_id` deduplicates transport/domain requests such as creating a run or issuing STOP;
 - `action_id` deduplicates logical semantic action attempts inside runs.
 
-The backend stores a durable RequestLedger entry:
+The backend stores the authoritative backend-global Artifact-v1 RequestLedger entry:
 
 ```yaml
 RequestLedgerEntry:
@@ -207,8 +209,8 @@ RequestLedgerEntry:
   operation: string
   resource_id: string | null
   status: ACCEPTED | COMPLETED | FAILED
-  response_code: integer
-  response_body_hash: string
+  response_code: integer | null
+  response_body_hash: string | null
 ```
 
 The request hash is:
@@ -226,25 +228,51 @@ Headers carrying nonce, request ID, timestamps or transport metadata do not part
 
 Duplicate rules:
 
-- same `request_id` + same request hash -> return the existing logical response/resource; do not re-execute domain side effects;
+- same `request_id` + same request hash -> resolve the existing durable request/resource/result; never allocate a second logical resource merely due to transport replay;
 - same `request_id` + different request hash -> `409 CONTROL_IDEMPOTENCY_CONFLICT`;
 - a repeated `POST /v1/runs` with the same request ID must return the same `run_id`, never create a second run;
 - a repeated one-step experiment request must resolve to the same experiment/run/action identities;
-- duplicate STOP request may return the already-created STOP transition/result; it must not create accidental additional semantic effects merely due to transport retry.
+- duplicate STOP/reset requests resolve their existing durable control transition/result and must not create accidental additional semantic/external effects merely due to transport retry.
 
-## 13. Request-ledger durability
+## 13. Request-ledger durability and domain ordering
 
-Package B must persist RequestLedger entries using the selected Control Center persistent store.
+Package B persists RequestLedger in the backend-global Artifact-v1 control store, not inside a run directory.
 
-For an operation capable of scheduling mutation-capable fake work or creating durable run identity, the RequestLedger acceptance mapping must be durable before returning success to the caller.
+For every resource-creating POST, the exact order is:
+
+```text
+validate + normalize body
+-> compute request_hash
+-> lookup request_id
+-> if absent, preallocate final logical resource_id
+-> durably append/commit RequestLedger ACCEPTED(request_id, hash, operation, resource_id)
+-> durability barrier succeeds
+-> invoke domain handler using exactly that preallocated resource_id
+-> domain handler idempotently ensure/create/schedule only that resource
+-> durably transition RequestLedger to COMPLETED or FAILED with bounded replayable result metadata
+-> return response
+```
+
+The `ACCEPTED` durability barrier is before **domain creation/scheduling**, not merely before HTTP success. If acceptance durability fails, the domain handler is not invoked.
+
+Crash/replay semantics:
+
+- crash after durable ACCEPTED but before domain creation -> same request/hash reuses the reserved `resource_id`; the handler may ensure/create that same resource once;
+- crash after domain creation/scheduling but before RequestLedger COMPLETED -> same request/hash discovers/resumes/returns that same resource ID; it never allocates a second resource;
+- crash after COMPLETED but before caller receives response -> replay returns the existing resource/result;
+- same request/hash in FAILED state follows the operation's explicitly declared replay rule and may not silently allocate a new identity; a deliberate logical retry uses a new request ID;
+- same request ID/different hash always conflicts before domain execution.
+
+For non-resource operations such as STOP/reset, the durable RequestLedger entry must bind to the already-created durable control transition/result identity (for example Artifact-v1 `ControlState.transition_id`) before returning success. Replaying the request returns that result and does not repeat unrelated external effects.
 
 After backend restart:
 
-- a valid same request ID/hash retrieves the existing durable resource/result;
-- missing/corrupt contradictory request-ledger state fails closed and must not silently recreate mutation-capable work;
-- request IDs are not reused for a different operation/body.
+- a valid same request ID/hash retrieves/resolves the existing durable resource/result regardless of the new `backend_epoch`;
+- a durable ACCEPTED reservation with missing resource is completed using the same reserved ID, never treated as a fresh request;
+- missing/corrupt contradictory request-ledger/domain/safety state fails closed and must not silently recreate mutation-capable work;
+- request IDs are never reused for a different operation/body.
 
-The ledger may retain completed non-mutating requests for a bounded retention window, but any entry needed to prevent duplicate side effects must remain at least as long as the corresponding run/action recovery state.
+The ledger may retain completed non-mutating requests for a bounded retention window, but any entry needed to prevent duplicate side effects/resource creation remains at least as long as the corresponding resource/run/action recovery state.
 
 ## 14. Normalized request bodies
 
@@ -331,13 +359,13 @@ Graceful backend shutdown:
 1. stop accepting new scheduling/mutation-capable POSTs;
 2. expose `SHUTTING_DOWN` status;
 3. latch cancellation/STOP semantics for harness work according to the execution contract;
-4. flush required RequestLedger, action dispatch journal, budget ledger and event/artifact state;
+4. flush required backend-global ControlState/RequestLedger plus per-run action dispatch journal, budget ledger and event/artifact state;
 5. boundedly stop harness-owned subscribers/captures/resources;
 6. mark unresolved runs/actions truthfully incomplete/ambiguous as required;
 7. invalidate/delete current control nonce;
 8. exit.
 
-Forced/crash shutdown is recovered according to Execution v1 and persistent ledgers. It never implies successful cleanup or PASS.
+Forced/crash shutdown is recovered according to Execution/Artifact v1. It never implies successful cleanup or PASS and never implicitly clears durable STOP.
 
 ## 20. No remote/LAN mode in v1
 
@@ -373,17 +401,20 @@ At minimum:
 12. same request ID/body returns same run/resource;
 13. same request ID/different body returns idempotency conflict;
 14. repeated `POST /runs` across transport retry creates one run;
-15. repeated request after backend restart resolves existing durable resource when ledger is valid;
-16. corrupt/missing safety-critical RequestLedger does not silently re-execute mutation-capable work;
-17. slow event subscriber cannot block execution and receives deterministic backpressure behavior;
-18. page/event bounds enforced;
-19. unknown raw/debug/action endpoint absent;
-20. browser reload/new tab cannot duplicate an active run/action solely due to lost client state;
-21. graceful shutdown flushes required ledgers and invalidates nonce;
-22. crash recovery follows Execution v1 rather than auto-resuming mutation.
+15. crash after durable ACCEPTED before resource creation reuses the same reserved resource ID;
+16. crash after resource creation/scheduling before COMPLETED maps replay to the same resource with no duplicate domain work;
+17. response lost after COMPLETED then backend restart returns the existing durable resource/result;
+18. corrupt/missing contradictory safety-critical RequestLedger does not silently re-execute mutation-capable work;
+19. duplicate STOP/reset request returns the existing durable control transition/result;
+20. slow event subscriber cannot block execution and receives deterministic backpressure behavior;
+21. page/event bounds enforced;
+22. unknown raw/debug/action endpoint absent;
+23. browser reload/new tab cannot duplicate an active run/action solely due to lost client state;
+24. graceful shutdown flushes required global/per-run safety state and invalidates nonce;
+25. crash recovery follows Execution v1 rather than auto-resuming mutation.
 
 ## 23. Compatibility
 
 Control API major version 1 is local-only and additive-only.
 
-Changing nonce authentication, Host/origin trust, idempotency semantics, remote exposure policy or domain bypass guarantees requires a new major contract or an explicitly reviewed security profile.
+Changing nonce authentication, Host/origin trust, RequestLedger pre-domain durability/idempotency semantics, remote exposure policy or domain bypass guarantees requires a new major contract or an explicitly reviewed security profile.

@@ -97,8 +97,8 @@ jobs:
               else:
                   break
           text = '\n'.join(body) + '\n'
-          needle = "                  rel = resolved.relative_to(home).as_posix()\n                  data = resolved.read_bytes()"
-          replacement = "                  rel = resolved.relative_to(home).as_posix()\n                  if '/cache/' in '/' + rel:\n                      return\n                  data = resolved.read_bytes()"
+          needle = "        rel = resolved.relative_to(home).as_posix()\n        data = resolved.read_bytes()"
+          replacement = "        rel = resolved.relative_to(home).as_posix()\n        if '/cache/' in '/' + rel:\n            return\n        data = resolved.read_bytes()"
           if text.count(needle) != 1:
               raise SystemExit(f'unexpected cache-filter patch count: {text.count(needle)}')
           text = text.replace(needle, replacement)

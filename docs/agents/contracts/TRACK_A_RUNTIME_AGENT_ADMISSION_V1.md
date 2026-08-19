@@ -132,7 +132,7 @@ Standalone lease `validate`, task metadata, a visible X11 window, a reachable po
 
 ### 5. `canonical_bootstrap`
 
-Use only when the authoritative current registration is absent and initial creation is actually required.
+Use only when the authoritative current registration is absent. This access class now has two reviewed missing-registration modes: `create_new` for true zero-client initial creation, and `adopt_existing` for metadata-only registration of exactly one already-running exact-fenced client. The modes are mutually exclusive and must not weaken each other.
 
 Missing registration MUST NOT fall through to `canonical_reuse_or_mutation`, manual registration editing, or ordinary `guard-run`. Initial creation is allowed only through the separate reviewed bootstrap transition defined by `TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md`.
 
@@ -144,6 +144,11 @@ mutation_authorized: false
 ```
 
 A future implementation must still re-prove registration absence plus the complete all-official-client candidate/session inventory under the continuously held canonical flock immediately before launch, then register and safely detach exactly as the bootstrap contract requires.
+
+
+For `adopt_existing`, the transition itself is not client mutation: it MUST NOT launch, login, stop, signal, attach to, inject into or otherwise alter the client. It must run under the current authoritative lease plus continuously held canonical flock, prove exactly one exact target and zero conflicting/unverifiable candidates, bind the exact Docker runtime locator/candidate fingerprint, repeat stable boot/PID/start/fence/display/window proof around atomic registration commit, and roll back only its own registration on failure. Window title is identity evidence only: `IN_GAME` requires a separately structural current-peer proof (for the current Kasm path, bridge `PING` plus exactly one validated player-protocol, game-session and worldmap handler); absent such proof the registration state is `UNKNOWN`. A successful adoption still leaves `mutation_authorized: false` for that transaction. Any later GUI/process mutation requires a fresh task checkpoint/re-admission as `canonical_reuse_or_mutation` with Gate B PASS and the final whole-lifetime supervisor.
+
+The current task should record `bootstrap_mode: create_new | adopt_existing` when this distinction applies. The deterministic admission validator intentionally keeps both modes inside `canonical_bootstrap`; adoption is not ordinary reuse and never bypasses Gate B for subsequent mutation.
 
 ### 6. `canonical_rebind`
 
@@ -248,7 +253,7 @@ A worker sees historical `:98`, reachable `6082`, or an old PID and attempts inp
 
 ### REFUSE — missing-registration shortcut
 
-A worker sees no authoritative `runtime-registration.json` and tries ordinary `guard-run` launch. Refuse; initial creation belongs to bootstrap.
+A worker sees no authoritative `runtime-registration.json` and tries ordinary `guard-run` mutation. Refuse. If no client exists, use reviewed create-bootstrap; if exactly one exact pre-existing client exists, use reviewed metadata-only adoption; ambiguous/mismatched candidates remain fail-closed.
 
 ### REFUSE — generation mismatch shortcut
 

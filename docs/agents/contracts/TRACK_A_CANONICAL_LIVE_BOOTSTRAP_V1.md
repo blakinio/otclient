@@ -92,6 +92,14 @@ If a registered client, an exact live client, any mismatched/unverifiable offici
 
 The bootstrap supervisor MUST keep the canonical coordination flock continuously from before lease revalidation and the authoritative absence inventory through creation, registration commit and safe detach. Therefore two concurrent bootstrap callers cannot both act on the same stale absence observation: after waiting for the flock, a later supervisor must revalidate its lease, repeat the full under-lock inventory and refuse creation if the first caller has already registered or left any conflicting official-client candidate/session.
 
+## Existing-runtime adoption — separate missing-registration transition
+
+Create-bootstrap remains a **zero-client creation transaction**. It must never be relaxed merely because an exact client already exists. When the authoritative registration is absent but exactly one already-running exact-fenced official client is freshly proven, the reviewed `adopt-existing` transition is the separate legal path.
+
+Adoption runs under the same current authoritative lease and continuously held canonical `coordination.lock`, but it creates no client descendants and performs no login/process/UI mutation. Its probe must cover all permitted running Docker containers, require exactly one exact client, reject any official-looking mismatched or unverifiable candidate, and prove boot identity + PID + process start ticks + exact fence + display + X11 window ownership. It hashes rather than persists the character-bearing window title and MUST NOT infer `IN_GAME` from that title. When `state=IN_GAME` is recorded, a current exact-peer structural discriminator such as the existing bridge `PING` plus exactly one validated `player_protocol_handler`, `gameserver_game_session` and `worldmap_handler` is required; otherwise state remains `UNKNOWN`. The proof also binds a stable Docker runtime locator and candidate fingerprint so later Gate B checks cannot silently reinterpret a same-number PID in another container. The complete proof is repeated before atomic registration commit and after commit; identity, uniqueness, lease or registration drift fails closed.
+
+Adoption writes the same schema-v1 authoritative registration bound to the current lease generation, with additive adoption provenance fields (`proof_kind`, `runtime_locator`, `candidate_fingerprint`, inventory scope/count/completeness and `state_evidence`) that later adoption-aware Gate B probes must reproduce. A pre-commit failure discards only the candidate. A post-commit failure removes only the exact registration created by that adoption transaction and never stops/signals/restarts/attaches to the pre-existing client. After successful adoption, later client mutation is still a separate ordinary reuse step requiring a fresh invocation/trusted base, any required rebind, Gate B PASS and final guarded mutation lifetime.
+
 ## Exact client fence
 
 The created client MUST match:

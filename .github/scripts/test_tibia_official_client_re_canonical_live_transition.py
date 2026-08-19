@@ -256,6 +256,104 @@ class Tests(unittest.TestCase):
         with self.assertRaisesRegex(self.m.E, 'probe_manifest_missing_fields'):
             self.m._manifest(path)
 
+    def adoption_manifest(self):
+        return {
+            'proof_kind': self.m.ADOPTION_PROOF_KIND,
+            'pid': 4242,
+            'display': ':1',
+            'window_identity': 'x11:0x9:pid:4242:class:client/Tibia:title_sha256:' + 'a' * 64,
+            'remote_view_endpoint': 'https://synology:6902/',
+            'remote_view_mapping': 'UNKNOWN',
+            'state': 'IN_GAME',
+            'state_evidence': 'BRIDGE_3_OF_3',
+            'boot_id_sha256': self.identity['boot_id_sha256'],
+            'process_start_ticks': self.identity['process_start_ticks'],
+            'client_version': self.m.VER,
+            'client_size': self.m.SIZE,
+            'client_sha256': self.m.SHA,
+            'runtime_locator': 'docker:otclient-track-a-kasmvnc:abc123',
+            'inventory_scope': 'all_running_docker_containers',
+            'inventory_complete': True,
+            'candidate_count': 1,
+            'candidate_fingerprint': 'c' * 64,
+        }
+
+    def test_adopt_existing_commits_without_process_mutation(self):
+        manifest = self.adoption_manifest()
+        with mock.patch.object(self.m, '_probe', side_effect=[dict(manifest), dict(manifest), dict(manifest)]), \
+                mock.patch.object(self.m, '_lease', return_value=1), \
+                mock.patch.object(self.m, '_kill') as killed:
+            self.m._adopt_existing(self.args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 1)
+        data = self.m._read()
+        self.assertEqual(data['pid'], 4242)
+        self.assertEqual(data['lease_generation'], 1)
+        self.assertEqual(data['registration_generation'], 1)
+        self.assertEqual(data['proof_kind'], self.m.ADOPTION_PROOF_KIND)
+        self.assertEqual(data['runtime_locator'], manifest['runtime_locator'])
+        self.assertEqual(data['candidate_fingerprint'], manifest['candidate_fingerprint'])
+        self.assertEqual(data['state_evidence'], 'BRIDGE_3_OF_3')
+        killed.assert_not_called()
+
+    def test_adopt_existing_identity_drift_before_commit_leaves_no_registration(self):
+        first = self.adoption_manifest()
+        changed = dict(first, candidate_fingerprint='d' * 64)
+        with mock.patch.object(self.m, '_probe', side_effect=[dict(first), changed]), \
+                mock.patch.object(self.m, '_lease', return_value=1):
+            with self.assertRaisesRegex(self.m.E, 'adoption_identity_changed_before_commit'):
+                self.m._adopt_existing(self.args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 1)
+        self.assertFalse(self.m.REG.exists())
+
+    def test_adopt_existing_postcommit_drift_rolls_registration_back_only(self):
+        first = self.adoption_manifest()
+        changed = dict(first, window_identity='x11:changed')
+        with mock.patch.object(self.m, '_probe', side_effect=[dict(first), dict(first), changed]), \
+                mock.patch.object(self.m, '_lease', return_value=1), \
+                mock.patch.object(self.m, '_kill') as killed:
+            with self.assertRaisesRegex(self.m.E, 'adoption_identity_changed_after_commit'):
+                self.m._adopt_existing(self.args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 1)
+        self.assertFalse(self.m.REG.exists())
+        killed.assert_not_called()
+
+    def test_adopt_existing_refuses_preexisting_registration(self):
+        self.write(self.registration())
+        with mock.patch.object(self.m, '_probe') as probe:
+            with self.assertRaisesRegex(self.m.E, 'registration_already_present'):
+                self.m._adopt_existing(self.args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 1)
+        probe.assert_not_called()
+
+    def test_adoption_manifest_requires_complete_unique_inventory(self):
+        path = Path(self.temp.name) / 'adopt.json'
+        data = self.adoption_manifest()
+        data['candidate_count'] = 2
+        path.write_text(json.dumps(data))
+        with self.assertRaisesRegex(self.m.E, 'adoption_target_not_unique'):
+            self.m._manifest(path)
+
+    def test_adoption_manifest_rejects_ingame_without_structural_proof(self):
+        path = Path(self.temp.name) / 'adopt.json'
+        data = self.adoption_manifest()
+        data['state_evidence'] = 'NO_STRUCTURAL_BRIDGE'
+        path.write_text(json.dumps(data))
+        with self.assertRaisesRegex(self.m.E, 'adoption_ingame_without_structural_proof'):
+            self.m._manifest(path)
+
+    def test_adopted_registration_gate_match_binds_runtime_locator(self):
+        manifest = self.adoption_manifest()
+        with mock.patch.object(self.m, '_probe', side_effect=[dict(manifest), dict(manifest), dict(manifest)]), \
+                mock.patch.object(self.m, '_lease', return_value=1):
+            self.m._adopt_existing(self.args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 1)
+        registration = self.m._read()
+        changed = dict(manifest, runtime_locator='docker:otclient-track-a-kasmvnc:different')
+        with self.assertRaisesRegex(self.m.E, 'registered_identity_runtime_locator_mismatch'):
+            self.m._match(changed, registration)
+
+    def test_parser_accepts_adopt_existing_probe_shape(self):
+        parsed = self.m.parser().parse_args([
+            'adopt-existing', '--task-id', 'OTC-TEST', '--session-id', 's',
+            '--token-file', str(Path(self.temp.name) / 'tok'), '--probe', str(WORKER),
+        ])
+        self.assertEqual(parsed.operation, 'adopt-existing')
+
 
 if __name__ == '__main__':
     unittest.main()

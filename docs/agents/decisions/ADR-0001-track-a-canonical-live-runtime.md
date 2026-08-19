@@ -12,12 +12,13 @@ Track A researches the official native Linux Tibia client on `synology-otclient-
 
 The target operating model is one reusable persistent live official-client runtime for sequential Track A work, plus task-isolated ephemeral sandboxes for experiments that do not require that runtime. Static reverse engineering, protocol reconstruction and repository work remain parallel.
 
-Four trust transitions must remain separate:
+Five trust transitions must remain separate:
 
 1. **Who may mutate?** A current authoritative controller lease is required.
-2. **How may an already registered runtime cross into a newer controller lease generation?** A dedicated fail-closed registration rebind is required when generations differ.
-3. **Which existing runtime may be reused/mutated?** A current exact-runtime registration and fresh preflight are required after any required rebind.
-4. **How may the first runtime be created when no registration exists?** Initial creation is a separate fail-closed bootstrap transaction; it is neither Gate B reuse nor generation rebinding.
+2. **How may one already-running exact runtime become registered when registration is absent?** A dedicated fail-closed metadata-only adoption transition is required.
+3. **How may an already registered runtime cross into a newer controller lease generation?** A dedicated fail-closed registration rebind is required when generations differ.
+4. **Which existing runtime may be reused/mutated?** A current exact-runtime registration and fresh preflight are required after any required rebind.
+5. **How may the first runtime be created when registration is absent and no client exists?** Initial creation is a separate fail-closed bootstrap transaction.
 
 The final authority implementation is the manager/supervisor stack promoted through PRs #312, #313, #317, #316 and cancellation hardening PR #321, with fresh final closeout in PR #322. The initial-creation contract is `docs/agents/contracts/TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md`, originally promoted by PR #318 and archived by #320, then reconciled by this governance PR to the final cancellation-safe manager and the generation-rebind boundary.
 
@@ -60,7 +61,15 @@ PR #321 is the final cancellation-safe implementation on top of PR #316 child-su
 
 If the manager is unavailable, lease validation fails, or the final whole-lifetime supervisor guarantee cannot be used, ordinary canonical mutation is disabled.
 
-### 3. Registration-generation rebind — fail closed before Gate B equality
+### 3. Existing-runtime adoption — metadata-only registration of one exact pre-existing client
+
+If the authoritative registration is absent but exactly one already-running exact-fenced official client is proven, bootstrap creation must not run because its zero-client precondition is false. The reviewed `adopt-existing` transition may instead create registration generation 1 while the current controller continuously owns `coordination.lock`.
+
+Adoption must freshly prove one exact target and no competing/mismatched/unverifiable official-client candidate, including current boot identity, PID, process start ticks, exact version/size/SHA, display, X11 window ownership and a stable runtime-locator/candidate fingerprint. Window title alone never proves `IN_GAME`; an adoption registration may claim `IN_GAME` only with a current exact-peer structural discriminator, and otherwise records `UNKNOWN`. The current Kasm path uses bridge `PING` plus exactly one validated player-protocol, game-session and worldmap handler. The proof is repeated before registration commit and after commit. Lease drift, registration races or any identity/uniqueness drift abort. Before commit only the candidate file is discarded; after commit only the exact adoption-created registration may be removed on rollback. The existing client is never launched, stopped, signalled, logged in, attached to or injected into by adoption.
+
+Adoption does not itself authorize gameplay/UI mutation. A later invocation based on merged trusted `main` must re-admit, pass Gate B (and rebind if required), and use the final guarded mutation supervisor before input.
+
+### 4. Registration-generation rebind — fail closed before Gate B equality
 
 A registration created by bootstrap or an earlier controller is bound to the lease generation that established or last revalidated it. A later legitimate controller `acquire` advances the manager generation. Therefore **generation mismatch is expected across sequential controller ownership and must not be solved by weakening Gate B or by ad-hoc JSON editing**.
 
@@ -82,7 +91,7 @@ A rebind MUST NOT launch, log in, stop, signal, attach to, inject into, replace 
 
 This ADR defines the required transition but does **not** implement it. Until a reviewed implementation exists, a lease-generation mismatch keeps ordinary canonical mutation disabled.
 
-### 4. Gate B — authoritative current-runtime registration and fresh preflight
+### 5. Gate B — authoritative current-runtime registration and fresh preflight
 
 A current lease does not prove what process is being targeted. After any required generation rebind, ordinary reuse/mutation requires the one authoritative registration record:
 
@@ -118,7 +127,7 @@ Gate B is fail-closed if the registration is absent, stale, contradictory, malfo
 
 After stale lease takeover or any ordinary new controller generation, prior registration is evidence to be freshly falsified, not self-authenticating current authority. If all exact-runtime facts remain unchanged, the dedicated rebind transition may bind that verified registration to the current lease generation; otherwise mutation stays disabled.
 
-### 5. Initial creation/bootstrap is a separate transition
+### 6. Initial creation/bootstrap is a separate transition
 
 Gate B governs reuse of an already registered runtime. Generation rebind governs an already registered exact runtime crossing into a newer controller lease generation. Neither may be weakened or repurposed to solve initial creation.
 

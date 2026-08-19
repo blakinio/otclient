@@ -204,16 +204,20 @@ jobs:
             | grep -Eai 'creature|battle.?list|combat|attack|follow|targeting|status.?effect|health|outfit|speed|skull|party|mark|light|unpass' \
             | sed 's/[^[:print:]]//g' \
             | sort -u \
-            | head -n 1200 \
+            > /tmp/track-a-cc-evidence/semantic-strings-all.txt
+          test -s /tmp/track-a-cc-evidence/semantic-strings-all.txt
+          head -n 1200 /tmp/track-a-cc-evidence/semantic-strings-all.txt \
             > /tmp/track-a-cc-evidence/semantic-strings.txt
-          test -s /tmp/track-a-cc-evidence/semantic-strings.txt
+          rm -f /tmp/track-a-cc-evidence/semantic-strings-all.txt
 
           strings -a /tmp/track-a-cc-client/client \
             | grep -Ea '(Gameclient|Gameserver|gameclient|gameserver|protobuf).*(Creature|creature|Attack|attack|Follow|follow|Battle|battle|Combat|combat|Skull|skull|Party|party|Mark|mark|Outfit|outfit|Light|light|Speed|speed|Health|health)' \
             | sed 's/[^[:print:]]//g' \
             | sort -u \
-            | head -n 800 \
-            > /tmp/track-a-cc-evidence/protocol-strings.txt || true
+            > /tmp/track-a-cc-evidence/protocol-strings-all.txt || true
+          head -n 800 /tmp/track-a-cc-evidence/protocol-strings-all.txt \
+            > /tmp/track-a-cc-evidence/protocol-strings.txt
+          rm -f /tmp/track-a-cc-evidence/protocol-strings-all.txt
 
           printf 'SEMANTIC_STRING_LINES=%s\nPROTOCOL_STRING_LINES=%s\n' \
             "$(wc -l < /tmp/track-a-cc-evidence/semantic-strings.txt)" \

@@ -20,14 +20,18 @@ WINDOW_RE = re.compile(r'^\s*(0x[0-9a-fA-F]+)\s+"(Tibia(?: - .+)?)":')
 BRIDGE_SOCKET = "/tmp/otclient-native-login-current-sha/bridge.sock"
 BRIDGE_TARGETS = ("player_protocol_handler", "gameserver_game_session", "worldmap_handler")
 BRIDGE_SCRIPT = r"""
-import json, socket, sys
+import json, socket, struct, sys
 path = sys.argv[1]
-commands = ["PING"] + ["DISCOVER " + name for name in sys.argv[2:]]
+expected_pid = int(sys.argv[2])
+commands = ["PING"] + ["DISCOVER " + name for name in sys.argv[3:]]
 rows = []
 for command in commands:
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     sock.settimeout(12)
     sock.connect(path)
+    peer_pid, _, _ = struct.unpack("3i", sock.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, struct.calcsize("3i")))
+    if peer_pid != expected_pid:
+        raise RuntimeError(f"bridge_peer_pid_mismatch:{peer_pid}!={expected_pid}")
     sock.sendall((command + "\n").encode())
     data = b""
     while b"\n" not in data and len(data) < 65536:
@@ -73,8 +77,14 @@ def candidate_rows(container_id: str, runner: Callable[[Sequence[str]], str] = r
 for d in /proc/[0-9]*; do
   [ -r "$d/stat" ] || continue
   pid=${d#/proc/}
+  comm=$(cat "$d/comm" 2>/dev/null || true)
   exe=$(readlink -f "$d/exe" 2>/dev/null || true)
-  [ -n "$exe" ] || continue
+  if [ -z "$exe" ]; then
+    case "$comm" in
+      client|Tibia*) printf '%s\tUNREADABLE\tUNREADABLE\tUNREADABLE\tUNREADABLE\n' "$pid"; continue ;;
+      *) continue ;;
+    esac
+  fi
   base=${exe##*/}
   case "$base:$exe" in
     client:*|*:*Tibia*) ;;
@@ -129,20 +139,29 @@ printf 'EXE=%s\nSIZE=%s\nSHA=%s\nSTART=%s\nBOOT=%s\n' "$exe" "$size" "$sha" "$st
 def window_proof(container_id: str, pid: int, runner: Callable[[Sequence[str]], str] = run) -> str:
     prefix = ["docker", "exec", "-u", "kasm-user", "-e", f"DISPLAY={TARGET_DISPLAY}", container_id, "sh", "-lc"]
     tree = runner(prefix + ["xwininfo -root -tree"])
-    candidates: list[tuple[str, str]] = []
+    title_candidates: list[tuple[str, str]] = []
     for line in tree.splitlines():
         match = WINDOW_RE.match(line)
-        if match and match.group(2) != "Tibia":
-            candidates.append((match.group(1), match.group(2)))
-    if len(candidates) != 1:
-        raise ProbeError(f"main_window_count:{len(candidates)}")
-    window_id, title = candidates[0]
-    props = runner(prefix + [f"xprop -id {window_id} _NET_WM_PID WM_CLASS"])
-    pid_match = re.search(r"_NET_WM_PID\(CARDINAL\) = (\d+)", props)
-    if not pid_match or int(pid_match.group(1)) != pid:
-        raise ProbeError("window_pid_mismatch")
-    if '"client"' not in props or '"Tibia"' not in props:
-        raise ProbeError("window_class_mismatch")
+        if match:
+            title_candidates.append((match.group(1), match.group(2)))
+    owned: list[tuple[str, str]] = []
+    class_pid_mismatch = False
+    for window_id, title in title_candidates:
+        props = runner(prefix + [f"xprop -id {window_id} _NET_WM_PID WM_CLASS"])
+        if '"client"' not in props or '"Tibia"' not in props:
+            continue
+        pid_match = re.search(r"_NET_WM_PID\(CARDINAL\) = (\d+)", props)
+        if not pid_match:
+            raise ProbeError("window_pid_missing")
+        if int(pid_match.group(1)) != pid:
+            class_pid_mismatch = True
+            continue
+        owned.append((window_id, title))
+    if len(owned) != 1:
+        if not owned and class_pid_mismatch:
+            raise ProbeError("window_pid_mismatch")
+        raise ProbeError(f"main_window_count:{len(owned)}")
+    window_id, title = owned[0]
     title_hash = hashlib.sha256(title.encode()).hexdigest()
     return f"x11:{window_id}:pid:{pid}:class:client/Tibia:title_sha256:{title_hash}"
 
@@ -153,7 +172,7 @@ def structural_state(container_id: str, pid: int, runtime: dict[str, Any], runne
         return "UNKNOWN", "NO_STRUCTURAL_BRIDGE"
     if present != "PRESENT":
         raise ProbeError("bridge_presence_invalid")
-    raw = runner(["docker", "exec", container_id, "python3", "-c", BRIDGE_SCRIPT, BRIDGE_SOCKET, *BRIDGE_TARGETS])
+    raw = runner(["docker", "exec", container_id, "python3", "-c", BRIDGE_SCRIPT, BRIDGE_SOCKET, str(pid), *BRIDGE_TARGETS])
     try:
         rows = json.loads(raw)
     except json.JSONDecodeError as exc:

@@ -1,0 +1,263 @@
+name: Track A UI/settings static model
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/track-a-ui-settings-static-model.yml
+      - docs/agents/evidence/OTC-20260819-track-a-ui-settings-static-model/**
+      - docs/agents/tasks/active/OTC-20260819-track-a-ui-settings-static-model.md
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  recover:
+    name: Recover official-client UI/settings static model
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+
+      - name: Fetch current official Linux client and emit bounded static settings evidence
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          command -v curl >/dev/null
+          command -v objdump >/dev/null
+          command -v readelf >/dev/null
+          command -v python3 >/dev/null
+          python3 -m pip install --disable-pip-version-check --no-input --user capstone pyelftools
+          python3 - <<'PY'
+          import capstone
+          import elftools
+          print(f'UI_SETTINGS_CAPSTONE_VERSION={capstone.__version__}')
+          print(f'UI_SETTINGS_PYELFTOOLS_IMPORT={elftools.__name__}')
+          PY
+
+          r="$RUNNER_TEMP/ui-settings-static"
+          mkdir -p "$r/bin" "$r/state" "$r/client"
+          cd "$r/bin"
+
+          curl --retry 3 --connect-timeout 10 --max-time 60 -fsSL -o wgcf https://github.com/ViRb3/wgcf/releases/download/v2.2.32/wgcf_2.2.32_linux_amd64
+          echo '2ff97f2201972ce582a424455d50a3719a380eef0cd1f3144f7779348e122a2c  wgcf' | sha256sum -c -
+          curl --retry 3 --connect-timeout 10 --max-time 60 -fsSL -o wireproxy.tgz https://github.com/windtf/wireproxy/releases/download/v1.1.3/wireproxy_linux_amd64.tar.gz
+          echo 'e88c1d090740373fc606c1bafd81d9a5eadc642cce5667616e20e9d7a444f51c  wireproxy.tgz' | sha256sum -c -
+          mkdir wp
+          tar -xzf wireproxy.tgz -C wp
+          cp "$(find wp -type f -name wireproxy -print -quit)" wireproxy
+          chmod 755 wgcf wireproxy
+
+          cd "$r/state"
+          timeout 30s "$r/bin/wgcf" register --accept-tos >/dev/null
+          timeout 30s "$r/bin/wgcf" generate >/dev/null
+          printf 'WGConfig = %s\n\n[Socks5]\nBindAddress = 127.0.0.1:25344\n' "$r/state/wgcf-profile.conf" > wireproxy.conf
+          nohup "$r/bin/wireproxy" -c wireproxy.conf >"$r/wireproxy.log" 2>&1 </dev/null &
+          for _ in $(seq 1 30); do
+            if curl --socks5-hostname 127.0.0.1:25344 -fsS --max-time 10 https://www.cloudflare.com/cdn-cgi/trace >"$r/trace" 2>/dev/null; then
+              break
+            fi
+            sleep 2
+          done
+          grep -Eq '^warp=(on|plus)$' "$r/trace"
+
+          u=https://static.tibia.com/launcher/tibiaclient-linux-current/bin/client.lzma
+          curl --socks5-hostname 127.0.0.1:25344 --compressed --retry 3 --connect-timeout 10 --max-time 120 -fL \
+            -A 'Mozilla/5.0 (X11; Linux x86_64)' -e "$u" -H 'Accept: */*' \
+            "$u" -o "$r/client/client.lzma"
+
+          python3 - "$r/client/client.lzma" "$r/client/client" <<'PY'
+          import hashlib
+          import lzma
+          import pathlib
+          import sys
+
+          packed_path = pathlib.Path(sys.argv[1])
+          out_path = pathlib.Path(sys.argv[2])
+          packed = packed_path.read_bytes()
+          assert len(packed) > 45, len(packed)
+          props = packed[32]
+          lc = props % 9
+          rest = props // 9
+          lp = rest % 5
+          pb = rest // 5
+          dict_size = int.from_bytes(packed[33:37], 'little')
+          assert 0 <= lc <= 8 and 0 <= lp <= 4 and 0 <= pb <= 4
+          assert dict_size > 0
+          raw = lzma.decompress(
+              packed[45:],
+              format=lzma.FORMAT_RAW,
+              filters=[{'id': lzma.FILTER_LZMA1, 'dict_size': dict_size, 'lc': lc, 'lp': lp, 'pb': pb}],
+          )
+          assert raw[:4] == b'\x7fELF', raw[:4]
+          out_path.write_bytes(raw)
+
+          print('UI_SETTINGS_RUNTIME_ACCESS=none')
+          print('UI_SETTINGS_CLIENT_EXECUTED=false')
+          print('UI_SETTINGS_OFFICIAL_SOURCE_URL=https://static.tibia.com/launcher/tibiaclient-linux-current/bin/client.lzma')
+          print('UI_SETTINGS_PACKED_SIZE=' + str(len(packed)))
+          print('UI_SETTINGS_PACKED_SHA256=' + hashlib.sha256(packed).hexdigest())
+          print('UI_SETTINGS_CLIENT_SIZE=' + str(len(raw)))
+          print('UI_SETTINGS_CLIENT_SHA256=' + hashlib.sha256(raw).hexdigest())
+          print(f'UI_SETTINGS_LZMA_ENVELOPE=offset45;lc={lc};lp={lp};pb={pb};dict={dict_size}')
+          PY
+
+          python3 - "$r/client/client" <<'PY'
+          from collections import deque
+          import json
+          import re
+          import subprocess
+          import sys
+
+          from capstone import Cs, CS_ARCH_X86, CS_MODE_64
+          from capstone.x86_const import X86_INS_CALL, X86_OP_IMM, X86_OP_MEM, X86_REG_RIP
+          from elftools.elf.elffile import ELFFile
+
+          path = sys.argv[1]
+          SHF_ALLOC = 0x2
+          SHF_EXECINSTR = 0x4
+
+          def unique_nearest_strings(previous, limit=24):
+              out = []
+              for refs, _ in reversed(previous):
+                  for _, text in refs:
+                      if text not in out:
+                          out.append(text)
+                          if len(out) >= limit:
+                              return out
+              return out
+
+          def unique_nearest_calls(previous, limit=16):
+              out = []
+              for _, call in reversed(previous):
+                  if call and call not in out:
+                      out.append(call)
+                      if len(out) >= limit:
+                          return out
+              return out
+
+          with open(path, 'rb') as fh:
+              elf = ELFFile(fh)
+
+              strings_by_va = {}
+              for section in elf.iter_sections():
+                  flags = int(section['sh_flags'])
+                  if not (flags & SHF_ALLOC) or (flags & SHF_EXECINSTR):
+                      continue
+                  if section['sh_type'] == 'SHT_NOBITS':
+                      continue
+                  data = section.data()
+                  base = int(section['sh_addr'])
+                  for match in re.finditer(rb'[\x20-\x7e]{1,160}\x00', data):
+                      text = match.group()[:-1].decode('utf-8', 'ignore')
+                      strings_by_va[base + match.start()] = text
+
+              literal_vas = {va for va, text in strings_by_va.items() if text == 'clientoptions.json'}
+              print('UI_SETTINGS_KEYS_CLIENTOPTIONS_LITERAL_COUNT=' + str(len(literal_vas)))
+              for va in sorted(literal_vas):
+                  print(f'UI_SETTINGS_KEYS_CLIENTOPTIONS_LITERAL_VA=0x{va:x}')
+
+              plt = subprocess.run(
+                  ['objdump', '-d', '-C', '--no-show-raw-insn', '-j', '.plt', '-j', '.plt.sec', path],
+                  text=True,
+                  stdout=subprocess.PIPE,
+                  stderr=subprocess.DEVNULL,
+                  check=False,
+              ).stdout
+              plt_by_va = {}
+              for line in plt.splitlines():
+                  m = re.match(r'^\s*([0-9a-fA-F]+)\s+<(.+@plt)>:$', line)
+                  if m:
+                      plt_by_va[int(m.group(1), 16)] = m.group(2)
+
+              qsettings_plt = {
+                  va: name for va, name in plt_by_va.items()
+                  if 'QSettings::' in name
+                  and any(token in name for token in ('value(', 'setValue(', 'beginGroup(', 'endGroup('))
+              }
+              print('UI_SETTINGS_KEYS_QSETTINGS_PLT_COUNT=' + str(len(qsettings_plt)))
+
+              md = Cs(CS_ARCH_X86, CS_MODE_64)
+              md.detail = True
+              qsettings_calls = []
+              client_xrefs = []
+
+              def string_refs(insn):
+                  found = []
+                  for op in insn.operands:
+                      if op.type == X86_OP_MEM and op.mem.base == X86_REG_RIP:
+                          target = insn.address + insn.size + op.mem.disp
+                          text = strings_by_va.get(target)
+                          if text is not None:
+                              found.append((target, text))
+                  return found
+
+              for section in elf.iter_sections():
+                  if not (int(section['sh_flags']) & SHF_EXECINSTR):
+                      continue
+                  previous = deque(maxlen=96)
+                  for insn in md.disasm(section.data(), int(section['sh_addr'])):
+                      refs = string_refs(insn)
+                      direct_call = None
+                      target = None
+                      if insn.id == X86_INS_CALL and insn.operands and insn.operands[0].type == X86_OP_IMM:
+                          target = int(insn.operands[0].imm)
+                          direct_call = plt_by_va.get(target)
+
+                      if any(va in literal_vas for va, _ in refs):
+                          client_xrefs.append({
+                              'address': insn.address,
+                              'strings': unique_nearest_strings(previous),
+                              'calls': unique_nearest_calls(previous),
+                          })
+
+                      if target in qsettings_plt:
+                          qsettings_calls.append({
+                              'address': insn.address,
+                              'symbol': qsettings_plt[target],
+                              'strings': unique_nearest_strings(previous),
+                              'calls': unique_nearest_calls(previous),
+                          })
+
+                      previous.append((refs, direct_call))
+
+              print('UI_SETTINGS_KEYS_CLIENTOPTIONS_XREF_COUNT=' + str(len(client_xrefs)))
+              for idx, item in enumerate(client_xrefs[:16]):
+                  print(
+                      'UI_SETTINGS_KEYS_CLIENTOPTIONS_XREF=' + str(idx)
+                      + ';VA=0x' + format(item['address'], 'x')
+                      + ';PRIOR_STRINGS_JSON=' + json.dumps(item['strings'], ensure_ascii=True, separators=(',', ':'))
+                      + ';PRIOR_PLT_JSON=' + json.dumps(item['calls'], ensure_ascii=True, separators=(',', ':'))
+                  )
+
+              print('UI_SETTINGS_KEYS_QSETTINGS_CALL_COUNT=' + str(len(qsettings_calls)))
+              for idx, item in enumerate(qsettings_calls[:64]):
+                  print(
+                      'UI_SETTINGS_KEYS_QSETTINGS_CALL=' + str(idx)
+                      + ';VA=0x' + format(item['address'], 'x')
+                      + ';SYMBOL=' + item['symbol']
+                      + ';PRIOR_STRINGS_JSON=' + json.dumps(item['strings'], ensure_ascii=True, separators=(',', ':'))
+                      + ';PRIOR_PLT_JSON=' + json.dumps(item['calls'], ensure_ascii=True, separators=(',', ':'))
+                  )
+
+              if len(literal_vas) != 1:
+                  raise SystemExit(f'expected one clientoptions.json literal, got {len(literal_vas)}')
+              if not client_xrefs:
+                  raise SystemExit('clientoptions.json has no decoded RIP-relative code xref')
+              if len(qsettings_plt) < 4:
+                  raise SystemExit(f'expected QSettings read/write/group PLT surface, got {len(qsettings_plt)}')
+              if not qsettings_calls:
+                  raise SystemExit('QSettings persistence PLT surface has no decoded direct callsites')
+
+              print('UI_SETTINGS_KEY_ADJACENCY_SCAN=PASS')
+          PY
+
+          echo 'UI_SETTINGS_BUILD_ID_BEGIN'
+          readelf -n "$r/client/client" | sed -n '/Build ID:/p' | head -n 1
+          echo 'UI_SETTINGS_BUILD_ID_END'
+
+          rm -f "$r/client/client" "$r/client/client.lzma"
+          echo 'UI_SETTINGS_PROPRIETARY_BINARY_RETAINED=false'

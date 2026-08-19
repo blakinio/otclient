@@ -1,25 +1,34 @@
 ---
 task_id: OTC-20260819-track-a-inventory-containers-live-e2e
-status: promotion_pending
-session_role: coordinator
+status: completed
+session_role: released
 project_lane: otclient
 lane: P0-STATE
 track_id: official-client-re
 task_kind: runtime_semantic_validation
-phase: coordinator-promotion
+phase: closed
 source_pr: 582
 source_branch: research/OTC-20260819-track-a-inventory-containers-live-e2e
 source_head: 81bb489a38d8d1719e5b6fc05ee6e12aef5e4c74
-source_disposition: close_unmerged_after_promotion
+source_disposition: closed_unmerged_superseded
 independent_audit: inventory-containers-passive-live-auditor-v1
 independent_audit_result: PASS_WITH_MUTATION_BLOCKER
 open_material_findings: 0
 bounded_task_result: PASSIVE_LIVE_STRENGTHENING_MUTATION_BLOCKED_NO_EXISTING_RUNTIME_ADOPTION_PATH
 canonical_D09_D22_status: 14_PARTIAL_0_DONE
 promotion_base: a85ef28b6f79b0f704378ebd1f7a4c5e6e7070dc
-promotion_pr: pending
-promotion_head: pending
-promotion_merge: pending
+promotion_pr: 587
+promotion_head: 00661998ccbe82bfc3d270adac90b57c7ffc2018
+promotion_merge: c056a38aeecb3f88b9c8b140997933d23c51027f
+promotion_merge_method: squash
+promotion_changed_paths: 6
+promotion_ahead_by: 1
+promotion_behind_by: 0
+promotion_ci_run: 32248599848
+promotion_ci_result: SUCCESS
+promotion_review: 4971670040
+promotion_review_result: PASS_WITH_MUTATION_BLOCKER
+promotion_review_threads_open: 0
 runtime_access: none
 runtime_owner_task: NOT_APPLICABLE
 runtime_namespace: NOT_APPLICABLE
@@ -42,16 +51,25 @@ passive_live_D10: AUTHENTICATED_VISIBLE_VALUES
 passive_live_D13: AUTHENTICATED_VISIBLE_STACK_COUNTS
 passive_live_D15: AUTHENTICATED_OPEN_BACKPACK
 raw_runtime_capture_retained: false
-ownership_release_state: effective_on_promotion_merge_and_terminal_closeout
+ownership_released: true
+stale_branches_reconciled: true
 ---
 
-# TIBIA-RE-INVENTORY-CONTAINERS — bounded authenticated live archive
+# TIBIA-RE-INVENTORY-CONTAINERS — terminal authenticated passive-live archive
 
-## Bounded result
+## Terminal disposition
 
-The task obtained valid current-session read-only evidence from the owner's already authenticated official client, then stopped at a real fail-closed controller-plane blocker before sending any input.
+The bounded live continuation is complete and runtime ownership is released. Source Draft #582 was preserved as provenance and closed unmerged as superseded after clean promotion PR #587 passed exact-head validation and squash-merged as:
 
-Fresh exact target facts:
+```text
+c056a38aeecb3f88b9c8b140997933d23c51027f
+```
+
+Promotion head `00661998ccbe82bfc3d270adac90b57c7ffc2018` was one commit ahead / zero behind its base, changed exactly six task evidence/archive paths, passed `git diff --check`, JSON validation and Track A governance, and completed CI run `32248599848` successfully. Independent promotion review `4971670040` recorded `PASS_WITH_MUTATION_BLOCKER` with zero open material findings and zero review threads.
+
+## Accepted bounded result
+
+Fresh exact target facts at observation:
 
 ```text
 PID         11365
@@ -71,20 +89,12 @@ Authenticated passive observations strengthen:
 
 All D09-D22 rows remain `PARTIAL`; none is promoted to `DONE`.
 
-## Independent audit
+## Mutation blocker remains intentional
 
-A fresh second read-only observation reproduced the D10/D13/D15 facts and independently rechecked exact PID/start/size/SHA, host client count `1`, and authoritative registration absence. Open material evidence findings: `0`.
+Authoritative `runtime-registration.json` was absent. Trusted-main transition code provided only `bootstrap`, `rebind`, and `gate-b`: bootstrap refuses an already-running official-client candidate, while rebind/gate-b require an existing registration. Therefore the already-running exact authenticated client had no reviewed path into canonical mutation authority.
 
-The auditor also falsified mutation admission against trusted-main transition code. The implementation supports only `bootstrap`, `rebind`, and `gate-b`: bootstrap refuses an existing official-client candidate, while rebind/gate-b require an existing authoritative registration. The already-running exact authenticated client is unregistered, so no reviewed trusted-main operation can adopt it for canonical mutation.
+This task did not send keyboard/mouse input, replay login, access credentials, move items, stimulate containers, mutate the process/network, or perform transactions. All temporary raw frames were deleted.
 
-## Safety
+## Next programme gate
 
-No new login, credentials, keyboard/mouse input, gameplay action, item/container movement, process control, debugger/injection, network mutation or transaction occurred. All temporary raw screenshots/crops were deleted and are not promoted.
-
-## Programme gate
-
-Promotion of this bounded result does not legalize future input. A separately owned runtime-infrastructure task must implement and independently review an explicit fail-closed transition for adopting/reconciling one already-running exact unregistered official client. That change must merge to trusted `main` and be consumed only from a later invocation before agent-driven GUI input.
-
-## Lifecycle
-
-After exact-head promotion validation and merge, close source #582 unmerged as superseded and finalize this archive with promotion CI/review/merge facts and released ownership. No further physical runtime operation belongs to this bounded task.
+A separately owned runtime-infrastructure task may implement an explicit fail-closed existing-unregistered-runtime reconciliation/adoption transition. It must be independently reviewed and merged to trusted `main`; a later invocation must then re-read that authority before any agent-driven GUI input. This terminal evidence task itself grants no such authority.

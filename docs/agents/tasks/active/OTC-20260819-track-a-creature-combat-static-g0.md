@@ -1,22 +1,22 @@
 ---
 task_id: OTC-20260819-track-a-creature-combat-static-g0
-status: validating
-agent: chatgpt-gpt-5.6-sol
-session_id: 20260819-creature-combat-g0
+status: ready
+agent: null
+session_id: null
 session_role: researcher
 project_lane: otclient
 lane: P0-STATE
 task_kind: discovery
-phase: final-draft-validation
+phase: coordinator-handoff
 branch: research/OTC-20260819-track-a-creature-combat-static-g0
 base_branch: main
 base_main: 82e5f435c3aa4172115bf7f6a0cd7a5cc6da3d50
 current_main_observed: cf90b84442dda730bdab93d8aa9f3236b7532ad8
 created: 2026-08-19T09:35:00+02:00
-updated: 2026-08-19T09:58:00+02:00
+updated: 2026-08-19T10:00:00+02:00
 risk: low
 execution_mode: github_only
-execution_reason: deterministic current-package static census and evidence processing; physical session is not required
+execution_reason: deterministic current-package static census and evidence processing; physical session was not required
 EXECUTION_CLASS: github_hosted
 RUNTIME_ACCESS: none
 PERSISTENT_SESSION_ROLE: consumer_of_runtime_evidence
@@ -49,7 +49,6 @@ owned_paths:
   - docs/agents/tasks/active/OTC-20260819-track-a-creature-combat-static-g0.md
   - docs/agents/reports/OTCLIENT-20260819-track-a-creature-combat-static-g0.md
   - docs/agents/evidence/OTC-20260819-track-a-creature-combat-static-g0/**
-  - .github/workflows/track-a-creature-combat-static-g0.yml
 reuses:
   - docs/agents/prompts/OTCLIENT_TIBIA_RE_PARALLEL_RUNTIME_AGENT_PROMPTS_V1.md
   - docs/agents/reports/OTCLIENT-20260814-official-client-capability-census.md
@@ -75,73 +74,39 @@ related_prs:
 
 ## Objective
 
-Execute owner alias `TIBIA-RE-CREATURE-COMBAT` as one bounded current-package static research slice for primary coverage `D01-D08` and structural leads relevant to `C15-C17`, without taking over the shared physical runtime, canonical coverage files, S10 action-protocol ownership, or spawn/mechanics work.
+Execute owner alias `TIBIA-RE-CREATURE-COMBAT` as a bounded current-package static research slice for primary coverage `D01-D08` and structural leads relevant to `C15-C17`, without taking over the shared physical runtime, canonical coverage files, S10 action-protocol ownership, or spawn/mechanics work.
 
-## Authority and isolation
+## Terminal researcher result
 
 ```yaml
-runtime_access: none
-mutation_authorized: false
-client_byte_mutation_authorized: false
-credentials_allowed: false
-login_allowed: false
-gameplay_allowed: false
+STATUS: DRAFT_NOT_PROMOTED
+DRAFT_PR: 558
+RUNTIME_ACCESS: none
+PHYSICAL_E2E_REQUIRED: false
+canonical_promotion: NOT_PERFORMED
+merge_performed: false
 ```
 
-No Synology/KasmVNC/client runtime was observed or controlled. The public official Linux package existed only inside disposable GitHub-hosted producer jobs and was deleted before compact text evidence upload.
-
-## Producer generations
-
-### Generation 1 — infrastructure cancellation
-
-```text
-run/job: 32228647135 / 95993567735
-result: CANCELLED
-failure_boundary: apt-get dependency installation exceeded job timeout
-current_package_fetched: false
-raw_client_retained: false
-```
-
-The retry was not blind: the producer was changed to dependency-light hosted setup using preinstalled `curl`/`strings` plus `pip pyelftools`.
-
-### Generation 2 — bounded pipeline defect
-
-```text
-run/job: 32230003488 / 95997593305
-result: FAILURE
-PYELFTOOLS_IMPORT=PASS
-CURRENT_PACKAGE_FENCE=PASS
-QMETA_ENUMERATION=PASS
-failure_boundary: sort -u | head under pipefail reported expected truncation SIGPIPE as failure
-cleanup: PASS
-raw_client_retained: false
-```
-
-The second repair removed the truncating pipeline shape without changing research filters or semantic classification rules.
-
-### Generation 3 — successful producer
+The successful current-package producer independently fenced the public native-Linux package and retained only compact text evidence.
 
 ```text
 producer_head: bb0dc3a44a6e5daca2f81817696f91043f8c03d5
 run/job: 32230171183 / 95998084380
-result: SUCCESS
 artifact: 9356949168
-artifact_digest: sha256:d08fba81bbb41ef2f18e6967163ad59c6883b31392836104253c2a4e2f8abbf7
+artifact_sha256: d08fba81bbb41ef2f18e6967163ad59c6883b31392836104253c2a4e2f8abbf7
 packed_sha256: 1fc26d66cef90723d29293f177fcff41c8e937e7aac830f08e82c2f4c69eb354
 packed_size: 10214529
 unpacked_sha256: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
 unpacked_size: 52109920
-current_package_fence: PASS
-raw_client_retained: false
+CURRENT_PACKAGE_FENCE=PASS
+RAW_CLIENT_RETAINED=false
 ```
 
-The downloaded artifact ZIP was independently hashed and exactly matched GitHub metadata. It contains only four text files: QMeta, fence, protocol strings and neutral semantic strings.
+The downloaded artifact ZIP was independently hashed and matched GitHub metadata. It contains only `creature-combat-qmeta.txt`, `fence.txt`, `protocol-strings.txt`, and `semantic-strings.txt`.
 
-The temporary producer workflow was deleted after successful artifact verification and is absent from the intended final PR diff.
+## Findings
 
-## Research result
-
-The predeclared row rules were applied without widening them after reading the artifact.
+The predeclared status rules were applied unchanged after artifact inspection:
 
 ```text
 D01 PARTIAL -> PARTIAL
@@ -157,34 +122,48 @@ C16 PARTIAL -> PARTIAL
 C17 PARTIAL -> PARTIAL
 ```
 
-### D06 dedicated current-build proof
+### D06
 
-Current `TCreatureHUDQmlRenderInfo` exposes exact QMeta ownership for creature name, health, mana/mana-shield bars, horizontal/vertical icons, player states, special conditions and `statusEffectsChanged`; `TCreatureHUDOverlayController` exposes HUD refresh/update.
+Current `TCreatureHUDQmlRenderInfo` directly exposes QMeta change surfaces for name, health, mana/mana-shield bars, horizontal/vertical icons, player states, special conditions and `statusEffectsChanged`; `TCreatureHUDOverlayController` exposes refresh/update.
 
-This closes the `NOT_STARTED` dedicated-evidence gap but not authoritative storage/schema/runtime semantics, so `D06` is only `PARTIAL`.
+This is dedicated exact-current-build evidence beyond broad lexical presence, so `D06` may be promoted by the coordinator from `NOT_STARTED` to `PARTIAL`. Authoritative provider/schema/runtime semantics remain `UNKNOWN`.
 
-### D07 dedicated current-build proof
+### D07
 
-Current `TBattleListController` exposes filter state/toggling and secondary-list creation; `TBattleListGameActionHandler` exposes first/next/previous target actions plus `filterDrawCommands` and `sortDrawCommands`; current neutral types include the battle-list sort/filter proxy and secondary-list action.
+Current `TBattleListController` exposes filter state/toggling and secondary-list requests. `TBattleListGameActionHandler` exposes first/next/previous target actions, `filterDrawCommands` and `sortDrawCommands`; current neutral types include a battle-list sort/filter proxy and a secondary-list game-action type.
 
-This closes the `NOT_STARTED` dedicated-evidence gap but not exact filter/sort/live-membership semantics, so `D07` is only `PARTIAL`.
+This is dedicated exact-current-build evidence beyond broad lexical presence, so `D07` may be promoted by the coordinator from `NOT_STARTED` to `PARTIAL`. Exact filter/sort/live-membership semantics remain `UNKNOWN`.
 
 ### Existing partial rows
 
-Current exact-package evidence revalidates `TCreature`, `TCreatureStorage`, `TCreatureProtocolMessageHandler`, `TCreaturesGameActionHandler`, creature server-message families, target-selection structure, `sendAttack`, `sendFollow`, `GameclientMessageAttack` and `GameclientMessageFollow`.
+Current-build evidence revalidates `TCreature`, `TCreatureStorage`, `TCreatureProtocolMessageHandler`, `TCreaturesGameActionHandler`, creature server-message families, target-selection structure, `sendAttack`, `sendFollow`, `GameclientMessageAttack` and `GameclientMessageFollow`.
 
-It does not close queue -> non-QMeta handler, handler -> model mutation, authoritative live state, target/action -> protocol -> effect causality, or server acceptance. No dedicated current-build cancel-attack/follow name was recovered; absence is not negative proof and `C17` receives no new semantic promotion.
+It does not close queue -> non-QMeta handler, handler -> model mutation, authoritative live state, target/action -> protocol -> effect causality or server acceptance. No dedicated current-build cancel-attack/follow structural name was recovered; absence is not negative proof and `C17` receives no new semantic promotion.
+
+## Producer repair history
+
+```text
+32228647135 / 95993567735 = CANCELLED at apt dependency install; no current package fetched
+32230003488 / 95997593305 = QMeta/fence PASS, then pipefail SIGPIPE in intentional sort|head truncation; cleanup PASS
+32230171183 / 95998084380 = SUCCESS after dependency-light + non-SIGPIPE repairs
+```
+
+The two failures were repaired by distinct evidence-based hypotheses; no identical failure was blindly rerun.
 
 ## Acceptance inventory
 
 - [x] Fresh current public Linux package fetched in a GitHub-hosted ephemeral job and exact packed/unpacked identity fenced.
-- [x] Creature/battle/combat QMeta class/method ownership enumerated without the rejected per-method jump-target heuristic.
+- [x] Creature/battle/combat QMeta ownership enumerated without the rejected per-method jump-target heuristic.
 - [x] Relevant generated protobuf/message and neutral string surfaces enumerated.
-- [x] D01-D08 and C15-C17 findings classified as FACT / INFERENCE / UNKNOWN without runtime overclaim.
-- [x] Negative scope control proves no credentials, login, gameplay, runtime observation, client execution, client mutation or raw-client artifact retention.
-- [x] Temporary producer workflow removed before final research head.
-- [x] Task-owned report and evidence paths are sufficient for a fresh coordinator without chat history.
-- [ ] Exact-head repository checks on the final Draft checkpoint head.
+- [x] D01-D08 and C15-C17 findings classified with FACT / INFERENCE / UNKNOWN boundaries.
+- [x] No credentials, login, gameplay, runtime observation, client execution, client mutation or raw-client artifact retention.
+- [x] Temporary producer workflow removed from the final PR diff.
+- [x] Task-owned report and evidence are sufficient for a fresh coordinator without chat history.
+- [x] Pre-handoff exact-head CI `32230564131` / `CI / Required` = SUCCESS on `ca41c1043116442d4c0041e39cc71d65ede96797`.
+- [x] Pre-handoff Track A governance `32230563911`: deterministic admission-policy audit = SUCCESS; fresh admission behavior audit = SUCCESS.
+- [x] PR diff before terminal handoff contains exactly three task-owned documentation/evidence paths.
+- [x] Review threads = 0; submitted reviews = 0 before terminal handoff.
+- [ ] Final exact-head checks after this terminal task-state commit; no further branch mutation is intended.
 - [ ] Coordinator independent review/promotion decision; researcher has no promotion/merge authority.
 
 ## Delivery classification
@@ -197,7 +176,7 @@ feature_scope:
   frontend_required: false
   integration_required: false
   e2e_required: false
-implementation_status: researcher_package_complete_validating
+implementation_status: researcher_package_complete
 physical_e2e: NOT_APPLICABLE
 physical_e2e_reason: static reverse-engineering evidence package with runtime_access none
 canonical_promotion: NOT_PERFORMED
@@ -214,34 +193,36 @@ canonical_promotion: NOT_PERFORMED
 ```yaml
 recovery:
   policy_version: 1
-  generation: 4
-  session_id: 20260819-creature-combat-g0
+  generation: 5
+  session_id: null
   session_started_at: 2026-08-19T09:35:00+02:00
-  checkpointed_at: 2026-08-19T09:58:00+02:00
-  last_progress_at: 2026-08-19T09:58:00+02:00
-  phase: final-draft-validation
-  exact_head: checkpoint-commit-created-by-this-update
+  checkpointed_at: 2026-08-19T10:00:00+02:00
+  last_progress_at: 2026-08-19T10:00:00+02:00
+  phase: coordinator-handoff
+  exact_head: terminal-task-state-commit-created-by-this-update
   pull_request: 558
-  active_operation: exact-head-ci-observation
+  active_operation: final-exact-head-checks
   external_run_ids:
     - 32230171183
-  operation_started_at: 2026-08-19T09:58:00+02:00
+    - 32230564131
+    - 32230563911
+  operation_started_at: 2026-08-19T10:00:00+02:00
   wait_deadline_at: null
-  check_generation: final-draft
+  check_generation: terminal-researcher-draft
   checks_used: 0
-  status: active
+  status: ready
   safe_to_resume: true
-  resume_condition: final Draft head has terminal repository checks
-  next_action: Verify the complete PR diff, exact-head CI/governance, review threads and current main. If clean, write the terminal researcher-ready checkpoint and leave Draft PR #558 for coordinator independent review without merging or canonical promotion.
+  resume_condition: coordinator can independently review exact Draft PR #558 head and retained artifact/evidence
+  next_action: Independently audit Draft PR #558 and artifact/evidence; classify ACCEPT, ACCEPT_WITH_EDITS, RETURN_FOR_EVIDENCE, or REJECT/SUPERSEDE. Only the coordinator may promote accepted row deltas into canonical coverage or integrate/merge.
 ```
 
 ## Invocation counters
 
 ```yaml
 invocation_started_at: 2026-08-19T09:52:00+02:00
-last_progress_at: 2026-08-19T09:58:00+02:00
+last_progress_at: 2026-08-19T10:00:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: final-draft
+ci_check_generation: terminal-researcher-draft
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0

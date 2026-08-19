@@ -1,19 +1,19 @@
 ---
 task_id: OTC-20260819-track-a-economy-panels-runtime-readonly
-status: blocked
+status: in_progress
 agent: ChatGPT
-session_id: chatgpt-economy-panels-runtime-20260819-resume-v2
+session_id: chatgpt-economy-panels-runtime-20260819-resume-v3
 session_role: researcher
 project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: runtime_read_only_semantic_validation
-phase: passive_visible_state_exhausted
+phase: bounded_gui_safe_navigation
 branch: research/OTC-20260819-track-a-economy-panels-runtime-readonly
 base_branch: main
-base_main: 08c0b6f89ffddd4c75b8f60060ce3b2a62195d95
+base_main: f13179df4aa99a946faf6ec9635d5d40370c6ff3
 risk: medium
-updated: 2026-08-19T10:58:00+02:00
+updated: 2026-08-19T11:25:28+02:00
 policy_version: 2
 execution_mode: remote-desktop-commander-synology
 execution_class: synology_physical_runtime
@@ -23,7 +23,7 @@ continuation_policy: stop_at_task_boundary
 task_completion_policy: checkpoint_only
 researcher_delivery: draft_pr_only
 promotion_authority: coordinator_only
-runtime_access: read_only
+runtime_access: bounded_gui_readonly_navigation
 runtime_owner_task: OTC-20260819-track-a-economy-panels-runtime-readonly
 runtime_namespace: track-a-kasmvnc-economy-readonly
 canonical_registration: NOT_APPLICABLE
@@ -34,15 +34,16 @@ generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
 target_uniqueness: PROVEN
-mutation_authorized: false
+mutation_authorized: true
+mutation_scope: reversible_local_ui_navigation_only
 physical_e2e_required: true
 login_authorized: false
 credential_use_authorized: false
-gui_input_authorized: false
+gui_input_authorized: true
 gameplay_authorized: false
 process_control_authorized: false
 transaction_authorized: false
-owner_runtime_window_confirmation: owner previously replied "gotowe" after explicit shared-runtime read-only reconciliation prerequisite; current owner invocation "wykonaj" resumes the same bounded read-only task and does not expand login/input/process-control/transaction authority
+owner_runtime_window_confirmation: '2026-08-19 owner invocation: "Kontynuuj #528 login + #550 GUI-safe economy panels; zgoda pozostaje ważna." This expands #550 only to bounded GUI-safe, reversible panel navigation. Login/credential authority remains isolated to #528. No economy/account transaction, reward claim, transfer, trade, purchase, sale, offer mutation, payment, gameplay movement or process control is authorized.'
 trusted_base_fence_governance_pr: 555
 trusted_base_fence_closeout_pr: 561
 trusted_base_version: '15.32'
@@ -51,15 +52,21 @@ trusted_base_sha256: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0
 trusted_base_exact_client_fence_result: PASS
 fresh_target_uniqueness: PROVEN
 fresh_live_client_fence_match: PASS
-live_client_pid: 17954
-live_client_start_ticks: 74839161
+live_client_pid: 11365
+live_client_start_ticks: 74970818
 live_client_xid: '0x1a00017'
 live_client_display: ':1'
 live_client_size: 52109920
 live_client_sha256: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
 competing_full_client_candidates: 0
-passive_visible_state: LOGIN_SCREEN
-panel_observation_after_preflight: PASSIVE_CAPTURE_COMPLETE_NO_G24_G31_VISIBLE
+passive_visible_state: IN_GAME
+native_login_structural_state: PASS_RETAINED_SESSION
+native_login_structural_discriminators:
+  player_protocol_handler_validated_hits: 1
+  gameserver_game_session_validated_hits: 1
+  worldmap_handler_validated_hits: 1
+credential_reentry_needed: false
+panel_observation_after_preflight: READY_FOR_BOUNDED_GUI_SAFE_NAVIGATION
 raw_capture_retained: false
 owned_paths:
   - docs/agents/tasks/active/OTC-20260819-track-a-economy-panels-runtime-readonly.md
@@ -70,8 +77,8 @@ dependencies:
   - trusted-base current-client fence PR #555 and closeout #561: SATISFIED
 read_only_overlap:
   - PR #475 worldmap runtime task is released with runtime_access none and owns no current runtime surface
-  - PR #528 native-login lane remains isolated in runtime_namespace native-login-exact-sha-re; this task does not observe or mutate its native-login surface
-  - PR #541 owns KasmVNC infrastructure; current owner-reconciled window permits shared read-only observation only, with no infrastructure mutation
+  - PR #528 native-login lane owns authentication semantics; current #550 run consumes only its already-authenticated retained session and does not use credentials
+  - PR #541 owns KasmVNC infrastructure; #550 does not mutate infrastructure
   - PR #536 coverage matrix remains read-only only, no edits
 runtime_locator:
   remote_desktop_commander_device: Synology
@@ -88,17 +95,19 @@ scope_groups:
   - G30 World transfer/main-character-change UI
   - G31 generic modal/panel flows
 acceptance:
-  - freshly prove the intended Kasm container/display and exact client PID/start/exe/size/SHA/window identity non-invasively
+  - freshly prove the intended Kasm container/display and exact client PID/start/exe/size/SHA/window identity before input
   - fail closed if multiple plausible clients/windows remain or the live build does not match the trusted-base current fence
-  - only after fresh target uniqueness and exact-client fence match, observe already-visible panel/session state without keyboard or mouse input
-  - never login, use credentials, open/drive panels with input, purchase/sell/create/cancel/accept offers, transfer Tibia Coins, claim rewards, commit auction/trade, world transfer, main-character change or due-payment actions
-  - persist only sanitized read-only evidence; no account secrets or unnecessary personal data
+  - use only reversible GUI panel navigation that cannot itself purchase, sell, create/cancel/accept offers, transfer Tibia Coins, claim rewards, commit auction/trade, world transfer, main-character change, due payment or other economy/account transaction
+  - never enter credentials in the GUI; any login/credential work remains isolated to #528 native semantic ingress
+  - do not move the character or perform gameplay actions merely to reach a feature
+  - inspect/capture only sanitized panel state and close/back out without confirming transactional actions
+  - persist only sanitized evidence; no account secrets or unnecessary personal data
   - leave researcher output at Draft PR for coordinator review
-last_completed_step: fresh exact-client/target preflight passed; one read-only X11 frame then established that the already-visible client state is LOGIN_SCREEN and no G24-G31 panel is visible; the potentially sensitive raw frame was deleted from container and host without OCR or retention; no input/login/process-control/transaction occurred
-blocker: NO_GUI_INPUT_OR_LOGIN_AUTHORITY_FOR_PANEL_NAVIGATION_FROM_LOGIN_STATE
-next_action: require a separately explicit owner/governance authority change for bounded GUI input and any login/credential use needed to reach G24-G31, or provide a separately legitimate already-authenticated runtime; re-admit before any state-changing input
+last_completed_step: fresh exact-client re-admission found one current helper-enabled PID 11365 at IN_GAME with zero persistent secret environment and three independent native structural discriminators each returning exactly one validated current-SHA object; credential re-entry is not needed
+blocker: none
+next_action: open the currently visible Store surface with one bounded reversible GUI action, capture and classify only read-only state, then continue to other panels only where an equally safe non-transactional navigation path is visible and unambiguous
 ---
 
 # TIBIA-RE-ECONOMY-PANELS — live SAFE_READ continuation
 
-The old exact-client fence blocker is resolved and fresh runtime identity passes. Passive SAFE_READ is now exhausted because the exact current client is at the login screen and no economy/account panel is already visible. The task remains Draft and blocked rather than opening or driving a panel outside its authority.
+The owner explicitly resumed #528 and #550 and preserved the existing consent. #550 now has bounded authority for reversible GUI-safe panel navigation only. Authentication remains the responsibility of #528, and the current exact client is already structurally in-game, so no credential re-entry is required. Transaction-producing actions remain prohibited.

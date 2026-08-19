@@ -97,9 +97,9 @@ The bootstrap supervisor MUST keep the canonical coordination flock continuously
 The created client MUST match:
 
 ```yaml
-version: 15.32.df7b29
-size: 51965216
-sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+version: 15.32
+size: 52109920
+sha256: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
 platform: official_native_linux_only
 ```
 
@@ -220,9 +220,9 @@ registered_at: <timestamp>
 boot_id_sha256: <hash>
 pid: <current pid>
 process_start_ticks: <current /proc starttime>
-client_version: 15.32.df7b29
-client_size: 51965216
-client_sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+client_version: 15.32
+client_size: 52109920
+client_sha256: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
 display: <declared canonical display proven now>
 window_identity: <non-secret current window evidence>
 remote_view_endpoint: <declared endpoint or null>
@@ -413,3 +413,9 @@ This contract does not:
 - alter Track B;
 - complete P0/P1/A3/A4;
 - make Track A complete.
+
+## 2026-08-19 current-client fence provenance boundary
+
+The current public native-Linux package is fenced by size `52109920` and SHA-256 `ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8`; `15.32` is an embedded version-family token, not a claim of a more specific suffix. The superseded `15.32.df7b29 / 51965216 / e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe` binary remains admissible only as explicitly historical build-fenced evidence. Historical addresses, offsets, QMeta/vptr assumptions, serializers, helper binaries and runtime-bridge profiles are **not** promoted to the current binary by this identity update.
+
+This fence change grants no login, credential, GUI input, gameplay, process-control, transaction or mutation authority. All ordinary ownership/admission/lease/Gate A/rebind/Gate B/bootstrap requirements remain unchanged.

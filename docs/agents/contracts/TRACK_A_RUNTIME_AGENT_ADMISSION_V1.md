@@ -57,9 +57,9 @@ The active task checkpoint is the durable admission record. It MUST NOT fabricat
 Every positive canonical identity, bootstrap identity, rebind identity, or current-runtime claim under this contract is fenced to the official native Linux client exactly as follows:
 
 ```yaml
-client_version: 15.32.df7b29
-client_size: 51965216
-client_sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+client_version: 15.32
+client_size: 52109920
+client_sha256: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
 runtime_platform: official_native_linux_only
 ```
 
@@ -261,3 +261,9 @@ A worker cannot prove target uniqueness/ownership or the observed namespace, but
 ## Failure mode
 
 When a required gate or target proof is unavailable/unproven, preserve the evidence, set the current runtime fact to `UNKNOWN`/the appropriate fail-closed token, persist exactly one next action, and continue only unrelated safe repository/static work. Do not weaken the gate, invent authority, or launch/login merely to make the task progress.
+
+## 2026-08-19 current-client fence provenance boundary
+
+The current public native-Linux package is fenced by size `52109920` and SHA-256 `ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8`; `15.32` is an embedded version-family token, not a claim of a more specific suffix. The superseded `15.32.df7b29 / 51965216 / e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe` binary remains admissible only as explicitly historical build-fenced evidence. Historical addresses, offsets, QMeta/vptr assumptions, serializers, helper binaries and runtime-bridge profiles are **not** promoted to the current binary by this identity update.
+
+This fence change grants no login, credential, GUI input, gameplay, process-control, transaction or mutation authority. All ordinary ownership/admission/lease/Gate A/rebind/Gate B/bootstrap requirements remain unchanged.

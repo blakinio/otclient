@@ -1,7 +1,7 @@
 # Tibia research track isolation
 
 ```yaml
-tibia_research_tracks_policy_version: 5
+tibia_research_tracks_policy_version: 6
 ```
 
 This contract is mandatory for all current and future official-Tibia research in `blakinio/otclient`.
@@ -122,9 +122,9 @@ current_lease_generation: <current validated generation>
 boot_id_sha256: <current boot identity hash equal to registration>
 pid: <current pid equal to registration>
 process_start_ticks: <current start ticks equal to registration>
-client_version: 15.32.df7b29
-client_size: 51965216
-client_sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+client_version: 15.32
+client_size: 52109920
+client_sha256: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
 display_window_state: freshly_revalidated
 target_uniqueness: proven
 competing_or_unverifiable_official_client_candidates: 0
@@ -155,9 +155,9 @@ lease_generation: <current validated controller generation>
 boot_id_sha256: <current boot identity hash>
 pid: <current pid>
 process_start_ticks: <current /proc starttime>
-client_version: 15.32.df7b29
-client_size: 51965216
-client_sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+client_version: 15.32
+client_size: 52109920
+client_sha256: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
 display: <current proven canonical X11 display>
 window_identity: <current official-client window evidence>
 remote_view_endpoint: <endpoint or null>
@@ -192,9 +192,9 @@ The bootstrap contract does not itself implement or authorize client launch/logi
 Track A's current exact official-client fence is:
 
 ```yaml
-version: 15.32.df7b29
-size: 51965216
-sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+version: 15.32
+size: 52109920
+sha256: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
 platform: official_native_linux_only
 ```
 
@@ -354,3 +354,9 @@ Track B / otclient-global-login:
 ```
 
 Revalidate exact live PR/task state on every continuation, but preserve the repository boundary, Linux-only rule, Track A Gate A/rebind/Gate B/bootstrap separation and Track B isolation unless the owner explicitly changes them.
+
+## 2026-08-19 current-client fence provenance boundary
+
+The current public native-Linux package is fenced by size `52109920` and SHA-256 `ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8`; `15.32` is an embedded version-family token, not a claim of a more specific suffix. The superseded `15.32.df7b29 / 51965216 / e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe` binary remains admissible only as explicitly historical build-fenced evidence. Historical addresses, offsets, QMeta/vptr assumptions, serializers, helper binaries and runtime-bridge profiles are **not** promoted to the current binary by this identity update.
+
+This fence change grants no login, credential, GUI input, gameplay, process-control, transaction or mutation authority. All ordinary ownership/admission/lease/Gate A/rebind/Gate B/bootstrap requirements remain unchanged.

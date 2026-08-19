@@ -17,31 +17,47 @@ received_message_strings: 189
 protocol_handler_type_xrefs: 47
 ```
 
-Durable sources:
+Independently re-read durable sources:
 
 - `docs/agents/reports/OTCLIENT-20260818-track-a-s1-unfiltered-static-census.md`
 - `docs/agents/evidence/OTC-20260818-track-a-s1-unfiltered-static-census/protocol-client-to-server.txt`
 - `docs/agents/evidence/OTC-20260818-track-a-s1-unfiltered-static-census/protocol-server-to-client.txt`
 - `docs/agents/evidence/OTC-20260818-track-a-s1-unfiltered-static-census/protocol-handler-code-xrefs.tsv`
 
-## UI/controller provenance fence
+## Capability-census provenance correction
 
-The historical capability census records economy/account UI/controller leads but its header declares SHA256 `e6cfa9ff3e04c6d643e79e071d162150678627681072633673eca5b3a1a7116c`. PR #293 and `docs/agents/tasks/archive/OTC-20260814-official-client-capability-experiment-sweep.md` instead record `e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe` for the historical researched binary.
+The source Draft incorrectly reported a digest conflict for `docs/agents/reports/OTCLIENT-20260814-official-client-capability-census.md`.
 
-This promotion does not guess which retained metadata record is wrong. Capability-census UI/controller observations remain **version-fenced leads with unresolved digest provenance**, not exact-S1-hash proof.
+Fresh coordinator verification found the same exact researched-client SHA in all four relevant locations:
+
+```text
+capability census @ source base a1368bbecd5b6a6bc2447d2c7debb1141efc2dcb
+  e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+
+capability census @ source head 54dca602dfa38f1cc347716cf0f701b22c3fe6e9
+  e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+
+PR #293 merged research-design record
+  e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+
+archive OTC-20260814-official-client-capability-experiment-sweep
+  consistent with PR #293; no conflicting digest is recorded
+```
+
+Therefore `capability_census_digest_provenance=CONFLICT` is rejected. The canonical capability-census report is itself fenced to the same historical exact binary. Its economy/account UI/controller observations may be retained as **exact-build static report leads**. They still do not prove live GUI behavior, normal call paths, dispatcher causality, ABI, confirmation behavior, or server-side effects.
 
 ## G24-G31 accepted findings
 
-| Group | Exact S1 generated-message evidence | Capability-census lead | Accepted conclusion |
+| Group | Exact S1 generated-message evidence | Same-exact-build capability-census report lead | Accepted conclusion |
 |---|---|---|---|
-| G24 Market | C2S `MarketAccept`, `MarketBrowse`, `MarketCancel`, `MarketCreate`, `MarketLeave`, `MarketStatistics`; S2C `MarketBrowse`, `MarketDetail`, `MarketEnter`, `MarketLeave`, `MarketStatistics` | Market controller/protocol/storage; offer/history/item-detail UI | Exact transport-name surface proven; live dispatch/confirmation/transaction semantics UNKNOWN. |
-| G25 Store / coins | C2S `BuyStoreOffer`, `GetTransactionDetails`, `GetTransactionHistory`, `OpenTransactionHistory`, `RequestResourceBalance`, `RequestStoreCategories`, `RequestStoreOffers`, `StoreEvent`, `TransferCurrency`; S2C `CreditBalance`, `RequestPurchaseData`, `ResourceBalance`, `SetStoreButtonDeeplink`, `StoreButtonIndicators`, `StoreCategories`, `StoreError`, `StoreOffers`, `StoreSuccess`, `TransactionDetails`, `TransactionHistory`, `UpdatingShopBalance` | Store protocol/controller, purchase confirmation/success, transaction history, coin details UI | Exact read and transaction-producing transport names proven; no purchase/transfer semantics promoted. |
-| G26 Daily Reward | C2S `CollectDailyReward`, `DailyRewardHistory`; S2C `DailyRewardBasic`, `DailyRewardCollectionState`, `DailyRewardHistory` | Daily Reward item-pick/collection UI | Exact reward transport names proven; claim semantics UNKNOWN and untested. |
-| G27 Reward Wall/resting/returner | C2S `OpenRewardWall`; S2C `OpenRewardWall`, `CloseRewardWall`, `RestingAreaState` | Reward Wall/resting/returner state | Exact wall/resting transport names proven; claim/state-transition semantics UNKNOWN. |
-| G28 Character/account UI | C2S `BlessingsDialog`, `OpenCyclopediaCharacterInfo`; S2C `Blessings`, `BlessingsDialog`, `CyclopediaCharacterInfo`, `PremiumTrigger` | Character Info, Blessings and premium-related controllers | Exact character-info/blessings/premium transport names proven; UI lead remains provenance-fenced. |
-| G29 Character auction/trade | C2S `CharacterTradeConfigurationAction`; S2C `CharacterTradeConfiguration` | Character auction configuration and character-trade dialog | Exact character-trade configuration transport names proven; commitment semantics UNKNOWN. |
-| G30 World transfer/main-character change | No dedicated generated-message name identified in the bounded 160/189 S1 review | due-payment, world-transfer, main-character-change controllers | Dedicated S1 transport mapping UNKNOWN; UI/controller lead provenance-fenced only. |
-| G31 Misc modal/panel | C2S `AnswerModalDialog`, `ClientCheck`; S2C `ClientCheck`, `ShowMessageDialog`, `ShowModalDialog` | server modal handler, generic dialogs/account-economy modal residue | Exact generic modal/client-check names proven; specific modal semantics UNKNOWN. |
+| G24 Market | C2S `MarketAccept`, `MarketBrowse`, `MarketCancel`, `MarketCreate`, `MarketLeave`, `MarketStatistics`; S2C `MarketBrowse`, `MarketDetail`, `MarketEnter`, `MarketLeave`, `MarketStatistics` | Market controller/protocol/storage; offer/history/item-detail UI | Exact transport-name surface proven; static UI/controller lead retained; live dispatch/confirmation/transaction semantics UNKNOWN. |
+| G25 Store / coins | C2S `BuyStoreOffer`, `GetTransactionDetails`, `GetTransactionHistory`, `OpenTransactionHistory`, `RequestResourceBalance`, `RequestStoreCategories`, `RequestStoreOffers`, `StoreEvent`, `TransferCurrency`; S2C `CreditBalance`, `RequestPurchaseData`, `ResourceBalance`, `SetStoreButtonDeeplink`, `StoreButtonIndicators`, `StoreCategories`, `StoreError`, `StoreOffers`, `StoreSuccess`, `TransactionDetails`, `TransactionHistory`, `UpdatingShopBalance` | Store protocol/controller, purchase confirmation/success, transaction history, coin-details UI | Exact read and transaction-producing transport names proven; static UI/controller lead retained; no purchase/transfer semantics promoted. |
+| G26 Daily Reward | C2S `CollectDailyReward`, `DailyRewardHistory`; S2C `DailyRewardBasic`, `DailyRewardCollectionState`, `DailyRewardHistory` | Daily Reward item-pick/collection UI | Exact reward transport names proven; static UI lead retained; claim semantics UNKNOWN and untested. |
+| G27 Reward Wall/resting/returner | C2S `OpenRewardWall`; S2C `OpenRewardWall`, `CloseRewardWall`, `RestingAreaState` | Reward Wall/resting/returner state | Exact wall/resting transport names proven; static lead retained; claim/state-transition semantics UNKNOWN. |
+| G28 Character/account UI | C2S `BlessingsDialog`, `OpenCyclopediaCharacterInfo`; S2C `Blessings`, `BlessingsDialog`, `CyclopediaCharacterInfo`, `PremiumTrigger` | Character Info, Blessings and premium-related controllers | Exact character-info/blessings/premium transport names proven; static controller lead retained; live semantics UNKNOWN. |
+| G29 Character auction/trade | C2S `CharacterTradeConfigurationAction`; S2C `CharacterTradeConfiguration` | Character auction configuration and character-trade dialog | Exact character-trade configuration transport names proven; static UI lead retained; commitment semantics UNKNOWN. |
+| G30 World transfer/main-character change | No dedicated generated-message name identified in the bounded 160/189 S1 review | due-payment, world-transfer, main-character-change controller leads | Dedicated S1 transport mapping UNKNOWN; controller presence is static evidence only. |
+| G31 Misc modal/panel | C2S `AnswerModalDialog`, `ClientCheck`; S2C `ClientCheck`, `ShowMessageDialog`, `ShowModalDialog` | server modal handler, generic dialogs/account-economy modal residue | Exact generic modal/client-check names proven; static UI lead retained; specific modal semantics UNKNOWN. |
 
 Full names in the retained registries carry the `GameclientMessage` / `GameserverMessage` prefixes.
 
@@ -62,13 +78,12 @@ All rows prove only direct code-to-type-string references. `semantic_dispatcher_
 
 ## Runtime/safety boundary
 
-Fresh Remote Desktop Commander revalidation reports `synology-otclient-01` offline; ping returns `ok: false` and the configured MCP endpoint unreachable. The task is `runtime_access: none` with `physical_e2e_required: false`, so runtime unavailability does not block the static closeout and no runtime semantics are claimed.
+This promotion is repository-only static review with `runtime_access: none`, `mutation_authorized: false`, and `physical_e2e_required: false`. The source Draft recorded a failed Remote Desktop Commander reachability probe, but this promotion does not treat that mutable device status as current evidence and does not rely on it for acceptance.
 
-No login, credentials, GUI input, process control, gameplay, purchase/sale, market mutation, Tibia Coin transfer, reward claim, auction/trade commitment, world transfer, main-character change or due-payment action occurred.
+No login, credentials, GUI input, process control, gameplay, purchase/sale, market mutation, Tibia Coin transfer, reward claim, auction/trade commitment, world transfer, main-character change or due-payment action is part of this promotion.
 
 ## Remaining UNKNOWN
 
-- capability-census digest provenance and exact-S1 persistence of its UI/controller observations;
 - generated-message-to-concrete-handler dispatch;
 - outgoing dispatcher functions, payload layouts and wire encoding;
 - handler-to-controller/storage mutation edges;

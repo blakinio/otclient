@@ -8,12 +8,12 @@ project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: runtime_read_only_semantic_validation
-phase: later_invocation_fresh_readonly_re_admission
+phase: passive_visible_state_observation_ready
 branch: research/OTC-20260819-track-a-economy-panels-runtime-readonly
 base_branch: main
 base_main: 08c0b6f89ffddd4c75b8f60060ce3b2a62195d95
 risk: medium
-updated: 2026-08-19T10:47:00+02:00
+updated: 2026-08-19T10:54:00+02:00
 policy_version: 2
 execution_mode: remote-desktop-commander-synology
 execution_class: synology_physical_runtime
@@ -48,17 +48,21 @@ trusted_base_fence_closeout_pr: 561
 trusted_base_version: '15.32'
 trusted_base_size: 52109920
 trusted_base_sha256: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
-trusted_base_exact_client_fence_result: GOVERNANCE_UPDATED_LIVE_RECHECK_REQUIRED
-panel_observation_after_preflight: PENDING_FRESH_PREFLIGHT
+trusted_base_exact_client_fence_result: PASS
+panel_observation_after_preflight: PASSIVE_ALREADY_VISIBLE_ONLY
 prior_target_uniqueness_snapshot_only: true
 prior_live_client_pid: 995
 prior_live_client_start_ticks: 73919186
 prior_live_client_xid: '0x1a00017'
-prior_live_client_display: ':1'
-prior_live_client_size: 52109920
-prior_live_client_sha256: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
-fresh_target_uniqueness: PENDING
-fresh_live_client_fence_match: PENDING
+fresh_target_uniqueness: PROVEN
+fresh_live_client_fence_match: PASS
+live_client_pid: 17954
+live_client_start_ticks: 74839161
+live_client_xid: '0x1a00017'
+live_client_display: ':1'
+live_client_size: 52109920
+live_client_sha256: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
+competing_full_client_candidates: 0
 owned_paths:
   - docs/agents/tasks/active/OTC-20260819-track-a-economy-panels-runtime-readonly.md
   - docs/agents/evidence/OTC-20260819-track-a-economy-panels-runtime-readonly/**
@@ -68,7 +72,7 @@ dependencies:
   - trusted-base current-client fence PR #555 and closeout #561: SATISFIED
 read_only_overlap:
   - PR #475 worldmap runtime task is released with runtime_access none and owns no current runtime surface
-  - PR #528 native-login lane remains isolated in runtime_namespace native-login-exact-sha-re; this task will not observe or mutate its :99/native-login surface
+  - PR #528 native-login lane remains isolated in runtime_namespace native-login-exact-sha-re; this task does not observe or mutate its native-login surface
   - PR #541 owns KasmVNC infrastructure; current owner-reconciled window permits shared read-only observation only, with no infrastructure mutation
   - PR #536 coverage matrix remains read-only only, no edits
 runtime_locator:
@@ -86,17 +90,17 @@ scope_groups:
   - G30 World transfer/main-character-change UI
   - G31 generic modal/panel flows
 acceptance:
-  - first freshly prove the intended Kasm container/display and exact client PID/start/exe/size/SHA/window identity non-invasively
+  - freshly prove the intended Kasm container/display and exact client PID/start/exe/size/SHA/window identity non-invasively
   - fail closed if multiple plausible clients/windows remain or the live build does not match the trusted-base current fence
   - only after fresh target uniqueness and exact-client fence match, observe already-visible panel/session state without keyboard or mouse input
   - never login, use credentials, open/drive panels with input, purchase/sell/create/cancel/accept offers, transfer Tibia Coins, claim rewards, commit auction/trade, world transfer, main-character change or due-payment actions
   - persist only sanitized read-only evidence; no account secrets or unnecessary personal data
   - leave researcher output at Draft PR for coordinator review
-last_completed_step: separate trusted-base current-client governance dependency is merged and archived; current invocation re-read main and live ownership state and reconstructed this two-path Draft on current main before any new runtime observation
-blocker: NONE_FOR_FRESH_READONLY_PREFLIGHT
-next_action: run the required fresh non-invasive Synology/Kasm preflight; immediately re-persist PID/start/SHA/XID/uniqueness and either continue passive SAFE_READ or fail closed on the first mismatch
+last_completed_step: fresh later-invocation Synology/Kasm re-admission proved one official client PID 17954 start 74839161 XID 0x1a00017 on DISPLAY :1; size/SHA exactly match trusted current fence; host/container inventory found zero competing official client candidates; no input/login/process-control/transaction occurred
+blocker: NONE_FOR_PASSIVE_ALREADY_VISIBLE_OBSERVATION
+next_action: capture and inspect the already-visible desktop read-only; if no G24-G31 panel is already visible, checkpoint NO_GUI_INPUT_AUTHORITY_FOR_PANEL_NAVIGATION rather than opening or driving a panel
 ---
 
 # TIBIA-RE-ECONOMY-PANELS — live SAFE_READ continuation
 
-The former exact-client governance blocker is resolved on trusted `main`. This later invocation is admitted only for fresh non-invasive read-only preflight and, if that passes, passive observation of already-visible economy/account UI state. No GUI input or transactional action is authorized.
+Fresh re-admission is PASS for the exact current client and unique Kasm target. This task may now inspect only already-visible UI state. No GUI input, login, process control or transaction action is authorized.

@@ -3,7 +3,12 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
+import socket
+import subprocess
 import sys
+import tempfile
+import threading
 import unittest
 from pathlib import Path
 
@@ -27,12 +32,14 @@ class Fake:
         wrong_pid: bool = False,
         bridge: bool = True,
         bridge_bad: bool = False,
+        unreadable_candidate: bool = False,
     ):
         self.second = second
         self.wrong_sha = wrong_sha
         self.wrong_pid = wrong_pid
         self.bridge = bridge
         self.bridge_bad = bridge_bad
+        self.unreadable_candidate = unreadable_candidate
         self.commands: list[list[str]] = []
 
     def __call__(self, cmd):
@@ -48,7 +55,8 @@ class Fake:
             return f'_NET_WM_PID(CARDINAL) = {pid}\nWM_CLASS(STRING) = "client", "Tibia"\n'
         if cmd[:3] == ["docker", "exec", "abc123"] and "for d in /proc" in text:
             sha = "0" * 64 if self.wrong_sha else module.SHA
-            return f"11365\t/home/u/Tibia-x/bin/client\t{module.SIZE}\t{sha}\t74970818\n"
+            extra = "222\tUNREADABLE\tUNREADABLE\tUNREADABLE\tUNREADABLE\n" if self.unreadable_candidate else ""
+            return f"11365\t/home/u/Tibia-x/bin/client\t{module.SIZE}\t{sha}\t74970818\n" + extra
         if cmd[:3] == ["docker", "exec", "def456"] and "for d in /proc" in text:
             return f"222\t/home/u/Tibia-y/bin/client\t{module.SIZE}\t{module.SHA}\t11\n"
         if cmd[:3] == ["docker", "exec", "abc123"] and "pid=11365" in text:
@@ -120,6 +128,72 @@ class Tests(unittest.TestCase):
     def test_window_pid_mismatch_fails_closed(self):
         with self.assertRaisesRegex(self.m.ProbeError, "window_pid_mismatch"):
             self.m.collect(Fake(wrong_pid=True))
+
+    def test_plausible_unreadable_process_fails_closed(self):
+        with self.assertRaisesRegex(self.m.ProbeError, "candidate_unverifiable"):
+            self.m.collect(Fake(unreadable_candidate=True))
+
+    def test_bridge_script_binds_unix_peer_pid(self):
+        with tempfile.TemporaryDirectory() as raw:
+            path = str(Path(raw) / "bridge.sock")
+            server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            server.bind(path)
+            server.listen(4)
+            errors: list[BaseException] = []
+
+            def serve() -> None:
+                try:
+                    for index in range(4):
+                        conn, _ = server.accept()
+                        with conn:
+                            command = b""
+                            while b"\n" not in command:
+                                chunk = conn.recv(4096)
+                                if not chunk:
+                                    break
+                                command += chunk
+                            if index == 0:
+                                row = {"ok": True, "command": "PING"}
+                            else:
+                                row = {"ok": True, "target": self.m.BRIDGE_TARGETS[index - 1], "scan_status": "OK", "validated_hits": 1}
+                            conn.sendall((json.dumps(row) + "\n").encode())
+                except BaseException as exc:
+                    errors.append(exc)
+                finally:
+                    server.close()
+
+            thread = threading.Thread(target=serve)
+            thread.start()
+            completed = subprocess.run(
+                [sys.executable, "-c", self.m.BRIDGE_SCRIPT, path, str(os.getpid()), *self.m.BRIDGE_TARGETS],
+                text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=10, check=False,
+            )
+            thread.join(timeout=5)
+            self.assertFalse(errors)
+            self.assertEqual(0, completed.returncode, completed.stderr)
+            self.assertEqual(4, len(json.loads(completed.stdout)))
+
+    def test_bridge_script_rejects_wrong_unix_peer_pid(self):
+        with tempfile.TemporaryDirectory() as raw:
+            path = str(Path(raw) / "bridge.sock")
+            server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            server.bind(path)
+            server.listen(1)
+
+            def serve() -> None:
+                conn, _ = server.accept()
+                conn.close()
+                server.close()
+
+            thread = threading.Thread(target=serve)
+            thread.start()
+            completed = subprocess.run(
+                [sys.executable, "-c", self.m.BRIDGE_SCRIPT, path, str(os.getpid() + 1), *self.m.BRIDGE_TARGETS],
+                text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=10, check=False,
+            )
+            thread.join(timeout=5)
+            self.assertNotEqual(0, completed.returncode)
+            self.assertIn("bridge_peer_pid_mismatch", completed.stderr)
 
 
 if __name__ == "__main__":

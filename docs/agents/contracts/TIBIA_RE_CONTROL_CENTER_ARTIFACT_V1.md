@@ -84,7 +84,7 @@ All filesystem implementations must:
 
 `control/` plus per-run `safety/`, or their database equivalents, are the authoritative local sources for:
 
-- durable STOP/reset ControlState;
+- durable STOP/reset/recovery ControlState;
 - RequestLedger dedupe/resource reservation;
 - ActionLedger dispatch state;
 - BudgetLedger reserved/at-risk/committed/uncertain state;
@@ -95,7 +95,7 @@ If presentation/evidence records disagree with safety state:
 ```text
 fail closed
 preserve both as contradiction evidence
-never clear STOP because presentation says RUNNING
+never clear STOP/recovery-required because presentation says RUNNING
 never downgrade POSSIBLY_DISPATCHED/AT_RISK based on presentation text
 ```
 
@@ -105,24 +105,33 @@ never downgrade POSSIBLY_DISPATCHED/AT_RISK based on presentation text
 ControlState:
   schema_version: 1
   stop_latched: bool
+  recovery_required: bool
   control_generation: integer
   transition_id: string
+  active_backend_epoch: string | null
   written_by_backend_epoch: string
   reason_code: string
   updated_monotonic_ns: integer
 ```
 
-The record is backend-global and survives `backend_epoch` changes. STOP/reset writes replace it atomically (or transactionally equivalent) under Execution-v1 `dispatch_gate` with a finite local durability deadline.
+The record is backend-global and survives `backend_epoch` changes. STOP/reset/backend-start/backend-clean-shutdown writes replace it atomically (or transactionally equivalent) with a finite local durability deadline. STOP/reset transitions that race with dispatch are written under Execution-v1 `dispatch_gate`.
 
 Rules:
 
 - every initialized persistent store has exactly one authoritative current ControlState;
-- first initialization must durably create a known initial record before mutation can be admitted;
+- first initialization must durably create a known record before mutation can be admitted;
+- before any backend admits mutation-capable work, it durably sets `active_backend_epoch=<current backend epoch>`; failure to persist this marker disables mutation;
+- a backend loading an existing record with non-null `active_backend_epoch` belonging to a prior backend treats the prior lifetime as unclean, sets/preserves `recovery_required=true`, and remains mutation-disabled until explicit recovery/reset succeeds;
+- a clean graceful shutdown may set `active_backend_epoch=null` only after all required safety state is durably flushed; it must preserve any STOP/recovery-required truth;
 - durable `stop_latched=true` remains true across restart until an explicit durable reset;
-- reset cannot expose RUNNING before the `stop_latched=false` record is durable;
-- STOP durability failure leaves the process in-memory STOPPED/mutation-disabled; reset durability failure leaves STOP latched;
-- missing/corrupt/contradictory ControlState in a previously initialized store fails closed as STOPPED/mutation-disabled;
+- reset cannot expose RUNNING before the `stop_latched=false` / allowed `recovery_required=false` transition is durable;
+- reset may clear `recovery_required` only after Action/Budget/RequestLedger recovery has no unresolved contradiction and all overlapping ambiguity restrictions are retained;
+- STOP durability failure leaves the process in-memory STOPPED/mutation-disabled; because the backend-active marker was already durable before mutation admission, a subsequent crash is observed as an unclean prior lifetime and cannot silently reopen mutation;
+- reset/backend-marker durability failure leaves mutation disabled;
+- missing/corrupt/contradictory ControlState in a previously initialized store fails closed as STOPPED/recovery-required/mutation-disabled;
 - ControlState grants no external/Track A authority and does not erase Action/Budget uncertainty.
+
+`control_generation` is scoped to `written_by_backend_epoch`; backend-epoch fencing remains required even when a later backend starts from the same numeric generation.
 
 ## 5. RequestLedger record
 
@@ -227,7 +236,7 @@ Recovery never invents PASS.
 
 `CONTRADICTORY` fails closed.
 
-Recovery never implicitly clears backend-global STOP.
+Recovery never implicitly clears backend-global STOP/recovery-required state.
 
 ## 9. Manifest
 
@@ -432,11 +441,11 @@ Do not hash secret material merely to include it; secret-class material is exclu
 
 Package B must define finite configurable retention limits for completed runs and large evidence, while never evicting:
 
-- ControlState needed to preserve STOP/reset truth;
+- ControlState needed to preserve STOP/reset/recovery truth;
 - RequestLedger entries still needed for replay/dedupe;
 - safety records still required to prevent duplicate/unsafe recovery of an active/ambiguous run.
 
-Eviction itself must not convert UNKNOWN/AMBIGUOUS into safe-to-retry or clear STOP.
+Eviction itself must not convert UNKNOWN/AMBIGUOUS into safe-to-retry, clear STOP or clear recovery-required state.
 
 Git stores normalized durable evidence summaries/hashes only where current repository evidence policy permits it.
 
@@ -462,12 +471,16 @@ At minimum:
 16. durable STOP ControlState survives backend restart;
 17. reset durability failure leaves STOP latched;
 18. initialized-store missing/corrupt ControlState fails closed;
-19. resource-creating RequestLedger ACCEPTED record/resource ID is durable before domain creation;
-20. crash after ACCEPTED before creation and crash after creation before COMPLETED both replay to the same resource ID without duplicate work;
-21. global STOP/reset request replay does not depend on a run directory.
+19. backend start must durably mark `active_backend_epoch` before mutation admission;
+20. crash/unclean backend leaves prior active marker and next backend sets/preserves `recovery_required=true` before admitting mutation;
+21. STOP persistence failure followed by crash cannot reopen mutation on restart;
+22. clean shutdown clears the active-backend marker only after safety flush and preserves STOP/recovery truth;
+23. resource-creating RequestLedger ACCEPTED record/resource ID is durable before domain creation;
+24. crash after ACCEPTED before creation and crash after creation before COMPLETED both replay to the same resource ID without duplicate work;
+25. global STOP/reset request replay does not depend on a run directory.
 
 ## 22. Compatibility
 
 Artifact major version 1 is additive-only.
 
-Changing safety-state precedence, ControlState/RequestLedger scope or durability, dispatch-journal durability, finalization immutability or secret exclusion requires a new major contract or separately reviewed compatible extension.
+Changing safety-state precedence, ControlState/RequestLedger scope or durability, unclean-backend recovery semantics, dispatch-journal durability, finalization immutability or secret exclusion requires a new major contract or separately reviewed compatible extension.

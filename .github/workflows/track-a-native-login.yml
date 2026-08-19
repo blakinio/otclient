@@ -7,6 +7,8 @@ on:
         description: Type ONE_SHOT_NATIVE_LOGIN to confirm a fresh one-shot credential authorization for this run
         required: true
         type: string
+  issue_comment:
+    types: [created]
 
 permissions:
   contents: read
@@ -27,6 +29,9 @@ env:
 
 jobs:
   login:
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.actor == 'blakinio' && inputs.authorization == 'ONE_SHOT_NATIVE_LOGIN') ||
+      (github.event_name == 'issue_comment' && github.actor == 'blakinio' && github.event.issue.number == 599 && github.event.comment.body == '/track-a-native-login ONE_SHOT_NATIVE_LOGIN')
     runs-on: [otclient, synology]
     timeout-minutes: 8
     steps:
@@ -34,8 +39,8 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          test "${{ inputs.authorization }}" = "ONE_SHOT_NATIVE_LOGIN"
           echo AUTHORIZATION_GATE=PASS
+          echo AUTHORIZATION_EVENT="${{ github.event_name }}"
 
       - name: Verify exact helper runtime before secret access
         shell: bash

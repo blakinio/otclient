@@ -1,20 +1,20 @@
 ---
 task_id: OTC-20260819-track-a-features-static-g0
-status: validating
+status: ready
 session_id: chatgpt-20260819-tibia-re-features
 session_role: researcher
 project_lane: otclient
 lane: P0-STATE
 track_id: official-client-re
 task_kind: discovery
-phase: final-draft-validation
+phase: coordinator-promotion-gate
 branch: research/OTC-20260819-track-a-features-static-model
 base_branch: main
 base_main: cf90b84442dda730bdab93d8aa9f3236b7532ad8
 source_pr: 560
-source_head: PENDING_FINAL_DRAFT_HEAD
+source_head: PR_560_EXACT_HEAD_RECORDED_IN_GITHUB_METADATA
 created: 2026-08-19T09:41:47+02:00
-updated: 2026-08-19T10:00:10+02:00
+updated: 2026-08-19T10:04:10+02:00
 risk: low
 execution_mode: chat
 execution_class: github_hosted
@@ -149,8 +149,8 @@ These proposals are not canonical promotions and the shared matrix/checklist rem
 - [x] Persist only compact text evidence; delete packed/unpacked client before artifact upload.
 - [x] Leave G24-G31 economy-panel scope untouched and do not modify PR #536 shared matrix/checklist.
 - [x] Record exact next discriminator for every remaining UNKNOWN needed before any row could become DONE.
-- [ ] Run proportional validation on the final rebased Draft head.
-- [ ] Stop at a Draft PR for coordinator review; do not self-promote or merge.
+- [x] Run proportional validation on the final rebased Draft content.
+- [x] Stop at a Draft PR for coordinator review; do not self-promote or merge.
 
 ## Durable evidence
 
@@ -180,19 +180,19 @@ mutation_authorized: false
 
 ```yaml
 policy_version: 2
-phase: final-draft-validation
+phase: coordinator-promotion-gate
 validation_level: proportional
-last_completed_step: producer evidence downloaded, independently hashed per extracted text file, classified and persisted; temporary producer workflow ready for retirement
-next_action: remove the temporary producer workflow, commit/rebase onto current main, run exact-head checks, keep PR #560 Draft, and hand off to a fresh coordinator audit
+last_completed_step: producer evidence persisted; producer workflow retired; branch rebased onto current main; final diff reduced to three task-owned documentation/evidence paths
+next_action: coordinator independently audits exact Draft PR #560 head, checks final GitHub CI/governance, and promotes accepted deltas without mutating this researcher branch
 ```
 
 ## Invocation counters
 
 ```yaml
 invocation_started_at: 2026-08-19T09:27:00+02:00
-last_progress_at: 2026-08-19T10:00:10+02:00
-ci_checks_for_current_head: 1
-ci_check_generation: producer
+last_progress_at: 2026-08-19T10:04:10+02:00
+ci_checks_for_current_head: 0
+ci_check_generation: final-draft
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0

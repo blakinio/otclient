@@ -3,7 +3,7 @@
 Date: 2026-08-19  
 Source Draft: PR #546  
 Source validated head: `54dca602dfa38f1cc347716cf0f701b22c3fe6e9`  
-Trusted promotion base: `main@b6d4a3276d17c926c5840f82521571fdfaa126a0`  
+Trusted promotion base: `main@f41102ca88f152d6e0bc502d72455354db536334`  
 Promotion PR: #547  
 Decision: **ACCEPT_CORRECTED_STATIC_ECONOMY_CENSUS**
 
@@ -16,9 +16,11 @@ Two material source-Draft defects were found and corrected before promotion:
 1. missing mandatory `runtime_access: none` admission fields plus an inconsistent `mutation_authorized: true` value;
 2. an unsupported same-exact-binary claim despite conflicting capability-census SHA metadata.
 
+The promotion was then rebased onto current `main@f41102ca88f152d6e0bc502d72455354db536334` after PR #548 archived the now-merged parallel-runtime-prompt task. The #548 change does not overlap these four promotion/archive paths.
+
 ## Current alias contract after PR #543
 
-PR #543 is now merged on the promotion base and makes `TIBIA-RE-ECONOMY-PANELS` a canonical researcher alias whose full mission includes read-only account/economy panel state and confirmation-boundary research for G24-G31. Its strict safety boundary still forbids spending, transfers, market commitments, reward claims, auction commitments, world transfer and main-character-change confirmation.
+PR #543 is merged on the promotion base and makes `TIBIA-RE-ECONOMY-PANELS` a canonical researcher alias whose full mission includes read-only account/economy panel state and confirmation-boundary research for G24-G31. Its strict safety boundary still forbids spending, transfers, market commitments, reward claims, auction commitments, world transfer and main-character-change confirmation.
 
 This promotion closes only the already-created bounded **static census subtask** `OTC-20260819-track-a-economy-panels-static-census`. It does **not** mark the full alias runtime mission or G24-G31 coverage as DONE. A separately admitted runtime continuation remains required for live panel/confirmation-boundary proof. That continuation cannot be executed in the present session because fresh Remote Desktop Commander revalidation reports `synology-otclient-01` offline/unreachable.
 

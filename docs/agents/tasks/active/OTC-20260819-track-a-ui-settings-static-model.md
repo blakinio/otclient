@@ -12,7 +12,7 @@ implementation_authorized: false
 run_scope: single_task
 researcher_delivery: draft_pr_only
 promotion_authority: coordinator_only
-base_main: e2c1fa0af020c83a992652a50391d48b85aa111e
+base_main: 5940913a325288cfd9985be54af1a56b65e5560e
 branch: docs/OTC-20260819-track-a-ui-settings-static-model
 session_id: chatgpt-20260819-ui-settings-002
 session_role: runtime_researcher
@@ -25,8 +25,8 @@ context_growth: stable
 context_score: 8
 estimate_confidence: medium
 invocation_started_at: 2026-08-19T07:19:00+02:00
-updated_at: 2026-08-19T07:45:00+02:00
-last_progress_at: 2026-08-19T07:45:00+02:00
+updated_at: 2026-08-19T07:47:00+02:00
+last_progress_at: 2026-08-19T07:47:00+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: runtime_persistence_probe_v3
 terminal_ci_wait_started_at: null
@@ -63,7 +63,7 @@ owner_authorization_source: "owner continuation instruction on 2026-08-19: dokon
 
 ## Authority and current main
 
-The owner invoked `TIBIA-RE-UI-SETTINGS` and then requested `dokoncz zadanie`. The alias package is canonical after #543. Current trusted base for this continuation is `main@e2c1fa0af020c83a992652a50391d48b85aa111e`; the advance from `f41102ca88f152d6e0bc502d72455354db536334` is #547's independently promoted economy-panel static census and does not overlap this task's settings/runtime paths or authority.
+The owner invoked `TIBIA-RE-UI-SETTINGS` and then requested `dokoncz zadanie`. The alias package is canonical after #543. Current trusted base for this continuation is `main@5940913a325288cfd9985be54af1a56b65e5560e`; the advances from `f41102ca88f152d6e0bc502d72455354db536334` through `e2c1fa0af020c83a992652a50391d48b85aa111e` and then `5940913a325288cfd9985be54af1a56b65e5560e` are the non-overlapping economy-panel promotion/closeout PRs #547 and #549. They do not modify this task's settings/runtime paths or authority.
 
 The promoted UI-settings mission requires settings recovery through reversible write and reload/restart persistence where authority permits, with exact before/after, shared input serialization and rollback. This researcher remains Draft-only and cannot self-promote or merge.
 
@@ -148,7 +148,7 @@ The intended input command then failed twice before key injection because `/work
 
 Repair v3: require `libxdo.so.3` inside the contained toolroot, export its resolved directory plus contained library directories to `LD_LIBRARY_PATH`, prove `xdotool version` before launching the experiment, then execute the already-pinned v2 physical body. No other causal logic is changed.
 
-The first v3 admission run `32220443981` failed closed before runtime because `main` advanced from `f41102ca...` to `e2c1fa0a...` via non-overlapping #547. This task record refreshes the base; that admission failure performed no physical job.
+The first v3 admission run `32220443981` failed closed before runtime because `main` advanced from `f41102ca...` to `e2c1fa0a...` via non-overlapping #547. Before the next synchronization, `main` advanced once more to `5940913a...` via non-overlapping economy closeout #549. This task record refreshes the base; neither freshness refusal performed a physical job.
 
 ## Completed static phase
 
@@ -179,7 +179,7 @@ STATUS: RUNTIME_PROOF_V3_READY
 ALIAS: TIBIA-RE-UI-SETTINGS
 TASK_ID: OTC-20260819-track-a-ui-settings-static-model
 DRAFT_PR: 544
-BASE_MAIN: e2c1fa0af020c83a992652a50391d48b85aa111e
+BASE_MAIN: 5940913a325288cfd9985be54af1a56b65e5560e
 V1_RUN: 32219692697
 V1_RESULT: HARNESS_FAILURE_BEFORE_CLIENT_IDENTITY
 V2_RUN: 32220128284

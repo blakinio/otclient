@@ -1,29 +1,49 @@
-# Track A economy panels — bounded GUI-safe live observation
+# Track A economy panels - GUI-safe diagnostic observation
 
-Date: 2026-08-19  
-Task: `OTC-20260819-track-a-economy-panels-runtime-readonly`  
-PR: #550  
-Runtime: `synology-otclient-01` / `otclient-track-a-kasmvnc` / `DISPLAY=:1`
+Date: 2026-08-19
+Task: `OTC-20260819-track-a-economy-panels-runtime-readonly`
+PR: #550
+Runtime locator used: `synology-otclient-01` / `otclient-track-a-kasmvnc` / `DISPLAY=:1`
 
-## Authority boundary
+## Controlling governance classification
 
-The owner invocation on 2026-08-19 explicitly continued both #528 and #550 and preserved the existing consent. For #550 this invocation was admitted only as bounded, reversible GUI-safe panel navigation on the already-authenticated official-client session.
+The owner invocation explicitly continued #528 and #550 and preserved the prior consent. That established a semantic permission boundary for GUI-safe economy-panel work, but it did not override Track A runtime admission.
 
-```yaml
-gui_input_authorized: true
-mutation_scope: reversible_local_ui_navigation_only
-login_authorized_by_550: false
-credential_use_authorized_by_550: false
-gameplay_authorized: false
-process_control_authorized: false
-transaction_authorized: false
+The GUI sequence below was executed under a task record that used the unsupported value `runtime_access: bounded_gui_readonly_navigation`. Exact-head Track A governance run `32240817177` failed the deterministic admission-policy job with:
+
+```text
+Track A runtime admission invalid: unsupported runtime_access='bounded_gui_readonly_navigation'
 ```
 
-Authentication semantics remain isolated to #528. No credential re-entry was needed because the current #528 runtime was already structurally in-game.
+Therefore every GUI semantic observation below is retained as a factual, secret-free **diagnostic observation only**. It is **not promotion-grade Track A evidence** and must not be used to mark the affected coverage groups PASS/DONE until a minimal revalidation is performed under a supported, actually satisfied runtime admission class.
 
-## Fresh exact-runtime fence
+After this defect was identified, no further GUI input was sent.
 
-Before GUI input and again after the observation sequence, direct runtime inspection proved the same target:
+## Controller-plane reconciliation
+
+Read-only controller-plane inspection of the authoritative state inside `otclient-synology-runner` established:
+
+```text
+state_root=/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime
+lease_status=active_but_expired
+lease_controller_task=OTC-20260818-native-login-to-ingame-e2e
+lease_generation=16
+lease_expires_utc=2026-08-18T15:49:15Z
+runtime-registration.json=MISSING
+```
+
+Current trusted-base rules fail closed for further #550 GUI mutation:
+
+- `read_only` cannot send keyboard/mouse input or change UI state;
+- `ephemeral_isolated` requires a task-owned isolated sandbox and cannot take over another task/shared runtime surface;
+- `canonical_reuse_or_mutation` requires an authoritative registration and the applicable Gate A/rebind/Gate B chain;
+- canonical bootstrap requires registration absence plus an under-lock inventory proving zero existing official-client candidates/sessions, which cannot be true while the already-running exact Kasm client exists.
+
+The current blocker is therefore `TRACK_A_RUNTIME_ADMISSION_UNAVAILABLE_FOR_SHARED_KASM_GUI_MUTATION`.
+
+## Diagnostic exact-target observation before the GUI sequence
+
+At the time of the diagnostic GUI sequence, direct runtime inspection found one intended official client target:
 
 ```text
 PID=11365
@@ -37,30 +57,24 @@ gameserver_game_session validated_hits=1
 worldmap_handler validated_hits=1
 ```
 
-The visible window remained bound to PID 11365 and the exact expected official client. The three native structural discriminators remained exactly-one after GUI observation, so the retained session stayed structurally in-game.
+The same PID/start/size/SHA and three exactly-one structural discriminators were observed again after the GUI sequence. This is factual diagnostic provenance only; it does not repair the missing runtime admission.
 
-## Live semantic observations
+## G25 Store / Tibia Coin history - diagnostic observed, not promotable
 
-Only controls whose visible tooltip or already-open panel made the action unambiguous were used. No product purchase/confirmation control, reward claim, market action, transfer confirmation, trade action or gameplay movement was used.
+The visible Store control opened the Store dialog. Read-only navigation exposed categories including `Home`, `Premium Time`, `Consumables`, `Bundles`, `Cosmetics`, `Houses`, `Boosts`, `Extras`, `History` and `Close`.
 
-### G25 — Store / Tibia Coin history: LIVE_READ_ONLY_PASS
-
-The visible `Store` control opened the live Store dialog. The dialog exposed read-only category/navigation state including `Home`, `Premium Time`, `Consumables`, `Bundles`, `Cosmetics`, `Houses`, `Boosts`, `Extras`, `History` and `Close`.
-
-The `History` control was invoked as a read-only request. The Store closed and a generic message dialog reported:
+Invoking `History` produced a generic message dialog:
 
 ```text
 Failed to retrieve Coins History
 No entries yet.
 ```
 
-The dialog was acknowledged with its `ok` button. No purchase, currency transfer or other transaction was initiated.
+The dialog was dismissed. `Premium Time` was also opened read-only. No purchase or currency transfer was initiated and no `Buy` action was used.
 
-The `Premium Time` category was also opened read-only and displayed premium-time offer rows/details. No `Buy` control was used.
+## G28 Character / premium - diagnostic observed, not promotable
 
-### G28 — Character / premium UI: LIVE_PARTIAL_PASS
-
-The main toolbar was mapped using hover tooltips before clicks. The verified `Open Tibia Cyclopedia` control opened Cyclopedia. Its tab tooltips were observed read-only and included:
+Tooltip-confirmed `Open Tibia Cyclopedia` navigation exposed tabs including:
 
 ```text
 Items
@@ -74,25 +88,13 @@ Boss Slots
 Magical Archive
 ```
 
-The verified `Character` tab opened the live character page. The page exposed sections including:
+The `Character` tab exposed sections including `General Stats`, `Battle Results`, `Achievements`, `Item Summary`, `Appearances`, `Store Summary`, and `Character Titles`.
 
-```text
-General Stats
-Battle Results
-Achievements
-Item Summary
-Appearances
-Store Summary
-Character Titles
-```
+The sidebar `Show Premium Features` control also expanded a premium-features panel and was then collapsed. The dedicated Blessings subpanel was not reached.
 
-This proves a live current-build character-information surface. It does not by itself prove the dedicated Blessings controller/subpanel.
+## G30 world transfer / main-character change - diagnostic observed, not promotable
 
-Separately, the sidebar `Show Premium Features` control expanded a live premium-features panel. The panel exposed premium-benefit state/text and was then collapsed. Combined with the Store `Premium Time` page, this is live current-build premium-related UI evidence. No purchase path was used.
-
-### G30 — World transfer / main-character-change UI: LIVE_STORE_SURFACE_PASS
-
-The Store `Extras` category was opened read-only. Its visible account-service catalogue included at least:
+Store `Extras` exposed account-service catalogue entries including:
 
 ```text
 World Transfer
@@ -102,27 +104,25 @@ Name Change
 Sex Change
 ```
 
-The details pane for the default World Transfer selection was visible, including an availability message and service description. No `Configure`, `Buy`, transfer, main-character-change or other commitment control was used.
+The default World Transfer details pane was visible. No `Configure`, `Buy`, transfer, main-character-change or other commitment control was used. The dedicated commit/controller path was not entered.
 
-This proves a live current-build Store account-service surface for G30. It does **not** prove that the dedicated world-transfer/main-character-change controller dialog or commit path was entered.
+## G31 generic modal flow - diagnostic observed, not promotable
 
-### G31 — generic modal/dialog flow: LIVE_PASS
+The Coin History request produced and dismissed a real generic message dialog, diagnostically demonstrating that modal/message flow in the observed current build.
 
-The Coin History request above produced and dismissed a real generic message dialog. This is direct live evidence for a generic modal/message-dialog flow associated with a bounded economy read.
-
-## Not reached in this bounded GUI-only window
+## Not reached
 
 ```yaml
 G24_market: NOT_REACHED
 G26_daily_reward: NOT_REACHED
 G27_reward_wall_resting_returner: NOT_REACHED
-G29_character_auction_trade: NOT_REACHED
 G28_blessings_subpanel: NOT_REACHED
+G29_character_auction_trade: NOT_REACHED
 ```
 
-No direct, unambiguous, transaction-free entry for these surfaces was established from the bounded current visible toolbar/Store/Cyclopedia window. `NOT_REACHED` is not evidence that the feature is absent. The worker did not move the character, logout/re-enter character selection, open external account flows, or guess hidden shortcuts merely to force coverage.
+`NOT_REACHED` is not evidence of absence. No character movement, logout/relogin, hidden-shortcut guessing or external account-flow navigation was used merely to force coverage.
 
-## Safety and side effects
+## Side effects
 
 ```text
 GUI_CREDENTIAL_ENTRY=false
@@ -139,8 +139,8 @@ MAIN_CHARACTER_CHANGE_COMMIT=false
 DUE_PAYMENT_ACTION=false
 ```
 
-Temporary screenshots were used only for immediate human-visible semantic inspection. They are not committed as evidence and are to be deleted from the container/host after extracting the sanitized facts above.
+Temporary screenshots used for immediate inspection were deleted from both host and container. No raw screenshot is committed.
 
-## Current result
+## Disposition
 
-The earlier passive-login-screen blocker is obsolete for the current runtime. The exact current #528 client is already in-game, and bounded GUI-safe observation now establishes live current-build evidence for G25, partial G28, G30 Store service UI and G31 without credential re-entry or economy/account transactions. G24/G26/G27/G29 and the G28 Blessings subpanel remain unresolved under the present no-gameplay/no-transaction boundary.
+G25, partial G28, G30 Store service UI and G31 remain diagnostic observations only. The next legal step is not more GUI exploration: first establish a reviewed admission/reconciliation path for the existing unregistered shared Kasm client, or another lawful task-owned runtime, then minimally revalidate the relevant SAFE_READ observations before coordinator promotion.

@@ -8,12 +8,12 @@ project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: governance_fence_advance
-phase: exact_head_ci_and_independent_audit
+phase: final_exact_head_ci_and_independent_audit
 branch: docs/OTC-20260819-track-a-current-client-fence-advance
 base_branch: main
 base_main: 82e5f435c3aa4172115bf7f6a0cd7a5cc6da3d50
 risk: high
-updated: 2026-08-19T09:12:00+02:00
+updated: 2026-08-19T09:22:11+02:00
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
@@ -32,6 +32,13 @@ bootstrap: NOT_APPLICABLE
 target_uniqueness: NOT_APPLICABLE
 mutation_authorized: false
 physical_e2e_required: false
+preliminary_independent_audit_head: 7c1c3658a9525761faba5a31c67e2e2f52e08957
+preliminary_independent_audit_result: PASS
+preliminary_independent_audit_material_findings_open: 0
+preliminary_independent_audit_context: fresh_detached_worktree_deterministic_falsifier
+preliminary_independent_audit_trust_worker_summary: false
+preliminary_independent_audit_implementation_authorized: false
+preliminary_independent_audit_public_package_refetch: PASS
 feature_scope:
   type: infrastructure
   user_facing: false
@@ -89,9 +96,9 @@ new_runtime_fence:
   version: '15.32'
   size: 52109920
   sha256: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
-last_completed_step: synchronized current-runtime fence update implemented across admission, bootstrap/Gate-B enforcement, canonical decision/coordination and deterministic governance; direct public-package provenance recorded; historical ABI/profile evidence remains unmodified
+last_completed_step: candidate governance/enforcement implementation is bounded to 15 declared paths; provenance evidence formatting/hash corrected; fresh detached-worktree validator on 7c1c3658... independently re-fetched the public package and reported PASS with zero material findings
 local_validation: git diff --check PASS; Track A static governance PASS; Python py_compile PASS; normalized bash syntax PASS; YAML parse PASS
-next_action: commit/push the bounded diff, open Draft PR, run exact-head GitHub CI/governance, then obtain a fresh independent post-implementation audit before any merge
+next_action: freeze this task-only checkpoint update as the final candidate head, require exact-head GitHub CI/Track A governance plus a repeat fresh-context validator on that exact SHA, then mark PR #555 Ready and squash-merge only if main freshness/review hygiene remain clean
 ---
 
 # Track A current official-client fence advance

@@ -107,7 +107,7 @@ jobs:
           esac
           xdo_dir="$(dirname "$xdo_lib")"
           export LD_LIBRARY_PATH="$xdo_dir:$tool/usr/lib/x86_64-linux-gnu:$tool/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-          "$tool/usr/bin/xdotool" version >/dev/null
+          "$tool/usr/bin/xdotool" --version >/dev/null
           echo "UI_SETTINGS_V3_LIBXDO_PATH=$xdo_lib"
           echo 'UI_SETTINGS_V3_XDOTOOL_LOADER_FENCE=PASS'
 

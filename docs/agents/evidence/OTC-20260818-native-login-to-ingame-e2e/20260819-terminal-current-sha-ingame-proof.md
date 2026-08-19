@@ -1,22 +1,22 @@
-# Terminal current-SHA native login → IN_GAME proof
+# Current-SHA native login → IN_GAME proof and post-handoff stability result
 
 Task: `OTC-20260818-native-login-to-ingame-e2e`  
 PR: `#528`  
 Date: 2026-08-19  
 Runner/runtime: `synology-otclient-01` / `otclient-track-a-kasmvnc` / `DISPLAY=:1`
 
-## Result
+## Proven E2E event
 
 ```text
-RESULT=SUCCESS
+RESULT=SUCCESS_AT_PROOF_POINT
 CHARACTER_ACTUALLY_LOGGED_INTO_GAME=YES
 CAUSAL_PROOF=COMPLETE
 STRUCTURAL_IN_GAME=PASS
+CURRENTLY_LOGGED_IN_AFTER_LATER_HANDOFF=NO
+RESTART_RELOGIN_STABILITY=NOT_PROVEN
 ```
 
-## Exact client identity
-
-The live post-auth proof process was revalidated directly in the Kasm container:
+## Exact client identity at the successful proof point
 
 ```text
 PID=27368
@@ -31,29 +31,21 @@ The exact SHA/size is the current Track A official-client fence promoted by merg
 
 ## Native auth handoff discriminator
 
-GitHub Actions run `32233929770`, job `96009597899`, proved:
+GitHub Actions run `32233929770`, job `96009597899`, proved the exact current helper/runtime prerequisites and reached the bounded credential step. The one-shot native credential ingress then returned `NATIVE_AUTH_RESPONSE_FAILED` because the native call caused a process handoff/re-exec before `auth.so` could return its IPC response.
 
-```text
-CURRENT_HELPER_SET=PASS
-HELPER_RUNTIME_RELAUNCH=PASS
-SECRET_ACCESS=false   # before the bounded auth step
-```
+Fresh read-only inspection showed that the replacement process used the same exact official executable but had a sanitized environment with no `LD_PRELOAD` and no `OTCLIENT_TIBIA_RE_*` variables. No second credential attempt was made.
 
-The bounded one-shot native credential ingress then returned `NATIVE_AUTH_RESPONSE_FAILED` after the native call caused a process handoff/re-exec before the helper could return its response. This was initially classified as a transport failure.
+A subsequent exact-client restart with the already-proven current-SHA helper set, **without credentials**, restored the authenticated play session and entered the game. No GUI credential entry, OCR, image matching, coordinate login, blind Tab/Return automation, TLS weakening, server-response fabrication, or authentication bypass was used.
 
-Fresh read-only inspection of the resulting exact client showed that the replacement process had the same exact executable but a sanitized environment with no `LD_PRELOAD` and no `OTCLIENT_TIBIA_RE_*` variables. No second credential attempt was made at that point.
+## Direct visible proof
 
-A subsequent exact-client restart with the already-proven current-SHA helper set, **without credentials**, restored the helper observation channel. The client restored the authenticated play session and entered the game. No GUI credential entry, OCR, image matching, coordinate login, blind Tab/Return automation, TLS weakening, server-response fabrication, or authentication bypass was used.
+A local X11 capture of real `DISPLAY=:1` was inspected directly on Synology at the successful proof point. It showed the Tibia world view with the player character rendered in-game, health/status HUD present, and the application title `Tibia - Gant Elmyn`.
 
-## Direct visible runtime proof
-
-A local X11 capture of real `DISPLAY=:1` was inspected directly on Synology. It showed the Tibia world view with the player character rendered in-game, health/status HUD present, and the application title `Tibia - Gant Elmyn`.
-
-The capture was used only for direct local observation and was **not committed or uploaded as repository evidence**.
+The capture was not committed or uploaded. All local/container screenshot files were deleted after inspection.
 
 ## Structural causal proof
 
-On the same live exact process `PID=27368`, the current-SHA runtime bridge independently discovered exactly one validated Qt object for each required in-game discriminator:
+On that same live exact process `PID=27368`, the current-SHA runtime bridge independently discovered exactly one validated Qt object for each required in-game discriminator:
 
 ```text
 player_protocol_handler
@@ -72,9 +64,18 @@ worldmap_handler
   class=tibia::worldmap::TWorldmapProtocolMessageHandler
 ```
 
-All three responses came from bridge peer PID `27368`.
+All three responses came from bridge peer PID `27368`. This proves that the exact current official client genuinely reached the world and owned the expected live game-session structures.
 
-Therefore the final E2E claim is not based only on a screenshot or UI state: the exact current official binary is visibly in the world and simultaneously owns all three exact-build structural game-session objects.
+## Post-proof stability check
+
+After the successful proof point, the client performed another process handoff. A fresh bridge `PING` identified exact current client PID `11365`, but the three in-game discriminators each returned `validated_hits=0`. A fresh local `DISPLAY=:1` observation showed the normal Tibia login screen rather than the world view.
+
+Therefore the correct terminal interpretation is:
+
+- the native-login-to-world E2E event **did occur and is causally proven**;
+- the resulting session did **not remain stable across the later process handoff**;
+- the client is **not currently left logged in**;
+- no second bounded credential attempt was made, preserving one-shot secret scope.
 
 ## Secret handling
 
@@ -85,19 +86,20 @@ persistent secret environment=false
 second secret attempt after handoff=false
 GUI credential entry=false
 session secret committed=false
+local screenshot artifacts retained=false
 ```
-
-The owner-authorized bounded GitHub Secrets ingress was the only credential-bearing path used.
 
 ## Final disposition
 
 ```yaml
 CURRENT_BUILD_NATIVE_AUTH: PASS_WITH_PROCESS_HANDOFF
-CURRENT_BUILD_SESSION_RESTORE_WITHOUT_REENTERING_CREDENTIALS: PASS
-VISIBLE_IN_GAME: PASS
-STRUCTURAL_IN_GAME: PASS_3_OF_3
+VISIBLE_IN_GAME_AT_PROOF_POINT: PASS
+STRUCTURAL_IN_GAME_AT_PROOF_POINT: PASS_3_OF_3
 CHARACTER_ACTUALLY_LOGGED_INTO_GAME: YES
 CAUSAL_PROOF: COMPLETE
+CURRENTLY_LOGGED_IN: NO
+POST_HANDOFF_SESSION_STABILITY: FAIL_NOT_RETAINED
+SECOND_SECRET_ATTEMPT: NOT_PERFORMED
 ```
 
-The earlier `NATIVE_AUTH_RESPONSE_FAILED` marker is superseded as a terminal result: it represented loss of the helper response across the native client handoff, not failure to authenticate. The later no-secret session restoration plus exact-process structural proof resolves that ambiguity.
+The earlier `NATIVE_AUTH_RESPONSE_FAILED` marker is not evidence that authentication itself failed; it is evidence that the helper response channel was lost across the native process handoff. The later visible + structural in-game proof resolves the E2E event, while the subsequent handoff establishes a separate remaining stability defect.

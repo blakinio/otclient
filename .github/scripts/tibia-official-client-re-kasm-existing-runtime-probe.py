@@ -139,20 +139,29 @@ printf 'EXE=%s\nSIZE=%s\nSHA=%s\nSTART=%s\nBOOT=%s\n' "$exe" "$size" "$sha" "$st
 def window_proof(container_id: str, pid: int, runner: Callable[[Sequence[str]], str] = run) -> str:
     prefix = ["docker", "exec", "-u", "kasm-user", "-e", f"DISPLAY={TARGET_DISPLAY}", container_id, "sh", "-lc"]
     tree = runner(prefix + ["xwininfo -root -tree"])
-    candidates: list[tuple[str, str]] = []
+    title_candidates: list[tuple[str, str]] = []
     for line in tree.splitlines():
         match = WINDOW_RE.match(line)
-        if match and match.group(2) != "Tibia":
-            candidates.append((match.group(1), match.group(2)))
-    if len(candidates) != 1:
-        raise ProbeError(f"main_window_count:{len(candidates)}")
-    window_id, title = candidates[0]
-    props = runner(prefix + [f"xprop -id {window_id} _NET_WM_PID WM_CLASS"])
-    pid_match = re.search(r"_NET_WM_PID\(CARDINAL\) = (\d+)", props)
-    if not pid_match or int(pid_match.group(1)) != pid:
-        raise ProbeError("window_pid_mismatch")
-    if '"client"' not in props or '"Tibia"' not in props:
-        raise ProbeError("window_class_mismatch")
+        if match:
+            title_candidates.append((match.group(1), match.group(2)))
+    owned: list[tuple[str, str]] = []
+    class_pid_mismatch = False
+    for window_id, title in title_candidates:
+        props = runner(prefix + [f"xprop -id {window_id} _NET_WM_PID WM_CLASS"])
+        if '"client"' not in props or '"Tibia"' not in props:
+            continue
+        pid_match = re.search(r"_NET_WM_PID\(CARDINAL\) = (\d+)", props)
+        if not pid_match:
+            raise ProbeError("window_pid_missing")
+        if int(pid_match.group(1)) != pid:
+            class_pid_mismatch = True
+            continue
+        owned.append((window_id, title))
+    if len(owned) != 1:
+        if not owned and class_pid_mismatch:
+            raise ProbeError("window_pid_mismatch")
+        raise ProbeError(f"main_window_count:{len(owned)}")
+    window_id, title = owned[0]
     title_hash = hashlib.sha256(title.encode()).hexdigest()
     return f"x11:{window_id}:pid:{pid}:class:client/Tibia:title_sha256:{title_hash}"
 

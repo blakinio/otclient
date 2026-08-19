@@ -1,21 +1,25 @@
 ---
 task_id: OTC-20260819-track-a-world-minimap-static-g0
-status: completed_static_scope
+status: completed
 agent: null
-session_role: released_after_promotion
+session_role: released
 project_lane: otclient
 lane: P0-STATE
 track_id: official-client-re
 task_kind: discovery
-phase: coordinator-promotion
+phase: closed
 execution_mode: github_only
 execution_class: github_hosted
 source_branch: research/OTC-20260819-track-a-world-minimap-static-g0
 source_pr: 545
 source_head: 55034d31a3cfd55c597f463c97ebf97065192c8b
+source_terminal_state: closed_superseded_unmerged
 promotion_decision: ACCEPT_WITH_EDITS
-promotion_pr: pending
-promotion_merge: pending
+promotion_pr: 551
+promotion_head: a86713c0f79190710cd437ed3b550ccaf7652436
+promotion_merge: 6071b237d70a11ab10e5050cc23730162b0e7e0b
+promotion_ci_run: 32223365501
+promotion_ci_result: success
 runtime_access: none
 runtime_owner_task: NOT_APPLICABLE
 runtime_namespace: NOT_APPLICABLE
@@ -33,59 +37,65 @@ login_allowed: false
 gameplay_allowed: false
 client_byte_mutation_authorized: false
 physical_e2e_required: false
-ownership_release_state: release_effective_on_promotion_merge
-audit_result: ACCEPT_WITH_EDITS
-coordinator_review: 4969045959
-open_material_findings_after_repair: 0
+ownership_released: true
+audit_result: PASS_AFTER_EDIT
+source_coordinator_review: 4969045959
+promotion_review: 4969069217
+open_material_findings: 0
+e2e_result: NOT_APPLICABLE
 ---
 
-# Terminal static-scope result
+# Terminal result
 
-The bounded `TIBIA-RE-WORLD-MINIMAP` G0 source Draft produced a valid dedicated current-public-package static package for F11/F12/F13, but its per-method target-address claims did not survive independent falsification.
+The bounded `TIBIA-RE-WORLD-MINIMAP` G0 static package is terminally promoted and closed.
 
-## Accepted result
+Source Draft #545 was independently audited, classified `ACCEPT_WITH_EDITS`, and closed unmerged as superseded after corrected promotion #551 merged.
 
-Exact producer artifact:
+## Accepted evidence
+
+Independent inspection of producer artifact `9345368809` reproduced its GitHub digest exactly:
 
 ```text
-run/job: 32194443653 / 95895463554
-artifact: 9345368809
 artifact sha256: c3c32ad9ce527e5ff7d469ae41914f3802fb55d465a993c8dbb32be2840e9755
+files: fence.txt, minimap-qmeta.txt, minimap-strings.txt
 packed sha256: 1fc26d66cef90723d29293f177fcff41c8e937e7aac830f08e82c2f4c69eb354
 unpacked sha256: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
 unpacked size: 52109920
-raw client retained: false
+CURRENT_PACKAGE_FENCE=PASS
+RAW_CLIENT_RETAINED=false
 ```
 
-Independent artifact inspection confirmed exactly three compact text files and reproduced the artifact digest.
+The fingerprint is exact for the public Linux package fetched by producer run `32194443653`; it is not proof of the bytes used by a currently installed/canonical runtime.
 
-Accepted coverage delta:
+Accepted static coverage consequence:
 
 ```text
-F11 NOT_STARTED -> PARTIAL
-F12 NOT_STARTED -> PARTIAL
-F13 PARTIAL -> PARTIAL
-F08 BLOCKED unchanged
-F10 BLOCKED unchanged
+F11 Minimap controller / visible area / floor state: NOT_STARTED -> PARTIAL
+F12 Minimap markers:                              NOT_STARTED -> PARTIAL
+F13 World<->screen coordinate transforms:         PARTIAL -> PARTIAL
+F08 server-delivered extent/control:              BLOCKED unchanged
+F10 worldmap patch causal propagation:            BLOCKED unchanged
 ```
 
-The shared PR #536 coverage matrix remains untouched; the delta is task-local until incorporated by its owner.
+PR #536's shared matrix/checklist paths were not modified. The delta is task-local until incorporated by its owner.
 
-## Coordinator audit finding
+## Material audit finding and correction
 
-`WM-MINIMAP-AUD-001` — MEDIUM / high confidence.
+`WM-MINIMAP-AUD-001` — MEDIUM, high confidence.
 
-The source producer's relative-jump-table heuristic cannot prove its emitted per-method `target=... direct=true` values. Unrelated metaobjects receive identical target destinations in the retained artifact, directly falsifying exact per-method binding.
+The source producer's relative-jump-table heuristic did not prove its emitted per-method `target=... direct=true` values. The raw retained artifact shows unrelated metaobjects receiving identical reported destinations, falsifying exact per-method binding.
 
-Disposition: fixed in coordinator promotion by retaining only:
+The corrected promotion rejects those per-method target addresses and retains only evidence that survived independent falsification:
 
-- exact package fingerprint;
+- exact public-package fingerprint;
 - Qt class/method ownership;
 - QMeta/static-metacall identity;
-- minimap/marker/action/protobuf/disk strings;
-- conservative F11/F12/F13 status.
+- minimap controller/visible-area/tile/render-info surfaces;
+- marker action/controller/storage/overlay/render-info/protobuf/disk surfaces;
+- world-map camera/viewport transform method-name surfaces;
+- conservative F11/F12/F13 classifications.
 
-Per-method native target addresses from the producer are rejected and must not be reused as facts.
+No formula, object field layout, live semantic transition, server-delivery effect or runtime-stability claim is promoted.
 
 ## Validation
 
@@ -99,9 +109,24 @@ source review threads = 0
 fresh coordinator review = 4969045959
 ```
 
-Promotion exact-head CI and merge evidence are intentionally pending until the corrected promotion PR exists.
+Corrected promotion exact head `a86713c0f79190710cd437ed3b550ccaf7652436`:
 
-E2E: `NOT_APPLICABLE` because the task is static GitHub-hosted reverse-engineering with `runtime_access: none`.
+```text
+CI 32223365501 = SUCCESS
+changed paths = exactly 4 promotion-owned documentation/evidence/archive paths
+promotion review = 4969069217
+open material findings = 0
+```
+
+Promotion PR #551 squash-merged as:
+
+```text
+6071b237d70a11ab10e5050cc23730162b0e7e0b
+```
+
+Source PR #545 is closed unmerged as superseded.
+
+E2E: `NOT_APPLICABLE` because this is static GitHub-hosted evidence with `runtime_access: none`.
 
 ## Remaining gaps
 
@@ -119,8 +144,31 @@ server_delivered_extent_causality: BLOCKED_PR_475
 worldmap_patch_causality: BLOCKED_PR_475
 ```
 
-These do not reopen the bounded G0 static task; they are future separately admitted work.
+These are future separately admitted work. They do not reopen this G0 task.
 
-## Ownership release
+## Closeout
 
-The source Draft remains unmerged. Its task/evidence/report paths are superseded by the corrected coordinator promotion. Ownership release becomes effective when that promotion merges; source PR #545 must then be closed unmerged as superseded.
+```yaml
+closeout:
+  implementation_complete: true
+  complete_feature_or_declared_partial: true
+  outcome_verified: true
+  audit:
+    result: PASS_AFTER_EDIT
+    findings_open_material: 0
+  e2e:
+    result: NOT_APPLICABLE
+    reason: static GitHub-hosted reverse-engineering package with runtime_access none
+  final_ci:
+    head: a86713c0f79190710cd437ed3b550ccaf7652436
+    result: PASS
+    run: 32223365501
+  pull_requests:
+    source: blakinio/otclient#545 closed_superseded_unmerged
+    promotion: blakinio/otclient#551 merged as 6071b237d70a11ab10e5050cc23730162b0e7e0b
+    unresolved_review_threads: 0
+  task_archived_or_terminal: true
+  ownership_released: true
+```
+
+No runtime, login, secret, gameplay or client mutation authority is retained by this task.

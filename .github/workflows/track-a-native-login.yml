@@ -1,0 +1,173 @@
+name: Track A native login
+
+on:
+  workflow_dispatch:
+    inputs:
+      authorization:
+        description: Type ONE_SHOT_NATIVE_LOGIN to confirm a fresh one-shot credential authorization for this run
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-bounded-one-shot-native-login
+  cancel-in-progress: false
+
+env:
+  EXPECTED_SHA: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
+  EXPECTED_SIZE: '52109920'
+  CONTAINER: otclient-track-a-kasmvnc
+  CLIENT: /home/kasm-user/otclient-track-a/Tibia-32177065988-1/bin/client
+  TASK_ROOT: /tmp/otclient-native-login-current-sha
+  BRIDGE_SOCKET: /tmp/otclient-native-login-current-sha/bridge.sock
+  AUTH_SOCKET: /tmp/otclient-native-login-current-sha/auth.sock
+  CHARACTER_SOCKET: /tmp/otclient-native-login-current-sha/character.sock
+
+jobs:
+  login:
+    runs-on: [otclient, synology]
+    timeout-minutes: 8
+    steps:
+      - name: Validate explicit one-shot authorization
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "${{ inputs.authorization }}" = "ONE_SHOT_NATIVE_LOGIN"
+          echo AUTHORIZATION_GATE=PASS
+
+      - name: Verify exact helper runtime before secret access
+        shell: bash
+        run: |
+          set +x; set -Eeuo pipefail
+          unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
+          pid="$(docker exec -u kasm-user "$CONTAINER" pgrep -x client)"
+          [[ "$pid" =~ ^[0-9]+$ ]]
+          test "$(docker exec -u kasm-user "$CONTAINER" stat -Lc %s /proc/$pid/exe)" = "$EXPECTED_SIZE"
+          test "$(docker exec -u kasm-user "$CONTAINER" sha256sum /proc/$pid/exe | awk '{print $1}')" = "$EXPECTED_SHA"
+          for s in "$BRIDGE_SOCKET" "$AUTH_SOCKET" "$CHARACTER_SOCKET"; do docker exec -u kasm-user "$CONTAINER" test -S "$s"; done
+          printf '%s\n' "$pid" > "$RUNNER_TEMP/preauth-pid"
+          echo EXACT_HELPER_RUNTIME=PASS
+
+      - name: Bounded one-shot native authentication
+        shell: bash
+        env:
+          TIBIA_TEST_EMAIL: ${{ secrets.TIBIA_TEST_EMAIL }}
+          TIBIA_TEST_PASSWORD: ${{ secrets.TIBIA_TEST_PASSWORD }}
+        run: |
+          set +x; set -Eeuo pipefail
+          test -n "${TIBIA_TEST_EMAIL:-}"; test -n "${TIBIA_TEST_PASSWORD:-}"
+          pid="$(cat "$RUNNER_TEMP/preauth-pid")"
+          set +e
+          docker exec -i -u kasm-user -e TIBIA_TEST_EMAIL -e TIBIA_TEST_PASSWORD "$CONTAINER" "$TASK_ROOT/secret-ingress" "$AUTH_SOCKET" "$pid" >"$RUNNER_TEMP/auth.out" 2>&1
+          rc=$?
+          set -e
+          unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
+          if [[ $rc -eq 0 ]] && grep -Fq NATIVE_AUTH_DISPATCH=PASS "$RUNNER_TEMP/auth.out"; then
+            echo NATIVE_AUTH_INGRESS=PASS_RESPONSE
+          elif grep -Fq NATIVE_AUTH_RESPONSE_FAILED "$RUNNER_TEMP/auth.out"; then
+            echo NATIVE_AUTH_INGRESS=PASS_WITH_PROCESS_HANDOFF
+          else
+            echo NATIVE_AUTH_INGRESS=FAIL
+            exit 2
+          fi
+          echo SECRET_VALUES_LOGGED=false
+          echo SECOND_SECRET_ATTEMPT=false
+
+      - name: Preserve replacement process and verify helper provenance
+        shell: bash
+        run: |
+          set +x; set -Eeuo pipefail
+          unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
+          sleep 3
+          pid="$(docker exec -u kasm-user "$CONTAINER" pgrep -x client)"
+          [[ "$pid" =~ ^[0-9]+$ ]]
+          test "$(docker exec -u kasm-user "$CONTAINER" stat -Lc %s /proc/$pid/exe)" = "$EXPECTED_SIZE"
+          test "$(docker exec -u kasm-user "$CONTAINER" sha256sum /proc/$pid/exe | awk '{print $1}')" = "$EXPECTED_SHA"
+          printf '%s\n' "$pid" > "$RUNNER_TEMP/replacement-pid"
+          echo CLIENT_TERMINATED_BY_WORKFLOW=false
+          docker exec -i -u kasm-user -e EXPECTED_PID="$pid" -e BSOCK="$BRIDGE_SOCKET" -e CSOCK="$CHARACTER_SOCKET" "$CONTAINER" python3 - <<'PY'
+          import os, socket, struct
+          expected = int(os.environ['EXPECTED_PID'])
+          for key in ('BSOCK', 'CSOCK'):
+              s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+              s.settimeout(3)
+              s.connect(os.environ[key])
+              peer = struct.unpack('3i', s.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, 12))
+              s.close()
+              print(f'{key}_PEER_PID={peer[0]}')
+              assert peer[0] == expected
+          print('HANDOFF_HELPER_PROVENANCE=PASS')
+          PY
+
+      - name: Native singleton confirmation without restart
+        shell: bash
+        run: |
+          set +x; set -Eeuo pipefail
+          pid="$(cat "$RUNNER_TEMP/replacement-pid")"
+          docker exec -i -u kasm-user -e CSOCK="$CHARACTER_SOCKET" -e EXPECTED_PID="$pid" "$CONTAINER" python3 - <<'PY'
+          import json, os, socket, struct, time
+          expected = int(os.environ['EXPECTED_PID'])
+          path = os.environ['CSOCK']
+          def call(cmd):
+              s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+              s.settimeout(5)
+              s.connect(path)
+              peer = struct.unpack('3i', s.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, 12))
+              assert peer[0] == expected
+              s.sendall(cmd.encode() + b'\n')
+              raw = b''
+              while b'\n' not in raw:
+                  raw += s.recv(4096)
+              s.close()
+              return json.loads(raw.split(b'\n', 1)[0])
+          state = {}
+          for _ in range(120):
+              state = call('STATE')
+              count = state.get('character_count', -1) if state.get('ok') else -1
+              if count > 0:
+                  break
+              time.sleep(.5)
+          count = state.get('character_count', -1)
+          print('NATIVE_CHARACTER_COUNT=' + str(count))
+          if count != 1:
+              raise SystemExit(78)
+          result = call('CONFIRM_UNIQUE')
+          assert result.get('ok') and result.get('confirmation_dispatched') and result.get('character_index') == 0
+          print('NATIVE_CHARACTER_CONFIRM=PASS')
+          PY
+
+      - name: Prove fresh structural IN_GAME
+        shell: bash
+        run: |
+          set +x; set -Eeuo pipefail
+          pid="$(cat "$RUNNER_TEMP/replacement-pid")"
+          docker exec -i -u kasm-user -e SOCKET="$BRIDGE_SOCKET" -e EXPECTED_PID="$pid" "$CONTAINER" python3 - <<'PY'
+          import json, os, socket, struct, time
+          expected = int(os.environ['EXPECTED_PID'])
+          path = os.environ['SOCKET']
+          def call(cmd):
+              s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+              s.settimeout(5)
+              s.connect(path)
+              peer = struct.unpack('3i', s.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, 12))
+              assert peer[0] == expected
+              s.sendall(cmd.encode() + b'\n')
+              raw = b''
+              while b'\n' not in raw:
+                  raw += s.recv(4096)
+              s.close()
+              return json.loads(raw.split(b'\n', 1)[0])
+          names = ('player_protocol_handler', 'gameserver_game_session', 'worldmap_handler')
+          for _ in range(120):
+              last = {name: call('DISCOVER ' + name) for name in names}
+              if all(item.get('ok') and item.get('validated_hits') == 1 for item in last.values()):
+                  print('RESULT=SUCCESS')
+                  print('CHARACTER_ACTUALLY_LOGGED_INTO_GAME=YES')
+                  print('CAUSAL_PROOF=COMPLETE')
+                  print('STRUCTURAL_IN_GAME=PASS')
+                  raise SystemExit(0)
+              time.sleep(1)
+          raise SystemExit(2)
+          PY

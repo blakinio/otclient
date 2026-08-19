@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260819-track-a-economy-panels-runtime-readonly
-status: validating
+status: blocked
 agent: ChatGPT
 session_id: chatgpt-economy-panels-runtime-20260819-resume-v2
 session_role: researcher
@@ -8,12 +8,12 @@ project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: runtime_read_only_semantic_validation
-phase: passive_visible_state_observation_ready
+phase: passive_visible_state_exhausted
 branch: research/OTC-20260819-track-a-economy-panels-runtime-readonly
 base_branch: main
 base_main: 08c0b6f89ffddd4c75b8f60060ce3b2a62195d95
 risk: medium
-updated: 2026-08-19T10:54:00+02:00
+updated: 2026-08-19T10:58:00+02:00
 policy_version: 2
 execution_mode: remote-desktop-commander-synology
 execution_class: synology_physical_runtime
@@ -49,11 +49,6 @@ trusted_base_version: '15.32'
 trusted_base_size: 52109920
 trusted_base_sha256: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
 trusted_base_exact_client_fence_result: PASS
-panel_observation_after_preflight: PASSIVE_ALREADY_VISIBLE_ONLY
-prior_target_uniqueness_snapshot_only: true
-prior_live_client_pid: 995
-prior_live_client_start_ticks: 73919186
-prior_live_client_xid: '0x1a00017'
 fresh_target_uniqueness: PROVEN
 fresh_live_client_fence_match: PASS
 live_client_pid: 17954
@@ -63,6 +58,9 @@ live_client_display: ':1'
 live_client_size: 52109920
 live_client_sha256: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
 competing_full_client_candidates: 0
+passive_visible_state: LOGIN_SCREEN
+panel_observation_after_preflight: PASSIVE_CAPTURE_COMPLETE_NO_G24_G31_VISIBLE
+raw_capture_retained: false
 owned_paths:
   - docs/agents/tasks/active/OTC-20260819-track-a-economy-panels-runtime-readonly.md
   - docs/agents/evidence/OTC-20260819-track-a-economy-panels-runtime-readonly/**
@@ -96,11 +94,11 @@ acceptance:
   - never login, use credentials, open/drive panels with input, purchase/sell/create/cancel/accept offers, transfer Tibia Coins, claim rewards, commit auction/trade, world transfer, main-character change or due-payment actions
   - persist only sanitized read-only evidence; no account secrets or unnecessary personal data
   - leave researcher output at Draft PR for coordinator review
-last_completed_step: fresh later-invocation Synology/Kasm re-admission proved one official client PID 17954 start 74839161 XID 0x1a00017 on DISPLAY :1; size/SHA exactly match trusted current fence; host/container inventory found zero competing official client candidates; no input/login/process-control/transaction occurred
-blocker: NONE_FOR_PASSIVE_ALREADY_VISIBLE_OBSERVATION
-next_action: capture and inspect the already-visible desktop read-only; if no G24-G31 panel is already visible, checkpoint NO_GUI_INPUT_AUTHORITY_FOR_PANEL_NAVIGATION rather than opening or driving a panel
+last_completed_step: fresh exact-client/target preflight passed; one read-only X11 frame then established that the already-visible client state is LOGIN_SCREEN and no G24-G31 panel is visible; the potentially sensitive raw frame was deleted from container and host without OCR or retention; no input/login/process-control/transaction occurred
+blocker: NO_GUI_INPUT_OR_LOGIN_AUTHORITY_FOR_PANEL_NAVIGATION_FROM_LOGIN_STATE
+next_action: require a separately explicit owner/governance authority change for bounded GUI input and any login/credential use needed to reach G24-G31, or provide a separately legitimate already-authenticated runtime; re-admit before any state-changing input
 ---
 
 # TIBIA-RE-ECONOMY-PANELS — live SAFE_READ continuation
 
-Fresh re-admission is PASS for the exact current client and unique Kasm target. This task may now inspect only already-visible UI state. No GUI input, login, process control or transaction action is authorized.
+The old exact-client fence blocker is resolved and fresh runtime identity passes. Passive SAFE_READ is now exhausted because the exact current client is at the login screen and no economy/account panel is already visible. The task remains Draft and blocked rather than opening or driving a panel outside its authority.

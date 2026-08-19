@@ -2,7 +2,7 @@
 
 ```yaml
 contract_id: TIBIA-RE-CONTROL-CENTER-ARTIFACT-V1
-version: 1.0
+version: 1.1
 major_version: 1
 status: normative_design
 producer_repository: blakinio/otclient
@@ -87,7 +87,7 @@ All filesystem implementations must:
 - durable STOP/reset/recovery ControlState;
 - RequestLedger dedupe/resource reservation;
 - ActionLedger dispatch state;
-- BudgetLedger reserved/at-risk/committed/uncertain state;
+- BudgetLedger runtime deadline plus external-effect reserved/at-risk/committed/uncertain state;
 - backend/recovery classification.
 
 If presentation/evidence records disagree with safety state:
@@ -141,9 +141,12 @@ RequestLedgerRecord:
   request_id: string
   request_hash: lowercase_hex_sha256
   operation: string
-  resource_id: string | null
+  resource_id: string
   backend_epoch_created: string
   status: ACCEPTED | COMPLETED | FAILED
+  result_status: string | null
+  result_control_generation: integer | null
+  result_ref: string | null
   response_code: integer | null
   response_body_hash: lowercase_hex_sha256 | null
   created_monotonic_ns: integer
@@ -152,17 +155,25 @@ RequestLedgerRecord:
 
 The RequestLedger is backend-global under `control/`. Records are append-only transitions or transactionally equivalent versioned rows.
 
-A later record for the same request ID must preserve the same request hash, operation and resource identity. For any resource-creating operation, the backend allocates the final logical `resource_id` and durably writes the `ACCEPTED` record **before invoking the domain handler that can create/schedule that resource**. If this reservation cannot be made durable, the domain handler is not invoked.
+Every POST receives one final logical `resource_id` before domain execution. A later record for the same request ID must preserve the same request hash, operation and resource identity. The backend durably writes `ACCEPTED` **before invoking any domain handler that can create/schedule the resource or perform the global control transition**. If this reservation cannot be made durable, the domain handler is not invoked.
 
-The domain path must then use the preallocated `resource_id` idempotently. Consequences:
+Resource identity rules:
+
+- a resource-creating operation preallocates the final run/experiment/action/control-domain resource ID;
+- STOP/reset preallocate a control-transition resource identity before entering the domain operation; the exact transition ID embedded in that resource identity must be used by the resulting `ControlState.transition_id`;
+- no v1 POST uses `resource_id=null`;
+- the domain path uses the preallocated identity idempotently and cannot substitute a new identity after acceptance;
+- `COMPLETED`/`FAILED` records persist enough bounded non-secret result metadata (`result_status`, optional `result_control_generation`, `result_ref`, response code/hash) to replay the original logical result even after later state transitions.
+
+Consequences:
 
 - crash after durable ACCEPTED but before resource creation -> retry uses the same reserved ID and may complete only that resource;
 - crash after resource creation but before COMPLETED response mapping -> retry resolves the same reserved resource, never allocates a second one;
+- delayed replay of an older STOP/reset request after later control transitions resolves the original control-transition identity/result and does not relatch/reset or advance generation again;
 - same request ID/hash -> same durable identity/result;
 - same request ID/different hash -> conflict, never reuse;
+- a FAILED request is replayed as that same failed logical request; a deliberate new logical attempt uses a new request ID;
 - a missing/corrupt record in a previously initialized ledger cannot be interpreted as permission to recreate mutation-capable work when contradictory domain/safety state exists.
-
-For non-resource global operations, `resource_id` may be null only when the operation has a durable replayable transition/result identity (for example the ControlState `transition_id`) and duplicate execution cannot create a second semantic/external effect.
 
 ## 6. ActionLedger record
 
@@ -197,12 +208,19 @@ A later transition cannot legally move from possible-dispatched back to not-disp
 
 ## 7. BudgetLedger
 
+Runtime is a monotonic deadline, not an ambiguous external side effect. External-effect accounting is separate:
+
 ```yaml
 BudgetLedger:
   schema_version: 1
   run_id: string
-  dimensions:
-    <dimension>:
+  runtime:
+    limit_seconds: integer
+    started_monotonic_ns: integer
+    deadline_monotonic_ns: integer
+    expired: bool
+  effect_dimensions:
+    <effect_dimension>:
       limit: integer
       reserved: integer
       at_risk: integer
@@ -211,11 +229,24 @@ BudgetLedger:
   updated_monotonic_ns: integer
 ```
 
-All values are non-negative checked integers.
+Core v1 effect dimensions are:
 
-Persist the ActionLedger dispatch commit and affected BudgetLedger at-risk transition in one atomic local transaction or a crash-safe protocol with equivalent all-or-conservative recovery semantics.
+```text
+max_actions
+max_movement_tiles
+max_spells
+max_consumables
+max_items_moved
+max_gold
+max_tibia_coins
+max_irreversible_changes
+```
 
-If atomicity cannot be proven after crash, recover the maximum plausible affected budget into `uncertain` before admitting new overlapping work.
+All numeric values use checked non-negative arithmetic. `deadline_monotonic_ns` is derived once from the validated Scenario-v1 `max_runtime_seconds` and run activation time; overflow fails closed. Runtime expiry stops new scheduling/dispatch but is never moved through `reserved/at_risk/committed/uncertain`, because elapsed time cannot become an ambiguous external effect.
+
+For external-effect dimensions, persist the ActionLedger dispatch commit and affected BudgetLedger at-risk transition in one atomic local transaction or a crash-safe protocol with equivalent all-or-conservative recovery semantics.
+
+If external-effect atomicity cannot be proven after crash, recover the maximum plausible affected effect budget into `uncertain` before admitting new overlapping work.
 
 ## 8. Recovery record
 
@@ -475,12 +506,15 @@ At minimum:
 20. crash/unclean backend leaves prior active marker and next backend sets/preserves `recovery_required=true` before admitting mutation;
 21. STOP persistence failure followed by crash cannot reopen mutation on restart;
 22. clean shutdown clears the active-backend marker only after safety flush and preserves STOP/recovery truth;
-23. resource-creating RequestLedger ACCEPTED record/resource ID is durable before domain creation;
-24. crash after ACCEPTED before creation and crash after creation before COMPLETED both replay to the same resource ID without duplicate work;
-25. global STOP/reset request replay does not depend on a run directory.
+23. runtime deadline is derived deterministically, overflows fail closed and expiry blocks new dispatch without entering external-effect ambiguity buckets;
+24. every POST RequestLedger ACCEPTED record/final resource identity is durable before domain execution;
+25. crash after ACCEPTED before creation and crash after creation before COMPLETED both replay to the same resource ID without duplicate work;
+26. global STOP/reset request replay does not depend on a run directory;
+27. delayed replay of an old STOP after a later reset returns the old transition/result and does not relatch or increment generation;
+28. delayed replay of an old reset after a later STOP returns the old transition/result and does not clear the newer STOP.
 
 ## 22. Compatibility
 
 Artifact major version 1 is additive-only.
 
-Changing safety-state precedence, ControlState/RequestLedger scope or durability, unclean-backend recovery semantics, dispatch-journal durability, finalization immutability or secret exclusion requires a new major contract or separately reviewed compatible extension.
+Changing safety-state precedence, ControlState/RequestLedger scope or durability, request/control-transition replay identity, runtime-deadline versus external-effect accounting, unclean-backend recovery semantics, dispatch-journal durability, finalization immutability or secret exclusion requires a new major contract or separately reviewed compatible extension.

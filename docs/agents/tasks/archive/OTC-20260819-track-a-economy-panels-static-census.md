@@ -30,8 +30,9 @@ source_track_a_governance_run: 32219366592
 source_track_a_governance_result: success
 source_ci_run: 32219366648
 source_ci_result: success
-audit_result: material_finding_repaired_pending_promotion_exact_head_ci
+audit_result: material_finding_repaired
 open_material_findings: 0
+promotion_exact_head_ci_gate: required_before_merge
 ---
 
 # Result

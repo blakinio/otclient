@@ -62,7 +62,7 @@ current_client_version_token: "15.32"
 current_client_size: 52109920
 current_client_sha256: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
 invocation_started_at: 2026-08-19T13:45:00+02:00
-last_progress_at: 2026-08-19T14:08:00+02:00
+last_progress_at: 2026-08-19T14:18:00+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: draft
 terminal_ci_wait_started_at: null
@@ -72,8 +72,8 @@ identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 0
 stall_warnings: 0
-current_blocker: current KasmVNC client is unique and readable, but canonical runtime-registration.json is absent so live GUI anti-idle input is not currently authorized
-next_action: run the exact remote Surveyor implementation against otclient-track-a-kasmvnc DISPLAY=:1; keepalive must fail closed unless registration/Gate A/Gate B/supervisor authority is proven at that moment
+current_blocker: current KasmVNC client remains read-only admitted but canonical registration is absent and generation-16 lease is expired; real anti-idle rotation is therefore not currently legal
+next_action: complete repository integration/readiness validation on PR #592; real rotation may be exercised only after a separately valid current canonical mutation admission exists
 ---
 
 # TIBIA-RE Surveyor v1
@@ -88,35 +88,53 @@ The harness must reduce repeated manual census work without converting lexical/s
 
 The owner requested an approximately ten-minute turn-in-place keepalive for the already-running research session. Trusted-base governance already defines the shared heartbeat `/tmp/otclient-track-a-last-activity`, shared lock `/tmp/otclient-track-a-gui-input.lock`, an eight-minute trigger threshold and safe rotation as the preferred minimal stimulus.
 
-Implementation must preserve that contract but fail closed: an unregistered/read-only target is observable but not mutable. A current run without canonical registration, Gate A/Gate B and GUI authority must emit `KEEPALIVE_SKIPPED_UNAUTHORIZED` and send no keyboard/mouse input. The task branch cannot expand its own authority.
+Implementation preserves that contract and fails closed: an unregistered/read-only target is observable but not mutable. A run without canonical registration, current lease/Gates and GUI authority emits `KEEPALIVE_SKIPPED_UNAUTHORIZED` and sends no keyboard/mouse input. Anti-idle events are explicitly excluded from subsystem semantic proof.
 
-## Acceptance
+## Acceptance progress
 
-- parse all 169 canonical coverage IDs and statuses deterministically;
-- index structured task evidence without trusting it as canonical status authority;
-- capture a secret-free current runtime identity/uniqueness/control-plane snapshot;
-- emit compact `coverage.json`, `agent_bundle.json` and human summary;
-- rank next experiments only from explicit canonical status/dependency data;
-- implement shared heartbeat/lock keepalive scheduling with an authority gate and no duplicate input;
-- keep anti-idle events explicitly excluded from subsystem semantic evidence;
-- unit-test coverage parsing, evidence indexing, runtime normalization and all keepalive allow/refuse paths;
-- run the surveyor against the current `otclient-track-a-kasmvnc` session;
-- do not login, read credentials, transact, attach/inject, mutate process memory or bypass canonical runtime admission.
+- PASS — parse all 169 canonical coverage IDs and statuses deterministically;
+- PASS — index structured task evidence without trusting it as canonical status authority;
+- PASS — capture a secret-free current runtime identity/uniqueness/control-plane snapshot;
+- PASS — emit compact `coverage.json`, `agent_bundle.json` and human summary;
+- PASS — rank next experiments only from explicit canonical status/dependency data;
+- PASS — implement shared heartbeat/lock keepalive scheduling with an authority gate and no duplicate input;
+- PASS — keep anti-idle events explicitly excluded from subsystem semantic evidence;
+- PASS — 13 focused unit tests cover coverage parsing, evidence indexing, runtime normalization and keepalive allow/refuse paths;
+- PASS — run the surveyor against the current `otclient-track-a-kasmvnc` session;
+- PASS — no login, credential read, transaction, attach/injection or process-memory mutation occurred;
+- BLOCKED — real keepalive rotation on the current session, because current canonical mutation admission does not exist.
 
-## Pre-live recovery checkpoint
+## Current-session validation checkpoint
 
 ```yaml
-phase: pre_live_current_session_validation
-exact_remote_implementation_head: 04ea2f1287cb85e9e1b22eacb7cbbff225513f82
-last_verified_result: 13 focused unit tests PASS; repository-only local bundle emits exactly 169 rows and canonical counts 14/95/56/4
-current_gate: fresh read-only KasmVNC runtime probe plus keepalive authority decision
-pending_external_state: revalidate current container/PID/start/SHA/window uniqueness and canonical registration/lease immediately before the run
-wait_started_at: null
-deadline: null
-check_generation: pre_live_1
-ci_observations: 0
-terminal_ci_observations: 0
-identical_failure_retries: 0
-repair_cycles: 0
-next_action: run the exact remote Surveyor from the Synology Docker host against otclient-track-a-kasmvnc DISPLAY=:1 and persist only sanitized outputs
+phase: post_live_current_session_validation
+executed_remote_head: 577fc48e123974adca68e06dea48d59aa4d1a127
+focused_tests: 13_PASS
+remote_diff_check: PASS
+canonical_rows: 169
+coverage_counts:
+  DONE: 14
+  PARTIAL: 95
+  NOT_STARTED: 56
+  BLOCKED: 4
+runtime_access_result: READ_ONLY_ADMITTED
+target_uniqueness_result: PROVEN
+candidate_process_count: 1
+client_pid: 11365
+client_start_ticks: 74970818
+exact_current_fence_match: true
+canonical_registration_present: false
+canonical_lease_generation: 16
+canonical_lease_expired: true
+keepalive_due: true
+keepalive_result: KEEPALIVE_SKIPPED_UNAUTHORIZED
+surveyor_input_sent: false
+heartbeat_present_after_run: false
+gui_lock_present_after_run: false
+rows_with_evidence_mentions: 88
+rows_with_current_sha_refs: 64
+total_evidence_file_mentions: 272
+privacy_secret_scan: PASS
+durable_evidence: docs/agents/evidence/OTC-20260819-track-a-tibia-re-surveyor-v1/20260819-current-kasm-live-run.md
+next_action: keep PR Draft until repository integration, exact-head CI and required independent audit are complete; do not manufacture registration merely to demonstrate rotation
 ```

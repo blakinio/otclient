@@ -2,143 +2,191 @@
 
 Recommended reasoning effort: high / maximum.
 
-Act as a **fresh independent read-only architecture, security and implementation-readiness auditor**.
+Act as a **fresh independent read-only architecture, security, concurrency and implementation-readiness auditor**.
 
 Repository:
 
-`https://github.com/blakinio/otclient`
+```text
+https://github.com/blakinio/otclient
+```
 
-Use the connected GitHub repository state as the source of truth.
+Use connected live GitHub repository state as the source of truth.
 
-Do **not** implement fixes during this task.
+This is an independent falsification task. Do not trust conclusions from the design/hardening authors.
 
-Do not modify files.  
-Do not commit.  
-Do not push.  
-Do not merge.  
-Do not create replacement architecture.  
-Do not perform Track A runtime actions.  
-Do not launch or control the Tibia client.  
-Do not access credentials.  
-Do not log in.  
-Do not perform gameplay actions.  
-Do not write to `blakinio/Oteryn-v2`.
+# 1. Absolute execution boundary
 
-## Audit target
+Do not implement fixes.
 
-Audit the complete design of:
+Do not:
 
-`TIBIA RE Control Center / E2E Lab`
+- modify files;
+- commit;
+- push;
+- merge;
+- create replacement architecture;
+- perform Track A runtime actions;
+- launch/control/observe the Tibia client beyond repository evidence;
+- access credentials or secret values;
+- log in;
+- perform gameplay actions;
+- write to `blakinio/Oteryn-v2`.
 
-The design was introduced by PR:
+Use `runtime_access:none` reasoning only.
 
-`blakinio/otclient#600`
+# 2. Audit target
 
-Known merge at the time this prompt was prepared:
+Audit the **current complete design** of:
 
-`ada65af85a872e2df43469f5687418fc5647811a`
+```text
+TIBIA RE Control Center / E2E Lab
+```
 
-Lifecycle closeout:
+Historical discovery anchors:
 
-`blakinio/otclient#601`
+```text
+design PR       blakinio/otclient#600
+design merge    ada65af85a872e2df43469f5687418fc5647811a
+closeout PR     blakinio/otclient#601
+closeout merge  5817f1ad699c2d68dfb1a03886dc8c20dace67e7
+audit prompt PR blakinio/otclient#602
+```
 
-Known closeout merge:
+These are discovery hints only, not current truth.
 
-`5817f1ad699c2d68dfb1a03886dc8c20dace67e7`
-
-These values are **discovery hints only**.
-
-Before relying on them:
+Before relying on any historical value:
 
 1. fetch current `main`;
-2. verify that #600 and #601 are actually merged;
-3. verify their exact merge commits;
-4. verify the current blobs of all audited files;
-5. inspect current open PRs and active tasks for newer overlapping work;
-6. if current repository evidence supersedes any value above, use the live repository state and explicitly report the discrepancy.
+2. verify #600/#601/#602 merge status and exact merge commits;
+3. identify every later PR/commit touching the Control Center programme/contracts/prompts;
+4. verify current blobs of every audited file;
+5. inspect all current open PRs and active tasks for overlapping Control Center, Surveyor, runtime bridge, Track A authority, E2E, HTTP/CLI or Oteryn integration work;
+6. report any discrepancy between historical hints and live state.
 
-## Mandatory files
+# 3. Mandatory files
 
-Read in full:
+Read in full from current trusted `main`:
 
 - `AGENTS.md`
 - `docs/agents/README.md`
 - `docs/agents/programs/TIBIA_RE_CONTROL_CENTER_E2E.md`
+- `docs/agents/contracts/TIBIA_RE_CONTROL_CENTER_EXECUTION_V1.md`
 - `docs/agents/contracts/TIBIA_RE_CONTROL_CENTER_ADAPTER_V1.md`
 - `docs/agents/prompts/TIBIA_RE_CONTROL_CENTER_MVP.md`
 - `docs/agents/tasks/archive/OTC-20260819-tibia-re-control-center-e2e-design.md`
 
-Also read the current relevant Track A governance and dependencies, including at minimum:
+Also inspect current relevant Track A governance/dependencies, including at minimum:
 
 - `docs/agents/programs/OTCLIENT_TIBIA_RE_EXPERIMENT_EXECUTION_MODEL.md`
 - `docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md`
 - `docs/agents/contracts/TRACK_A_KASMVNC_RUNTIME_ACCESS_V1.md`
-- current canonical lease/registration/Gate A/Gate B/rebind/supervisor contracts referenced by repository instructions
+- current canonical lease/registration/Gate A/rebind/Gate B/bootstrap/whole-lifetime-supervisor contracts referenced by trusted instructions
+- current GUI input lock/activity-heartbeat contracts/helpers
 - `docs/agents/MODULE_CATALOG.md`
 - `docs/agents/REPOSITORY_MAP.md`
 - `docs/agents/KNOWN_RISKS.md`
 - `docs/agents/BUILD_TEST_MATRIX.md`
 - `docs/agents/CROSS_REPO_CONTRACTS.md`
 
-Inspect the current exact status and relevant content of:
+Inspect exact current state/content of:
 
-- PR #592 `TIBIA-RE Surveyor`
-- `tools/tibia_re_surveyor/**`, if now merged or otherwise present on current main
-- `tools/tibia_runtime_bridge/**`
-- existing Track A lease/input-lock/heartbeat/runtime-control helpers
-- any existing scenario, recorder, E2E, HTTP, web UI, CLI or adapter infrastructure that could overlap with the proposed design
+- PR #592 Surveyor;
+- `tools/tibia_re_surveyor/**` if present/accepted;
+- `tools/tibia_runtime_bridge/**`;
+- canonical lease/input-lock/runtime-control helpers;
+- existing scenario, recorder, artifact, HTTP, web, CLI, fake/test, cancellation and idempotency infrastructure that can overlap the design.
 
-For the Oteryn side, inspect **read-only** current repository state in:
+For `blakinio/Oteryn-v2`, read-only inspect:
 
-`https://github.com/blakinio/Oteryn-v2`
+- current `main` exact SHA;
+- `AGENTS.md` and applicable nested instructions;
+- `docs/architecture/ADR-0007-native-end-to-end-test-platform.md`;
+- relevant current architecture/security documents;
+- `apps/client`;
+- existing E2E/test-support/control interfaces;
+- production/test-build restrictions.
 
-Read its current:
+Do not assume historical `otclient/oteryn-client/**` is canonical.
 
-- `AGENTS.md`
-- relevant architecture documents
-- `apps/client`
-- existing test-support/E2E/control interfaces
-- security rules affecting a future test adapter
+# 4. Evidence discipline
 
-Do not assume historical `otclient/oteryn-client/**` is still canonical.
+Distinguish explicitly:
 
-# PRIMARY OBJECTIVE
+```text
+FACT       directly verified from current repository/tool state
+INFERENCE  derived from verified facts
+UNKNOWN    missing/unavailable evidence
+```
 
-Determine whether the Control Center design is:
+Do not convert prose intent into implementation-readiness automatically.
+
+A contract passes only when two competent agents could implement the relevant behavior without inventing materially different safety semantics.
+
+A test list does not repair an ambiguous contract unless the expected behavior is itself defined.
+
+# 5. Primary objective
+
+Determine whether the current Control Center design is:
 
 1. architecturally sound;
 2. implementable without major redesign;
-3. properly integrated with existing Track A infrastructure;
-4. safely fail-closed;
-5. suitable for both browser and direct-machine operation;
-6. capable of becoming a reusable E2E platform;
-7. suitable for later semantic differential testing against Oteryn v2;
-8. sufficiently specified for another agent to begin Package A implementation.
+3. integrated with existing Track A infrastructure instead of duplicating it;
+4. safely fail-closed at the exact irreversible mutation boundary;
+5. deterministic under concurrency, STOP, retries, transport loss and process restart;
+6. privacy-safe before event/artifact creation;
+7. truthful for multi-source causal evidence;
+8. suitable for browser and direct-machine operation through one backend;
+9. reusable as a research/E2E platform;
+10. compatible with current Oteryn v2 ADR-0007 without becoming a second Oteryn E2E authority;
+11. suitable for later semantic differential testing;
+12. sufficiently specified for a fresh agent to implement Package A with zero Track A runtime access.
 
-Do not trust the conclusions of the agent that authored #600.
+# 6. Non-negotiable invariants to falsify
 
-Independently falsify the design.
+Attempt to disprove every invariant below.
 
-# AUDIT AREA A — REPOSITORY FIT AND DUPLICATION
+```text
+scenario validity
+!= capability support
+!= evidence maturity
+!= observation freshness
+!= mutation authority
+```
 
-Verify whether the design correctly reuses existing infrastructure rather than rebuilding it.
+```text
+Browser ----\
+             -> one Control API/domain service -> Scenario Engine -> MutationCoordinator -> Adapter
+CLI --------/
+```
 
-Check for duplication or conflict with:
+```text
+STOP linearizes before dispatch -> mutation does not begin
+Dispatch linearizes before STOP -> action is classified already-dispatched
+```
 
-- Surveyor;
-- runtime bridge;
-- canonical runtime lease manager;
-- canonical registration;
-- Gate A / rebind / Gate B;
-- whole-lifetime supervisor;
-- GUI input lock;
-- activity heartbeat;
-- evidence registries;
-- existing client-test infrastructure;
-- existing scenario/test helpers;
-- existing HTTP/web/CLI infrastructure.
+```text
+same action_id + same request -> one logical dispatch maximum
+same action_id + different request -> deterministic refusal
+```
 
-For every proposed component classify:
+```text
+possible dispatch + lost result -> AMBIGUOUS unless authoritatively reconciled
+AMBIGUOUS mutation -> no automatic retry
+```
+
+```text
+secret-class data never enters normal Event/Artifact/Error/Report/AgentBundle objects
+```
+
+```text
+ingest order != source causal order
+```
+
+Any path that violates one of these in a safety-relevant way is at least P1, and P0 where it can create unauthorized mutation, secret exposure or irreversible/value effects.
+
+# 7. Audit area A — repository fit and duplication
+
+Classify each proposed component:
 
 ```text
 REUSE_EXISTING
@@ -148,243 +196,202 @@ DUPLICATE_OR_CONFLICTING
 UNKNOWN
 ```
 
-Pay special attention to whether a new:
+Audit at least:
 
-- Safety Controller,
-- Recorder,
-- Artifact Store,
-- Scenario Engine,
-- Adapter API
+- Safety Controller;
+- MutationCoordinator;
+- Scenario Engine;
+- Recorder;
+- Artifact Store;
+- Adapter API;
+- Control API;
+- fake adapter;
+- Surveyor integration;
+- runtime bridge integration;
+- Track A lease/registration/Gates/supervisor/input lock;
+- Oteryn adapter/E2E integration.
 
-would accidentally become a second source of truth.
+Verify no new component becomes a second source of truth for Track A authority/capability registries or Oteryn E2E authority.
 
-# AUDIT AREA B — AUTHORITY AND FAIL-CLOSED DESIGN
+# 8. Audit area B — final authority/dispatch linearization
 
-Attempt to find every way the proposed platform could accidentally execute an action without valid current Track A authority.
+Do not accept `preflight immediately before dispatch` as sufficient by itself.
+
+Verify the design explicitly defines one final irreversible dispatch boundary and requires revalidation there of:
+
+- idempotency state;
+- current Control Center generation;
+- cancellation state;
+- adapter generation;
+- runtime instance;
+- session epoch;
+- budget reservation;
+- semantic capability;
+- external current authority;
+- shared GUI/input lock if applicable;
+- all current official Track A identity/authority fences inside the existing canonical guarded mutation boundary.
+
+Falsify against:
+
+- stale/expired lease;
+- stale registration;
+- mismatched lease/registration generation;
+- client process restart;
+- PID reuse;
+- changed executable/hash;
+- changed boot ID;
+- changed window/display/container;
+- changed session epoch;
+- changed adapter generation;
+- authority loss one instruction/nanosecond before dispatch.
+
+Any design where a prior cached PASS can authorize later mutation is a material finding.
+
+# 9. Audit area C — STOP ALL and concurrency
+
+Verify one explicit STOP linearization point exists under the same local coordinator synchronization domain used for dispatch admission.
 
 Audit:
 
-- stale lease;
-- expired lease;
-- stale registration;
-- mismatched lease generation;
-- mismatched runtime generation;
-- process restart;
-- PID reuse;
-- changed executable;
-- changed boot ID;
-- changed session epoch;
-- different X11 window;
-- different container;
-- changed display;
-- authority loss between scenario validation and dispatch;
-- authority loss during a multi-step scenario;
-- queued actions after authority loss;
-- browser reconnect;
-- duplicated HTTP request;
-- repeated CLI request;
-- race between STOP ALL and action dispatch;
-- concurrent operators;
-- concurrent scenarios;
-- cancellation while waiting;
-- cancellation during adapter dispatch.
-
-Confirm that:
-
-`scenario validity != mutation authority`
-
-and that mutating authority is checked at the final possible point before dispatch.
-
-Any path capable of turning:
-
-`READ_ONLY -> mutation`
-
-without external Track A authority is a critical finding.
-
-# AUDIT AREA C — STOP ALL / CANCELLATION
-
-Deeply audit the proposed `STOP ALL` semantics.
-
-Determine whether the design adequately defines:
-
-- cancellation generation;
+- increment/latch of control generation;
 - queued work rejection;
-- active scenario cancellation;
-- active adapter call cancellation;
-- bounded wait cancellation;
-- capture shutdown;
-- local lock cleanup;
+- active wait cancellation;
+- in-flight adapter cancellation request;
+- not-yet-dispatched mutation prevention;
+- already-dispatched conservative classification;
 - stale completion rejection;
-- post-cancellation events;
-- restart after STOP;
-- concurrent request races.
+- reset semantics;
+- concurrent browser/CLI operators;
+- two scenarios;
+- concurrent read-only operations;
+- resource/lock cleanup.
 
-Look specifically for the classic race:
+Reject vague wording such as `cancel active action` without race-fencing semantics.
 
-```text
-preflight PASS
-        |
-        +---- STOP ALL
-        |
-dispatch mutation
-```
+# 10. Audit area D — idempotency, replay and crash recovery
 
-The design must provide a concrete implementation strategy that prevents or fences this race.
+Verify:
 
-Do not accept vague language such as `cancel active action` if the contract does not make the behavior implementable.
+- `action_id` uniqueness/idempotency scope;
+- same-ID/same-body behavior;
+- same-ID/different-body conflict;
+- HTTP POST retry after response loss;
+- CLI retry;
+- browser reload;
+- duplicate tabs;
+- duplicate budget reservation;
+- action result retrieval;
+- no automatic retry after `AMBIGUOUS` or possible dispatch;
+- backend restart with `NOT_DISPATCHED` versus `POSSIBLY_DISPATCHED` work;
+- fresh control generation after restart;
+- no automatic mutation resume after restart.
 
-# AUDIT AREA D — SCENARIO ENGINE
+# 11. Audit area E — Scenario Engine determinism
 
-Audit the scenario model for determinism and testability.
+Verify typed/versioned definitions for:
 
-Check:
-
-- validation;
-- stable step IDs;
+- schema version;
+- deterministic stable step IDs;
+- predicates/operators;
+- UNKNOWN semantics;
 - preconditions;
-- timeouts;
 - assertions;
 - waits;
+- timeouts;
+- pause/resume;
 - abort conditions;
-- side-effect budgets;
-- capability requirements;
-- session/runtime fencing;
 - retries;
-- idempotency;
-- partial completion;
 - failure propagation;
-- cancellation;
+- partial completion;
+- runtime/session/adapter generation fencing;
+- capability requirements;
 - reproducibility.
 
-Determine whether the schema can represent at least:
+Check representability of movement, turning, spells, potion, food, rune, target selection, attack/follow, inventory, containers, equipment, controlled chat, read-only observation and before/after checkpoints.
 
-- movement;
-- turning;
-- spell cast;
-- potion use;
-- food;
-- rune use;
-- target selection;
-- attack/follow;
-- inventory;
-- containers;
-- equipment;
-- controlled chat;
-- read-only observation;
-- before/after checkpoints.
+# 12. Audit area F — enforceable side-effect budgets
 
-Identify any semantics that are underspecified enough that two agents could implement materially incompatible engines.
+Audit per-run ledger semantics:
 
-# AUDIT AREA E — SIDE-EFFECT BUDGETS
+```text
+limit
+reserved
+committed
+uncertain
+```
 
-Verify that the proposed budget model is enforceable rather than decorative.
+Verify reserve-before-dispatch and conservative accounting for:
 
-Audit at minimum:
-
-- max runtime;
-- max actions;
-- max movement;
+- runtime;
+- action attempts;
+- movement tiles;
 - spells;
 - consumables;
-- moved items;
+- moved items/stack amount;
 - gold;
 - Tibia Coins;
 - irreversible changes.
 
-Determine:
+Determine exactly how PASS, proven no-dispatch, dispatched-but-unmeasured, TIMEOUT, FAIL, CANCELLED and AMBIGUOUS affect each ledger.
 
-1. which budgets can be enforced before dispatch;
-2. which require state confirmation;
-3. how failed or ambiguous actions consume budget;
-4. how duplicate dispatch is accounted for;
-5. whether budget state survives retries/reconnects within one run.
+Hard budget that cannot be safely bounded must refuse before dispatch.
 
-Flag any budget that appears safe in YAML but cannot actually be measured reliably.
+Flag any budget that is only decorative/reporting metadata.
 
-# AUDIT AREA F — RECORDER AND CAUSAL EVIDENCE
+# 13. Audit area G — Recorder and causal evidence
 
-Compare the Control Center Recorder design against:
+Compare against `OTCLIENT_TIBIA_RE_EXPERIMENT_EXECUTION_MODEL.md`.
 
-`OTCLIENT_TIBIA_RE_EXPERIMENT_EXECUTION_MODEL.md`
+Verify Event model distinguishes:
 
-Verify preservation of:
+- ingestion sequence;
+- ingestion monotonic time;
+- source timestamp;
+- source clock domain;
+- source sequence;
+- sequence scope;
+- ordering confidence;
+- late events.
+
+Verify preservation when observable of:
 
 - session epoch;
-- monotonic timestamps;
-- stimulus ID;
+- stimulus ID/BACKGROUND;
 - direction;
-- sequence/correlation data;
-- runtime thread when observable;
-- handler/object identity;
-- before state;
-- after state;
+- message sequence/type/lane;
+- runtime thread;
+- handler/runtime object/object-instance epoch;
+- before/after state hashes;
 - semantic delta;
-- negative/no-stimulus controls;
-- evidence reference.
+- evidence reference;
+- negative/no-stimulus control linkage.
 
-Check whether the proposed normalized `Event` envelope loses any information required for causal RE.
+A single total `seq` must not be presented as source causal order across independent clocks.
 
-Verify that correlation is not incorrectly treated as causal proof.
+Correlation must not auto-promote to causal proof.
 
-Determine whether one unified event sequence across:
+# 14. Audit area H — late events and artifact finalization
+
+Verify:
 
 ```text
-ACTION
-TRACE
-NET
-STATE
-SCREEN
-SNAPSHOT
-ASSERTION
-RESULT
+ACTIVE -> CLOSING -> FINALIZED
 ```
 
-can be implemented without lying about ordering across independent sources.
+Audit:
 
-Require explicit handling of:
+- bounded drain/watermarks;
+- late event tagging;
+- late event inability to rewrite terminal result;
+- crash/incomplete artifacts;
+- atomic/staged finalization;
+- immutable finalized result;
+- append-only supplements;
+- no synthesized PASS after restart/crash.
 
-- source timestamp;
-- ingestion timestamp;
-- sequence scope;
-- clock domain;
-- unknown ordering.
+# 15. Audit area I — security/privacy at construction time
 
-# AUDIT AREA G — NETWORK CAPTURE
-
-Audit the default metadata-only network design.
-
-Check whether it provides enough information for:
-
-- C2S/S2C discrimination;
-- connection/session lane;
-- message candidate correlation;
-- packet/message sequence;
-- packet size;
-- semantic message type when actually known.
-
-Verify that it does **not** persist sensitive:
-
-- login credentials;
-- auth tokens;
-- session tokens;
-- tickets;
-- encryption material;
-- secret-bearing payloads.
-
-Find any field or artifact path where secrets could accidentally escape through:
-
-- exceptions;
-- repr/debug output;
-- raw packet fallback;
-- reports;
-- screenshots;
-- agent bundles.
-
-# AUDIT AREA H — PRIVACY / REDACTION
-
-Falsify the redaction model.
-
-Test the design conceptually against:
+Falsify against:
 
 - email;
 - password;
@@ -392,56 +399,65 @@ Test the design conceptually against:
 - auth/session tokens;
 - cookies;
 - tickets;
-- RSA material;
+- encryption/RSA material;
 - private chat;
 - player identities;
-- screenshots containing login UI;
-- trace strings;
 - environment variables;
-- exception messages.
+- packet payloads;
+- trace strings;
+- exception/repr/debug messages;
+- screenshots showing login/auth UI.
 
-Determine whether redaction occurs:
+Required invariant:
 
 ```text
-BEFORE event creation
+classification/redaction/rejection BEFORE normal object creation
 ```
 
-or only at export time.
+Export-time-only redaction is a material weakness.
 
-Preferred invariant:
+Verify `SECRET_REJECTED` can record category/reason without value/hash/reversible derivative.
 
-> secret-class data never enters the normal event/artifact object graph.
+Verify screenshots have a safe/quarantine/reject admission path rather than automatic persistence.
 
-Flag export-time-only redaction as a material weakness.
+# 16. Audit area J — network capture
 
-# AUDIT AREA I — CONTROL API
+Default persistent path must be metadata-only.
 
-Audit the proposed browser/CLI Control API.
+Verify support for:
 
-Check:
+- C2S/S2C;
+- connection/session lane;
+- source-local sequence when known;
+- size;
+- message type only when structurally known;
+- correlation ID.
 
-- one domain path for browser and CLI;
-- no GUI bypass;
-- no hidden raw-action endpoint;
-- request bounds;
-- action idempotency;
-- replay protection;
-- duplicate POST handling;
-- event-stream bounds;
-- run-history bounds;
-- cancellation;
-- shutdown;
-- malformed inputs.
+Verify no raw-payload fallback exists.
 
-Initial implementation is intended to be loopback-only.
+A future sanitized payload mode must require a separate explicit policy proving pre-persistence secret exclusion.
 
-Verify that this is sufficient and clearly specified.
+# 17. Audit area K — Control API / browser / CLI
 
-If future LAN exposure is discussed, confirm the current design does **not** accidentally make remote unauthenticated control easy to enable.
+Verify browser and CLI share one backend/domain implementation.
 
-# AUDIT AREA J — WEB UI
+Audit:
 
-Audit whether the dense proposed GUI is technically reasonable.
+- versioning;
+- loopback-only default;
+- body/collection/history bounds;
+- event subscriber/backpressure bounds;
+- idempotency key handling;
+- duplicate POST/result retrieval;
+- malformed requests;
+- STOP/reset/pause/resume/abort;
+- browser reload;
+- backend shutdown;
+- absence of raw/debug action bypass.
+
+Remote/LAN control must not become available through a trivial unauthenticated bind flag.
+
+# 18. Audit area L — UI truthfulness
 
 Required major surfaces:
 
@@ -467,113 +483,82 @@ Compare
 Logger
 ```
 
-Verify the design correctly separates:
-
-- observation;
-- configuration;
-- action;
-- evidence status;
-- authority status.
-
-Check that `MUTATION_ALLOWED` cannot be mistaken for a checkbox or local UI setting.
-
-Verify that unknown state is rendered as `UNKNOWN` rather than fake/example data.
-
-Audit whether manual Quick Actions correctly become one-step experiments instead of bypassing Recorder/Scenario Engine.
-
-# AUDIT AREA K — DIRECT-MACHINE MODE
-
-Verify that CLI/local operation and browser operation actually share the same backend semantics.
-
-Find any reason they might drift into two execution implementations.
-
-Preferred invariant:
+Verify explicit separation of:
 
 ```text
-Browser
-   \
-    -> Control API/domain service -> Scenario Engine
-   /
-CLI
+AUTHORITY
+CAPABILITY
+EVIDENCE
+FRESHNESS
 ```
 
-not:
+`MUTATION_ALLOWED` must not appear to be locally grantable.
 
-```text
-Browser -> API
-CLI -> direct adapter calls
-```
+UNKNOWN/STALE/UNSUPPORTED/NOT_PROVEN must remain truthful states.
 
-Treat a CLI bypass as a material architecture defect.
+Quick Actions must be one-step experiments through Scenario Engine, never a raw bypass.
 
-# AUDIT AREA L — OFFICIAL TIBIA ADAPTER
+# 19. Audit area M — Official Tibia adapter
 
-Determine whether Adapter Contract v1 is sufficient to hide implementation-specific details such as:
+Verify common scenarios remain semantic and hide:
 
 - GUI coordinates;
 - raw key presses;
 - QMeta IDs;
-- function addresses;
-- vtables;
-- packet opcodes;
+- addresses/vtables;
+- opcodes;
 - wire layouts.
 
-Scenarios should express semantic intent such as:
+Verify generic support is:
 
 ```text
-move NORTH
-cast_spell EXURA
-use_consumable HEALTH_POTION
+read_supported
+action_supported
 ```
 
-not runtime implementation details.
-
-Verify independent read/action maturity remains representable:
+and Track A-only evidence maturity remains in an official extension:
 
 ```text
 R0-R4
 A0-A4
 ```
 
-and that read support can never imply action support.
+Read support must never imply action support.
 
-# AUDIT AREA M — OTERYN V2 E2E ADAPTER
+Verify the official adapter is an extension/consumer of current Track A infrastructure, not a parallel authority system.
 
-Audit the proposed future cross-repository boundary against current `blakinio/Oteryn-v2`.
+# 20. Audit area N — Surveyor boundary
 
-Verify that:
+Verify integration is pinned to:
+
+```text
+surveyor_schema_version
+producer_commit
+producer_interface
+```
+
+A schema mismatch should degrade to explicit `UNAVAILABLE/INCOMPATIBLE`, not copied internals or fabricated data.
+
+Control Center must not silently promote/overwrite Surveyor-owned evidence/coverage state.
+
+# 21. Audit area O — Oteryn v2 integration
+
+Audit against current `blakinio/Oteryn-v2`, especially accepted ADR-0007.
+
+Verify:
 
 - Oteryn retains `protocol-oteryn`;
-- Control Center does not require Tibia wire compatibility;
 - semantic comparison is sufficient;
-- server-authoritative Oteryn state remains authoritative;
-- test hooks do not create an unauthenticated production control interface;
-- adapter/test code can be excluded or locked down appropriately in production;
-- cross-repo versioning can be managed.
+- client sends intent and server remains authoritative;
+- Control Center does not create a second Oteryn scenario/E2E authority;
+- test hooks cannot mutate authoritative state outside supported paths;
+- test hooks are excluded/locked down in production according to Oteryn governance;
+- cross-repo contract/versioning is explicit;
+- Track A R/A grades are not imposed on generic Oteryn capability semantics.
 
-Determine whether `TIBIA_RE_CONTROL_CENTER_ADAPTER_V1` is actually generic enough for Oteryn without polluting Oteryn architecture with Track A concepts.
+# 22. Audit area P — differential E2E
 
-Flag fields that should live in official-adapter-specific extensions rather than the generic contract.
-
-# AUDIT AREA N — DIFFERENTIAL E2E
-
-Falsify the proposed semantic comparison approach.
-
-Check expected comparison semantics for:
-
-- position;
-- HP;
-- mana;
-- conditions;
-- target state;
-- inventory;
-- containers;
-- equipment;
-- cooldowns;
-- visual/game effects;
-- timing.
-
-Classify comparison fields as:
+Verify versioned field profiles support:
 
 ```text
 EXACT
@@ -585,122 +570,137 @@ REFERENCE_ONLY
 NOT_COMPARABLE
 ```
 
-Check that the design does not imply official Tibia and Oteryn should use identical:
+At minimum classify:
 
+- position;
+- HP;
+- mana;
+- conditions;
+- target state;
+- inventory;
+- containers;
+- equipment;
+- cooldown state/timing;
+- visual/game effects;
+- pixel/frame output;
+- latency;
 - protocol bytes;
-- internal object structure;
-- timing;
+- internal object layout;
 - renderer implementation.
 
-Define what should constitute an E2E mismatch.
+An UNKNOWN/unobservable reference field must be coverage gap, not candidate mismatch.
 
-# AUDIT AREA O — TESTABILITY
+# 23. Audit area Q — Package A zero-runtime testability
 
-Audit whether Package A can be implemented and validated with **zero Track A runtime access**.
-
-It should be possible to test:
-
-- schema parser;
-- fake adapter;
-- successful one-step scenario;
-- capability refusal;
-- read-only mutation refusal;
-- authority change;
-- runtime identity change;
-- timeout;
-- STOP ALL;
-- budget exhaustion;
-- event ordering;
-- secret rejection;
-- artifact generation.
-
-Identify anything in Package A that unnecessarily depends on the official client.
-
-# AUDIT AREA P — IMPLEMENTATION PHASING
-
-Critically review:
+Package A must be implementable with:
 
 ```text
-P0 Surveyor
-P1 read-only Control Center
-P2 Scenario Engine
-P3 bounded Official actions
-P4 Recorder expansion
-P5 research suites
-P6 Oteryn adapter
-P7 differential E2E
+runtime_access=none
+network_listener=none
+official_client_access=none
 ```
 
-and the implementation prompt's:
+Verify the fake adapter/manual clock can deterministically test every contract boundary without a real client.
+
+If Package A requires current official runtime behavior to validate core semantics, report a material phasing defect.
+
+# 24. Audit area R — implementation phasing
+
+Expected dependency order:
 
 ```text
-Package A control-core
-Package B browser/CLI
-Package C Surveyor integration
-Package D Track A mutation adapter
-Package E Oteryn adapter
+P0 contracts/falsification baseline
+P1 Package A control-core + Recorder primitives + fake adapter
+P2 Package B loopback API + browser + CLI
+P3 Package C accepted Surveyor/read-only integration
+P4 Package D separately admitted official Track A mutation adapter
+P5 runtime capture-producer expansion
+P6 research suites
+P7 Oteryn adapter
+P8 differential E2E
 ```
 
-Determine whether dependencies are ordered correctly.
+Verify:
 
-Look for work that should move earlier/later.
+- Scenario Engine precedes UI;
+- fake adapter precedes official adapter;
+- Recorder core precedes real actions;
+- Surveyor integration waits for an accepted exact producer interface;
+- official actions are separate from UI implementation;
+- Oteryn work remains separate repository governance.
 
-Especially verify whether:
+# 25. Mandatory falsification matrix
 
-- Scenario Engine should precede browser UI;
-- fake adapter exists before official adapter;
-- Recorder primitives should exist before real actions;
-- Surveyor integration should wait for #592;
-- official action support remains separated from UI implementation.
+For each case return `SAFE_DEFINED`, `UNSAFE`, or `UNDERSPECIFIED` plus exact contract evidence.
 
-# AUDIT AREA Q — IMPLEMENTATION READINESS
+1. Authority expires one nanosecond before irreversible action dispatch. Expected safe outcome: final dispatch refuses.
+2. Client restarts between advisory preflight and execute. Expected: runtime/adapter/session fence refuses stale dispatch.
+3. Two browser tabs start mutation scenarios simultaneously. Expected: one per-adapter mutation coordinator serializes admission.
+4. CLI and browser submit same logical Quick Action simultaneously with same action ID. Expected: at most one dispatch.
+5. STOP ALL races with dispatch. Expected: exactly one linearization order; no stale post-STOP dispatch.
+6. Network recorder reports after run terminal state. Expected: late evidence only; terminal result unchanged.
+7. Screenshot may contain login credentials. Expected: quarantine/refuse before normal artifact creation.
+8. Adapter throws exception containing secret-shaped material. Expected: stable safe reason only; raw text excluded.
+9. Sources emit timestamps from different clock domains. Expected: source/ingest clocks remain distinct; no false total order.
+10. Potion dispatch result is lost, then caller retries. Expected: original becomes/retains possible-dispatch state; no automatic second dispatch; conservative budget consumed.
+11. Oteryn reports a field official Tibia cannot observe. Expected: coverage gap/not comparable, not mismatch.
+12. Official adapter action evidence is A4 while read path is R1. Expected: independent maturity remains truthful.
+13. Surveyor changes output schema. Expected: pinned incompatibility/refusal, no copied fallback logic.
+14. HTTP client repeats POST after connection loss. Expected: same idempotency key returns existing logical state/result.
+15. Runtime authority changes while scenario paused. Expected: resume revalidation; subsequent mutation does not reuse stale authority.
+16. Stale scenario resumes after new session epoch. Expected: pending mutation invalidated/refused.
+17. Operator reloads browser during active run. Expected: backend remains owner; no duplicate run/action dispatch.
+18. Backend restarts with action possibly in-flight. Expected: possible dispatch -> AMBIGUOUS unless authoritatively reconciled; no auto-resume/retry.
+19. Same action ID is reused with different parameters. Expected: deterministic idempotency conflict refusal.
+20. STOP ALL completes, then stale old-generation action callback returns PASS. Expected: evidence retained but cannot advance current run.
+21. Ambiguous item/gold action would exceed remaining budget under maximum plausible effect. Expected: no retry/new action admission that breaches conservative budget.
+22. Recorder process crashes before final manifest/result flush. Expected: run remains incomplete, never synthesized PASS.
+23. Login/auth packet appears while metadata recorder is enabled. Expected: metadata only, no raw fallback.
+24. Oteryn test adapter is accidentally compiled in a production-default profile. Expected: current Oteryn security/build policy must prevent/flag this before claiming readiness.
 
-Answer:
+# 26. Package A implementation-readiness question
 
-> Could a fresh competent implementation agent now implement Package A solely from repository documentation without needing this chat?
+Answer exactly:
 
-If NO, list exactly what contract/specification is missing.
+> Could a fresh competent implementation agent implement Package A solely from current repository documentation, without this chat and without inventing concurrency, dispatch, STOP, retry, budget, privacy, event-ordering, artifact or restart semantics?
 
-Examples:
+If NO, enumerate the exact missing contract/types/lifecycles/tests.
 
-- ambiguous type;
-- missing lifecycle;
-- missing error semantics;
-- missing storage location;
-- missing concurrency model;
-- missing version negotiation;
-- missing cancellation rule;
-- missing fake-adapter behavior;
-- missing test acceptance criterion.
+# 27. Severity
 
-# REQUIRED FALSIFICATION TESTS
+`P0` — design can permit unauthorized mutation, secret exposure, uncontrolled irreversible/value effects, or invalidates the core architecture.
 
-Attempt to construct at least these failure scenarios:
+`P1` — material flaw/ambiguity that can make implementation unsafe/unreliable or requires redesign before Package A/affected phase.
 
-1. authority expires one nanosecond before action dispatch;
-2. client restarts between preflight and action;
-3. two browser tabs start scenarios simultaneously;
-4. CLI and browser trigger the same Quick Action simultaneously;
-5. STOP ALL races with action dispatch;
-6. network recorder reports after scenario already ended;
-7. screenshot contains login credentials;
-8. adapter throws exception containing secret material;
-9. event sequence receives timestamps from different clock domains;
-10. a failed potion dispatch is retried and consumes two potions;
-11. Oteryn adapter reports a field official Tibia cannot observe;
-12. official adapter reports A4 while read path is only R1;
-13. Surveyor #592 changes its output format;
-14. HTTP client repeats POST after connection loss;
-15. runtime authority changes while a scenario is paused;
-16. stale scenario resumes after a new session epoch;
-17. operator reloads the browser during an active run;
-18. backend process restarts with an action possibly in-flight.
+`P2` — meaningful correctness/testability/maintainability gap that should be fixed before or while implementing the affected phase.
 
-For each, state whether the current design already defines safe behavior.
+`P3` — non-blocking improvement.
 
-# REQUIRED OUTPUT
+Do not invent findings to populate sections. Clean section must be exactly `NONE`.
 
-Return exactly this structure:
+# 28. Decision criteria
+
+Return `PASS` only if:
+
+- no P0/P1 findings;
+- Package A implementation-ready=YES;
+- all safety-critical falsification cases are `SAFE_DEFINED` from current contracts.
+
+Return `PASS_WITH_FINDINGS` only if:
+
+- no P0/P1 findings;
+- Package A implementation-ready=YES;
+- remaining findings are P2/P3 only.
+
+Return `FAIL` if:
+
+- any P0/P1 exists; or
+- Package A implementation-ready=NO; or
+- a required safety-critical behavior remains underspecified.
+
+# 29. Required output
+
+Return exactly:
 
 ```text
 REVIEW_TYPE=TIBIA_RE_CONTROL_CENTER_INDEPENDENT_AUDIT
@@ -709,8 +709,7 @@ REPOSITORY=
 CURRENT_MAIN=
 DESIGN_PR=
 DESIGN_MERGE=
-CLOSEOUT_PR=
-CLOSEOUT_MERGE=
+LATEST_CONTROL_CENTER_HARDENING=
 AUDITED_FILES=
 SURVEYOR_STATE=
 OTERYN_V2_HEAD=
@@ -718,7 +717,7 @@ OTERYN_V2_HEAD=
 RESULT=PASS | PASS_WITH_FINDINGS | FAIL
 
 SUMMARY:
-<short factual summary>
+...
 
 P0_FINDINGS:
 - ...
@@ -738,13 +737,25 @@ ARCHITECTURE_VERDICT:
 TRACK_A_AUTHORITY_VERDICT:
 ...
 
+ATOMIC_DISPATCH_VERDICT:
+...
+
 STOP_ALL_CONCURRENCY_VERDICT:
+...
+
+IDEMPOTENCY_REPLAY_VERDICT:
 ...
 
 SCENARIO_ENGINE_VERDICT:
 ...
 
+SIDE_EFFECT_BUDGET_VERDICT:
+...
+
 RECORDER_CAUSAL_EVIDENCE_VERDICT:
+...
+
+ARTIFACT_RECOVERY_VERDICT:
 ...
 
 SECURITY_PRIVACY_VERDICT:
@@ -754,6 +765,9 @@ BROWSER_CLI_VERDICT:
 ...
 
 OFFICIAL_ADAPTER_VERDICT:
+...
+
+SURVEYOR_INTEGRATION_VERDICT:
 ...
 
 OTERYN_V2_ADAPTER_VERDICT:
@@ -774,48 +788,22 @@ FALSIFICATION_RESULTS:
 1. ...
 2. ...
 ...
-18. ...
+24. ...
 
 RECOMMENDED_CHANGES_BEFORE_IMPLEMENTATION:
 1. ...
-2. ...
 
 RECOMMENDED_IMPLEMENTATION_ORDER:
 1. ...
-2. ...
 
 EVIDENCE:
 - exact repository paths
 - exact PRs
 - exact SHAs
-- exact workflow/check results when relevant
+- exact relevant workflow/check results
 
 FINAL_DECISION:
 ...
 ```
 
-## Severity definition
-
-`P0` — design can cause unsafe authority/security behavior, secret exposure, irreversible effects, or invalidates the architecture.
-
-`P1` — material flaw likely to require redesign or make the initial implementation unsafe/unreliable.
-
-`P2` — meaningful correctness, maintainability, testability or specification gap that should be fixed before/while implementing the affected phase.
-
-`P3` — non-blocking improvement.
-
-Do not create findings merely to produce output.
-
-A clean section must say:
-
-`NONE`
-
-## Decision criteria
-
-Return `PASS` only if there are no P0/P1 findings and Package A is sufficiently specified for implementation.
-
-Return `PASS_WITH_FINDINGS` when no P0/P1 exists but meaningful P2/P3 improvements remain.
-
-Return `FAIL` if any P0/P1 finding exists or Package A cannot safely start without material redesign.
-
-This is an **independent audit**, not an implementation task.
+This is an independent audit, not an implementation task.

@@ -1,0 +1,152 @@
+name: Track A UI settings persistence discriminator v3
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/tibia-official-client-re-ui-settings-persistence-v3.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-ui-settings-persistence-544-v3
+  cancel-in-progress: true
+
+jobs:
+  admission:
+    name: Admit current-main isolated UI settings proof v3
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact PR head with history
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Revalidate current main and task admission
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git fetch --no-tags origin main
+          live_main="$(git rev-parse origin/main)"
+          task=docs/agents/tasks/active/OTC-20260819-track-a-ui-settings-static-model.md
+          task_main="$(sed -n 's/^base_main: //p' "$task" | head -n1)"
+          [[ -n "$task_main" && "$live_main" == "$task_main" ]] || {
+            echo "UI_SETTINGS_V3_REFUSED=MAIN_MOVED:task=$task_main:live=$live_main" >&2
+            exit 40
+          }
+          grep -Fxq 'runtime_access: ephemeral_isolated' "$task"
+          grep -Fxq 'runtime_owner_task: OTC-20260819-track-a-ui-settings-static-model' "$task"
+          grep -Fxq 'runtime_namespace: ui-settings-persistence-ephemeral' "$task"
+          grep -Fxq 'target_uniqueness: PROVEN' "$task"
+          grep -Fxq 'mutation_authorized: true' "$task"
+          grep -Fxq 'execution_class: synology_physical_runtime' "$task"
+          grep -Fxq 'physical_e2e_required: true' "$task"
+          python3 .github/scripts/test_track_a_agent_runtime_governance.py \
+            --changed-from "$live_main" \
+            --expected-branch "${GITHUB_HEAD_REF}"
+          echo "UI_SETTINGS_V3_LIVE_MAIN=$live_main"
+          echo 'UI_SETTINGS_V3_ADMISSION=PASS'
+
+  persistence:
+    name: Prove fullscreen persistence and exact rollback v3
+    needs: admission
+    runs-on: [otclient, synology]
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Execute v2 body with pinned libxdo loader repair
+        shell: bash
+        run: |
+          set +x
+          set -Eeuo pipefail
+          umask 077
+
+          [[ "${RUNNER_NAME:-}" == synology-otclient-01 ]] || {
+            echo "UI_SETTINGS_V3_REFUSED=WRONG_RUNNER:${RUNNER_NAME:-UNKNOWN}" >&2
+            exit 41
+          }
+
+          live_main="$(git ls-remote https://github.com/blakinio/otclient.git refs/heads/main | awk '{print $1}')"
+          task_main="$(sed -n 's/^base_main: //p' docs/agents/tasks/active/OTC-20260819-track-a-ui-settings-static-model.md | head -n1)"
+          [[ -n "$live_main" && "$live_main" == "$task_main" ]] || {
+            echo "UI_SETTINGS_V3_REFUSED=MAIN_MOVED:task=$task_main:live=$live_main" >&2
+            exit 42
+          }
+          echo "UI_SETTINGS_V3_LIVE_MAIN=$live_main"
+
+          tool=''
+          for candidate in \
+            '/home/runner/_work/_otclient_tibia_re_state/toolroot' \
+            '/work/_otclient_tibia_re_state/toolroot'; do
+            if [[ -d "$candidate" && ! -L "$candidate" ]]; then
+              xdo_lib="$(find "$candidate" -xdev \( -type f -o -type l \) -name 'libxdo.so.3' -print -quit 2>/dev/null || true)"
+              if [[ -n "$xdo_lib" && -e "$xdo_lib" ]]; then
+                tool="$candidate"
+                break
+              fi
+            fi
+          done
+          [[ -n "$tool" ]] || {
+            echo 'UI_SETTINGS_V3_REFUSED=LIBXDO_NOT_FOUND_IN_CONTAINED_TOOLROOT' >&2
+            exit 43
+          }
+          xdo_lib="$(realpath -e "$xdo_lib")"
+          case "$xdo_lib" in
+            "$(realpath -e "$tool")"/*) ;;
+            *)
+              echo 'UI_SETTINGS_V3_REFUSED=LIBXDO_ESCAPES_TOOLROOT' >&2
+              exit 44
+              ;;
+          esac
+          xdo_dir="$(dirname "$xdo_lib")"
+          export LD_LIBRARY_PATH="$xdo_dir:$tool/usr/lib/x86_64-linux-gnu:$tool/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+          "$tool/usr/bin/xdotool" version >/dev/null
+          echo "UI_SETTINGS_V3_LIBXDO_PATH=$xdo_lib"
+          echo 'UI_SETTINGS_V3_XDOTOOL_LOADER_FENCE=PASS'
+
+          pinned='cb6fb812a5682f9442f482abaa4764e067589692'
+          source="$RUNNER_TEMP/ui-settings-v2-pinned.yml"
+          script="$RUNNER_TEMP/ui-settings-v2-body.sh"
+          curl -fsSL --retry 3 --connect-timeout 10 \
+            "https://raw.githubusercontent.com/blakinio/otclient/$pinned/.github/workflows/tibia-official-client-re-ui-settings-persistence-v2.yml" \
+            -o "$source"
+          grep -Fq 'name: Track A UI settings persistence discriminator v2' "$source"
+          python3 - "$source" "$script" <<'PY'
+          import pathlib, sys
+          src = pathlib.Path(sys.argv[1]).read_text(encoding='utf-8').splitlines()
+          anchor = '      - name: Execute repaired task-owned reversible settings experiment'
+          try:
+              start = src.index(anchor)
+          except ValueError:
+              raise SystemExit('pinned v2 physical step anchor missing')
+          run_index = None
+          for i in range(start + 1, len(src)):
+              if src[i] == '        run: |':
+                  run_index = i + 1
+                  break
+          if run_index is None:
+              raise SystemExit('pinned v2 run block missing')
+          body = []
+          for line in src[run_index:]:
+              if line.startswith('          '):
+                  body.append(line[10:])
+              elif line == '':
+                  body.append('')
+              else:
+                  break
+          if not body or body[0] != 'set +x':
+              raise SystemExit('unexpected pinned v2 body')
+          pathlib.Path(sys.argv[2]).write_text('\n'.join(body) + '\n', encoding='utf-8')
+          PY
+          chmod 700 "$script"
+          echo "UI_SETTINGS_V3_PINNED_V2_SOURCE=$pinned"
+          echo 'UI_SETTINGS_V3_EXECUTING_REPAIRED_BODY=true'
+          bash "$script"
+          echo 'UI_SETTINGS_V3_RUNTIME_RESULT=PASS'

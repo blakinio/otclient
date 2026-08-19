@@ -1,0 +1,295 @@
+name: Track A native-login final independent audit
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/track-a-native-login-final-independent-audit.yml
+
+permissions:
+  contents: read
+
+env:
+  SOURCE_HEAD: 8e029f5849a1d51f69486adcc3716c80f139e60e
+  EXPECTED_PACKED_SHA256: 1fc26d66cef90723d29293f177fcff41c8e937e7aac830f08e82c2f4c69eb354
+  EXPECTED_PACKED_SIZE: '10214529'
+  EXPECTED_UNPACKED_SHA256: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
+  EXPECTED_UNPACKED_SIZE: '52109920'
+  EXPECTED_BUILD_ID: d803d9695868713ef6ab0c3cf65f91212c9c6a62
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Prepare deterministic tooling
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends qt6-base-dev pkg-config binutils
+          python3 -m pip install --disable-pip-version-check --no-input --user 'pyelftools==0.32' 'capstone==5.0.6'
+          command -v g++
+          command -v curl
+          command -v readelf
+          pkg-config --modversion Qt6Core
+
+      - name: Fetch exact source-head helper files
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          r="$RUNNER_TEMP/native-login-final-audit"
+          mkdir -p "$r/src" "$r/bin" "$r/state" "$r/client"
+          base="https://raw.githubusercontent.com/blakinio/otclient/$SOURCE_HEAD"
+          curl --connect-timeout 10 --max-time 30 --retry 3 -fsSL "$base/tools/tibia_runtime_bridge/current_sha_native_login_gate.py" -o "$r/src/current_sha_native_login_gate.py"
+          curl --connect-timeout 10 --max-time 30 --retry 3 -fsSL "$base/tools/tibia_runtime_bridge/current_sha_secret_ingress.cpp" -o "$r/src/current_sha_secret_ingress.cpp"
+          curl --connect-timeout 10 --max-time 30 --retry 3 -fsSL "$base/tools/tibia_runtime_bridge/experimental_character_control_current.cpp" -o "$r/src/experimental_character_control_current.cpp"
+          test -s "$r/src/current_sha_native_login_gate.py"
+          test -s "$r/src/current_sha_secret_ingress.cpp"
+          test -s "$r/src/experimental_character_control_current.cpp"
+          echo SOURCE_HELPERS_FETCHED=PASS
+
+      - name: Compile and synthetic-test current-SHA helper files
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          r="$RUNNER_TEMP/native-login-final-audit"
+          python3 -m py_compile "$r/src/current_sha_native_login_gate.py"
+          g++ -std=c++20 -O2 -Wall -Wextra "$r/src/current_sha_secret_ingress.cpp" -o "$r/bin/secret-ingress"
+          g++ -std=c++20 -O2 -fPIC -shared -Wall -Wextra \
+            $(pkg-config --cflags Qt6Core) \
+            "$r/src/experimental_character_control_current.cpp" \
+            -o "$r/bin/character-current.so" \
+            $(pkg-config --libs Qt6Core) -ldl -pthread -Wl,--no-undefined
+          test -s "$r/bin/secret-ingress"
+          test -s "$r/bin/character-current.so"
+
+          cat > "$r/state/fake_auth_server.py" <<'PY'
+          import array, fcntl, json, os, socket, struct, sys
+          path = sys.argv[1]
+          expected_email = b'synthetic@example.invalid'
+          expected_password = b'synthetic-password-only'
+          try:
+              os.unlink(path)
+          except FileNotFoundError:
+              pass
+          s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+          s.bind(path)
+          os.chmod(path, 0o600)
+          s.listen(1)
+          c, _ = s.accept()
+          data, anc, flags, addr = c.recvmsg(256, socket.CMSG_SPACE(array.array('i').itemsize))
+          assert data == b'AUTH_WITH_CREDENTIALS\n', data
+          received = []
+          for level, ctype, payload in anc:
+              if level == socket.SOL_SOCKET and ctype == socket.SCM_RIGHTS:
+                  fds = array.array('i')
+                  fds.frombytes(payload[: len(payload) - (len(payload) % fds.itemsize)])
+                  received.extend(fds.tolist())
+          assert len(received) == 1, received
+          fd = received[0]
+          seals = fcntl.fcntl(fd, fcntl.F_GET_SEALS)
+          required = fcntl.F_SEAL_SEAL | fcntl.F_SEAL_SHRINK | fcntl.F_SEAL_GROW | fcntl.F_SEAL_WRITE
+          assert seals & required == required, hex(seals)
+          os.lseek(fd, 0, os.SEEK_SET)
+          blob = os.read(fd, 8192)
+          elen, plen = struct.unpack_from('<II', blob, 0)
+          assert elen == len(expected_email)
+          assert plen == len(expected_password)
+          assert blob[8:8+elen] == expected_email
+          assert blob[8+elen:8+elen+plen] == expected_password
+          assert len(blob) == 8 + elen + plen
+          os.close(fd)
+          response = {
+              'ok': True,
+              'invocation_dispatched': True,
+              'qmeta_method_id': 17,
+              'qmeta_signature': 'onRequestLoginWithCredentials(QString,QString)',
+          }
+          c.sendall(json.dumps(response, separators=(',', ':')).encode() + b'\n')
+          c.close(); s.close(); os.unlink(path)
+          PY
+          sock="$r/state/fake-auth.sock"
+          python3 "$r/state/fake_auth_server.py" "$sock" &
+          server_pid=$!
+          for _ in $(seq 1 100); do test -S "$sock" && break; sleep .05; done
+          test -S "$sock"
+          TIBIA_TEST_EMAIL='synthetic@example.invalid' \
+          TIBIA_TEST_PASSWORD='synthetic-password-only' \
+            "$r/bin/secret-ingress" "$sock" "$server_pid" > "$r/state/secret-test.out"
+          wait "$server_pid"
+          grep -qx 'NATIVE_AUTH_DISPATCH=PASS' "$r/state/secret-test.out"
+          grep -qx 'NATIVE_AUTH_QMETA_METHOD_ID=17' "$r/state/secret-test.out"
+          grep -qx 'SECRET_VALUES_LOGGED=false' "$r/state/secret-test.out"
+          echo CURRENT_SHA_HELPER_BUILD=PASS
+          echo CURRENT_SHA_SECRET_INGRESS_SYNTHETIC=PASS
+          echo REAL_SECRET_ACCESS=false
+          echo OFFICIAL_CLIENT_EXECUTED=false
+
+      - name: Fetch and fence exact current public client
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          r="$RUNNER_TEMP/native-login-final-audit"
+          cd "$r/bin"
+          curl --connect-timeout 10 --max-time 60 --retry 3 -fsSL -o wgcf https://github.com/ViRb3/wgcf/releases/download/v2.2.32/wgcf_2.2.32_linux_amd64
+          echo '2ff97f2201972ce582a424455d50a3719a380eef0cd1f3144f7779348e122a2c  wgcf' | sha256sum -c -
+          curl --connect-timeout 10 --max-time 60 --retry 3 -fsSL -o wireproxy.tgz https://github.com/windtf/wireproxy/releases/download/v1.1.3/wireproxy_linux_amd64.tar.gz
+          echo 'e88c1d090740373fc606c1bafd81d9a5eadc642cce5667616e20e9d7a444f51c  wireproxy.tgz' | sha256sum -c -
+          mkdir -p wp
+          tar -xzf wireproxy.tgz -C wp
+          cp "$(find wp -type f -name wireproxy -print -quit)" wireproxy
+          chmod 755 wgcf wireproxy
+          cd "$r/state"
+          timeout 30 "$r/bin/wgcf" register --accept-tos >/dev/null
+          timeout 30 "$r/bin/wgcf" generate >/dev/null
+          printf 'WGConfig = %s\n\n[Socks5]\nBindAddress = 127.0.0.1:25349\n' "$r/state/wgcf-profile.conf" > wireproxy.conf
+          "$r/bin/wireproxy" -c wireproxy.conf > "$r/state/wireproxy.log" 2>&1 &
+          wp_pid=$!
+          trap 'kill "$wp_pid" 2>/dev/null || true; rm -rf "$r/client"' EXIT
+          for _ in $(seq 1 20); do
+            if curl --socks5-hostname 127.0.0.1:25349 --connect-timeout 5 --max-time 10 -fsS https://www.cloudflare.com/cdn-cgi/trace > "$r/state/trace" 2>/dev/null; then break; fi
+            sleep 2
+          done
+          grep -Eq '^warp=(on|plus)$' "$r/state/trace"
+          u=https://static.tibia.com/launcher/tibiaclient-linux-current/bin/client.lzma
+          curl --socks5-hostname 127.0.0.1:25349 --connect-timeout 10 --max-time 90 --retry 3 --compressed -fL -A 'Mozilla/5.0 (X11; Linux x86_64)' -e "$u" -H 'Accept: */*' "$u" -o "$r/client/client.lzma"
+          test "$(stat -c %s "$r/client/client.lzma")" = "$EXPECTED_PACKED_SIZE"
+          test "$(sha256sum "$r/client/client.lzma" | awk '{print $1}')" = "$EXPECTED_PACKED_SHA256"
+          python3 - "$r/client/client.lzma" "$r/client/client" <<'PY'
+          import hashlib, lzma, pathlib, sys
+          src=pathlib.Path(sys.argv[1]); dst=pathlib.Path(sys.argv[2]); blob=src.read_bytes()
+          q=blob[32]; lc=q%9; z=q//9; lp=z%5; pb=z//5; ds=int.from_bytes(blob[33:37],'little')
+          raw=lzma.decompress(blob[45:], format=lzma.FORMAT_RAW, filters=[{'id':lzma.FILTER_LZMA1,'dict_size':ds,'lc':lc,'lp':lp,'pb':pb}])
+          assert len(raw)==52109920
+          assert hashlib.sha256(raw).hexdigest()=='ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8'
+          dst.write_bytes(raw)
+          PY
+          test "$(readelf -n "$r/client/client" | awk '/Build ID:/{print $3; exit}')" = "$EXPECTED_BUILD_ID"
+          echo CURRENT_PUBLIC_PACKAGE_FENCE=PASS
+
+      - name: Run source gate and strict independent QMeta binding audit
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          r="$RUNNER_TEMP/native-login-final-audit"
+          python3 "$r/src/current_sha_native_login_gate.py" "$r/client/client" "$r/state/gate.env" > "$r/state/gate.out"
+          grep -qx 'CURRENT_AUTH_CONTRACT=PASS' "$r/state/gate.out"
+          grep -qx 'CURRENT_CHARACTER_CONTRACT=PASS' "$r/state/gate.out"
+          grep -qx 'CURRENT_GAMESERVER_ROUTE_CONTRACT=PASS' "$r/state/gate.out"
+          grep -qx 'CURRENT_INGAME_MARKER_CONTRACT=PASS' "$r/state/gate.out"
+          grep -qx 'CURRENT_EXACT_SHA_NATIVE_LOGIN_GATES=PASS' "$r/state/gate.out"
+
+          python3 - "$r/client/client" <<'PY'
+          import pathlib, struct, sys
+          from capstone import Cs, CS_ARCH_X86, CS_MODE_64
+          from capstone.x86_const import X86_OP_IMM, X86_OP_MEM, X86_OP_REG, X86_REG_EDX, X86_REG_RIP
+          from elftools.elf.elffile import ELFFile
+          from elftools.elf.relocation import RelocationSection
+
+          path=pathlib.Path(sys.argv[1]); raw=path.read_bytes()
+          with path.open('rb') as fh:
+              elf=ELFFile(fh)
+              sections=[(int(s['sh_offset']),int(s['sh_size']),int(s['sh_addr']),int(s['sh_flags']),s['sh_type']) for s in elf.iter_sections()]
+              relocs={}
+              for sec in elf.iter_sections():
+                  if isinstance(sec, RelocationSection):
+                      for rel in sec.iter_relocations():
+                          e=rel.entry
+                          if int(e['r_info_type'])==8 and 'r_addend' in e:
+                              relocs[int(e['r_offset'])]=int(e['r_addend'])
+          def off(va,n=1):
+              for fo,sz,va0,fl,typ in sections:
+                  if typ!='SHT_NOBITS' and va0<=va and va+n<=va0+sz: return fo+va-va0
+              raise ValueError(hex(va))
+          def exe(va): return any((fl&4) and va0<=va<va0+sz for fo,sz,va0,fl,typ in sections)
+          def u32(va): return struct.unpack_from('<I',raw,off(va,4))[0]
+          def i32(va): return struct.unpack_from('<i',raw,off(va,4))[0]
+          def qstr(base,idx):
+              rel,n=u32(base+idx*8),u32(base+idx*8+4)
+              assert n<=512
+              p=off(base+rel,n); return raw[p:p+n].decode('utf-8')
+          metas=[]
+          for obj in sorted(relocs):
+              if not all(obj+d in relocs for d in (8,16,24)): continue
+              try:
+                  sd,mdv,sm=relocs[obj+8],relocs[obj+16],relocs[obj+24]
+                  h=[u32(mdv+4*i) for i in range(14)]
+                  rev,ci,_,_,mc,mdata,_,_,_,_,_,_,_,sc=h
+                  if not (5<=rev<=20 and 0<=sc<=mc<=512 and mdata>=14 and exe(sm)): continue
+                  cls=qstr(sd,ci); methods=[]
+                  for idx in range(mc):
+                      row=mdv+4*(mdata+idx*6)
+                      methods.append((idx,qstr(sd,u32(row)),u32(row+4),u32(row+16)))
+                  metas.append((cls,obj,sm,mc,sc,methods))
+              except Exception: pass
+          dedup={}
+          for m in metas: dedup[(m[0],m[1])]=m
+          metas=list(dedup.values())
+          md=Cs(CS_ARCH_X86,CS_MODE_64); md.detail=True
+          def strict_dispatch(meta):
+              cls,obj,sm,mc,sc,methods=meta
+              code=raw[off(sm):off(sm)+0x1800]
+              ins=list(md.disasm(code,sm)); candidates=[]
+              for i,x in enumerate(ins):
+                  if x.mnemonic!='cmp' or len(x.operands)!=2: continue
+                  a,b=x.operands
+                  if not (a.type==X86_OP_REG and a.reg==X86_REG_EDX and b.type==X86_OP_IMM and b.imm==mc-1): continue
+                  for j in range(i+1,min(i+22,len(ins))):
+                      lea=ins[j]
+                      if lea.mnemonic!='lea' or len(lea.operands)!=2: continue
+                      dst,src=lea.operands
+                      if dst.type!=X86_OP_REG or src.type!=X86_OP_MEM or src.mem.base!=X86_REG_RIP: continue
+                      base_reg=dst.reg; table=lea.address+lea.size+src.mem.disp
+                      for k in range(j+1,min(j+12,len(ins))):
+                          mv=ins[k]
+                          if mv.mnemonic!='movsxd' or len(mv.operands)!=2: continue
+                          td,ms=mv.operands
+                          if td.type!=X86_OP_REG or ms.type!=X86_OP_MEM: continue
+                          if ms.mem.base!=base_reg or ms.mem.index!=X86_REG_EDX or ms.mem.scale!=4: continue
+                          target_reg=td.reg
+                          tail=ins[k+1:min(k+8,len(ins))]
+                          add_ok=any(y.mnemonic=='add' and len(y.operands)==2 and y.operands[0].type==X86_OP_REG and y.operands[0].reg==target_reg and y.operands[1].type==X86_OP_REG and y.operands[1].reg==base_reg for y in tail)
+                          jmp_ok=any(y.mnemonic=='jmp' and len(y.operands)==1 and y.operands[0].type==X86_OP_REG and y.operands[0].reg==target_reg for y in tail)
+                          if not (add_ok and jmp_ok): continue
+                          targets=[table+i32(table+4*n) for n in range(mc)]
+                          if all(exe(t) for t in targets): candidates.append((table,targets))
+              uniq=[]
+              for c in candidates:
+                  if c[0] not in [x[0] for x in uniq]: uniq.append(c)
+              assert len(uniq)==1,(cls,len(uniq),[hex(x[0]) for x in uniq])
+              return uniq[0]
+          expected={
+            'tibia::client::TGameClient': {
+              'onRequestLoginWithCredentials': (17,0xd196f0),
+              'connectClientToGameserverWithExistingCredentials': (11,0xd19500),
+            },
+            'tibia::gamewindow::TCharacterSelectionController': {
+              'requestCharacterLogin': (0,0xd52050),
+              'onCharacterSelectionConfirmed': (11,0xd52020),
+            },
+            'tibia::authentication::TAuthenticationProcessController': {
+              'requestCharacterGameserverLogin': (5,0xd0fd27),
+              'onStartGameServerLoginStateEntered': (27,0xd0fb62),
+            },
+          }
+          for cls,wanted in expected.items():
+              ms=[m for m in metas if m[0]==cls]
+              assert len(ms)==1,(cls,len(ms))
+              meta=ms[0]; table,targets=strict_dispatch(meta)
+              names={name:(idx,argc,flags) for idx,name,argc,flags in meta[5]}
+              for name,(idx,target) in wanted.items():
+                  assert name in names,(cls,name)
+                  assert names[name][0]==idx,(cls,name,names[name][0],idx)
+                  assert targets[idx]==target,(cls,name,hex(targets[idx]),hex(target))
+                  role='SIGNAL' if idx<meta[4] else 'METHOD'
+                  print(f'STRICT_QMETA_BINDING={cls}::{name};INDEX={idx};ROLE={role};TARGET=0x{target:x};TABLE=0x{table:x}')
+          print('STRICT_CURRENT_SHA_QMETA_BINDINGS=PASS')
+          PY
+          rm -f "$r/client/client" "$r/client/client.lzma"
+          test ! -e "$r/client/client"
+          test ! -e "$r/client/client.lzma"
+          echo CURRENT_SHA_SOURCE_GATE=PASS
+          echo RAW_CLIENT_RETAINED=false
+          echo OFFICIAL_CLIENT_EXECUTED=false
+          echo REAL_SECRET_ACCESS=false

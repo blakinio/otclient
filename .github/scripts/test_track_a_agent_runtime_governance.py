@@ -363,7 +363,10 @@ def static_policy_audit() -> None:
     admission = read("docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md")
     canonical = read("docs/agents/prompts/OTCLIENT_TIBIA_RE_CANONICAL.md")
 
-    exact_fence = "e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe"
+    exact_fence = "ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8"
+    exact_size = "52109920"
+    exact_version = "15.32"
+    historical_fence = "e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe"
     registration = "/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime/runtime-registration.json"
 
     require(
@@ -395,7 +398,7 @@ def static_policy_audit() -> None:
         "docs/agents/TIBIA_RESEARCH_TRACKS.md",
         tracks,
         (
-            "tibia_research_tracks_policy_version: 5",
+            "tibia_research_tracks_policy_version: 6",
             "Gate A — authoritative lease and final cancellation-safe whole-lifetime supervisor",
             "Registration generation rebind — fail closed before Gate B",
             "Gate B — authoritative exact-runtime registration and fresh preflight",
@@ -487,6 +490,20 @@ def static_policy_audit() -> None:
     )
     if not bootstrap_implementation_promoted():
         raise SystemExit("trusted bootstrap implementation/archive proof is incomplete")
+
+    for label, text in (
+        ("tracks current fence", tracks),
+        ("admission current fence", admission),
+        ("bootstrap current fence", read("docs/agents/contracts/TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md")),
+        ("ADR current fence", read("docs/agents/decisions/ADR-0001-track-a-canonical-live-runtime.md")),
+    ):
+        require(label, text, (exact_fence, exact_size, exact_version))
+
+    transition = read(BOOTSTRAP_TRANSITION)
+    session = read(".github/scripts/tibia-official-client-re-canonical-live-session.sh")
+    require("current canonical transition fence", transition, ("VER = '15.32'", "SIZE = 52109920", "SHA = 'ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8'"))
+    require("current canonical live-session fence", session, ("SIZE=52109920", "SHA=ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8"))
+    forbid("current canonical enforcement", transition + session, (historical_fence, "SIZE=51965216", "SIZE = 51965216"))
 
     forbid(
         "OTCLIENT_TIBIA_RE_CANONICAL.md",

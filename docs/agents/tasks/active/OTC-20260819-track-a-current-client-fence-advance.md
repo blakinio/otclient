@@ -1,18 +1,19 @@
 ---
 task_id: OTC-20260819-track-a-current-client-fence-advance
-status: implementing
+status: validating
 agent: ChatGPT
 session_id: chatgpt-track-a-fence-advance-20260819
 session_role: implementer
 project_lane: otclient
 lane: RUNTIME
+track_id: official-client-re
 task_kind: governance_fence_advance
-phase: implementation
+phase: exact_head_ci_and_independent_audit
 branch: docs/OTC-20260819-track-a-current-client-fence-advance
 base_branch: main
 base_main: 82e5f435c3aa4172115bf7f6a0cd7a5cc6da3d50
 risk: high
-updated: 2026-08-19T08:55:00+02:00
+updated: 2026-08-19T09:12:00+02:00
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
@@ -88,7 +89,9 @@ new_runtime_fence:
   version: '15.32'
   size: 52109920
   sha256: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
-next_action: implement the synchronized current-runtime fence update, preserve historical build-specific evidence and ABI profiles, then run deterministic local validation before opening the Draft PR
+last_completed_step: synchronized current-runtime fence update implemented across admission, bootstrap/Gate-B enforcement, canonical decision/coordination and deterministic governance; direct public-package provenance recorded; historical ABI/profile evidence remains unmodified
+local_validation: git diff --check PASS; Track A static governance PASS; Python py_compile PASS; normalized bash syntax PASS; YAML parse PASS
+next_action: commit/push the bounded diff, open Draft PR, run exact-head GitHub CI/governance, then obtain a fresh independent post-implementation audit before any merge
 ---
 
 # Track A current official-client fence advance

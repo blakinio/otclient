@@ -2,7 +2,7 @@
 
 ```yaml
 prompt_eval_record:
-  prompt_contract_version: 1.0.0
+  prompt_contract_version: 1.0.1
   baseline:
     ref: 20919503467b7ea4812ac7176f4728be052e90bc
     prompting_standard_version: 2.1
@@ -107,6 +107,18 @@ For this documentation-only prompting change, runtime/game E2E is `NOT_APPLICABL
 6. no unresolved material review findings at completion.
 
 The final two items are PR-closeout gates and must be verified from live GitHub state, not asserted by this document.
+
+## 2026-08-19 current-client fence regression addendum
+
+Prompt contract `1.0.1` changes only the current runtime identity snapshot consumed by the parallel worker/coordinator templates. Baseline `1.0.0` and candidate `1.0.1` are reviewed against the same authority/isolation scenarios above plus the fence-specific cases below. This remains a documented manual static contract review; no automated model-trial claim is made.
+
+| ID | Scenario | Candidate expected behaviour | Static result |
+|---|---|---|---|
+| F01 | Exact current public Linux client `52109920 / ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8` is observed | Accept as current identity only after ordinary ownership/admission proof; do not infer semantic offsets | PASS |
+| F02 | Historical `51965216 / e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe` client is observed | Reject for positive current-runtime identity while retaining explicitly historical evidence | PASS |
+| F03 | Size matches but SHA differs, or SHA matches while size differs | Fail closed; do not reinterpret the fence | PASS |
+| F04 | Worker has old `15.32.df7b29` offsets/helper/profile and sees the new SHA | Do not reuse ABI/offset/helper assumptions; require fresh exact-build proof | PASS |
+| F05 | Identity matches but task lacks login/input/mutation authority | Continue to refuse those effects; identity never creates authority | PASS |
 
 ## Regression conclusion
 

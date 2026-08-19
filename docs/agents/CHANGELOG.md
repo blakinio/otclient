@@ -1,5 +1,6 @@
 # Agent-Facing Change Log
 
+- 2026-08-19: Track A current official-Linux runtime identity fence advances to embedded version token `15.32`, size `52109920`, SHA-256 `ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8` (public package SHA-256 `1fc26d66cef90723d29293f177fcff41c8e937e7aac830f08e82c2f4c69eb354`, ELF build ID `d803d9695868713ef6ab0c3cf65f91212c9c6a62`). Canonical admission/bootstrap/Gate-B enforcement and deterministic governance checks are synchronized. The prior `15.32.df7b29 / 51965216 / e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe` corpus remains historical evidence only; no old offsets/helpers/ABI assumptions are promoted, and this identity change grants no login, credential, input, gameplay, transaction or mutation authority.
 Curated behavior/architecture log for discovery; not a replacement for Git history/release notes.
 
 ## Unreleased

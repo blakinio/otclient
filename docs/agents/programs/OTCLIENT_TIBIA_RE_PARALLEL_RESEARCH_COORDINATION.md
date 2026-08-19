@@ -7,7 +7,7 @@ subject: official native Linux Tibia client only
 status: operational_coordination_addendum
 promotion_authority: coordinator_only
 research_worker_output: draft_only
-prompt_contract_version: 1.0.0
+prompt_contract_version: 1.0.1
 prompt_eval: docs/agents/programs/OTCLIENT_TIBIA_RE_PARALLEL_AGENT_PROMPT_EVAL.md
 ```
 
@@ -135,9 +135,9 @@ Unless the current canonical programme intentionally advances to another build, 
 Current research fence at adoption time:
 
 ```text
-canonical version mapping: 15.32.df7b29
-size:                      51965216
-SHA-256:                   e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+canonical version mapping: 15.32
+size:                      52109920
+SHA-256:                   ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
 ```
 
 The version text is the repository's canonical mapping for the SHA/size pair; do not call it an embedded exact-version-string proof unless independently demonstrated.
@@ -254,3 +254,9 @@ Material changes to researcher/coordinator authority, routing, stop conditions, 
 This model does not reduce Track A completion criteria. Full success still requires all applicable P2, P1, P0, runtime/action, quantitative coverage, validation, canonical-state, handover and closeout gates.
 
 No worker and no coordinator may claim `100%`, `COMPLETE`, or equivalent merely because Draft PRs are green or merged. Completion remains an evidence-gated programme state.
+
+## 2026-08-19 current-client fence provenance boundary
+
+The current public native-Linux package is fenced by size `52109920` and SHA-256 `ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8`; `15.32` is an embedded version-family token, not a claim of a more specific suffix. The superseded `15.32.df7b29 / 51965216 / e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe` binary remains admissible only as explicitly historical build-fenced evidence. Historical addresses, offsets, QMeta/vptr assumptions, serializers, helper binaries and runtime-bridge profiles are **not** promoted to the current binary by this identity update.
+
+This fence change grants no login, credential, GUI input, gameplay, process-control, transaction or mutation authority. All ordinary ownership/admission/lease/Gate A/rebind/Gate B/bootstrap requirements remain unchanged.

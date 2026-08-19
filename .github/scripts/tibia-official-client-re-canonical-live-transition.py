@@ -20,9 +20,9 @@ STATE = Path('/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime
 REG = STATE / 'runtime-registration.json'
 GUARD_PATH = Path(__file__).with_name('tibia-official-client-re-canonical-live-guard.py')
 RID = 'track-a-canonical-live'
-VER = '15.32.df7b29'
-SIZE = 51965216
-SHA = 'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe'
+VER = '15.32'
+SIZE = 52109920
+SHA = 'ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8'
 STATES = {'LOGIN', 'CHARACTER_SELECT', 'IN_GAME', 'DISCONNECTED', 'UNKNOWN'}
 FIELDS = {
     'schema_version', 'runtime_id', 'registration_generation', 'lease_generation',

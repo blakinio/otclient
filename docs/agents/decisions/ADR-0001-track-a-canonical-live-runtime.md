@@ -102,9 +102,9 @@ lease_generation: <current validated controller generation>
 boot_id_sha256: <current boot identity hash>
 pid: <current pid>
 process_start_ticks: <current /proc starttime>
-client_version: 15.32.df7b29
-client_size: 51965216
-client_sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+client_version: 15.32
+client_size: 52109920
+client_sha256: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
 display: <current proven canonical X11 display>
 window_identity: <current official-client window evidence>
 remote_view_endpoint: <endpoint or null>
@@ -141,9 +141,9 @@ This ADR does not implement bootstrap or rebind and does not authorize a live cl
 The accepted Track A official-client fence is exactly:
 
 ```yaml
-version: 15.32.df7b29
-size: 51965216
-sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+version: 15.32
+size: 52109920
+sha256: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
 platform: official_native_linux_only
 ```
 
@@ -205,3 +205,9 @@ Track B never shares Track A's canonical live runtime, authority namespace, regi
 - Bootstrap contract: PR #318 merged as `9d3b94d4f06a1eba1dacca91a9dd288e1a8af56a`, with task closeout in PR #320; this PR reconciles that contract to final PR #321/#322 semantics and defines the required post-bootstrap generation-rebind boundary without implementing live bootstrap/rebind.
 - This governance PR requires a fresh post-restack independent audit, exact-head `CI / Required`, zero unresolved material review findings, protected merge, and post-merge archival/ownership release.
 - Runtime E2E is `NOT_APPLICABLE` to this documentation/governance decision; no live runtime is created, registered, rebound or mutated by this PR.
+
+## 2026-08-19 current-client fence provenance boundary
+
+The current public native-Linux package is fenced by size `52109920` and SHA-256 `ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8`; `15.32` is an embedded version-family token, not a claim of a more specific suffix. The superseded `15.32.df7b29 / 51965216 / e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe` binary remains admissible only as explicitly historical build-fenced evidence. Historical addresses, offsets, QMeta/vptr assumptions, serializers, helper binaries and runtime-bridge profiles are **not** promoted to the current binary by this identity update.
+
+This fence change grants no login, credential, GUI input, gameplay, process-control, transaction or mutation authority. All ordinary ownership/admission/lease/Gate A/rebind/Gate B/bootstrap requirements remain unchanged.

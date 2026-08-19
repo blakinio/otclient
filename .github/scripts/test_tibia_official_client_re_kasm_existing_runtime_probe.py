@@ -33,6 +33,7 @@ class Fake:
         bridge: bool = True,
         bridge_bad: bool = False,
         unreadable_candidate: bool = False,
+        plain_title: bool = False,
     ):
         self.second = second
         self.wrong_sha = wrong_sha
@@ -40,6 +41,7 @@ class Fake:
         self.bridge = bridge
         self.bridge_bad = bridge_bad
         self.unreadable_candidate = unreadable_candidate
+        self.plain_title = plain_title
         self.commands: list[list[str]] = []
 
     def __call__(self, cmd):
@@ -49,8 +51,12 @@ class Fake:
         if cmd[:3] == ["docker", "ps", "--format"]:
             return "abc123\totclient-track-a-kasmvnc\n" + ("def456\tother\n" if self.second else "")
         if cmd[:2] == ["docker", "exec"] and "xwininfo -root -tree" in text:
-            return '    0x1a00017 "Tibia - Redacted Character": ("client" "Tibia") 3440x1174+0+24\n'
+            title = "Tibia" if self.plain_title else "Tibia - Redacted Character"
+            utility = '    0x1a00019 "Tibia": () 1x1+0+0\n' if self.plain_title else ''
+            return utility + f'    0x1a00017 "{title}": ("client" "Tibia") 3440x1174+0+24\n'
         if cmd[:2] == ["docker", "exec"] and "xprop -id" in text:
+            if "0x1a00019" in text:
+                return ""
             pid = 999 if self.wrong_pid else 11365
             return f'_NET_WM_PID(CARDINAL) = {pid}\nWM_CLASS(STRING) = "client", "Tibia"\n'
         if cmd[:3] == ["docker", "exec", "abc123"] and "for d in /proc" in text:
@@ -107,6 +113,12 @@ class Tests(unittest.TestCase):
         self.assertNotIn("Redacted Character", payload["window_identity"])
         self.assertEqual(payload["client_sha256"], self.m.SHA)
         self.assertFalse(any("/proc/$pid/environ" in " ".join(cmd) for cmd in fake.commands))
+
+    def test_plain_tibia_title_is_valid_window_identity_when_bridge_proves_ingame(self):
+        payload = self.m.collect(Fake(plain_title=True))
+        self.assertEqual(payload["state"], "IN_GAME")
+        self.assertEqual(payload["state_evidence"], "BRIDGE_3_OF_3")
+        self.assertIn("title_sha256:", payload["window_identity"])
 
     def test_title_alone_never_promotes_ingame_without_structural_bridge(self):
         payload = self.m.collect(Fake(bridge=False))

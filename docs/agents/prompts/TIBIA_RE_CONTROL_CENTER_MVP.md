@@ -198,11 +198,11 @@ Runtime fences/timestamps/current authority are not part of semantic action hash
 
 ### A4. EffectBound
 
-Before reservation, obtain deterministic finite maximum plausible effect per action.
+Before reservation, obtain deterministic finite maximum plausible external effect per action.
 
 Fake adapter must support exact EffectBound fixtures.
 
-If any required hard effect cannot be bounded, refuse before dispatch.
+If any required hard external effect cannot be bounded, refuse before dispatch.
 
 ### A5. Backend epoch/control generation and activation marker
 
@@ -263,9 +263,23 @@ Rules:
 - explicit retry -> new ID + fresh attempt/budget/fences/authority;
 - `CONFIRMED` is terminal successful lifecycle state and cannot be rewritten by late callbacks.
 
-### A9. Side-effect BudgetLedger
+### A9. Runtime deadline and external-effect BudgetLedger
 
-Per dimension:
+Runtime is not an ambiguous effect bucket. Derive one monotonic deadline exactly once at run activation:
+
+```text
+runtime_deadline = checked_add(run_started_monotonic, max_runtime_seconds)
+```
+
+Rules:
+
+- overflow fails closed;
+- every wait is capped by the earlier of its own timeout and the run deadline;
+- pause, restart and authority waiting never freeze or extend the deadline;
+- expiry stops new scheduling/dispatch;
+- recovery preserves the original activation/deadline and never grants a fresh runtime window.
+
+For external-effect dimensions only:
 
 ```text
 limit
@@ -277,11 +291,11 @@ uncertain
 
 Use checked arithmetic.
 
-Before dispatch reserve Scenario-v1 EffectBound against the explicit SideEffectBudget.
+Before dispatch reserve Scenario-v1 EffectBound against the explicit SideEffectBudget external-effect dimensions.
 
 At durable dispatch commit, move reserved -> at-risk atomically with ActionLedger possible-dispatch transition.
 
-Reconcile conservatively according to Execution v1.
+Reconcile conservatively according to Execution v1. `max_actions` counts semantic actions capable of crossing an external-effect boundary, not parser/refusal attempts.
 
 ### A10. Preparation
 
@@ -289,12 +303,13 @@ Outside dispatch gate:
 
 - validate action;
 - capability check;
-- budget reservation;
+- external-effect budget reservation;
+- verify run deadline remains unexpired;
 - advisory preflight;
 - await fake authority;
 - before-state capture.
 
-Every wait is deterministic/bounded/cancellable.
+Every wait is deterministic/bounded/cancellable and cannot extend the run deadline.
 
 Preflight never grants standing dispatch permission.
 
@@ -307,13 +322,14 @@ Immediately before fake irreversible effect:
 3. verify backend/control generation;
 4. verify durable + in-memory STOP/recovery-required/cancellation state;
 5. verify adapter/runtime/session fences;
-6. verify budget reservation;
-7. verify capability;
-8. verify current fake authority;
-9. atomically make ActionLedger `DISPATCH_COMMITTED/POSSIBLY_DISPATCHED` and budget `AT_RISK` durable;
-10. complete durability barrier;
-11. leave dispatch gate;
-12. only then allow exactly one fake physical effect.
+6. verify run runtime deadline remains unexpired;
+7. verify external-effect budget reservation;
+8. verify capability;
+9. verify current fake authority;
+10. atomically make ActionLedger `DISPATCH_COMMITTED/POSSIBLY_DISPATCHED` and external-effect budget `AT_RISK` durable;
+11. complete durability barrier;
+12. leave dispatch gate;
+13. only then allow exactly one fake physical effect.
 
 Durability failure/timeout -> no effect.
 
@@ -354,7 +370,9 @@ Deterministic store must simulate:
 - backend-active marker durability failure;
 - unclean backend restart with prior active marker;
 - reset persistence failure;
-- corrupt/missing/contradictory ControlState/ledger.
+- corrupt/missing/contradictory ControlState/ledger;
+- runtime deadline expiry/overflow;
+- restart after elapsed runtime proving no fresh deadline is granted.
 
 Expected classes:
 
@@ -366,15 +384,15 @@ CONFIRMED
 
 On every restart use a fresh backend epoch, load/validate global control state, classify an uncleared prior active backend as recovery-required, durably install the current active marker, then recover per-run safety state before any mutation admission.
 
-No automatic mutation resume/retry.
+Recovery preserves the original run activation/deadline. No automatic mutation resume/retry.
 
 ### A15. Pause/resume
 
-Pause does not suspend external generations/deadlines.
+Pause does not suspend external generations/deadlines and does not freeze or extend the run's monotonic runtime deadline.
 
-Resume revalidates backend/control/adapter/runtime/session fences and declared predicates.
+Resume revalidates backend/control/adapter/runtime/session fences, original run deadline and declared predicates.
 
-Changed runtime/session invalidates pending mutation by default.
+Changed runtime/session or an expired run deadline invalidates pending mutation by default.
 
 ### A16. Recorder core
 
@@ -432,6 +450,7 @@ A test must prove it cannot create a gameplay/process mutation path.
 Support Artifact v1 literally for Package A scope:
 
 - backend-global durable ControlState including STOP/recovery/active-backend marker;
+- original run activation/runtime deadline persistence;
 - incomplete/staging run;
 - per-run safety-critical dispatch journal separate from report presentation;
 - deterministic flush/finalization;
@@ -481,10 +500,10 @@ Package A is not complete until all pass with `runtime_access:none`:
 28. durability barrier timeout -> no effect;
 29. crash after durable commit before effect -> AMBIGUOUS/no retry;
 30. crash after effect before result -> AMBIGUOUS/no retry unless reconciled;
-31. budget reservation/exhaustion;
-32. budget arithmetic overflow refusal;
+31. external-effect budget reservation/exhaustion;
+32. external-effect budget arithmetic overflow refusal;
 33. commit atomically moves reserved -> at-risk;
-34. ambiguous consumable/item action consumes conservative budget;
+34. ambiguous consumable/item action consumes conservative external-effect budget;
 35. explicit retry only after proven NOT_DISPATCHED and uses new action ID;
 36. pause/resume after session/runtime change refuses pending mutation;
 37. wait timeout/cancellation;
@@ -511,7 +530,11 @@ Package A is not complete until all pass with `runtime_access:none`:
 58. prior uncleared active-backend marker forces recovery-required on the next backend;
 59. STOP persistence failure followed by crash cannot reopen mutation after restart;
 60. clean-shutdown marker failure causes conservative recovery-required next start;
-61. missing/corrupt initialized ControlState is fail-closed.
+61. missing/corrupt initialized ControlState is fail-closed;
+62. runtime deadline overflow fails closed;
+63. runtime deadline expiry while waiting prevents later dispatch;
+64. pause does not extend the runtime deadline;
+65. restart/recovery does not grant a fresh runtime deadline.
 
 ## 9. Package B — Control API v1 + browser + CLI
 
@@ -521,7 +544,7 @@ Before exposing mutation-capable fake operations, select/extend the local persis
 
 - backend-global ControlState;
 - backend-global RequestLedger;
-- per-run Action/Budget dispatch-journal semantics;
+- per-run runtime deadline and Action/Budget dispatch-journal semantics;
 - Artifact-v1 safety-state precedence.
 
 Implement Control API v1 literally:
@@ -534,9 +557,13 @@ Implement Control API v1 literally:
 - exact same-origin browser Origin policy;
 - no permissive CORS/cookie ambient auth;
 - durable request IDs/hashes;
-- preallocate final logical resource ID and durably persist RequestLedger ACCEPTED **before** resource-creating domain execution;
-- crash after ACCEPTED-before-create and crash after create-before-COMPLETED both replay to the same resource ID;
+- for every POST, preallocate the final logical resource/control-transition identity and durably persist RequestLedger ACCEPTED **before** domain execution;
+- run/experiment/action-domain execution must use that exact reserved identity;
+- STOP/reset must use the reserved control-transition identity as `ControlState.transition_id`;
+- crash after ACCEPTED-before-domain execution and crash after resource/control transition before COMPLETED both replay to the same identity;
+- delayed replay of an old STOP/reset after newer control transitions returns the old durable result and must not mutate current ControlState;
 - duplicate POST resource/result reuse;
+- FAILED request identity is replayed as the same failed logical request; deliberate retry uses a new request ID;
 - request/page/event/subscriber bounds;
 - slow-subscriber backpressure;
 - stable safe error envelope;
@@ -557,7 +584,7 @@ Run every mandatory test defined by current Control API v1 plus:
 - `MUTATION_ALLOWED` is not locally grantable;
 - browser reload/new tab cannot duplicate active work;
 - UI UNKNOWN/STALE/UNSUPPORTED/NOT_PROVEN truthfulness;
-- shutdown/restart preserves ControlState/RequestLedger/Action/Budget safety state;
+- shutdown/restart preserves ControlState/RequestLedger/runtime deadline/Action/Budget safety state;
 - no real official-client mutation path exists.
 
 ## 10. Package C — Surveyor/read-only integration
@@ -668,7 +695,7 @@ ResultPort      -> canonical accepted/refused/result/evidence projection
 
 A future policy/Ollama engine must re-enter the ordinary Scenario/ActionRequest/domain path. It never receives credentials, Control API nonce, direct adapter handles, shell/process/raw-memory/unrestricted-input authority or Track A writable authority.
 
-Deterministic code, outside the policy/model, owns schema validation, rate limits, budgets, idempotency, STOP, recovery, capability/freshness checks and final external authority.
+Deterministic code, outside the policy/model, owns schema validation, rate limits, runtime deadlines, external-effect budgets, idempotency, STOP, recovery, capability/freshness checks and final external authority.
 
 Model failure/unavailability must not disable manual research, STOP or deterministic safety.
 
@@ -699,6 +726,7 @@ Never claim:
 - passive capture when enablement actually attaches/injects/mutates;
 - STOP reversal of already-committed effect;
 - restart as an implicit STOP/recovery reset;
+- restart/pause as a way to extend the original runtime deadline;
 - remote/LAN security from loopback API design;
 - safe secret handling from export-time redaction alone;
 - policy/model output as authority/capability/evidence;
@@ -718,7 +746,8 @@ STOP-vs-commit linearizability=PASS
 durable STOP/reset/recovery state=PASS
 bounded local durability-before-effect=PASS
 ActionLedger idempotency=PASS
-BudgetLedger at-risk/uncertain accounting=PASS
+runtime deadline overflow/expiry/pause/restart semantics=PASS
+external-effect BudgetLedger at-risk/uncertain accounting=PASS
 crash/restart ambiguity handling=PASS
 multi-clock Recorder=PASS
 construction-time secret exclusion=PASS

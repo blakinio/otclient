@@ -21,6 +21,8 @@ owned_paths:
   - docs/agents/contracts/TIBIA_RE_CONTROL_CENTER_EXECUTION_V1.md
   - docs/agents/prompts/TIBIA_RE_CONTROL_CENTER_MVP.md
   - docs/agents/prompts/TIBIA_RE_CONTROL_CENTER_INDEPENDENT_AUDIT.md
+  - docs/agents/MODULE_CATALOG.md
+  - docs/agents/CHANGELOG.md
   - docs/agents/tasks/active/OTC-20260819-tibia-re-control-center-hardening.md
 reuses:
   - docs/agents/programs/OTCLIENT_TIBIA_RE_EXPERIMENT_EXECUTION_MODEL.md
@@ -70,10 +72,12 @@ Harden the merged Control Center architecture, adapter contract and implementati
 - Reconciled Oteryn v2 adapter with accepted ADR-0007 instead of creating a second Oteryn E2E authority.
 - Added field-level semantic comparison classes and explicit coverage-gap outcomes.
 - Reordered phases so Scenario Engine, Recorder primitives, durability model and fake adapter precede UI and all real mutation.
+- Added the hardened Control Center contracts to `MODULE_CATALOG.md` and recorded the architecture change in `CHANGELOG.md`.
+- Updated the now-merged #596 canonical adoption catalogue entry so future agents do not treat it as an active unmerged dependency.
 
 ## Falsification baseline
 
-The hardened audit prompt now requires 28 explicit race/retry/crash/privacy/cross-repo cases, including:
+The hardened audit prompt requires 28 explicit race/retry/crash/privacy/cross-repo cases, including:
 
 - authority loss at final commit;
 - STOP versus dispatch commit;
@@ -93,12 +97,25 @@ The hardened audit prompt now requires 28 explicit race/retry/crash/privacy/cros
 
 Documentation/contracts only. No Track A runtime observation/mutation, no client launch/control, no credentials, login or gameplay, and no writes to `blakinio/Oteryn-v2`.
 
+## Repository reconciliation
+
+The branch was reconciled with `main@a5cbdf1125887f8e5455dfbed5ee5a8e901f105c` through merge/reconciliation commit `bd498ecd827dbd5e9e32e493169abd41703e4a0e` after #596 and its closeout had landed. No Control Center semantic conflict was found; the design continues to consume then-current trusted-base Track A authority dynamically rather than pin the adoption implementation.
+
+Surveyor #592 was rechecked and remained an open Draft at `90fb32f69173a6e621dfe6bd34c6f2e494076655`; Package C therefore remains schema/producer-pinned and blocked on an accepted exact Surveyor state.
+
 ## Validation state
 
-Draft PR #605 exists. Full changed-file set is intentionally limited to the five Control Center design/contract/prompt files plus this task record.
+Draft PR #605 exists. Current intended changed-file set is exactly the five Control Center programme/contract/prompt paths, `MODULE_CATALOG.md`, `CHANGELOG.md`, and this task record.
 
-`main` advanced while the task was running. Before readiness, restack/reconcile onto the latest trusted `main`, inspect the exact final diff, run repository-required docs/governance checks on the final head, and obtain a fresh independent re-audit of the hardened design.
+Before readiness:
+
+1. recheck/reconcile any newer `main` movement that can affect the design;
+2. inspect the exact final changed-file set and full diff;
+3. run repository-required docs/governance checks on the exact final head;
+4. perform full self-review;
+5. obtain a genuinely fresh independent re-audit of the exact final hardening head; this implementing session cannot self-label its own review independent;
+6. only if the independent result has no P0/P1 and `PACKAGE_A_IMPLEMENTATION_READY=YES`, proceed to readiness/merge under repository policy.
 
 ## Next action
 
-Restack PR #605 on current `main`, verify no semantic conflicts with newly merged Track A changes, then run exact-head validation and fresh independent audit.
+Revalidate current `main` and exact PR #605 head, run exact-head repository checks, then hand the exact unchanged head to a fresh independent Control Center audit.

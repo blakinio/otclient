@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260819-tibia-re-control-center-hardening
-status: active
+status: superseded
 agent: ChatGPT
 project_lane: otclient
 lane: P0-DESIGN-HARDENING
@@ -25,6 +25,11 @@ gameplay_allowed: false
 transaction_authorized: false
 initial_base_sha: 3e3b3a731cb21d775ae686c65991e90969bb86fb
 implementation_pr: 605
+superseded_by_task: OTC-20260819-tibia-re-control-center-hardening-r2
+superseded_by_branch: docs/OTC-20260819-tibia-re-control-center-hardening-r2
+independent_audit_review_id: 4976939865
+independent_audit_result: FAIL
+ownership_released: true
 owned_paths:
   - docs/agents/programs/TIBIA_RE_CONTROL_CENTER_E2E.md
   - docs/agents/contracts/TIBIA_RE_CONTROL_CENTER_ADAPTER_V1.md
@@ -136,6 +141,10 @@ Before readiness:
 5. obtain a genuinely fresh independent re-audit of the exact final hardening head; this implementing session cannot self-label its own review independent;
 6. only if the independent result has no P0/P1 and `PACKAGE_A_IMPLEMENTATION_READY=YES`, proceed to readiness/merge under repository policy.
 
+## Supersession
+
+Exact head 5e63a0ec988cf4fa7789274f13c9d654254e8e44 received independent audit review 4976939865 with RESULT=FAIL, P0=0, four P1 findings and PACKAGE_A_IMPLEMENTATION_READY=NO. The audited head remains unchanged. Remediation continues in successor task OTC-20260819-tibia-re-control-center-hardening-r2 on a separate branch; this task releases ownership and must not be resumed for implementation.
+
 ## Next action
 
-Observe the exact-head checks after this admission-metadata repair; if green, perform final diff/self-review and hand the unchanged head to a fresh independent Control Center audit.
+Continue only through the successor task; do not modify or promote the audited #605 head.

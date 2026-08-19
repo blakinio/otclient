@@ -1,17 +1,17 @@
 ---
 task_id: OTC-20260819-ollama-local-research-agent-poc
-status: validating
+status: ready
 agent: ChatGPT
 project_lane: otclient
 lane: P0-DESIGN
 track_id: official-client-re
 task_kind: documentation
-phase: exact-head-validation
+phase: closeout
 branch: docs/OTC-20260819-ollama-local-research-agent-poc
 base_branch: main
 base_sha: 4bd1eb1dfe503ac469110eebf645d698c970edd7
 created: 2026-08-19T16:34:00+02:00
-updated: 2026-08-19T17:40:00+02:00
+updated: 2026-08-19T23:21:00+02:00
 risk: low
 related_pr: "609"
 owned_paths:
@@ -90,9 +90,9 @@ gameplay_allowed: false
 transaction_authorized: false
 owner_funded_ai_api_authorized: false
 invocation_started_at: 2026-08-19T16:34:00+02:00
-last_progress_at: 2026-08-19T17:40:00+02:00
-current_blocker: fresh independent documentation audit is still required before merge/terminal closeout under current repository closeout governance
-next_action: verify exact-head CI/governance for prompt v1.1, then obtain a fresh independent documentation/prompt audit; if PASS, complete review/merge/archive closeout
+last_progress_at: 2026-08-19T23:21:00+02:00
+current_blocker: none
+next_action: revalidate this checkpoint-only head, verify exact-head CI/governance, mark PR ready, then squash-merge if all gates remain green
 ---
 
 # TIBIA RE Ollama local research-agent PoC prompt persistence
@@ -167,6 +167,16 @@ This is a deterministic contract review of prompt text, not an automated or repe
 
 Static matrix result: **20/20 PASS** for the v1.1 contract text. This is implementer self-evaluation only.
 
+## Independent documentation/prompt audit
+
+Fresh independent review `4976885761` evaluated exact head `58ef237357b86a723ae8df421955b6b8d4864cb6` against the trusted-base prompting/closeout contracts and the same 20-case scenario set, with baseline prompt v1.0.0 from `59b610fa34be2aae7dd22a8c457adf55099ee6b9`.
+
+Result: **PASS**, material findings open: **0**.
+
+The baseline had clear gaps in design-only readiness, Draft-as-capability handling, model-authored parameters, frozen candidate membership, repeated proposal consensus and technical-vs-research-value separation. v1.1 closes those gaps and introduces no identified safety-critical regression. The audit also verified the three-file scope, zero review threads/requested changes, and exact-head CI/governance success on `58ef237357b86a723ae8df421955b6b8d4864cb6`.
+
+This checkpoint-only update changes the branch head after that audit. Therefore the final head still requires a narrow delta revalidation and exact-head CI/governance before merge; the audit is not being replayed as evidence for an unreviewed content change.
+
 ## Validation history
 
 Previous v1.0 exact-head evidence recorded on PR #609:
@@ -187,7 +197,16 @@ v1.1 implementation commits added after that evidence:
 35ef322042bf221ba2e9f43bae9583ed13cdacd1  alias alignment
 ```
 
-This checkpoint commit changes the head again. Therefore previous CI is historical only; final exact-head checks must be re-run/verified.
+Final prompt-content head before this audit checkpoint:
+
+```text
+58ef237357b86a723ae8df421955b6b8d4864cb6
+CI run                         32271616098 = SUCCESS
+Track A governance             32271615683 = SUCCESS
+independent audit              review 4976885761 = PASS
+material findings open         0
+runtime E2E                    NOT_APPLICABLE: documentation-only persistence task
+```
 
 Full intended changed-file inventory remains exactly:
 
@@ -201,7 +220,7 @@ docs/agents/tasks/active/OTC-20260819-ollama-local-research-agent-poc.md
 
 ```yaml
 self_review:
-  result: PASS_WITH_INDEPENDENT_AUDIT_PENDING
+  result: PASS
   material_findings_open: 0
   evidence:
     - prompt contract version advanced to 1.1.0 with rollback to v1.0
@@ -216,14 +235,12 @@ self_review:
     - no secret value, credential, proprietary binary or private capture is embedded
 ```
 
-This self-review is not the fresh independent audit required by repository closeout policy.
-
 ## Context checkpoint
 
 ```yaml
-checkpoint_version: 3
-status: validating
-phase: exact-head-validation
+checkpoint_version: 4
+status: ready
+phase: closeout
 branch: docs/OTC-20260819-ollama-local-research-agent-poc
 pr: 609
 base_sha: 4bd1eb1dfe503ac469110eebf645d698c970edd7
@@ -235,8 +252,9 @@ synology_accessed: false
 molehill_accessed: false
 ollama_called: false
 static_prompt_eval: 20/20 PASS
-self_review: PASS_WITH_INDEPENDENT_AUDIT_PENDING
-independent_audit: NOT_RUN
-runtime_e2e: NOT_APPLICABLE
-next_action: verify v1.1 exact-head CI/governance, then obtain a fresh independent prompt/documentation audit before readiness/merge
+self_review: PASS
+independent_audit: PASS on prompt-content head 58ef237357b86a723ae8df421955b6b8d4864cb6; review 4976885761
+runtime_e2e: NOT_APPLICABLE: documentation-only persistence task
+current_blocker: none
+next_action: revalidate this checkpoint-only delta, verify exact-head CI/governance, mark PR ready, then squash-merge if all gates remain green
 ```

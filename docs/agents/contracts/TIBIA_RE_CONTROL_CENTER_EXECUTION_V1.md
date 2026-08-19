@@ -30,9 +30,9 @@ No UI state, CLI option, scenario field, API credential, capability bit, cached 
 
 For `OFFICIAL_TIBIA`, then-current trusted-base Track A lease/registration/Gate A/rebind/Gate B/target identity/GUI input lock/whole-lifetime supervisor remain the sole external mutation authority.
 
-Scenario typing/hashing/effect bounds are defined by Scenario v1. Durable run/safety artifact structure is defined by Artifact v1.
+Scenario typing/hashing/effect bounds are defined by Scenario v1. Durable backend-global and per-run safety/artifact structure is defined by Artifact v1.
 
-## 2. Core identities
+## 2. Core identities and backend activation
 
 Every backend lifetime creates a fresh opaque unique `backend_epoch`.
 
@@ -41,6 +41,10 @@ Within one backend epoch, `control_generation` is a checked monotonic unsigned i
 Every adapter exposes `adapter_generation`. Mutation may also bind `runtime_instance_id` and `session_epoch`.
 
 Changed required identity/fence invalidates pending mutation.
+
+Before a backend may admit mutation-capable work, it must load Artifact-v1 ControlState and durably mark `active_backend_epoch=<current backend_epoch>`. If an existing record still names a different prior active backend, the prior lifetime is unclean: set/preserve `recovery_required=true` and keep mutation disabled until explicit recovery/reset. Failure to persist the current backend-active marker disables mutation.
+
+This marker is not Track A authority; it only prevents a crash or failed STOP persistence from becoming an implicit safety reset on the next backend lifetime.
 
 ## 3. MutationCoordinator
 
@@ -52,7 +56,7 @@ It owns only Control Center-local execution safety:
 - mutation dispatch serialization;
 - ActionLedger idempotency;
 - BudgetLedger;
-- durable backend-global STOP/reset ControlState;
+- durable backend-global STOP/reset/recovery ControlState;
 - backend/control-generation fencing;
 - STOP/reset linearization;
 - one-shot durable dispatch commit;
@@ -98,6 +102,8 @@ The coordinator has one small local `dispatch_gate` used only to linearize:
 
 Do not hold it while waiting for external/Track A authority, GUI/input locks, captures, network I/O, sleeps or adapter discovery.
 
+Backend-start activation happens before mutation admission; clean-shutdown marker persistence happens after new mutation admission is closed. Those lifecycle writes therefore do not compete with an admitted action for dispatch linearization.
+
 ### 5.1 Narrow durability exceptions
 
 The only I/O permitted while holding `dispatch_gate` is one of these bounded local safety transactions:
@@ -110,9 +116,9 @@ POSSIBLY_DISPATCHED
 budget AT_RISK
 ```
 
-2. the backend-global ControlState transaction that durably latches STOP or durably clears it during an explicit reset.
+2. the backend-global ControlState transaction that durably latches STOP or durably clears STOP/recovery-required state during an explicit reset.
 
-Both transactions have a finite deadline, no external network dependency and fail closed. Dispatch durability timeout/error means no physical dispatch. STOP durability timeout/error leaves the in-memory latch STOPPED and disables further mutation/reset progress until durable state is safely reconciled. Reset durability timeout/error leaves STOP latched.
+Both transactions have a finite deadline, no external network dependency and fail closed. Dispatch durability timeout/error means no physical dispatch. STOP durability timeout/error leaves the in-memory latch STOPPED and disables further mutation/reset progress until durable state is safely reconciled. Reset durability timeout/error leaves STOP/recovery-required state blocking mutation.
 
 No arbitrary artifact/report/capture I/O is permitted under `dispatch_gate`.
 
@@ -229,7 +235,7 @@ Inside dispatch gate verify immediately before commit:
 2. matching active mutation-run ownership where mutation-capable;
 3. backend epoch;
 4. control generation;
-5. durable + in-memory STOP/cancellation state;
+5. durable + in-memory STOP/recovery-required/cancellation state;
 6. adapter generation;
 7. runtime/session fences;
 8. valid budget reservation;
@@ -277,7 +283,9 @@ AMBIGUOUS
 
 unless authoritative reconciliation proves exact effect/no-effect.
 
-Prefer false-positive ambiguity over duplicate mutation.
+The backend-active marker additionally ensures that an unclean process lifetime itself forces recovery-required state on the next backend before mutation admission.
+
+Prefer false-positive ambiguity/recovery blocking over duplicate mutation.
 
 ## 14. STOP ALL
 
@@ -285,7 +293,7 @@ STOP acquires the same dispatch gate and:
 
 1. computes the next checked control generation;
 2. latches STOPPED in memory before any later mutation may commit;
-3. durably writes backend-global Artifact-v1 `ControlState(stop_latched=true, control_generation=<next>)` under the gate;
+3. durably writes backend-global Artifact-v1 `ControlState(stop_latched=true, control_generation=<next>, recovery_required=<preserved>)` under the gate;
 4. commits the new generation only with that durable STOP state; on durability failure, remains in-memory STOPPED and mutation-disabled rather than reopening dispatch;
 5. releases the gate;
 6. cancels queued/waiting old-generation work;
@@ -299,7 +307,9 @@ STOP wins gate -> stale action cannot commit -> no physical effect
 commit wins gate -> possible-dispatch/at-risk already durable -> STOP treats action as already committed
 ```
 
-No third outcome.
+No third dispatch outcome exists.
+
+If STOP persistence fails and the backend subsequently crashes, the already-durable Artifact-v1 `active_backend_epoch` from backend activation causes the next backend to classify the prior lifetime as unclean and enter recovery-required/mutation-disabled state. Thus a storage failure cannot turn process restart into an implicit reset.
 
 STOP cannot promise rollback and grants no gameplay/process-control authority. Repeating STOP while already latched is idempotent with respect to external gameplay effects; it may return the existing durable STOP result rather than invent another mutation.
 
@@ -317,15 +327,19 @@ It must not use STOP to initiate:
 
 Any compensating external action is a separate semantic action with fresh authority/idempotency/budget.
 
-## 16. Reset
+## 16. Reset and recovery release
 
 STOP remains durably latched across backend restart until explicit reset.
 
-Reset acquires `dispatch_gate`, verifies the currently loaded durable STOP state, unresolved ambiguity/budget restrictions and checked next control generation, then durably writes Artifact-v1 `ControlState(stop_latched=false, ...)` before exposing RUNNING state or admitting new mutation. Reset durability timeout/error leaves STOP latched and returns a typed failure.
+Reset acquires `dispatch_gate`, verifies the currently loaded durable STOP/recovery state, Action/Budget/RequestLedger recovery, unresolved ambiguity/budget restrictions and checked next control generation, then durably writes Artifact-v1 ControlState before exposing RUNNING or admitting new mutation.
+
+A reset may clear `recovery_required` only when local persistent safety state is internally consistent and every unresolved possible-dispatch/ambiguous overlapping effect remains conservatively represented/blocked. It is not a data-loss escape hatch. If recovery cannot establish those invariants, reset refuses and mutation remains disabled.
+
+Reset durability timeout/error leaves STOP/recovery-required state blocking mutation and returns a typed failure.
 
 Reset grants no external authority, cannot reuse stale callbacks and must preserve unresolved ambiguous overlapping side-effect blocks. It does not clear ActionLedger/BudgetLedger uncertainty and cannot be used to bypass Track A authority.
 
-Generation overflow or missing/corrupt contradictory ControlState fails closed as STOPPED/mutation-disabled.
+Generation overflow or missing/corrupt contradictory ControlState fails closed as STOPPED/recovery-required/mutation-disabled.
 
 ## 17. Pause/resume
 
@@ -339,7 +353,15 @@ Every later mutation is freshly authorized at final commit.
 
 Every restart creates a fresh backend epoch, rejects old-epoch callbacks as control input, does not auto-resume mutation runs and reacquires all external authority.
 
-Before admitting any mutation-capable request, the backend loads and validates backend-global Artifact-v1 ControlState. A durable `stop_latched=true` survives the new backend epoch and remains STOPPED until explicit reset. Restart is never an implicit reset. A previously initialized store with missing/corrupt/contradictory ControlState fails closed as STOPPED/mutation-disabled; a brand-new store must durably create its known initial ControlState before mutation can be admitted.
+Startup order before mutation admission:
+
+1. load/validate backend-global Artifact-v1 ControlState and RequestLedger plus relevant per-run safety state;
+2. if the loaded `active_backend_epoch` names a prior backend, classify that prior lifetime as unclean and set/preserve `recovery_required=true`;
+3. durably write current `active_backend_epoch=<new backend_epoch>` while preserving STOP/recovery truth;
+4. recover Action/Budget/RequestLedger state conservatively;
+5. only when `stop_latched=false`, `recovery_required=false`, safety state is consistent and all other local/external gates pass may mutation admission become possible.
+
+A durable `stop_latched=true` survives the new backend epoch and remains STOPPED until explicit reset. Restart is never an implicit reset. A prior unclean backend also blocks mutation until explicit recovery/reset. A previously initialized store with missing/corrupt/contradictory ControlState fails closed. A brand-new store must durably create its initial current-backend-active ControlState before mutation can be admitted.
 
 Durable dispatch classes:
 
@@ -354,7 +376,11 @@ CONFIRMED
 - confirmed terminal authoritative result -> recover `CONFIRMED` without redispatch;
 - missing/corrupt/contradictory safety state -> fail closed.
 
-Artifact-v1 safety-state precedence applies. Recovery never weakens the loaded STOP latch and never auto-resumes a mutation run.
+Artifact-v1 safety-state precedence applies. Recovery never weakens STOP/recovery-required state and never auto-resumes a mutation run.
+
+### 18.1 Clean shutdown marker
+
+After new mutation admission is closed and all required global/per-run safety state is durably flushed, a graceful shutdown may durably write `active_backend_epoch=null`. It must preserve `stop_latched` and `recovery_required` values. Failure to persist the clean-shutdown marker is safe: the next backend treats the prior lifetime as unclean and requires recovery rather than assuming clean state.
 
 ## 19. BudgetLedger
 
@@ -496,7 +522,7 @@ No raw-payload fallback. Future payload mode requires separate approved sanitiza
 
 Artifact v1 defines backend-global ControlState/RequestLedger plus per-run Action/Budget/Recovery ledgers, manifest, event/action evidence, staging/finalization, screenshot quarantine, supplements and hashes.
 
-Safety ledgers/control state have precedence over report/presentation. Presentation failure cannot downgrade STOP, possible-dispatch or at-risk state.
+Safety ledgers/control state have precedence over report/presentation. Presentation failure cannot downgrade STOP/recovery-required, possible-dispatch or at-risk state.
 
 PASS is forbidden for unresolved ambiguous required mutation or incomplete required finalization/privacy/cleanup state.
 
@@ -537,6 +563,8 @@ Use deterministic manual clock/state scheduler and deterministic durability stor
 - crash before/after effect;
 - exact STOP-vs-commit interleavings;
 - STOP persistence/restart/reset durability failures;
+- backend-active marker write/clean-shutdown failures;
+- unclean backend recovery-required semantics;
 - STOP while waiting for authority;
 - duplicate actions;
 - budgets;
@@ -566,15 +594,19 @@ At minimum:
 13. pause/resume stale identity refusal;
 14. restart fresh epoch/stale callback refusal;
 15. durable STOP latch survives restart and still refuses mutation;
-16. reset durability failure leaves STOP latched;
+16. reset durability failure leaves STOP/recovery blocking mutation;
 17. missing/corrupt initialized ControlState fails closed;
-18. invasive capture hidden in read path refused;
-19. emergency-stop mutation attempt refused;
-20. multi-clock ordering truthfulness;
-21. late event cannot rewrite terminal result;
-22. secret construction barriers;
-23. artifact safety-state precedence/finalization;
-24. `CONFIRMED` is terminal and duplicate callbacks cannot redispatch or rewrite it.
+18. backend activation marker must be durable before mutation admission;
+19. crash with prior active-backend marker makes next backend recovery-required;
+20. STOP persistence failure followed by crash cannot reopen mutation;
+21. clean-shutdown marker failure causes conservative recovery-required next start;
+22. invasive capture hidden in read path refused;
+23. emergency-stop mutation attempt refused;
+24. multi-clock ordering truthfulness;
+25. late event cannot rewrite terminal result;
+26. secret construction barriers;
+27. artifact safety-state precedence/finalization;
+28. `CONFIRMED` is terminal and duplicate callbacks cannot redispatch or rewrite it.
 
 Scenario/Artifact/Control API contracts add their own deterministic acceptance tests.
 
@@ -582,4 +614,4 @@ Scenario/Artifact/Control API contracts add their own deterministic acceptance t
 
 Execution major version 1 is additive-only.
 
-Changing mutation-run ownership, dispatch ordering, STOP linearization/durability, durability-before-effect, idempotency, budget ambiguity, secret construction boundary or restart fencing requires a new major version or separately reviewed compatible extension.
+Changing mutation-run ownership, dispatch ordering, STOP linearization/durability, backend activation/recovery markers, durability-before-effect, idempotency, budget ambiguity, secret construction boundary or restart fencing requires a new major version or separately reviewed compatible extension.

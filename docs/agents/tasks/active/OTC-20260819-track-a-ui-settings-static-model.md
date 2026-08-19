@@ -6,20 +6,17 @@ alias: TIBIA-RE-UI-SETTINGS
 track_id: official-client-re
 subject: official native Linux Tibia client only
 status: validating
-phase: coordinator-ready-gate
+phase: coordinator-current-main-gate
 task_kind: discovery
 implementation_authorized: false
 run_scope: single_task
 researcher_delivery: draft_pr_only
 promotion_authority: coordinator_only
-base_main: cf90b84442dda730bdab93d8aa9f3236b7532ad8
+base_main: 2e572789a2bc4b64c5e906c4515c15c625f6bc9e
 branch: docs/OTC-20260819-track-a-ui-settings-static-model
 session_role: coordinator
 execution_mode: chat_github
-execution_reason: independent coordinator audit accepted the bounded slice with one repaired fullscreen-evidence classification; all final exact-head checks now pass
-context_pressure: medium
-context_growth: stable
-estimate_confidence: high
+execution_reason: final accepted evidence is unchanged; current-main revalidation is required because #555 advanced Track A current-client fence and governance after the prior exact-head generation started
 runtime_access: none
 runtime_owner_task: NOT_APPLICABLE
 runtime_namespace: NOT_APPLICABLE
@@ -36,33 +33,25 @@ physical_e2e_required: false
 source_pr: 544
 source_researcher_head: 7861752c312f77fad0cde28c44c8745aa2806909
 coordinator_review: 4969134238
-final_coordinator_review: 4969851468
 coordinator_decision: ACCEPT_WITH_EDITS
 open_material_findings_after_repair: 0
-final_validated_head: 7f4d62be2e788f6e6ac6bf4beb568bc85c350c1e
-final_governance_run: 32230632072
-final_ci_run: 32230632291
-final_static_model_run: 32230632118
-final_static_model_job: 95999452908
 ---
 
-# OTC-20260819 Track A UI/settings coordinator checkpoint
+# OTC-20260819 Track A UI/settings coordinator current-main gate
 
-## Accepted delivery
+## Accepted scope
 
-`TIBIA-RE-UI-SETTINGS` has a bounded current-build evidence slice accepted by the coordinator with one corrected negative-control classification.
+The coordinator accepts the bounded `TIBIA-RE-UI-SETTINGS` evidence slice with one corrected negative-control classification. No further runtime work is authorized or required for this closeout.
 
-Accepted scope:
+Accepted evidence includes:
 
-1. dedicated current-public-package static model evidence for H07-H14;
-2. exact static `clientoptions.json` xrefs and used `QSettings` callsites;
-3. lower-priority current-build refresh signals for selected H02/H04/H05/H06/H15/H18 surfaces;
-4. one causal reversible Master Volume persistence experiment in a task-owned `ephemeral_isolated` runtime;
-5. bounded negative-control/harness evidence from earlier fullscreen attempts.
+- dedicated current-build H07-H14 settings/model/controller evidence;
+- `clientoptions.json` literal/xrefs and used `QSettings` callsites;
+- selected lower-priority H02/H04/H05/H06/H15/H18 static refresh signals;
+- one causal reversible Master Volume persistence experiment in a task-owned isolated runtime;
+- bounded fullscreen/harness negative-control evidence.
 
-The researcher has dropped runtime authority. No further physical operation belongs to this closeout.
-
-## Exact current-build fence
+## Exact build fence
 
 ```yaml
 client_size: 52109920
@@ -71,49 +60,40 @@ elf_build_id: d803d9695868713ef6ab0c3cf65f91212c9c6a62
 packed_sha256: 1fc26d66cef90723d29293f177fcff41c8e937e7aac830f08e82c2f4c69eb354
 ```
 
-## FACT — static evidence
-
-Final exact-head static run `32230632118`, job `95999452908`, independently reproduced:
+The repaired static producer on head `7f4d62be2e788f6e6ac6bf4beb568bc85c350c1e` reproduced this exact package plus:
 
 ```text
-UI_SETTINGS_PACKED_SIZE=10214529
-UI_SETTINGS_PACKED_SHA256=1fc26d66cef90723d29293f177fcff41c8e937e7aac830f08e82c2f4c69eb354
-UI_SETTINGS_CLIENT_SIZE=52109920
-UI_SETTINGS_CLIENT_SHA256=ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
-UI_SETTINGS_KEYS_CLIENTOPTIONS_LITERAL_COUNT=1
-UI_SETTINGS_KEYS_CLIENTOPTIONS_LITERAL_VA=0x20d2406
-UI_SETTINGS_KEYS_QSETTINGS_PLT_COUNT=4
-UI_SETTINGS_KEYS_CLIENTOPTIONS_XREF_COUNT=38
-UI_SETTINGS_KEYS_QSETTINGS_CALL_COUNT=51
+clientoptions.json literal count = 1 at 0x20d2406
+clientoptions executable xrefs = 38
+QSettings PLT targets = 4
+QSettings direct callsites = 51
 UI_SETTINGS_KEY_ADJACENCY_SCAN=PASS
-Build ID=d803d9695868713ef6ab0c3cf65f91212c9c6a62
 UI_SETTINGS_PROPRIETARY_BINARY_RETAINED=false
 ```
 
-The source exact-build package establishes dedicated class/model/controller surfaces for H07-H13, `TClientOptions`, `EClientOption`, one `clientoptions.json` literal with 38 decoded executable references, four used `QSettings` read/write/group PLT targets and 51 direct callsites.
-
-This is dedicated evidence beyond broad capability-name presence but does not by itself establish setting-specific runtime semantics.
-
-## FACT — independently verified Master Volume persistence
-
-Independent coordinator review of primary Remote Desktop Commander command/result history proves the task-owned isolated exact client, shared GUI-input lock, baseline `clientoptions.json`, committed semantic JSON change:
+Runs:
 
 ```text
-options.soundMasterVolume:    100 -> 43
-options.soundMasterVolumeOld: 100 -> 43
+Track A governance 32230632072 = SUCCESS
+CI 32230632291 = SUCCESS
+Track A UI/settings static model 32230632118 = SUCCESS
+static-model job 95999452908 = SUCCESS
 ```
 
-Both values survived a clean same-HOME restart. The inverse UI commit restored both fields to `100`; a second clean restart retained `100/100`. Terminal cleanup proved zero task-marker processes and removal of the task root/display. No login or credentials were used.
+## Master Volume causal proof
 
-Temporary visual readbacks recorded by the researcher matched the semantic chain, but temporary screenshots were deleted; durable promotion relies on the independently verified semantic JSON/restart/rollback chain plus source observation for UI text.
+Independent coordinator review of primary Remote Desktop Commander command/result history confirmed:
 
-## Material audit correction
+```text
+options.soundMasterVolume:    100 -> 43 -> restart 43 -> rollback 100 -> restart 100
+options.soundMasterVolumeOld: 100 -> 43 -> restart 43 -> rollback 100 -> restart 100
+```
 
-`UISET-AUD-001` — MEDIUM / high confidence.
+The task used an isolated exact client/HOME/display, held the shared GUI-input lock, used no login or credentials, and ended with zero task marker processes plus task-root/display cleanup.
 
-The source overclaimed `Alt+Return` fullscreen persistence as `DISPROVEN`. Inspection of the pinned experiment code shows v5/v6 removed v2's immediate `await_size_change` effect proof and only scanned candidate files after sending the key.
+## UISET-AUD-001 correction
 
-Accepted terminal classification:
+The source overclaimed the fullscreen/Alt+Return v6 result. Correct terminal classification is:
 
 ```yaml
 fullscreen_persistence_discriminator: INCONCLUSIVE
@@ -123,21 +103,19 @@ fullscreen_effect_proven: false
 fullscreen_persistence_disproven: false
 ```
 
-The corrected durable evidence removes the semantic disproof claim. Open material findings after repair: `0`.
+Open material findings after repair: `0`.
 
-## Coverage disposition
-
-Against PR #536's status definitions, this task supports the following **task-local** delta only:
+## Task-local coverage disposition
 
 ```text
 H07 NOT_STARTED -> PARTIAL
 H08 NOT_STARTED -> PARTIAL
 H09 NOT_STARTED -> PARTIAL
 H10 NOT_STARTED -> PARTIAL
-H11 NOT_STARTED -> PARTIAL  (runtime strengthened by Master Volume)
+H11 NOT_STARTED -> PARTIAL  (causal Master Volume strengthening)
 H12 NOT_STARTED -> PARTIAL
 H13 NOT_STARTED -> PARTIAL
-H14 NOT_STARTED -> PARTIAL  (runtime strengthened by persistence/restart/rollback)
+H14 NOT_STARTED -> PARTIAL  (causal persistence/restart/rollback strengthening)
 ```
 
 No H07-H14 row is `DONE`. PR #536 shared matrix/checklist paths remain untouched.
@@ -145,38 +123,26 @@ No H07-H14 row is `DONE`. PR #536 shared matrix/checklist paths remain untouched
 ## Remaining UNKNOWN
 
 - complete H10/H12/H13 setting-specific runtime semantics;
+- complete H11 audio/music/ambient semantics beyond Master Volume;
 - all per-setting persistence sinks and Apply/OK timing;
-- character-specific/global option partition;
-- profile/migration versioning semantics;
+- character/global option partition;
+- profile/migration versioning;
 - user-visible `QSettings` versus `clientoptions.json` relationship;
-- fullscreen persistence semantics;
-- complete H11 audio/music/ambient configuration semantics beyond the proven Master Volume path.
+- fullscreen persistence semantics.
 
-## Final exact-head validation
+## Current-main freshness
 
-Final head before Ready transition:
-
-```text
-7f4d62be2e788f6e6ac6bf4beb568bc85c350c1e
-```
-
-Terminal checks:
+PR #555 merged after the previous final generation started and advanced `main` to:
 
 ```text
-Track A agent runtime governance 32230632072 = SUCCESS
-CI 32230632291 = SUCCESS
-CI / Required = SUCCESS
-Track A UI/settings static model 32230632118 = SUCCESS
-static-model job 95999452908 = SUCCESS
-changed paths = exactly 7 task-owned paths
-review threads = 0
-final coordinator review = 4969851468
-open material findings = 0
+2e572789a2bc4b64c5e906c4515c15c625f6bc9e
 ```
 
-The final workflow repair removed a GitHub-hosted `apt` infrastructure stall only. It preserved the existing evidence scan logic and pass thresholds, while adding bounded dependency/network setup; generic CI/actionlint and the static producer both passed on the repaired workflow.
+Its 15 paths are disjoint from all 7 paths owned by #544, but #555 changes Track A governance/contracts and advances the current official-client fence. Therefore this checkpoint intentionally retriggers exact-head governance/CI/static-model against the new `main` rather than relying on pre-#555 checks.
 
-## Durable evidence
+No research claim, product code, runtime authority or #536 path changes in this synchronization.
+
+## Durable paths
 
 - `.github/workflows/track-a-ui-settings-static-model.yml`
 - `docs/agents/evidence/OTC-20260819-track-a-ui-settings-static-model/current-build-static-model.md`
@@ -187,4 +153,4 @@ The final workflow repair removed a GitHub-hosted `apt` infrastructure stall onl
 
 ## Next action
 
-Coordinator may mark #544 Ready and squash-merge this exact accepted head. After merge, archive this task, release ownership and persist terminal source/merge evidence in a lifecycle-only closeout PR.
+Freeze the resulting head. If exact-head governance, CI and static-model all pass against `main@2e572789...`, re-check head/main/review threads and squash-merge #544 with an expected-head guard. Then move this task from active to archive and release ownership in a lifecycle-only PR.

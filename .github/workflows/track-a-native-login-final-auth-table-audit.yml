@@ -1,0 +1,174 @@
+name: Track A native-login auth-controller table audit
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/track-a-native-login-final-auth-table-audit.yml
+
+permissions:
+  contents: read
+
+env:
+  SOURCE_HEAD: 8e029f5849a1d51f69486adcc3716c80f139e60e
+  EXPECTED_PACKED_SHA256: 1fc26d66cef90723d29293f177fcff41c8e937e7aac830f08e82c2f4c69eb354
+  EXPECTED_UNPACKED_SHA256: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Fetch exact package and prove generated QMeta switch tables
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          r="$RUNNER_TEMP/native-login-table-audit"
+          mkdir -p "$r/bin/wp" "$r/state" "$r/client" "$r/src"
+          cleanup() {
+            if test -n "${wp_pid:-}"; then kill "$wp_pid" 2>/dev/null || true; fi
+            rm -rf "$r/client"
+          }
+          trap cleanup EXIT
+          python3 -m pip install --disable-pip-version-check --no-input --user 'pyelftools==0.32' 'capstone==5.0.6'
+          curl --connect-timeout 10 --max-time 30 --retry 3 -fsSL \
+            "https://raw.githubusercontent.com/blakinio/otclient/$SOURCE_HEAD/tools/tibia_runtime_bridge/current_sha_native_login_gate.py" \
+            -o "$r/src/current_sha_native_login_gate.py"
+
+          cd "$r/bin"
+          curl --connect-timeout 10 --max-time 60 --retry 3 -fsSL -o wgcf https://github.com/ViRb3/wgcf/releases/download/v2.2.32/wgcf_2.2.32_linux_amd64
+          echo '2ff97f2201972ce582a424455d50a3719a380eef0cd1f3144f7779348e122a2c  wgcf' | sha256sum -c -
+          curl --connect-timeout 10 --max-time 60 --retry 3 -fsSL -o wireproxy.tgz https://github.com/windtf/wireproxy/releases/download/v1.1.3/wireproxy_linux_amd64.tar.gz
+          echo 'e88c1d090740373fc606c1bafd81d9a5eadc642cce5667616e20e9d7a444f51c  wireproxy.tgz' | sha256sum -c -
+          tar -xzf wireproxy.tgz -C wp
+          cp "$(find wp -type f -name wireproxy -print -quit)" wireproxy
+          chmod 755 wgcf wireproxy
+          cd "$r/state"
+          timeout 30 "$r/bin/wgcf" register --accept-tos >/dev/null
+          timeout 30 "$r/bin/wgcf" generate >/dev/null
+          printf 'WGConfig = %s\n\n[Socks5]\nBindAddress = 127.0.0.1:25350\n' "$r/state/wgcf-profile.conf" > wireproxy.conf
+          "$r/bin/wireproxy" -c wireproxy.conf > "$r/state/wireproxy.log" 2>&1 &
+          wp_pid=$!
+          for _ in $(seq 1 20); do
+            if curl --socks5-hostname 127.0.0.1:25350 --connect-timeout 5 --max-time 10 -fsS https://www.cloudflare.com/cdn-cgi/trace > "$r/state/trace" 2>/dev/null; then break; fi
+            sleep 2
+          done
+          grep -Eq '^warp=(on|plus)$' "$r/state/trace"
+          u=https://static.tibia.com/launcher/tibiaclient-linux-current/bin/client.lzma
+          curl --socks5-hostname 127.0.0.1:25350 --connect-timeout 10 --max-time 90 --retry 3 --compressed -fL \
+            -A 'Mozilla/5.0 (X11; Linux x86_64)' -e "$u" -H 'Accept: */*' "$u" -o "$r/client/client.lzma"
+          test "$(sha256sum "$r/client/client.lzma" | awk '{print $1}')" = "$EXPECTED_PACKED_SHA256"
+          python3 - "$r/client/client.lzma" "$r/client/client" <<'PY'
+          import hashlib, lzma, pathlib, sys
+          src=pathlib.Path(sys.argv[1]); dst=pathlib.Path(sys.argv[2]); blob=src.read_bytes()
+          q=blob[32]; lc=q%9; z=q//9; lp=z%5; pb=z//5; ds=int.from_bytes(blob[33:37],'little')
+          raw=lzma.decompress(blob[45:], format=lzma.FORMAT_RAW, filters=[{'id':lzma.FILTER_LZMA1,'dict_size':ds,'lc':lc,'lp':lp,'pb':pb}])
+          assert len(raw)==52109920
+          assert hashlib.sha256(raw).hexdigest()=='ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8'
+          dst.write_bytes(raw)
+          PY
+          echo CURRENT_PUBLIC_PACKAGE_FENCE=PASS
+
+          python3 "$r/src/current_sha_native_login_gate.py" "$r/client/client" "$r/state/gate.env" > "$r/state/gate.out"
+          grep -qx 'CURRENT_AUTH_CONTRACT=PASS' "$r/state/gate.out"
+          grep -qx 'CURRENT_CHARACTER_CONTRACT=PASS' "$r/state/gate.out"
+          grep -qx 'CURRENT_GAMESERVER_ROUTE_CONTRACT=PASS' "$r/state/gate.out"
+          grep -qx 'CURRENT_EXACT_SHA_NATIVE_LOGIN_GATES=PASS' "$r/state/gate.out"
+          echo SOURCE_CURRENT_SHA_GATE=PASS
+
+          python3 - "$r/client/client" <<'PY'
+          import collections, pathlib, struct, sys
+          from capstone import Cs, CS_ARCH_X86, CS_MODE_64
+          from capstone.x86_const import X86_OP_IMM, X86_OP_MEM, X86_OP_REG, X86_REG_RIP
+          from elftools.elf.elffile import ELFFile
+
+          path=pathlib.Path(sys.argv[1]); raw=path.read_bytes()
+          with path.open('rb') as fh:
+              elf=ELFFile(fh)
+              sections=[(int(s['sh_offset']),int(s['sh_size']),int(s['sh_addr']),int(s['sh_flags']),s['sh_type'],s.name) for s in elf.iter_sections()]
+          def off(va,n=1):
+              for fo,sz,base,flags,typ,name in sections:
+                  if typ!='SHT_NOBITS' and base<=va and va+n<=base+sz: return fo+va-base
+              raise ValueError(hex(va))
+          def exe(va):
+              return any((flags&4) and base<=va<base+sz for fo,sz,base,flags,typ,name in sections)
+          def u32(va): return struct.unpack_from('<I',raw,off(va,4))[0]
+          def i32(va): return struct.unpack_from('<i',raw,off(va,4))[0]
+          def qstr(base,idx):
+              rel,n=u32(base+8*idx),u32(base+8*idx+4)
+              assert n<=512
+              p=off(base+rel,n); return raw[p:p+n].decode('utf-8')
+
+          specs={
+            'TGameClient': {
+              'data':0x1CB4740,'strings':0x1CB4CF4,'table':0x1D903C4,
+              'names':[(31,'onRequestLoginWithCredentials')],
+              'targets':{17:0xD196F0,11:0xD19500},
+            },
+            'TCharacterSelectionController': {
+              'data':0x1CC47C0,'strings':0x1CC4C14,'table':0x1D98FE4,
+              'names':[(1,'requestCharacterLogin'),(16,'onCharacterSelectionConfirmed')],
+              'targets':{0:0xD52050,11:0xD52020},
+            },
+            'TAuthenticationProcessController': {
+              'data':0x1CAC140,'strings':0x1CAC760,'table':0x1D8FF20,
+              'names':[(7,'requestCharacterGameserverLogin'),(34,'onStartGameServerLoginStateEntered')],
+              'targets':{5:0xD0FD27,27:0xD0FB62},
+            },
+          }
+          for name,s in specs.items():
+              s['method_count']=u32(s['data']+4*4)
+              assert 1 <= s['method_count'] <= 512,(name,s['method_count'])
+              for idx,text in s['names']:
+                  assert qstr(s['strings'],idx)==text,(name,idx,qstr(s['strings'],idx),text)
+              targets=[s['table']+i32(s['table']+4*i) for i in range(s['method_count'])]
+              assert all(exe(t) for t in targets),(name,'non-executable table target')
+              for idx,target in s['targets'].items():
+                  assert targets[idx]==target,(name,idx,hex(targets[idx]),hex(target))
+
+          md=Cs(CS_ARCH_X86,CS_MODE_64); md.detail=True; md.skipdata=True
+          wanted_tables={s['table']:name for name,s in specs.items()}
+          refs={table:[] for table in wanted_tables}
+          for fo,sz,base,flags,typ,secname in sections:
+              if not (flags&4) or typ=='SHT_NOBITS' or sz==0: continue
+              previous=collections.deque(maxlen=24)
+              for ins in md.disasm(raw[fo:fo+sz],base):
+                  if ins.mnemonic=='lea' and len(ins.operands)==2:
+                      dst,src=ins.operands
+                      if dst.type==X86_OP_REG and src.type==X86_OP_MEM and src.mem.base==X86_REG_RIP:
+                          target=ins.address+ins.size+src.mem.disp
+                          if target in wanted_tables:
+                              refs[target].append((ins.address,dst.reg,list(previous)))
+                  previous.append(ins)
+
+          for table,name in wanted_tables.items():
+              spec=specs[name]; valid=[]
+              for lea_addr,base_reg,previous in refs[table]:
+                  cmp_ok=any(
+                    x.mnemonic=='cmp' and len(x.operands)==2 and
+                    x.operands[0].type==X86_OP_REG and md.reg_name(x.operands[0].reg) in ('edx','rdx') and
+                    x.operands[1].type==X86_OP_IMM and x.operands[1].imm==spec['method_count']-1
+                    for x in previous
+                  )
+                  if not cmp_ok: continue
+                  forward=list(md.disasm(raw[off(lea_addr):off(lea_addr)+160],lea_addr))
+                  for pos,x in enumerate(forward):
+                      if x.address!=lea_addr: continue
+                      for mv in forward[pos+1:pos+14]:
+                          if mv.mnemonic!='movsxd' or len(mv.operands)!=2: continue
+                          td,ms=mv.operands
+                          if td.type!=X86_OP_REG or ms.type!=X86_OP_MEM: continue
+                          if ms.mem.base!=base_reg or md.reg_name(ms.mem.index) not in ('edx','rdx') or ms.mem.scale!=4: continue
+                          target_reg=td.reg
+                          tail=forward[forward.index(mv)+1:forward.index(mv)+10]
+                          add_ok=any(y.mnemonic=='add' and len(y.operands)==2 and y.operands[0].type==X86_OP_REG and y.operands[0].reg==target_reg and y.operands[1].type==X86_OP_REG and y.operands[1].reg==base_reg for y in tail)
+                          jmp_ok=any(y.mnemonic=='jmp' and len(y.operands)==1 and y.operands[0].type==X86_OP_REG and y.operands[0].reg==target_reg for y in tail)
+                          if add_ok and jmp_ok: valid.append(lea_addr)
+              valid=sorted(set(valid))
+              assert len(valid)==1,(name,'strict-switch-xrefs',list(map(hex,valid)),'all-table-refs',[(hex(a),md.reg_name(r)) for a,r,_ in refs[table]])
+              print(f'STRICT_TABLE_SWITCH={name};TABLE=0x{table:x};METHODS={spec["method_count"]};LEA=0x{valid[0]:x}')
+          print('STRICT_ALL_NATIVE_LOGIN_QMETA_TABLES=PASS')
+          PY
+          echo RAW_CLIENT_RETAINED=false
+          echo OFFICIAL_CLIENT_EXECUTED=false
+          echo REAL_SECRET_ACCESS=false

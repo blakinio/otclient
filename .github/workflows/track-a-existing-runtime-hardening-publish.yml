@@ -1,0 +1,46 @@
+name: Track A existing-runtime audit-hardening publisher
+
+on:
+  push:
+    branches:
+      - fix/OTC-20260819-track-a-existing-runtime-adoption-hardening
+    paths:
+      - .github/workflows/track-a-existing-runtime-hardening-publish.yml
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: [otclient, synology]
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Publish exact audited hardening commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          SRC=/work/_otclient_existing_runtime_adoption_hardening
+          BRANCH=fix/OTC-20260819-track-a-existing-runtime-adoption-hardening
+          EXPECTED=b2f939cecedc6beba3f4ce8f405d1355395fbf2b
+          BASE=a71dda46742d8db1bdddfa5d225e9b32703b2080
+          test "$RUNNER_NAME" = "synology-otclient-01"
+          test "$(git -C "$SRC" rev-parse HEAD)" = "$EXPECTED"
+          test "$(git -C "$SRC" rev-parse HEAD^)" = "$BASE"
+          git fetch origin main "$BRANCH"
+          test "$(git rev-parse origin/main)" = "$BASE"
+          git fetch "$SRC" "$EXPECTED:refs/remotes/local/adoption-hardening"
+          git checkout --detach "$EXPECTED"
+          python3 .github/scripts/test_tibia_official_client_re_kasm_existing_runtime_probe.py
+          python3 .github/scripts/test_tibia_official_client_re_canonical_live_transition.py
+          python3 .github/scripts/test_track_a_agent_runtime_governance.py
+          rm -rf .github/scripts/__pycache__
+          git diff --check "$BASE...HEAD"
+          test "$(git diff --name-only "$BASE...HEAD" | wc -l)" = 4
+          remote=$(git ls-remote origin "refs/heads/$BRANCH" | awk '{print $1}')
+          test -n "$remote"
+          git push --force-with-lease="refs/heads/$BRANCH:$remote" origin "HEAD:refs/heads/$BRANCH"
+          echo TRACK_A_ADOPTION_HARDENING_PUBLISH=PASS

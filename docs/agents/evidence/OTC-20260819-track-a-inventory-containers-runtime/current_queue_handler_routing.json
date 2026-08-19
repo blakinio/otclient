@@ -1,0 +1,56 @@
+{
+  "schema": "track-a-current-inventory-container-routing-v1",
+  "task": "OTC-20260819-track-a-inventory-containers-runtime",
+  "client": {
+    "version_token": "15.32",
+    "size": 52109920,
+    "sha256": "ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8",
+    "build_id": "d803d9695868713ef6ab0c3cf65f91212c9c6a62"
+  },
+  "queue": {
+    "type": "tibia::protocol::TProtocolMessageQueue",
+    "qmeta_record_va": "0x30b83c0",
+    "static_metacall_va": "0xde7fa0",
+    "method_count": 355,
+    "signal_count": 192
+  },
+  "handler": {
+    "type": "tibia::container::TContainerProtocolMessageHandler",
+    "qmeta_record_va": "0x30b78c0",
+    "static_metacall_va": "0xd1a1d0",
+    "method_count": 35,
+    "signal_count": 11
+  },
+  "proven_connections": [
+    {"queue_signal_index":40,"queue_signal":"receivedSetInventoryMessage","queue_wrapper_va":"0xdd7aa0","handler_method_index":11,"handler_method":"handleSetInventoryMessage","handler_callable_va":"0xe6ff50","connect_setup_va":"0x7ec146"},
+    {"queue_signal_index":67,"queue_signal":"receivedDeleteInventoryMessage","queue_wrapper_va":"0xdd7fb0","handler_method_index":12,"handler_method":"handleDeleteInventoryMessage","handler_callable_va":"0xe702e0","connect_setup_va":"0x7ec1d2"},
+    {"queue_signal_index":117,"queue_signal":"receivedPlayerInventoryMessage","queue_wrapper_va":"0xdd8910","handler_method_index":13,"handler_method":"handlePlayerInventoryMessage","handler_callable_va":"0xe6c460","connect_setup_va":"0x7ec25e"},
+    {"queue_signal_index":62,"queue_signal":"receivedContainerMessage","queue_wrapper_va":"0xdd7ec0","handler_method_index":14,"handler_method":"handleContainerMessage","handler_callable_va":"0xe71ca0","connect_setup_va":"0x7ec2ea"},
+    {"queue_signal_index":65,"queue_signal":"receivedChangeInContainerMessage","queue_wrapper_va":"0xdd7f50","handler_method_index":16,"handler_method":"handleChangeInContainerMessage","handler_callable_va":"0xe704a0","connect_setup_va":"0x7ec402"},
+    {"queue_signal_index":66,"queue_signal":"receivedDeleteInContainerMessage","queue_wrapper_va":"0xdd7f80","handler_method_index":17,"handler_method":"handleDeleteInContainerMessage","handler_callable_va":"0xe70610","connect_setup_va":"0x7ec48e"},
+    {"queue_signal_index":64,"queue_signal":"receivedCreateInContainerMessage","queue_wrapper_va":"0xdd7f20","handler_method_index":18,"handler_method":"handleCreateInContainerMessage","handler_callable_va":"0xe70780","connect_setup_va":"0x7ec51a"},
+    {"queue_signal_index":116,"queue_signal":"receivedObjectInfoMessage","queue_wrapper_va":"0xdd88e0","handler_method_index":19,"handler_method":"handleObjectInfoMessage","handler_callable_va":"0xe6c850","connect_setup_va":"0x7ec5a6"},
+    {"queue_signal_index":153,"queue_signal":"receivedStashMessage","queue_wrapper_va":"0xdd8fd0","handler_method_index":20,"handler_method":"handleStashMessage","handler_callable_va":"0xe66e40","connect_setup_va":"0x7ec632"},
+    {"queue_signal_index":154,"queue_signal":"receivedSpecialContainersAvailableMessage","queue_wrapper_va":"0xdd9000","handler_method_index":22,"handler_method":"handleSpecialContainersAvailableMessage","handler_callable_va":"0xe65440","connect_setup_va":"0x7ec74a"},
+    {"queue_signal_index":155,"queue_signal":"receivedDepotSearchResultMessage","queue_wrapper_va":"0xdd9030","handler_method_index":23,"handler_method":"handleDepotSearchResultMessage","handler_callable_va":"0xe66fb0","connect_setup_va":"0x7ec7d6"},
+    {"queue_signal_index":156,"queue_signal":"receivedDepotSearchDetailListMessage","queue_wrapper_va":"0xdd9060","handler_method_index":24,"handler_method":"handleDepotSearchDetailListMessage","handler_callable_va":"0xe708f0","connect_setup_va":"0x7ec862"}
+  ],
+  "passive_live_observation": {
+    "runtime_access": "read_only",
+    "target_uniqueness": "PROVEN",
+    "client_pid": 17954,
+    "display": ":1",
+    "screen_state": "LOGIN_SCREEN",
+    "inventory_or_container_ui_visible": false,
+    "gui_input_sent": false,
+    "credentials_used": false,
+    "login_performed": false
+  },
+  "classification": {
+    "queue_qmeta_current_build": "FACT",
+    "listed_queue_signal_to_handler_callable_connectImpl_pairs": "FACT",
+    "handler_to_storage_mutation": "UNKNOWN",
+    "storage_to_controller_connection": "UNKNOWN",
+    "live_inventory_container_semantics": "NOT_OBSERVED_LOGIN_SCREEN"
+  }
+}

@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260819-tibia-re-control-center-e2e-design
-status: in_progress
+status: validating
 agent: ChatGPT
 project_lane: otclient
 lane: P0-DESIGN
@@ -38,11 +38,11 @@ track_a_runtime_agent_admission_version: 1
 execution_class: github_repository_docs
 runtime_access: none
 persistent_session_role: none
-runtime_owner_task: null
-runtime_namespace: null
-canonical_registration: NOT_ACCESSED
-canonical_lease_generation: NOT_ACCESSED
-registration_lease_generation: NOT_ACCESSED
+runtime_owner_task: NOT_APPLICABLE
+runtime_namespace: NOT_APPLICABLE
+canonical_registration: NOT_APPLICABLE
+canonical_lease_generation: NOT_APPLICABLE
+registration_lease_generation: NOT_APPLICABLE
 gate_a: NOT_APPLICABLE
 generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
@@ -58,9 +58,9 @@ transaction_authorized: false
 owner_funded_ai_api_authorized: false
 owner_current_instruction: prepare the project described by the current TIBIA RE Control Center UI concept for browser or direct-machine use and future Oteryn Rust E2E reuse
 invocation_started_at: 2026-08-19T15:16:00+02:00
-last_progress_at: 2026-08-19T15:16:00+02:00
-current_blocker: null
-next_action: author the normative project architecture, adapter contract and bounded MVP implementation prompt, then self-review the exact diff
+last_progress_at: 2026-08-19T15:25:00+02:00
+current_blocker: exact-head Track A governance must be revalidated after admission-metadata repair
+next_action: wait for exact-head CI/governance, then perform final self-review and readiness disposition
 ---
 
 # TIBIA RE Control Center / E2E Lab design
@@ -90,16 +90,46 @@ Documentation and contracts only. No runtime observation, no GUI input, no login
 - provide a bounded implementation prompt that a later agent can execute without reconstructing this chat;
 - keep all implementation paths unclaimed so #592 and other active runtime tasks are not overlapped.
 
+## Validation history
+
+Initial exact-head validation on `50b79915837abaa3c376eae1b13bf32572f82461`:
+
+```yaml
+CI: PASS
+track_a_governance: FAIL
+failure: canonical_registration used non-schema value NOT_ACCESSED for runtime_access=none
+repair: set runtime owner/namespace/registration/generation fields to NOT_APPLICABLE as required by current governance
+runtime_effect_of_failure_or_repair: none
+```
+
+## Self-review checkpoint
+
+Full changed-file review found exactly four task-owned documentation paths. No implementation path, workflow, runtime bridge, Surveyor path, module catalogue or Oteryn-v2 repository path is changed.
+
+The design explicitly keeps:
+
+- browser/CLI operations behind one backend/domain path;
+- real official-client mutation out of the initial implementation packages;
+- Track A authority external and fail-closed;
+- credentials/session secrets outside scenario/event artifacts;
+- official-vs-Oteryn comparison semantic rather than raw-wire-equality based;
+- PR #592 as an unmerged dependency rather than assumed capability.
+
+No material self-review finding remains after the admission-metadata repair.
+
 ## Context checkpoint
 
 ```yaml
-phase: design_authoring
+phase: exact_head_validation
 base_main: 951888b338382bc2511ec846fad46518298baa72
+pr: 600
 survey_pr: 592
 survey_pr_status: open_draft
 survey_owned_paths_overlap: none
 runtime_access: none
 credentials_accessed: false
 client_executed: false
-next_action: author the project programme and adapter contract
+real_gui_input_sent: false
+oteryn_v2_written: false
+next_action: verify exact-head CI/governance and current-main freshness
 ```

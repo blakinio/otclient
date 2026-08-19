@@ -1,18 +1,20 @@
 ---
 task_id: OTC-20260819-track-a-features-static-g0
-status: investigating
+status: validating
 session_id: chatgpt-20260819-tibia-re-features
 session_role: researcher
 project_lane: otclient
 lane: P0-STATE
 track_id: official-client-re
 task_kind: discovery
-phase: investigate
+phase: final-draft-validation
 branch: research/OTC-20260819-track-a-features-static-model
 base_branch: main
-base_main: 82e5f435c3aa4172115bf7f6a0cd7a5cc6da3d50
+base_main: cf90b84442dda730bdab93d8aa9f3236b7532ad8
+source_pr: 560
+source_head: PENDING_FINAL_DRAFT_HEAD
 created: 2026-08-19T09:41:47+02:00
-updated: 2026-08-19T09:41:47+02:00
+updated: 2026-08-19T10:00:10+02:00
 risk: low
 execution_mode: chat
 execution_class: github_hosted
@@ -40,10 +42,11 @@ implementation_authorized: true
 e2e_required: false
 decomposition_decision: single
 owned_paths:
-  - .github/workflows/track-a-features-static-g0.yml
   - docs/agents/tasks/active/OTC-20260819-track-a-features-static-g0.md
   - docs/agents/reports/OTCLIENT-20260819-track-a-features-static-g0.md
   - docs/agents/evidence/OTC-20260819-track-a-features-static-g0/**
+retired_producer_path:
+  - .github/workflows/track-a-features-static-g0.yml
 dependencies:
   - promoted public-package fingerprint from PR #551
   - PR #536 is read-only planning input only; its shared matrix paths are not owned
@@ -52,9 +55,14 @@ related_prs:
   - 550
   - 551
   - 555
+  - 560
+producer_run: 32229656311
+producer_job: 95996576897
+producer_artifact: 9356800104
+producer_artifact_digest_reported: sha256:779f2d1af266ad0327191a5fda1289a524884c1a9fdb2c4d351d3de3dcaab8d0
 ---
 
-# Track A feature-systems static G3
+# Track A feature-systems static G0
 
 ## Objective
 
@@ -98,23 +106,57 @@ feature_scope:
   integration_required: false
   e2e_required: false
   completion_claim: internal_only
-complete_user_facing_featurezfalse
+complete_user_facing_feature: false
 physical_e2e: NOT_APPLICABLE
 physical_e2e_reason: static GitHub-hosted reverse-engineering package with runtime_access none
 ```
 
+## Producer result
+
+```text
+run/job: 32229656311 / 95996576897 = SUCCESS
+producer_head: 9ae46d14807e46e76c044c336e50033b11fa3a1e
+artifact: 9356800104
+GitHub-reported artifact digest: sha256:779f2d1af266ad0327191a5fda1289a524884c1a9fdb2c4d351d3de3dcaab8d0
+packed sha256: 1fc26d66cef90723d29293f177fcff41c8e937e7aac830f08e82c2f4c69eb354
+unpacked sha256: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
+unpacked size: 52109920
+current public package fence: PASS
+QMeta classes: 61
+feature strings: 818
+protocol strings: 13
+raw client retained: false
+```
+
+Task-local proposed deltas against PR #536 planning state:
+
+```text
+G01 NOT_STARTED -> PARTIAL
+G04 NOT_STARTED -> PARTIAL
+G05 NOT_STARTED -> PARTIAL
+G06 NOT_STARTED -> PARTIAL
+```
+
+These proposals are not canonical promotions and the shared matrix/checklist remains untouched.
+
 ## Acceptance inventory
 
-- [ ] Fetch the public Linux package only in an ephemeral GitHub-hosted job and fail closed unless the exact promoted public-package packed/unpacked fingerprint is reproduced.
-- [ ] Enumerate exact-package Qt class ownership plus methods/signals/properties/enums for Cyclopedia/Bestiary/Charm/Monster Bonus surfaces.
-- [ ] Retain exact-package feature/protocol strings needed to distinguish controller/storage/handler/request/action boundaries.
-- [ ] Do not infer per-method code targets from heuristic jump-table recovery.
-- [ ] Classify all material conclusions as FACT / INFERENCE / UNKNOWN and keep current runtime semantics UNKNOWN.
-- [ ] Persist only compact text evidence; delete packed/unpacked client before artifact upload.
-- [ ] Leave G24-G31 economy-panel scope untouched and do not modify PR #536 shared matrix/checklist.
-- [ ] Record exact next discriminator for every remaining UNKNOWN needed before any row could become DONE.
-- [ ] Run proportional validation on the final draft head.
+- [x] Fetch the public Linux package only in an ephemeral GitHub-hosted job and fail closed unless the exact promoted public-package packed/unpacked fingerprint is reproduced.
+- [x] Enumerate exact-package Qt class ownership plus methods/signals/properties/enums for Cyclopedia/Bestiary/Charm/Monster Bonus surfaces.
+- [x] Retain exact-package feature/protocol strings needed to distinguish controller/storage/handler/request/action boundaries.
+- [x] Do not infer per-method code targets from heuristic jump-table recovery.
+- [x] Classify all material conclusions as FACT / INFERENCE / UNKNOWN and keep current runtime semantics UNKNOWN.
+- [x] Persist only compact text evidence; delete packed/unpacked client before artifact upload.
+- [x] Leave G24-G31 economy-panel scope untouched and do not modify PR #536 shared matrix/checklist.
+- [x] Record exact next discriminator for every remaining UNKNOWN needed before any row could become DONE.
+- [ ] Run proportional validation on the final rebased Draft head.
 - [ ] Stop at a Draft PR for coordinator review; do not self-promote or merge.
+
+## Durable evidence
+
+- `docs/agents/evidence/OTC-20260819-track-a-features-static-g0/20260819-current-package-cyclopedia-bestiary-charms-bonus.md`
+- `docs/agents/reports/OTCLIENT-20260819-track-a-features-static-g0.md`
+- GitHub Actions run `32229656311`, job `95996576897`, artifact `9356800104`.
 
 ## Admission record
 
@@ -138,19 +180,19 @@ mutation_authorized: false
 
 ```yaml
 policy_version: 2
-phase: investigate
-validation_level: focused
-last_completed_step: live-state and ownership preflight completed; isolated worktree created
-next_action: run the bounded GitHub-hosted feature census, persist compact evidence/report, remove the temporary workflow, and checkpoint the Draft PR for coordinator review
+phase: final-draft-validation
+validation_level: proportional
+last_completed_step: producer evidence downloaded, independently hashed per extracted text file, classified and persisted; temporary producer workflow ready for retirement
+next_action: remove the temporary producer workflow, commit/rebase onto current main, run exact-head checks, keep PR #560 Draft, and hand off to a fresh coordinator audit
 ```
 
 ## Invocation counters
 
 ```yaml
 invocation_started_at: 2026-08-19T09:27:00+02:00
-last_progress_at: 2026-08-19T09:41:47+02:00
-ci_checks_for_current_head: 0
-ci_check_generation: draft
+last_progress_at: 2026-08-19T10:00:10+02:00
+ci_checks_for_current_head: 1
+ci_check_generation: producer
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0

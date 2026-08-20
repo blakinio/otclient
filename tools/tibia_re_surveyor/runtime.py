@@ -79,9 +79,7 @@ class DockerRuntimeProbe:
         size = int(self._docker_exec(self.target_container, ["stat", "-Lc", "%s", f"{proc}/exe"]).strip())
         sha = self._docker_exec(self.target_container, ["sha256sum", f"{proc}/exe"], timeout=30.0).split()[0]
         stat_text = self._docker_exec(self.target_container, ["cat", f"{proc}/stat"])
-        environ = self._docker_exec(self.target_container, ["cat", f"{proc}/environ"], required=False)
-        display = next((entry.split("=", 1)[1] for entry in environ.split("\x00") if entry.startswith("DISPLAY=")), None)
-        return {"pid": pid, "process_start_ticks": self._start_ticks(stat_text), "exe_basename": exe.rsplit("/", 1)[-1] if exe else None, "client_size": size, "client_sha256": sha, "display": display, "exact_fence_match": size == EXPECTED_CLIENT_SIZE and sha == EXPECTED_CLIENT_SHA256}
+        return {"pid": pid, "process_start_ticks": self._start_ticks(stat_text), "exe_basename": exe.rsplit("/", 1)[-1] if exe else None, "client_size": size, "client_sha256": sha, "exact_fence_match": size == EXPECTED_CLIENT_SIZE and sha == EXPECTED_CLIENT_SHA256}
 
     def _visible_tibia_windows(self) -> List[dict]:
         raw = self._docker_exec(self.target_container, ["xdotool", "search", "--onlyvisible", "--name", "^Tibia"], user="kasm-user", env={"DISPLAY": self.display}, required=False)

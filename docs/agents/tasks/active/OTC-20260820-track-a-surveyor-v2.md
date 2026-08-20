@@ -1,19 +1,19 @@
 ---
 task_id: OTC-20260820-track-a-surveyor-v2
-status: implementing
+status: validating
 agent: ChatGPT
 project_lane: otclient
 lane: P0-STATE
 track_id: official-client-re
 task_kind: research_infrastructure
-phase: implement
+phase: closeout
 branch: feat/OTC-20260820-track-a-surveyor-v2
 base_branch: main
 base_sha: c9156e72aa3c647054ff9dfc5ffed00e43a7e9cd
 created: 2026-08-20T08:49:00+02:00
-updated: 2026-08-20T08:49:00+02:00
+updated: 2026-08-20T09:55:00+02:00
 risk: medium
-related_pr: ""
+related_pr: "616"
 owned_paths:
   - tools/tibia_re_surveyor/**
   - tests/tools/tibia_re_surveyor/**
@@ -71,9 +71,9 @@ gameplay_allowed: false
 transaction_authorized: false
 owner_funded_ai_api_authorized: false
 invocation_started_at: 2026-08-20T08:49:00+02:00
-last_progress_at: 2026-08-20T08:49:00+02:00
+last_progress_at: 2026-08-20T09:55:00+02:00
 current_blocker: none
-next_action: import the reviewed Surveyor v1 implementation from PR #592 onto current main and extend it with deterministic collect-all alias bundles and missing-reader reporting
+next_action: commit this audit/validation checkpoint, revalidate its checkpoint-only delta, then require fresh exact-head CI/governance before readiness and squash merge
 ---
 
 # TIBIA-RE Surveyor v2 implementation
@@ -123,4 +123,57 @@ validation:
     evidence: implementation not yet imported
 blockers: []
 next_action: import #592 code/test blobs onto this current-main branch and implement the v2 collect-all layer
+```
+
+## Final implementation validation checkpoint
+
+```yaml
+checkpoint_version: 2
+updated_at: 2026-08-20T09:55:00+02:00
+audited_implementation_head: d103238b45aa5feb90ae7914d1e83dbd8e44d0b8
+branch: feat/OTC-20260820-track-a-surveyor-v2
+pr: 616
+status: validating
+phase: closeout
+runtime_access: none
+implementation_result:
+  canonical_rows: 169
+  alias_views: 12
+  subsystem_telemetry_documents: 11
+  missing_typed_readers: 11
+  current_bridge_profile_state: NO_EXACT_CURRENT_PROFILE
+  collector_has_input_path: false
+  full_process_environment_read: false
+  semantic_promotion_allowed: false
+focused_validation:
+  compileall: PASS
+  unittest_discover: 17_PASS
+  repository_only_collect_all: PASS
+  privacy_scan: PASS
+  manifest_present: true
+  diff_check: PASS
+exact_head_validation_on_audited_implementation:
+  ci_run: 32344898863
+  ci_result: SUCCESS
+  track_a_agent_governance_run: 32344898266
+  track_a_agent_governance_result: SUCCESS
+  track_a_canonical_live_governance_run: 32344898169
+  track_a_canonical_live_governance_result: SUCCESS
+independent_audit:
+  review_id: 4980263059
+  validator: local Ollama qwen3.5:9b on Molehill-PC
+  num_ctx: 65536
+  prompt_eval_count: 46738
+  result: PASS
+  material_findings_open: 0
+self_review_dispositions:
+  - stale PR #592 keepalive/input prototype intentionally removed; current task has no owner authorization for anti-idle mutation
+  - runtime probe no longer reads complete /proc/PID/environ merely to discover DISPLAY
+  - bridge profile compatibility is dynamically censused and fails closed when no exact current SHA profile exists
+  - raw character-bearing window titles are not retained in v2 output
+runtime_e2e: NOT_APPLICABLE
+runtime_e2e_reason: repository implementation task has runtime_access:none; the first physical collect-all is a separate admitted runtime-validation task after trusted-base merge
+blockers:
+  - this checkpoint changes only the task record after the independent implementation audit and therefore needs narrow delta revalidation plus fresh exact-head CI/governance
+next_action: narrow-audit this checkpoint-only delta, then verify fresh exact-head CI/governance and merge PR #616 if all gates remain green
 ```

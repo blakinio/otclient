@@ -2,7 +2,7 @@
 
 ```yaml
 contract_id: TIBIA-RE-CONTROL-CENTER-ADAPTER-V1
-version: 1.3
+version: 1.4
 major_version: 1
 status: hardened_design_baseline
 producer_repository: blakinio/otclient
@@ -24,7 +24,7 @@ Common scenarios express semantic intent only. They do not expose client-specifi
 - protocol opcodes;
 - wire layouts.
 
-Execution safety is normative in `TIBIA_RE_CONTROL_CENTER_EXECUTION_V1.md` and action parameter/canonical-hash semantics in `TIBIA_RE_CONTROL_CENTER_SCENARIO_V1.md`.
+Execution safety is normative in `TIBIA_RE_CONTROL_CENTER_EXECUTION_V1.md` and scenario/action/semantic-field semantics are normative in `TIBIA_RE_CONTROL_CENTER_SCENARIO_V1.md`.
 
 ## 2. Version negotiation
 
@@ -57,7 +57,7 @@ AdapterIdentity:
 
 Changed adapter/runtime/session identity invalidates stale pending mutation.
 
-## 4. Generic capability model
+## 4. Generic capability and semantic-schema model
 
 ```yaml
 Capability:
@@ -71,7 +71,33 @@ Capability:
 
 Read and action support are independent.
 
-### 4.1 Official-client evidence extension
+### 4.1 Semantic field registries
+
+Scenario predicates never address free-form adapter JSON. The Scenario Engine owns the built-in `control-center.core@1.0.0` field registry from Scenario v1. An adapter that supports additional normalized predicate fields advertises immutable registry descriptors:
+
+```yaml
+SemanticRegistryDescriptor:
+  schema_id: SemanticKey
+  semantic_version: string
+  registry_hash: lowercase_hex_sha256
+  source: string
+```
+
+The full registry uses exactly the Scenario-v1 `SemanticFieldRegistry` schema.
+
+Rules:
+
+- the adapter operation `semantic_field_registries()` returns descriptors only; descriptors grant no read/action authority;
+- `semantic_field_registry(schema_id, semantic_version)` returns the exact immutable registry or `UNSUPPORTED`;
+- `registry_hash = SHA-256(UTF8(JCS(validated SemanticFieldRegistry)))`;
+- a returned registry whose computed hash differs from the descriptor is rejected before scenario execution;
+- an adapter may omit advertisement of the built-in core registry because the Scenario Engine already owns it, but every value exposed for a built-in core path must conform to that exact descriptor;
+- extension registry IDs/versions cannot be redefined by another adapter process under the same identity/version;
+- registry negotiation is static/read-only metadata and never creates external runtime authority.
+
+A scenario with `semantic_schema_id/version` binds to exactly that registry. A scenario with both null uses the built-in core registry.
+
+### 4.2 Official-client evidence extension
 
 Only `OFFICIAL_TIBIA` exposes Track A research maturity:
 
@@ -106,7 +132,7 @@ RuntimeStatus:
 
 For `OFFICIAL_TIBIA`, `MUTATION_ALLOWED` is status only. It never constitutes standing authority for a later action.
 
-## 6. Snapshot model
+## 6. Snapshot model and typed projection
 
 Adapters return only truthfully sourced fields:
 
@@ -150,6 +176,27 @@ GameSnapshot:
 
 Unknown remains null/UNKNOWN. Never fabricate plausible values for UI completeness.
 
+The nested `object` fields above are transport containers for normalized snapshot families, not a predicate type system. For every path used by Scenario predicates or `SNAPSHOT_PATH`, the adapter must additionally expose a typed projection through the selected Scenario-v1 `SemanticFieldRegistry`:
+
+```yaml
+SemanticFieldValue:
+  path: SemanticFieldPath
+  schema_id: SemanticKey
+  semantic_version: string
+  status: OBSERVED | UNKNOWN | STALE | UNSUPPORTED
+  value: registry_typed_value | null
+```
+
+Rules:
+
+- `value` must match the descriptor's `value_type/cardinality` exactly when `status=OBSERVED`;
+- UNKNOWN/STALE/UNSUPPORTED carry `value=null`;
+- no predicate may traverse arbitrary `conditions`, `target`, `inventory`, `containers`, `battle_list` or other object structure directly;
+- adapters may internally derive a typed projection from their normalized snapshot but must not invent values or coerce types;
+- a registry/path mismatch fails closed before predicate evaluation.
+
+This keeps the broad snapshot extensible while making scenario semantics deterministic.
+
 ## 7. DispatchFence
 
 ```yaml
@@ -184,6 +231,8 @@ ActionRequest:
 
 `parameters`, `EffectBound` and `action_request_hash` are produced according to Scenario v1.
 
+`parameters` is serialized from the selected typed Scenario-v1 action schema. The adapter must not reinterpret it as a generic free-form command object.
+
 Login credentials/session secrets are never serialized into ActionRequest.
 
 ## 9. ExecutionContext and one-shot commit
@@ -200,7 +249,7 @@ ExecutionContext:
 
 - is one-shot;
 - performs final Execution-v1 dispatch-gate/fence checks;
-- makes `DISPATCH_COMMITTED/POSSIBLY_DISPATCHED` and budget `AT_RISK` durable;
+- makes `DISPATCH_COMMITTED/POSSIBLY_DISPATCHED` and applicable non-time budget `AT_RISK` state durable;
 - refuses if STOP/generation/identity/authority/durability checks fail.
 
 The adapter must not cross a physical mutation boundary unless this exact action's commit returned `COMMITTED`.
@@ -221,7 +270,7 @@ The local `dispatch_gate` is not held while waiting to acquire Track A authority
 
 ## 11. Action lifecycle/result
 
-Execution lifecycle is normative in Execution v1.
+Execution lifecycle is normative in Execution v1. `CONFIRMED` is the successful terminal lifecycle state.
 
 Result envelope:
 
@@ -251,15 +300,18 @@ ActionResult:
 
 After successful dispatch commit with uncertain physical outcome, return `POSSIBLY_DISPATCHED/AMBIGUOUS`, not a retryable pre-dispatch failure.
 
-A successful local GUI/function call is not automatically PASS; PASS requires scenario-declared evidence.
+A successful local GUI/function call is not automatically PASS; PASS requires scenario-declared evidence and terminal `CONFIRMED` semantics.
 
 ## 12. Required logical adapter operations
 
 ```text
 identity() -> AdapterIdentity
 capabilities() -> CapabilitySet
+semantic_field_registries() -> [SemanticRegistryDescriptor]
+semantic_field_registry(schema_id, semantic_version) -> SemanticFieldRegistry | UNSUPPORTED
 runtime_status() -> RuntimeStatus
 snapshot(request) -> GameSnapshot
+semantic_field_values(snapshot_id, schema_id, semantic_version, paths) -> [SemanticFieldValue]
 preflight(action_request) -> PreflightResult
 execute(action_request, execution_context) -> ActionResult
 wait_for(condition, timeout, cancellation_token) -> WaitResult
@@ -268,7 +320,9 @@ capture_stop(capture_session) -> CaptureSummary
 emergency_stop(reason) -> StopResult
 ```
 
-Concrete language/API may differ, but these responsibilities cannot be bypassed.
+Concrete language/API may differ, but these responsibilities and their semantics cannot be bypassed.
+
+`semantic_field_values` is observational only. It may reuse already normalized snapshot data; it must not trigger hidden attach/input/process/network mutation.
 
 ## 13. Preflight
 
@@ -289,7 +343,7 @@ Preflight is advisory/diagnostic only. `allowed_now=true` never authorizes futur
 
 ## 14. Snapshot/wait purity
 
-`snapshot()` and ordinary `wait_for()` are observational operations.
+`snapshot()`, `semantic_field_values()` and ordinary `wait_for()` are observational operations.
 
 They must not:
 
@@ -341,9 +395,9 @@ A compensating external action, if ever desired, is a normal semantic action wit
 
 ## 17. Scenario step semantics
 
-Scenario structure, typed predicates, semantic selectors, action parameters, retry rules, parser bounds, canonical hashing, EffectBound and privacy/capture policy are normative in `TIBIA_RE_CONTROL_CENTER_SCENARIO_V1.md`.
+Scenario structure, semantic registry binding, typed predicates, semantic selectors, action parameters, retry rules, parser bounds, canonical hashing, SideEffectBudget, EffectBound and privacy/capture policy are normative in `TIBIA_RE_CONTROL_CENTER_SCENARIO_V1.md`.
 
-Unknown action kind/unsupported semantic version fails closed.
+Unknown action kind/unsupported semantic registry or contract version fails closed.
 
 ## 18. Event envelope
 
@@ -512,8 +566,23 @@ Mismatch requires both sides to support/observe the field at the same normalized
 
 Unknown/unobservable reference is a coverage gap, not candidate failure.
 
-## 26. Compatibility
+## 26. Package A adapter/registry tests
+
+At minimum:
+
+1. built-in core registry works without adapter extension advertisement;
+2. extension descriptor hash matches returned JCS registry;
+3. descriptor/hash mismatch fails closed;
+4. unsupported registry ID/version fails scenario validation/execution;
+5. same ID/version cannot change descriptors silently;
+6. registered scalar/list/set values enforce exact value type/cardinality;
+7. UNKNOWN/STALE/UNSUPPORTED semantic field values carry no concrete value;
+8. predicate path cannot traverse free-form snapshot objects;
+9. `semantic_field_values` is passive and cannot trigger invasive enablement;
+10. registry/capability/evidence/authority remain independent concepts.
+
+## 27. Compatibility
 
 Adapter major version 1 is additive-only.
 
-Changing final commit semantics, passive-observation purity, capture-control safety, emergency-stop safety or external authority relationship requires a new major version or a separately reviewed compatible extension.
+Changing final commit semantics, semantic-registry binding, passive-observation purity, capture-control safety, emergency-stop safety or external authority relationship requires a new major version or a separately reviewed compatible extension.

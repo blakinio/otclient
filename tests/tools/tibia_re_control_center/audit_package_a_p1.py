@@ -15,7 +15,9 @@ from tools.tibia_re_control_center.model import (
     DispatchFence,
     DispatchState,
     LifecycleState,
+    PrivacyError,
     SideEffectBudget,
+    ValidationError,
 )
 from tools.tibia_re_control_center.recorder import Recorder
 from tools.tibia_re_control_center.scenario import (
@@ -122,10 +124,14 @@ def abort_scenario() -> str:
 
 
 def main() -> None:
-    _, _, store, coordinator = stack(epoch="audit-stop")
+    _, stop_adapter, store, coordinator = stack(epoch="audit-stop")
+    capture = stop_adapter.capture_start({"state": True})
     store.inject_fault("stop", "error")
     assert coordinator.stop_all() is False
     assert coordinator.stop_durability_unresolved is True
+    assert coordinator.runs["audit-p1-run"].cancelled is True
+    assert stop_adapter.emergency_stop_calls == 1
+    assert stop_adapter.capture_sessions[capture]["active"] is False
     assert coordinator.reset_stop() is False
     assert coordinator.mutation_admission_allowed() is False
     assert coordinator.stop_all() is True
@@ -152,6 +158,8 @@ def main() -> None:
     ).run(scenario, run_id="audit-abort-run")
     assert result.status == "REFUSED"
     assert adapter.physical_effects == []
+    abort_action = next(iter(result.action_results.values()))
+    assert abort_action.reason_code == "CLIENT_NOT_IN_GAME"
 
     _, adapter, store, coordinator = stack(epoch="audit-callback")
     request = request_for(coordinator, adapter, "audit-callback-action")
@@ -178,6 +186,100 @@ def main() -> None:
         lifecycle_state=LifecycleState.DISPATCHING,
     ) is False
     assert store.load_action(request.action_id).lifecycle_state == LifecycleState.RESERVED
+
+    _, race_adapter, race_store, race_coordinator = stack(epoch="audit-callback-race")
+    race_request = request_for(race_coordinator, race_adapter, "audit-callback-race-action")
+    race_identity = race_adapter.identity()
+    callback_results: list[bool] = []
+
+    def callback_during_execution() -> None:
+        callback_results.append(
+            race_coordinator.accept_callback(
+                race_request.action_id,
+                backend_epoch=race_coordinator.backend_epoch,
+                control_generation=race_coordinator.control_generation,
+                adapter_generation=race_identity.adapter_generation,
+                runtime_instance_id=race_identity.runtime_instance_id,
+                session_epoch=race_identity.session_epoch,
+                lifecycle_state=LifecycleState.CONFIRMING,
+            )
+        )
+
+    race_adapter.after_commit_hook = callback_during_execution
+    race_result = race_coordinator.execute_action(race_request)
+    assert callback_results == [False]
+    assert race_result.status == ActionStatus.PASS
+    assert race_store.load_action(race_request.action_id).lifecycle_state == LifecycleState.CONFIRMED
+
+    secret_raw = json.loads(abort_scenario())
+    secret_raw["name"] = "PASSWORD=hunter2"
+    secret_scenario = parse_and_validate(json.dumps(secret_raw))
+    secret_artifacts = ArtifactStore()
+    try:
+        secret_artifacts.create_run(
+            run_id="audit-secret-run",
+            scenario_id=secret_scenario.scenario_id,
+            scenario_hash=secret_scenario.scenario_hash,
+            scenario_ast=secret_scenario.ast,
+            adapter_identity={"adapter_id": "fake"},
+            backend_epoch="audit-secret",
+            initial_control_generation=0,
+            started_monotonic_ns=0,
+            privacy_policy=secret_scenario.ast["privacy_policy"],
+        )
+    except PrivacyError:
+        pass
+    else:
+        raise AssertionError("secret-shaped scenario was serialized")
+    assert secret_artifacts.runs == {}
+
+    class BlockingActivationStore(DeterministicDurableStore):
+        def __init__(self) -> None:
+            super().__init__()
+            self.calls = 0
+            self.calls_lock = threading.Lock()
+            self.first_entered = threading.Event()
+            self.second_entered = threading.Event()
+            self.release_first = threading.Event()
+
+        def persist_run_activation(self, run_id: str, started_ns: int, deadline_ns: int) -> None:
+            with self.calls_lock:
+                self.calls += 1
+                call = self.calls
+            if call == 1:
+                self.first_entered.set()
+                if not self.release_first.wait(2):
+                    raise RuntimeError("audit first admission was not released")
+            else:
+                self.second_entered.set()
+            super().persist_run_activation(run_id, started_ns, deadline_ns)
+
+    admission_clock = ManualClock()
+    admission_adapter = FakeAdapter(admission_clock)
+    admission_store = BlockingActivationStore()
+    admission = MutationCoordinator(admission_adapter, admission_store, admission_clock, backend_epoch="audit-admission")
+    admission_successes: list[str] = []
+    admission_errors: list[str] = []
+
+    def start_admission(run_id: str) -> None:
+        try:
+            admission_successes.append(admission.start_run(run_id, audit_budget()).run_id)
+        except ValidationError as exc:
+            admission_errors.append(exc.code)
+
+    first = threading.Thread(target=start_admission, args=("audit-run-a",))
+    second = threading.Thread(target=start_admission, args=("audit-run-b",))
+    first.start()
+    assert admission_store.first_entered.wait(2)
+    second.start()
+    assert not admission_store.second_entered.wait(0.1)
+    admission_store.release_first.set()
+    first.join(2)
+    second.join(2)
+    assert not first.is_alive() and not second.is_alive()
+    assert len(admission_successes) == 1
+    assert admission_errors == ["REFUSED_MUTATION_RUN_CONFLICT"]
+    assert admission_store.calls == 1
 
     _, adapter, store, coordinator = stack(epoch="audit-shutdown")
     request = request_for(coordinator, adapter, "audit-shutdown-action")
@@ -207,6 +309,11 @@ def main() -> None:
     print("FINAL_GATE_ABORT_REVALIDATION=PASS")
     print("CALLBACK_IDENTITY_TERMINAL_FENCE=PASS")
     print("CLEAN_SHUTDOWN_INFLIGHT_FENCE=PASS")
+    print("MUTATION_RUN_ADMISSION_SERIALIZATION=PASS")
+    print("FAILED_STOP_CLEANUP=PASS")
+    print("CALLBACK_RECONCILIATION_SERIALIZATION=PASS")
+    print("SCENARIO_ARTIFACT_PRIVACY_GATE=PASS")
+    print("FINAL_GATE_ABORT_REASON=PASS")
 
 
 if __name__ == "__main__":

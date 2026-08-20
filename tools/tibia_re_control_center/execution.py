@@ -82,6 +82,7 @@ class MutationCoordinator:
         self.backend_epoch = backend_epoch or f"backend-{uuid.uuid4().hex}"
         self.dispatch_gate = threading.RLock()
         self.control_transition_lock = threading.RLock()
+        self.run_admission_lock = threading.RLock()
         self.mutation_execution_lock = threading.Lock()
         self.runs: dict[str, RunState] = {}
         self.results: dict[str, ActionResult] = {}
@@ -177,40 +178,34 @@ class MutationCoordinator:
         return checked_add(started_ns, duration, maximum=MAX_U64, field_name="runtime_deadline")
 
     def start_run(self, run_id: str, budget: SideEffectBudget, *, mutation_capable: bool = True) -> RunState:
-        if run_id in self.runs:
-            return self.runs[run_id]
-        if mutation_capable:
-            if not self.mutation_admission_allowed():
-                raise ValidationError("MUTATION_LOCALLY_BLOCKED", "STOP/recovery/activation state blocks mutation admission")
-            if self.active_mutation_run_id is not None:
-                raise ValidationError("REFUSED_MUTATION_RUN_CONFLICT", "another mutation-capable run owns this adapter")
-        elif self.runs and not self.adapter.concurrency_safe_reads:
-            raise ValidationError("READ_CONCURRENCY_UNPROVEN", "read-only concurrency is not proven safe")
-        started = self.clock.now_ns()
-        deadline = self._derive_deadline(started, budget.max_runtime_seconds)
-        self.store.persist_run_activation(run_id, started, deadline)
-        ledger = BudgetLedger(
-            run_id=run_id,
-            limit_seconds=budget.max_runtime_seconds,
-            started_monotonic_ns=started,
-            deadline_monotonic_ns=deadline,
-            dimensions={name: BudgetDimension(limit=value) for name, value in budget.effect_limits().items()},
-            updated_monotonic_ns=started,
-        )
-        self.store.write_budget(ledger, operation="budget_init")
-        identity = self.adapter.identity()
-        run = RunState(
-            run_id,
-            ledger,
-            identity.adapter_generation,
-            identity.runtime_instance_id,
-            identity.session_epoch,
-            mutation_capable,
-        )
-        self.runs[run_id] = run
-        if mutation_capable:
-            self.active_mutation_run_id = run_id
-        return run
+        with self.run_admission_lock:
+            if run_id in self.runs:
+                return self.runs[run_id]
+            if mutation_capable:
+                if not self.mutation_admission_allowed():
+                    raise ValidationError("MUTATION_LOCALLY_BLOCKED", "STOP/recovery/activation state blocks mutation admission")
+                if self.active_mutation_run_id is not None:
+                    raise ValidationError("REFUSED_MUTATION_RUN_CONFLICT", "another mutation-capable run owns this adapter")
+            elif self.runs and not self.adapter.concurrency_safe_reads:
+                raise ValidationError("READ_CONCURRENCY_UNPROVEN", "read-only concurrency is not proven safe")
+            started = self.clock.now_ns()
+            deadline = self._derive_deadline(started, budget.max_runtime_seconds)
+            self.store.persist_run_activation(run_id, started, deadline)
+            ledger = BudgetLedger(
+                run_id=run_id,
+                limit_seconds=budget.max_runtime_seconds,
+                started_monotonic_ns=started,
+                deadline_monotonic_ns=deadline,
+                dimensions={name: BudgetDimension(limit=value) for name, value in budget.effect_limits().items()},
+                updated_monotonic_ns=started,
+            )
+            self.store.write_budget(ledger, operation="budget_init")
+            identity = self.adapter.identity()
+            run = RunState(run_id, ledger, identity.adapter_generation, identity.runtime_instance_id, identity.session_epoch, mutation_capable)
+            self.runs[run_id] = run
+            if mutation_capable:
+                self.active_mutation_run_id = run_id
+            return run
 
     def recover_run(self, run_id: str, *, mutation_capable: bool = True) -> RunState:
         activation = self.store.load_run_activation(run_id)
@@ -232,9 +227,10 @@ class MutationCoordinator:
         return run
 
     def finish_run(self, run_id: str) -> None:
-        if self.active_mutation_run_id == run_id:
-            self.active_mutation_run_id = None
-        self.runs.pop(run_id, None)
+        with self.run_admission_lock:
+            if self.active_mutation_run_id == run_id:
+                self.active_mutation_run_id = None
+            self.runs.pop(run_id, None)
 
     def _run(self, run_id: str) -> RunState:
         try:
@@ -251,14 +247,15 @@ class MutationCoordinator:
         return expired
 
     def acquire_mutation_run(self, run_id: str) -> None:
-        run = self._run(run_id)
-        if not run.mutation_capable:
-            raise ValidationError("RUN_READ_ONLY", "read-only run cannot acquire mutation ownership")
-        if not self.mutation_admission_allowed():
-            raise ValidationError("MUTATION_LOCALLY_BLOCKED", "local safety state blocks mutation ownership")
-        if self.active_mutation_run_id not in {None, run_id}:
-            raise ValidationError("REFUSED_MUTATION_RUN_CONFLICT", "another mutation run owns this adapter")
-        self.active_mutation_run_id = run_id
+        with self.run_admission_lock:
+            run = self._run(run_id)
+            if not run.mutation_capable:
+                raise ValidationError("RUN_READ_ONLY", "read-only run cannot acquire mutation ownership")
+            if not self.mutation_admission_allowed():
+                raise ValidationError("MUTATION_LOCALLY_BLOCKED", "local safety state blocks mutation ownership")
+            if self.active_mutation_run_id not in {None, run_id}:
+                raise ValidationError("REFUSED_MUTATION_RUN_CONFLICT", "another mutation run owns this adapter")
+            self.active_mutation_run_id = run_id
 
     def _check_reservation_fit(self, ledger: BudgetLedger, request: ActionRequest) -> None:
         for name in EFFECT_DIMENSIONS:
@@ -411,7 +408,8 @@ class MutationCoordinator:
         run: RunState,
         request: ActionRequest,
         token: CancellationToken | None,
-        final_commit_check: Callable[[], bool] | None,
+        final_commit_check: Callable[[], str | None] | None,
+        final_commit_refusal_reason: list[str | None],
     ) -> bool:
         with self.dispatch_gate:
             record = self.store.load_action(request.action_id)
@@ -452,10 +450,12 @@ class MutationCoordinator:
                 return False
             if final_commit_check is not None:
                 try:
-                    final_check_passed = final_commit_check()
+                    final_reason = final_commit_check()
                 except Exception:  # noqa: BLE001 -- fail closed on any safety-hook failure
+                    final_commit_refusal_reason[0] = "FINAL_COMMIT_SAFETY_CHECK_FAILED"
                     return False
-                if final_check_passed is not True:
+                if final_reason is not None:
+                    final_commit_refusal_reason[0] = final_reason
                     return False
             next_budget = self._move_reserved_to_at_risk(run.budget, request.action_id)
             committed = record.with_state(
@@ -480,7 +480,7 @@ class MutationCoordinator:
         request: ActionRequest,
         *,
         token: CancellationToken | None = None,
-        final_commit_check: Callable[[], bool] | None = None,
+        final_commit_check: Callable[[], str | None] | None = None,
     ) -> ActionResult:
         run = self._run(request.run_id)
         with self.mutation_execution_lock:
@@ -596,8 +596,11 @@ class MutationCoordinator:
                     run, request, LifecycleState.REFUSED,
                     ActionStatus.REFUSED, "PREFLIGHT_REFUSED",
                 )
+            final_commit_refusal_reason: list[str | None] = [None]
             one_shot = _OneShotCommit(
-                lambda: self._final_commit(run, request, token, final_commit_check)
+                lambda: self._final_commit(
+                    run, request, token, final_commit_check, final_commit_refusal_reason
+                )
             )
             try:
                 execution = self.adapter.execute_committed(request, one_shot)
@@ -640,7 +643,7 @@ class MutationCoordinator:
                     )
                 return self._terminalize_pre_dispatch(
                     run, request, LifecycleState.REFUSED,
-                    ActionStatus.REFUSED, "FINAL_COMMIT_REFUSED",
+                    ActionStatus.REFUSED, final_commit_refusal_reason[0] or "FINAL_COMMIT_REFUSED",
                 )
             durable = self.store.load_action(request.action_id)
             if durable is None or durable.dispatch_state == DispatchState.NOT_DISPATCHED:
@@ -694,19 +697,17 @@ class MutationCoordinator:
             return result
 
     def stop_all(self, *, transition_id: str | None = None, reason_code: str = "STOP_ALL") -> bool:
+        persisted = False
         with self.control_transition_lock, self.dispatch_gate:
-                try:
-                    next_generation = checked_add(
-                        self.control_generation,
-                        1,
-                        maximum=MAX_U64,
-                        field_name="control_generation",
-                    )
-                except ValidationError:
-                    self.in_memory_stop = True
-                    self.mutation_disabled = True
-                    return False
-                self.in_memory_stop = True
+            self.in_memory_stop = True
+            self.mutation_disabled = True
+            try:
+                next_generation = checked_add(
+                    self.control_generation, 1, maximum=MAX_U64, field_name="control_generation"
+                )
+            except ValidationError:
+                self.stop_durability_unresolved = True
+            else:
                 next_state = self._new_control_state(
                     stop_latched=True,
                     recovery_required=self.control_state.recovery_required,
@@ -719,15 +720,14 @@ class MutationCoordinator:
                     self.store.write_control_state(next_state, operation="stop")
                 except (DurabilityError, DurabilityTimeout):
                     self.stop_durability_unresolved = True
-                    self.mutation_disabled = True
-                    return False
-                self.control_state = next_state
-                self.stop_durability_unresolved = False
-                self.mutation_disabled = True
+                else:
+                    self.control_state = next_state
+                    self.stop_durability_unresolved = False
+                    persisted = True
         for run in self.runs.values():
             run.cancelled = True
         self.adapter.emergency_stop(reason_code)
-        return True
+        return persisted
 
     def reset_stop(self, *, transition_id: str | None = None, reason_code: str = "EXPLICIT_RESET") -> bool:
         with self.control_transition_lock, self.dispatch_gate:
@@ -865,6 +865,34 @@ class MutationCoordinator:
         return self.execute_action(new_request, token=token)
 
     def accept_callback(
+        self,
+        action_id: str,
+        *,
+        backend_epoch: str,
+        control_generation: int,
+        lifecycle_state: LifecycleState,
+        adapter_generation: str | object = _MISSING,
+        runtime_instance_id: str | None | object = _MISSING,
+        session_epoch: str | None | object = _MISSING,
+        authoritative_confirmation: Confirmation = Confirmation.UNKNOWN,
+    ) -> bool:
+        if not self.mutation_execution_lock.acquire(blocking=False):
+            return False
+        try:
+            return self._accept_callback_unlocked(
+                action_id,
+                backend_epoch=backend_epoch,
+                control_generation=control_generation,
+                lifecycle_state=lifecycle_state,
+                adapter_generation=adapter_generation,
+                runtime_instance_id=runtime_instance_id,
+                session_epoch=session_epoch,
+                authoritative_confirmation=authoritative_confirmation,
+            )
+        finally:
+            self.mutation_execution_lock.release()
+
+    def _accept_callback_unlocked(
         self,
         action_id: str,
         *,

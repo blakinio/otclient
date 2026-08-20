@@ -250,9 +250,9 @@ class ScenarioEngine:
 
                         def final_commit_check(
                             bound_scenario: ValidatedScenario = scenario,
-                        ) -> bool:
+                        ) -> str | None:
                             observed = self._snapshot_mapping(self.adapter.snapshot())
-                            return self._abort_reason(bound_scenario, observed) is None
+                            return self._abort_reason(bound_scenario, observed)
 
                         result = self.coordinator.execute_action(
                             request,

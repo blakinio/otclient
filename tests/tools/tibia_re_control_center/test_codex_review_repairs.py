@@ -16,7 +16,9 @@ from tools.tibia_re_control_center.model import (
     DispatchFence,
     DispatchState,
     LifecycleState,
+    PrivacyError,
     SideEffectBudget,
+    ValidationError,
 )
 from tools.tibia_re_control_center.recorder import Recorder
 from tools.tibia_re_control_center.scenario import (
@@ -167,6 +169,7 @@ class CodexP1RegressionTests(unittest.TestCase):
         self.assertEqual([], adapter.physical_effects)
         action = next(iter(result.action_results.values()))
         self.assertEqual(DispatchState.NOT_DISPATCHED, action.dispatch_state)
+        self.assertEqual("CLIENT_NOT_IN_GAME", action.reason_code)
 
     def test_callback_cannot_terminalize_or_cross_adapter_session_fence(self):
         _, adapter, store, coordinator = make_stack()
@@ -231,6 +234,111 @@ class CodexP1RegressionTests(unittest.TestCase):
         self.assertTrue(coordinator.clean_shutdown())
         self.assertIsNone(store.load_control_state().active_backend_epoch)
 
+
+    def test_mutation_run_admission_is_serialized(self):
+        class BlockingActivationStore(DeterministicDurableStore):
+            def __init__(self) -> None:
+                super().__init__()
+                self.calls = 0
+                self.calls_lock = threading.Lock()
+                self.first_entered = threading.Event()
+                self.second_entered = threading.Event()
+                self.release_first = threading.Event()
+
+            def persist_run_activation(self, run_id: str, started_ns: int, deadline_ns: int) -> None:
+                with self.calls_lock:
+                    self.calls += 1
+                    call = self.calls
+                if call == 1:
+                    self.first_entered.set()
+                    if not self.release_first.wait(2):
+                        raise RuntimeError("first admission was not released")
+                else:
+                    self.second_entered.set()
+                super().persist_run_activation(run_id, started_ns, deadline_ns)
+
+        clock = ManualClock()
+        adapter = FakeAdapter(clock)
+        store = BlockingActivationStore()
+        coordinator = MutationCoordinator(adapter, store, clock, backend_epoch="run-admission")
+        successes: list[str] = []
+        errors: list[str] = []
+
+        def start(run_id: str) -> None:
+            try:
+                successes.append(coordinator.start_run(run_id, hard_budget()).run_id)
+            except ValidationError as exc:
+                errors.append(exc.code)
+
+        first = threading.Thread(target=start, args=("run-a",))
+        second = threading.Thread(target=start, args=("run-b",))
+        first.start()
+        self.assertTrue(store.first_entered.wait(2))
+        second.start()
+        self.assertFalse(store.second_entered.wait(0.1))
+        store.release_first.set()
+        first.join(2)
+        second.join(2)
+        self.assertFalse(first.is_alive())
+        self.assertFalse(second.is_alive())
+        self.assertEqual(1, len(successes))
+        self.assertEqual(["REFUSED_MUTATION_RUN_CONFLICT"], errors)
+        self.assertEqual(1, store.calls)
+        self.assertEqual(successes[0], coordinator.active_mutation_run_id)
+
+    def test_failed_stop_still_runs_harness_cleanup(self):
+        _, adapter, store, coordinator = make_stack(epoch="stop-cleanup")
+        capture = adapter.capture_start({"state": True})
+        store.inject_fault("stop", "error")
+        self.assertFalse(coordinator.stop_all(reason_code="AUDIT_STOP"))
+        self.assertTrue(coordinator.runs["repair-run"].cancelled)
+        self.assertEqual(1, adapter.emergency_stop_calls)
+        self.assertFalse(adapter.capture_sessions[capture]["active"])
+        self.assertTrue(coordinator.stop_durability_unresolved)
+
+    def test_callback_is_refused_while_action_execution_is_reconciling(self):
+        _, adapter, store, coordinator = make_stack(epoch="callback-race")
+        request = make_request(coordinator, adapter, "callback-race-action")
+        identity = adapter.identity()
+        callback_results: list[bool] = []
+
+        def callback_during_action() -> None:
+            callback_results.append(
+                coordinator.accept_callback(
+                    request.action_id,
+                    backend_epoch=coordinator.backend_epoch,
+                    control_generation=coordinator.control_generation,
+                    adapter_generation=identity.adapter_generation,
+                    runtime_instance_id=identity.runtime_instance_id,
+                    session_epoch=identity.session_epoch,
+                    lifecycle_state=LifecycleState.CONFIRMING,
+                )
+            )
+
+        adapter.after_commit_hook = callback_during_action
+        result = coordinator.execute_action(request)
+        self.assertEqual([False], callback_results)
+        self.assertEqual(ActionStatus.PASS, result.status)
+        self.assertEqual(LifecycleState.CONFIRMED, store.load_action(request.action_id).lifecycle_state)
+
+    def test_secret_shaped_scenario_is_rejected_before_artifact_serialization(self):
+        raw = json.loads(abort_scenario_json())
+        raw["name"] = "PASSWORD=hunter2"
+        scenario = parse_and_validate(json.dumps(raw))
+        artifacts = ArtifactStore()
+        with self.assertRaises(PrivacyError):
+            artifacts.create_run(
+                run_id="privacy-run",
+                scenario_id=scenario.scenario_id,
+                scenario_hash=scenario.scenario_hash,
+                scenario_ast=scenario.ast,
+                adapter_identity={"adapter_id": "fake"},
+                backend_epoch="privacy-backend",
+                initial_control_generation=0,
+                started_monotonic_ns=0,
+                privacy_policy=scenario.ast["privacy_policy"],
+            )
+        self.assertEqual({}, artifacts.runs)
 
 if __name__ == "__main__":
     unittest.main()

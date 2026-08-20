@@ -33,7 +33,7 @@ _EVENT_KINDS = {
 _SENSITIVITIES = {"PUBLIC", "RESEARCH_INTERNAL", "PERSONAL_REDACTED", "SECRET_REJECTED"}
 
 
-def _scan_non_secret(value: Any, *, key_path: str = "payload") -> None:
+def ensure_no_secret_material(value: Any, *, key_path: str = "payload") -> None:
     if isinstance(value, Mapping):
         for key, child in value.items():
             normalized = str(key).lower()
@@ -41,11 +41,11 @@ def _scan_non_secret(value: Any, *, key_path: str = "payload") -> None:
                 raise PrivacyError("SECRET_FIELD", f"secret-class field rejected at {key_path}")
             if normalized in {"private_chat", "private_message", "raw_chat"}:
                 raise PrivacyError("PRIVATE_CHAT", "unapproved private-chat content is not admitted")
-            _scan_non_secret(child, key_path=f"{key_path}.{key}")
+            ensure_no_secret_material(child, key_path=f"{key_path}.{key}")
         return
     if isinstance(value, (list, tuple)):
         for child in value:
-            _scan_non_secret(child, key_path=key_path)
+            ensure_no_secret_material(child, key_path=key_path)
         return
     if isinstance(value, str):
         for pattern in _SECRET_VALUE_PATTERNS:
@@ -57,7 +57,7 @@ def safe_error(code: str, *, safe_message: str, exception: BaseException | None 
     del exception
     if not code or not isinstance(code, str):
         raise ValidationError("INVALID_ERROR_CODE", "error code must be a non-empty string")
-    _scan_non_secret(safe_message, key_path="safe_message")
+    ensure_no_secret_material(safe_message, key_path="safe_message")
     return {"code": code, "safe_message": safe_message}
 
 
@@ -147,7 +147,7 @@ class Recorder:
             raise ValidationError("INVALID_EVENT_KIND", "event kind is not admitted")
         if sensitivity not in _SENSITIVITIES or sensitivity == "SECRET_REJECTED":
             raise ValidationError("INVALID_EVENT_SENSITIVITY", "ordinary event cannot be constructed as SECRET_REJECTED")
-        _scan_non_secret(payload)
+        ensure_no_secret_material(payload)
         self._ingest_seq += 1
         is_late = self.state != "ACTIVE" if late is None else bool(late)
         event = Event(

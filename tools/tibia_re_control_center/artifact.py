@@ -15,7 +15,12 @@ from .model import (
     ValidationError,
     validate_opaque_id,
 )
-from .recorder import Recorder, ScreenshotDisposition, ScreenshotRecord
+from .recorder import (
+    Recorder,
+    ScreenshotDisposition,
+    ScreenshotRecord,
+    ensure_no_secret_material,
+)
 
 
 def _safe_relative_path(path: str) -> str:
@@ -69,6 +74,8 @@ class ArtifactStore:
         privacy_policy: Mapping[str, Any],
     ) -> RunArtifact:
         validate_opaque_id(run_id, field_name="run_id")
+        privacy_scan_ast = {key: value for key, value in scenario_ast.items() if key != "privacy_policy"}
+        ensure_no_secret_material(privacy_scan_ast, key_path="scenario")
         if scenario_hash != sha256_jcs(scenario_ast):
             raise ValidationError("SCENARIO_HASH_CONTRADICTION", "scenario hash does not match canonical Scenario-v1 AST")
         if run_id in self.runs:

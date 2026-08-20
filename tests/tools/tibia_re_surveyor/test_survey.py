@@ -118,11 +118,11 @@ class CollectAllModelTests(unittest.TestCase):
         }
         result = build_collect_all(bundle, coverage)
         gaps = result["missing_readers"]["reader_gaps"]
-        self.assertEqual(11, len(gaps))
+        self.assertEqual(10, len(gaps))
         self.assertEqual("TIBIA-RE-AUTH-SESSION", gaps[0]["alias"])
         self.assertEqual(125, gaps[0]["canonical_priority_score"])
-        self.assertEqual("TIBIA-RE-PLAYER-STATE", gaps[1]["alias"])
-        self.assertEqual(125, gaps[1]["canonical_priority_score"])
+        self.assertNotIn("TIBIA-RE-PLAYER-STATE", [gap["alias"] for gap in gaps])
+        self.assertIsNone(result["aliases"]["TIBIA-RE-PLAYER-STATE"]["missing_reader"])
         self.assertEqual(1, gaps[0]["rank"])
         self.assertFalse(gaps[0]["semantic_promotion_allowed"])
 
@@ -198,7 +198,7 @@ class CollectAllOutputTests(unittest.TestCase):
             bundle = build_bundle(args)
             self.assertEqual(169, sum(bundle["coverage_counts"].values()))
             self.assertEqual(12, bundle["collect_all"]["alias_count"])
-            self.assertEqual(11, bundle["collect_all"]["missing_reader_count"])
+            self.assertEqual(10, bundle["collect_all"]["missing_reader_count"])
             self.assertEqual("NO_EXACT_CURRENT_PROFILE", bundle["bridge_profile"]["state"])
             self.assertEqual(0, bundle["bridge_profile"]["exact_current_profile_count"])
             self.assertTrue((output / "surveyor" / "coverage.json").is_file())

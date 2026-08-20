@@ -6,11 +6,13 @@ import json
 import os
 from pathlib import Path
 import sys
+import subprocess
 from typing import Optional, Sequence
 
 from .collect_all import build_collect_all, write_collect_all
 from .coverage import parse_critical_dependencies, parse_matrix, rank_next, status_counts
 from .evidence import DockerRepoReader, LocalRepoReader, RepoReader
+from .player_state import read_player_state
 from .runtime import (
     DockerRuntimeProbe,
     EXPECTED_CLIENT_SHA256,
@@ -171,6 +173,7 @@ def build_bundle(args: argparse.Namespace) -> dict:
         for row in rows
     ]
     runtime = None
+    typed_readers = {}
     if args.runtime_docker:
         probe = DockerRuntimeProbe(
             target_container=args.runtime_container,
@@ -178,6 +181,26 @@ def build_bundle(args: argparse.Namespace) -> dict:
             control_container=args.control_container,
         )
         runtime = probe.snapshot()
+        processes = runtime.get("processes") if isinstance(runtime, dict) else None
+        if runtime.get("runtime_access") == "READ_ONLY_ADMITTED" and isinstance(processes, list) and len(processes) == 1:
+            proc = processes[0]
+
+            def _runner(command):
+                completed = subprocess.run(
+                    command,
+                    check=False,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    timeout=45,
+                )
+                if completed.returncode != 0:
+                    raise RuntimeError(completed.stderr.strip() or f"reader command rc={completed.returncode}")
+                return completed.stdout
+
+            typed_readers["player_state_typed_reader"] = read_player_state(
+                pid=int(proc["pid"]), start_ticks=int(proc["process_start_ticks"]), runner=_runner
+            )
 
     generated_at = datetime.now(timezone.utc).isoformat()
     recommended = rank_next(rows, dependencies, limit=args.top_next)
@@ -194,6 +217,7 @@ def build_bundle(args: argparse.Namespace) -> dict:
         "recommended_next": recommended,
         "runtime": runtime,
         "bridge_profile": bridge_profile,
+        "typed_readers": typed_readers,
         "guardrails": {
             "surveyor_can_promote_canonical_status": False,
             "evidence_mentions_are_semantic_proof": False,

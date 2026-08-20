@@ -1,17 +1,17 @@
 ---
 task_id: OTC-20260820-runtime-namespace-hardening
-status: validating
+status: ready
 agent: ChatGPT
 project_lane: otclient
 lane: P0-STATE
 track_id: official-client-re
 task_kind: implementation
-phase: validate
+phase: closeout
 branch: fix/OTC-20260820-runtime-namespace-hardening
 base_branch: main
 base_sha: 272ea49f5bf2d8651e22dfa776537e8ea61758e2
 created: 2026-08-20T12:36:11+02:00
-updated: 2026-08-20T12:36:11+02:00
+updated: 2026-08-20T12:54:44+02:00
 risk: medium
 owned_paths:
   - tools/tibia_re_surveyor/runtime.py
@@ -46,7 +46,7 @@ feature_scope:
   backend_required: false
   frontend_required: false
   integration_required: true
-  e2e_required: true
+  e2e_required: false
   completion_claim: internal_only
 track_a_runtime_agent_admission_version: 1
 execution_class: github_repository_implementation
@@ -71,7 +71,7 @@ gameplay_allowed: false
 transaction_authorized: false
 owner_funded_ai_api_authorized: false
 invocation_started_at: 2026-08-20T12:36:11+02:00
-last_progress_at: 2026-08-20T12:43:09+02:00
+last_progress_at: 2026-08-20T12:54:44+02:00
 context_pressure: medium
 context_growth: stable
 context_score: 6
@@ -81,7 +81,7 @@ repair_cycles: 0
 ci_checks_for_current_head: 0
 terminal_ci_checks_for_current_generation: 0
 current_blocker: none
-next_action: commit and push the namespace-scoped implementation, then run exact-head CI and independent audit on PR #623
+next_action: independently revalidate this checkpoint-only delta, require fresh exact-head CI/governance, then mark PR #623 ready and squash-merge if all gates remain green
 ---
 
 # Track A Surveyor runtime namespace hardening
@@ -131,3 +131,58 @@ runtime_e2e: PENDING_POST_MERGE
 blockers: []
 next_action: exact-head CI and independent audit on the implementation head
 `
+
+## Final pre-merge checkpoint
+
+```yaml
+checkpoint_version: 3
+updated_at: 2026-08-20T12:54:44+02:00
+implementation_head: fef0f9621d937c030c325b3003939cd7ab857f15
+pr: 623
+status: ready
+phase: closeout
+runtime_access: none
+implementation_result:
+  target_container: otclient-track-a-kasmvnc
+  control_container: otclient-synology-runner
+  hostwide_docker_enumeration: false
+  external_containers_scanned: false
+  target_uniqueness_scope: DECLARED_RUNTIME_NAMESPACE
+  cross_project_container_execution_path: absent
+focused_validation:
+  compileall: PASS
+  unittest_discover: 23_PASS
+  repository_only_collect_all: PASS
+  aliases: 12
+  telemetry_documents: 11
+  privacy_scan: PASS
+  manifest_present: true
+  yaml_parse: PASS
+  hostwide_discovery_refs: NONE
+  diff_check: PASS
+exact_head_validation_on_implementation:
+  ci_run: 32360293766
+  ci_result: SUCCESS
+  track_a_agent_governance_run: 32360293648
+  track_a_agent_governance_result: SUCCESS
+  track_a_canonical_live_governance_run: 32360293423
+  track_a_canonical_live_governance_result: SUCCESS
+independent_audit:
+  review_id: 4981863459
+  validator: local Ollama qwen3.5:9b on Molehill-PC
+  num_ctx: 32768
+  prompt_eval_count: 14620
+  result: PASS
+  material_findings_open: 0
+e2e:
+  result: NOT_APPLICABLE
+  reason: PR #623 is repository/workflow implementation with runtime_access:none; physical observation is deliberately performed only after trusted-base merge by the separately admitted existing RUNTIME task and does not expand this implementation task's authority
+post_merge_program_validation:
+  required: true
+  operator: .github/workflows/track-a-surveyor-v2-readonly.yml
+  runtime_task: OTC-20260819-track-a-adopt-existing-live
+  purpose: prove final trusted-main collect-all and owner-login verdict before user-facing programme completion
+blockers:
+  - this checkpoint-only delta requires narrow independent revalidation and fresh exact-head required checks
+next_action: narrow-audit this checkpoint-only delta, then verify fresh exact-head CI/governance and merge PR #623 if all gates remain green
+```

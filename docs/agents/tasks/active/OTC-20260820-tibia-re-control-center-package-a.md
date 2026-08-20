@@ -64,7 +64,6 @@ validation_level: full
 complete_user_facing_feature: false
 delegated_repair_task: OTC-20260820-tibia-re-control-center-package-a-p1-isolation
 owned_paths:
-  - .github/workflows/tibia-re-control-center-core.yml
   - docs/agents/tasks/active/OTC-20260820-tibia-re-control-center-package-a.md
   - docs/agents/tasks/archive/OTC-20260820-tibia-re-control-center-package-a.md
   - docs/agents/MODULE_CATALOG.md

@@ -74,6 +74,15 @@ class ArtifactStore:
         privacy_policy: Mapping[str, Any],
     ) -> RunArtifact:
         validate_opaque_id(run_id, field_name="run_id")
+        ensure_no_secret_material(
+            {
+                "run_id": run_id,
+                "scenario_id": scenario_id,
+                "adapter_identity": adapter_identity,
+                "backend_epoch": backend_epoch,
+            },
+            key_path="artifact_metadata",
+        )
         privacy_scan_ast = {key: value for key, value in scenario_ast.items() if key != "privacy_policy"}
         ensure_no_secret_material(privacy_scan_ast, key_path="scenario")
         if scenario_hash != sha256_jcs(scenario_ast):

@@ -340,5 +340,93 @@ class CodexP1RegressionTests(unittest.TestCase):
             )
         self.assertEqual({}, artifacts.runs)
 
+    def test_stop_cleanup_blocks_reset_until_cleanup_finishes(self):
+        _, adapter, _, coordinator = make_stack(epoch="cleanup-fence")
+        cleanup_started = threading.Event()
+        release_cleanup = threading.Event()
+        original_cleanup = adapter.emergency_stop
+        outcomes: list[bool] = []
+
+        def blocking_cleanup(reason: str = "STOP"):
+            cleanup_started.set()
+            if not release_cleanup.wait(2):
+                raise RuntimeError("cleanup was not released")
+            return original_cleanup(reason)
+
+        adapter.emergency_stop = blocking_cleanup
+        worker = threading.Thread(target=lambda: outcomes.append(coordinator.stop_all()))
+        worker.start()
+        self.assertTrue(cleanup_started.wait(2))
+        self.assertTrue(coordinator.stop_cleanup_in_progress)
+        self.assertFalse(coordinator.reset_stop())
+        self.assertFalse(coordinator.mutation_admission_allowed())
+        self.assertFalse(coordinator.clean_shutdown())
+        release_cleanup.set()
+        worker.join(2)
+        self.assertFalse(worker.is_alive())
+        self.assertEqual([True], outcomes)
+        self.assertFalse(coordinator.stop_cleanup_in_progress)
+        self.assertTrue(coordinator.reset_stop())
+
+    def test_final_safety_hook_rechecks_stop_before_dispatch(self):
+        _, adapter, store, coordinator = make_stack(epoch="hook-stop")
+        request = make_request(coordinator, adapter, "hook-stop-action")
+
+        def stop_from_final_hook() -> None:
+            self.assertTrue(coordinator.stop_all(reason_code="HOOK_STOP"))
+
+        result = coordinator.execute_action(request, final_commit_check=stop_from_final_hook)
+        self.assertEqual(ActionStatus.REFUSED, result.status)
+        self.assertEqual(DispatchState.NOT_DISPATCHED, result.dispatch_state)
+        self.assertEqual([], adapter.physical_effects)
+        self.assertTrue(store.load_control_state().stop_latched)
+
+    def test_action_request_hash_is_recomputed_before_deduplication(self):
+        _, adapter, _, coordinator = make_stack(epoch="hash-guard")
+        first = make_request(coordinator, adapter, "hash-guard-action")
+        self.assertEqual(ActionStatus.PASS, coordinator.execute_action(first).status)
+        changed_parameters = {"direction": "SOUTH", "tiles": 1}
+        second = ActionRequest(
+            action_id=first.action_id,
+            run_id=first.run_id,
+            step_id=first.step_id,
+            attempt_index=first.attempt_index,
+            kind=first.kind,
+            parameters=changed_parameters,
+            timeout_ms=first.timeout_ms,
+            required_capability=first.required_capability,
+            required_authority=first.required_authority,
+            dispatch_fence=first.dispatch_fence,
+            effect_bound=adapter.effect_bound(first.kind, changed_parameters),
+            action_request_hash=first.action_request_hash,
+        )
+        result = coordinator.execute_action(second)
+        self.assertEqual(ActionStatus.REFUSED, result.status)
+        self.assertEqual("REFUSED_IDEMPOTENCY_CONFLICT", result.reason_code)
+
+    def test_artifact_metadata_is_privacy_scanned_before_construction(self):
+        scenario = parse_and_validate(abort_scenario_json())
+        artifacts = ArtifactStore()
+        with self.assertRaises(PrivacyError):
+            artifacts.create_run(
+                run_id="metadata-privacy-run",
+                scenario_id=scenario.scenario_id,
+                scenario_hash=scenario.scenario_hash,
+                scenario_ast=scenario.ast,
+                adapter_identity={
+                    "adapter_id": "PASSWORD=hunter2",
+                    "adapter_kind": "fake",
+                    "adapter_version": "1",
+                    "adapter_generation": "generation-1",
+                    "runtime_instance_id": "runtime-1",
+                    "session_epoch": "session-1",
+                },
+                backend_epoch="metadata-backend",
+                initial_control_generation=0,
+                started_monotonic_ns=0,
+                privacy_policy=scenario.ast["privacy_policy"],
+            )
+        self.assertEqual({}, artifacts.runs)
+
 if __name__ == "__main__":
     unittest.main()

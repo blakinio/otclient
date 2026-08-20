@@ -304,6 +304,98 @@ def main() -> None:
     assert not worker.is_alive()
     assert results and results[0].status == ActionStatus.PASS
 
+
+    _, cleanup_adapter, _, cleanup_coordinator = stack(epoch="audit-cleanup-overlap")
+    cleanup_started = threading.Event()
+    cleanup_release = threading.Event()
+    cleanup_original = cleanup_adapter.emergency_stop
+    cleanup_results: list[bool] = []
+
+    def blocking_cleanup(reason: str = "STOP"):
+        cleanup_started.set()
+        if not cleanup_release.wait(2):
+            raise RuntimeError("audit cleanup was not released")
+        return cleanup_original(reason)
+
+    cleanup_adapter.emergency_stop = blocking_cleanup
+    cleanup_worker = threading.Thread(target=lambda: cleanup_results.append(cleanup_coordinator.stop_all()))
+    cleanup_worker.start()
+    assert cleanup_started.wait(2)
+    assert cleanup_coordinator.stop_cleanup_in_progress is True
+    assert cleanup_coordinator.reset_stop() is False
+    assert cleanup_coordinator.mutation_admission_allowed() is False
+    assert cleanup_coordinator.clean_shutdown() is False
+    cleanup_release.set()
+    cleanup_worker.join(2)
+    assert not cleanup_worker.is_alive()
+    assert cleanup_results == [True]
+    assert cleanup_coordinator.stop_cleanup_in_progress is False
+
+    _, hook_adapter, hook_store, hook_coordinator = stack(epoch="audit-hook-stop")
+    hook_request = request_for(hook_coordinator, hook_adapter, "audit-hook-stop-action")
+
+    def stop_from_final_hook() -> None:
+        assert hook_coordinator.stop_all(reason_code="AUDIT_HOOK_STOP") is True
+
+    hook_result = hook_coordinator.execute_action(hook_request, final_commit_check=stop_from_final_hook)
+    assert hook_result.status == ActionStatus.REFUSED
+    assert hook_result.dispatch_state == DispatchState.NOT_DISPATCHED
+    assert hook_adapter.physical_effects == []
+    assert hook_store.load_control_state().stop_latched is True
+
+    _, hash_adapter, _, hash_coordinator = stack(epoch="audit-hash-guard")
+    first_hash_request = request_for(hash_coordinator, hash_adapter, "audit-hash-action")
+    assert hash_coordinator.execute_action(first_hash_request).status == ActionStatus.PASS
+    changed = {"direction": "SOUTH", "tiles": 1}
+    forged = ActionRequest(
+        action_id=first_hash_request.action_id,
+        run_id=first_hash_request.run_id,
+        step_id=first_hash_request.step_id,
+        attempt_index=first_hash_request.attempt_index,
+        kind=first_hash_request.kind,
+        parameters=changed,
+        timeout_ms=first_hash_request.timeout_ms,
+        required_capability=first_hash_request.required_capability,
+        required_authority=first_hash_request.required_authority,
+        dispatch_fence=first_hash_request.dispatch_fence,
+        effect_bound=hash_adapter.effect_bound(first_hash_request.kind, changed),
+        action_request_hash=first_hash_request.action_request_hash,
+    )
+    forged_result = hash_coordinator.execute_action(forged)
+    assert forged_result.status == ActionStatus.REFUSED
+    assert forged_result.reason_code == "REFUSED_IDEMPOTENCY_CONFLICT"
+
+    metadata_scenario = parse_and_validate(abort_scenario())
+    metadata_artifacts = ArtifactStore()
+    try:
+        metadata_artifacts.create_run(
+            run_id="audit-metadata-privacy",
+            scenario_id=metadata_scenario.scenario_id,
+            scenario_hash=metadata_scenario.scenario_hash,
+            scenario_ast=metadata_scenario.ast,
+            adapter_identity={
+                "adapter_id": "PASSWORD=hunter2",
+                "adapter_kind": "fake",
+                "adapter_version": "1",
+                "adapter_generation": "generation-1",
+                "runtime_instance_id": "runtime-1",
+                "session_epoch": "session-1",
+            },
+            backend_epoch="audit-metadata-backend",
+            initial_control_generation=0,
+            started_monotonic_ns=0,
+            privacy_policy=metadata_scenario.ast["privacy_policy"],
+        )
+    except PrivacyError:
+        pass
+    else:
+        raise AssertionError("secret-shaped artifact metadata was serialized")
+    assert metadata_artifacts.runs == {}
+    print("STOP_CLEANUP_RESET_OVERLAP_FENCE=PASS")
+    print("POST_FINAL_HOOK_DISPATCH_RECHECK=PASS")
+    print("CANONICAL_ACTION_HASH_GUARD=PASS")
+    print("ARTIFACT_METADATA_PRIVACY_GATE=PASS")
+
     print("PACKAGE_A_CODEX_P1_AUDIT=PASS")
     print("FAILED_STOP_RESET_FENCE=PASS")
     print("FINAL_GATE_ABORT_REVALIDATION=PASS")

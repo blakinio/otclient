@@ -28,6 +28,7 @@ from .model import (
     checked_add,
     checked_mul,
 )
+from .scenario import action_request_hash
 from .store import DeterministicDurableStore
 
 _MISSING = object()
@@ -90,6 +91,7 @@ class MutationCoordinator:
         self.in_memory_stop = False
         self.mutation_disabled = False
         self.stop_durability_unresolved = False
+        self.stop_cleanup_in_progress = False
         self.activation_error: str | None = None
         self.control_state = self._activate_backend()
 
@@ -164,6 +166,7 @@ class MutationCoordinator:
         return not (
             self.mutation_disabled
             or self.in_memory_stop
+            or self.stop_cleanup_in_progress
             or self.control_state.stop_latched
             or self.control_state.recovery_required
         )
@@ -411,7 +414,7 @@ class MutationCoordinator:
         final_commit_check: Callable[[], str | None] | None,
         final_commit_refusal_reason: list[str | None],
     ) -> bool:
-        with self.dispatch_gate:
+        with self.control_transition_lock, self.dispatch_gate:
             record = self.store.load_action(request.action_id)
             if record is None or record.action_request_hash != request.action_request_hash:
                 return False
@@ -457,6 +460,41 @@ class MutationCoordinator:
                 if final_reason is not None:
                     final_commit_refusal_reason[0] = final_reason
                     return False
+            record = self.store.load_action(request.action_id)
+            if record is None or record.action_request_hash != request.action_request_hash:
+                return False
+            if record.dispatch_state != DispatchState.NOT_DISPATCHED:
+                return False
+            if self.active_mutation_run_id != request.run_id:
+                return False
+            if token is not None and token.cancelled:
+                return False
+            if run.cancelled or run.paused:
+                return False
+            if fence.expected_backend_epoch != self.backend_epoch or fence.expected_control_generation != self.control_generation:
+                return False
+            if self.in_memory_stop or self.stop_cleanup_in_progress or self.control_state.stop_latched or self.control_state.recovery_required or self.mutation_disabled:
+                return False
+            identity = self.adapter.identity()
+            if identity.adapter_generation != fence.expected_adapter_generation:
+                return False
+            if identity.runtime_instance_id != fence.expected_runtime_instance_id:
+                return False
+            if identity.session_epoch != fence.expected_session_epoch:
+                return False
+            if self._deadline_expired(run):
+                return False
+            capability = self.adapter.capability(request.required_capability)
+            if capability is None:
+                return False
+            if request.required_authority == Authority.MUTATION and not capability.action_supported:
+                return False
+            if request.required_authority == Authority.READ_ONLY and not capability.read_supported:
+                return False
+            if not self.adapter.current_authority(request.required_authority):
+                return False
+            if request.action_id not in run.budget.reservations:
+                return False
             next_budget = self._move_reserved_to_at_risk(run.budget, request.action_id)
             committed = record.with_state(
                 LifecycleState.DISPATCH_COMMITTED,
@@ -483,6 +521,25 @@ class MutationCoordinator:
         final_commit_check: Callable[[], str | None] | None = None,
     ) -> ActionResult:
         run = self._run(request.run_id)
+        canonical_request_hash = action_request_hash(
+            schema_version=request.schema_version,
+            run_id=request.run_id,
+            step_id=request.step_id,
+            attempt_index=request.attempt_index,
+            kind=request.kind,
+            parameters=request.parameters,
+            timeout_ms=request.timeout_ms,
+            required_capability=request.required_capability,
+            required_authority=request.required_authority,
+        )
+        if canonical_request_hash != request.action_request_hash:
+            return self._make_result(
+                request,
+                LifecycleState.REFUSED,
+                ActionStatus.REFUSED,
+                DispatchState.NOT_DISPATCHED,
+                reason_code="REFUSED_IDEMPOTENCY_CONFLICT",
+            )
         with self.mutation_execution_lock:
             existing = self.store.load_action(request.action_id)
             if existing is not None:
@@ -701,6 +758,7 @@ class MutationCoordinator:
         with self.control_transition_lock, self.dispatch_gate:
             self.in_memory_stop = True
             self.mutation_disabled = True
+            self.stop_cleanup_in_progress = True
             try:
                 next_generation = checked_add(
                     self.control_generation, 1, maximum=MAX_U64, field_name="control_generation"
@@ -726,12 +784,17 @@ class MutationCoordinator:
                     persisted = True
         for run in self.runs.values():
             run.cancelled = True
-        self.adapter.emergency_stop(reason_code)
+        try:
+            self.adapter.emergency_stop(reason_code)
+        except Exception:  # noqa: BLE001 -- failed cleanup must keep STOP fail-closed
+            return False
+        with self.control_transition_lock:
+            self.stop_cleanup_in_progress = False
         return persisted
 
     def reset_stop(self, *, transition_id: str | None = None, reason_code: str = "EXPLICIT_RESET") -> bool:
         with self.control_transition_lock, self.dispatch_gate:
-                if self.stop_durability_unresolved:
+                if self.stop_cleanup_in_progress or self.stop_durability_unresolved:
                     return False
                 for ledger in self.store.budget_ledgers.values():
                     if any(
@@ -958,7 +1021,7 @@ class MutationCoordinator:
             return False
         try:
             with self.control_transition_lock:
-                if self.activation_error is not None or self.stop_durability_unresolved:
+                if self.activation_error is not None or self.stop_durability_unresolved or self.stop_cleanup_in_progress:
                     return False
                 if any(
                     record.dispatch_state != DispatchState.NOT_DISPATCHED and not record.terminal

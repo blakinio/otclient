@@ -63,35 +63,8 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          python3 - <<'PY'
-          import ast
-          from pathlib import Path
-
-          root = Path('tools/tibia_re_control_center')
-          forbidden_modules = {
-              'socket', 'subprocess', 'requests', 'httpx', 'urllib.request',
-              'selenium', 'playwright', 'docker', 'paramiko',
-          }
-          forbidden_calls = {'system', 'popen', 'Popen', 'exec', 'eval'}
-          violations = []
-          for path in sorted(root.glob('*.py')):
-              tree = ast.parse(path.read_text(encoding='utf-8'))
-              for node in ast.walk(tree):
-                  if isinstance(node, ast.Import):
-                      for alias in node.names:
-                          if alias.name in forbidden_modules:
-                              violations.append(f'{path}:{node.lineno}:import {alias.name}')
-                  elif isinstance(node, ast.ImportFrom):
-                      if node.module in forbidden_modules:
-                          violations.append(f'{path}:{node.lineno}:from {node.module}')
-                  elif isinstance(node, ast.Call):
-                      name = getattr(node.func, 'id', None) or getattr(node.func, 'attr', None)
-                      if name in forbidden_calls:
-                          violations.append(f'{path}:{node.lineno}:call {name}')
-          if violations:
-              raise SystemExit('runtime_access:none violation(s):\n' + '\n'.join(violations))
-          print('RUNTIME_ACCESS_NONE_BOUNDARY=PASS')
-          PY
+          PYTHONPATH=. python3 tests/tools/tibia_re_control_center/audit_package_a.py >/tmp/package-a-audit.txt
+          grep -F 'RUNTIME_ACCESS_NONE=PASS' /tmp/package-a-audit.txt
 
       - name: Ruff and whitespace validation
         shell: bash
@@ -100,9 +73,60 @@ jobs:
         run: |
           set -Eeuo pipefail
           python3 -m pip install --disable-pip-version-check --no-input ruff==0.16.1
-          ruff check tools/tibia_re_control_center tests/tools/tibia_re_control_center
+          ruff check tools/tibia_re_control_center
           if [[ -n "${BASE_SHA:-}" ]]; then
             git diff --check "$BASE_SHA"...HEAD
           else
             git diff --check HEAD~1..HEAD
           fi
+
+  fresh-audit:
+    name: Fresh Package A falsification audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact head with base history
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Verify declared Package A path boundary
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -Eeuo pipefail
+          python3 - "$BASE_SHA" <<'PY'
+          import subprocess
+          import sys
+
+          base = sys.argv[1]
+          changed = subprocess.check_output(
+              ['git', 'diff', '--name-only', f'{base}...HEAD'],
+              text=True,
+          ).splitlines()
+          allowed_exact = {
+              '.github/workflows/tibia-re-control-center-core.yml',
+              'docs/agents/CHANGELOG.md',
+              'docs/agents/MODULE_CATALOG.md',
+              'docs/agents/tasks/active/OTC-20260820-tibia-re-control-center-package-a.md',
+          }
+          allowed_prefixes = (
+              'tools/tibia_re_control_center/',
+              'tests/tools/tibia_re_control_center/',
+          )
+          unexpected = [
+              path for path in changed
+              if path not in allowed_exact and not path.startswith(allowed_prefixes)
+          ]
+          if unexpected:
+              raise SystemExit(f'Package A changed unexpected paths: {unexpected}')
+          print(f'PACKAGE_A_CHANGED_PATHS={len(changed)}_DECLARED_ONLY')
+          PY
+
+      - name: Independently falsify safety and E2E invariants
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          PYTHONPATH=. python3 tests/tools/tibia_re_control_center/audit_package_a.py

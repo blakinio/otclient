@@ -10,6 +10,14 @@
 - Never weaken, bypass, or falsely mark a review/validation gate as satisfied merely because owner-funded AI use is forbidden.
 
 
+## Local model resource policy — mandatory
+
+- Local AI/model work on a physical host or shared GPU pool MUST use at most one resident or actively inferencing model at a time. Parallel workers may prepare prompts/evidence, but actual model residency/inference is serialized.
+- Before loading or invoking a different local model, unload the previous model and re-check provider residency. For Ollama, `ollama ps` or `/api/ps` must show either no loaded model or only the exact target model; more than one resident model, a different resident model, or UNKNOWN/unavailable residency state means fail closed and do not start inference.
+- Multi-model evaluation is sequential: model A -> unload/verify -> model B -> unload/verify. Do not intentionally keep multiple heavy local models warm for comparison, voting, audit panels or throughput.
+- Model/session wrappers should use bounded keep-alive and best-effort unload on exit. Task completion/handoff should release task-loaded models when practical and record any model that could not be verified unloaded.
+- This resource rule grants no model authority, runtime authority, Track A authority, credentials, merge authority or review status.
+
 ## Central Spark PR pre-review — standing owner authorization
 
 - The owner explicitly authorizes the central controller in `blakinio/github-projects-control` to perform recurring advisory PR pre-review for this repository using exactly `gpt-5.3-codex-spark` through ChatGPT-managed Codex authentication on its trusted private runner. This is a standing, bounded repository-automation exception to the owner-funded AI restriction above; it does **not** authorize repository agents to invoke Codex, OpenAI API, hosted Code Review, or any other AI service themselves.

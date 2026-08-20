@@ -1,12 +1,12 @@
 ---
 task_id: OTC-20260820-ingame-semantic-downgrade-live
-status: ready
+status: implementing
 agent: ChatGPT
 project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: validation
-phase: validate
+phase: implement
 branch: runtime/OTC-20260820-ingame-semantic-downgrade-live
 base_branch: main
 base_sha: 7e6b0a83253e871bdf6b7506e5026d73ee0a9a90
@@ -41,8 +41,11 @@ context_pressure: low
 context_growth: stable
 context_score: 4
 decomposition_decision: single
+owned_paths:
+  - .github/workflows/track-a-semantic-downgrade.yml
+  - docs/agents/tasks/active/OTC-20260820-ingame-semantic-downgrade-live.md
 current_blocker: none
-next_action: on trusted main, freshly prove exact runtime identity and lease authority, perform only the metadata semantic-downgrade transition, then rerun the read-only Surveyor negative E2E on the still-logged-out target and archive
+next_action: merge the owner-gated one-shot self-hosted semantic-downgrade workflow, dispatch it on trusted main, then rerun the read-only Surveyor negative E2E and archive
 ---
 
 # Track A live semantic downgrade

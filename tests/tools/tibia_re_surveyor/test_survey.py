@@ -191,6 +191,8 @@ class CollectAllOutputTests(unittest.TestCase):
             self.assertEqual(169, sum(bundle["coverage_counts"].values()))
             self.assertEqual(12, bundle["collect_all"]["alias_count"])
             self.assertEqual(11, bundle["collect_all"]["missing_reader_count"])
+            self.assertEqual("NO_EXACT_CURRENT_PROFILE", bundle["bridge_profile"]["state"])
+            self.assertEqual(0, bundle["bridge_profile"]["exact_current_profile_count"])
             self.assertTrue((output / "surveyor" / "coverage.json").is_file())
             self.assertTrue((output / "surveyor" / "runtime.json").is_file())
             self.assertTrue((output / "surveyor" / "agent_bundle.json").is_file())

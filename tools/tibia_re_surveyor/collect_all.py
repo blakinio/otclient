@@ -213,6 +213,18 @@ def build_collect_all(bundle: Mapping[str, object], coverage_rows: Sequence[Mapp
                 "source": "surveyor.coverage",
             },
             "runtime_identity": runtime_observation,
+            "bridge_profile_compatibility": {
+                "state": (bundle.get("bridge_profile") or {}).get("state", "UNKNOWN"),
+                "evidence_level": "PROVEN" if bundle.get("bridge_profile") else "UNKNOWN",
+                "source": "surveyor.bridge_profile",
+                "value": bundle.get("bridge_profile"),
+            },
+            "bridge_endpoint": {
+                "state": "UNKNOWN",
+                "evidence_level": "UNKNOWN",
+                "source": "current admitted runtime binding",
+                "reason": "NO_CANONICAL_BRIDGE_ENDPOINT_PROBED_BY_REPOSITORY_ONLY_COLLECTOR",
+            },
         }
         if reader_id is not None:
             source_states["subsystem_typed_reader"] = {

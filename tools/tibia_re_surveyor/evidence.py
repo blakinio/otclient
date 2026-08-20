@@ -18,6 +18,9 @@ class RepoReader:
     def read_text(self, relative_path: str) -> str:
         raise NotImplementedError
 
+    def list_paths(self, relative_dir: str, suffix: str = "") -> List[str]:
+        raise NotImplementedError
+
     def scan_evidence_mentions(
         self, row_ids: Sequence[str], current_client_sha256: str, max_refs_per_row: int = 8
     ) -> Dict[str, dict]:
@@ -36,6 +39,20 @@ class LocalRepoReader(RepoReader):
             return path.read_text(encoding="utf-8")
         except (OSError, UnicodeError) as exc:
             raise RepositoryReadError(f"cannot read {relative_path}: {exc}") from exc
+
+    def list_paths(self, relative_dir: str, suffix: str = "") -> List[str]:
+        if Path(relative_dir).is_absolute() or ".." in Path(relative_dir).parts:
+            raise RepositoryReadError("relative repository directory required")
+        directory = (self.root / relative_dir).resolve()
+        if self.root not in directory.parents and directory != self.root:
+            raise RepositoryReadError("repository directory escapes root")
+        if not directory.is_dir():
+            return []
+        return [
+            str(path.relative_to(self.root)).replace("\\", "/")
+            for path in sorted(directory.iterdir())
+            if path.is_file() and (not suffix or path.name.endswith(suffix))
+        ]
 
     def scan_evidence_mentions(
         self, row_ids: Sequence[str], current_client_sha256: str, max_refs_per_row: int = 8
@@ -96,6 +113,35 @@ class DockerRepoReader(RepoReader):
         if relative_path.startswith("/") or ".." in Path(relative_path).parts:
             raise RepositoryReadError("relative repository path required")
         return self._run(["cat", f"{self.root}/{relative_path}"])
+
+    def list_paths(self, relative_dir: str, suffix: str = "") -> List[str]:
+        if Path(relative_dir).is_absolute() or ".." in Path(relative_dir).parts:
+            raise RepositoryReadError("relative repository directory required")
+        script = r'''
+import json, pathlib, sys
+root = pathlib.Path(sys.argv[1]).resolve()
+relative = pathlib.Path(sys.argv[2])
+suffix = sys.argv[3]
+directory = (root / relative).resolve()
+try:
+  directory.relative_to(root)
+except ValueError:
+  raise SystemExit(2)
+out = []
+if directory.is_dir():
+  for path in sorted(directory.iterdir()):
+    if path.is_file() and (not suffix or path.name.endswith(suffix)):
+      out.append(path.relative_to(root).as_posix())
+print(json.dumps(out, separators=(',', ':')))
+'''
+        raw = self._run(["python3", "-c", script, self.root, relative_dir, suffix])
+        try:
+            result = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise RepositoryReadError("invalid repository path-list response") from exc
+        if not isinstance(result, list) or not all(isinstance(item, str) for item in result):
+            raise RepositoryReadError("invalid repository path-list shape")
+        return result
 
     def scan_evidence_mentions(
         self, row_ids: Sequence[str], current_client_sha256: str, max_refs_per_row: int = 8

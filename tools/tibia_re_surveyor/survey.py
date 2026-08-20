@@ -21,6 +21,7 @@ from .runtime import DockerRuntimeProbe, EXPECTED_CLIENT_SHA256
 
 MATRIX_PATH = "docs/agents/reports/OTCLIENT-20260818-full-client-re-matrix.md"
 CHECKLIST_PATH = "docs/agents/reports/OTCLIENT-20260818-full-client-re-100-percent-checklist.md"
+BRIDGE_PROFILE_DIR = "tools/tibia_runtime_bridge/profiles"
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -129,6 +130,38 @@ def _summary_markdown(bundle: dict) -> str:
     return "\n".join(lines)
 
 
+def _bridge_profile_census(reader: RepoReader) -> dict:
+    paths = reader.list_paths(BRIDGE_PROFILE_DIR, ".json")
+    profiles = []
+    exact_matches = []
+    for path in paths:
+        try:
+            doc = json.loads(reader.read_text(path))
+        except (RuntimeError, json.JSONDecodeError):
+            profiles.append({"path": path, "state": "MALFORMED_OR_UNREADABLE"})
+            continue
+        sha = doc.get("binary_sha256") if isinstance(doc, dict) else None
+        item = {
+            "path": path,
+            "client_version": doc.get("client_version") if isinstance(doc, dict) else None,
+            "binary_sha256": sha,
+            "exact_current_sha_match": sha == EXPECTED_CLIENT_SHA256,
+        }
+        profiles.append(item)
+        if item["exact_current_sha_match"]:
+            exact_matches.append(path)
+    return {
+        "source": BRIDGE_PROFILE_DIR,
+        "profile_count": len(paths),
+        "profiles": profiles,
+        "exact_current_client_sha256": EXPECTED_CLIENT_SHA256,
+        "exact_current_profile_count": len(exact_matches),
+        "exact_current_profiles": exact_matches,
+        "state": "EXACT_PROFILE_AVAILABLE" if len(exact_matches) == 1 else ("AMBIGUOUS_EXACT_PROFILES" if len(exact_matches) > 1 else "NO_EXACT_CURRENT_PROFILE"),
+        "semantic_promotion_allowed": False,
+    }
+
+
 def build_bundle(args: argparse.Namespace) -> dict:
     reader = _repo_reader(args)
     matrix_text = reader.read_text(MATRIX_PATH)
@@ -136,6 +169,7 @@ def build_bundle(args: argparse.Namespace) -> dict:
     rows = parse_matrix(matrix_text, checklist_text)
     counts = status_counts(rows)
     dependencies = parse_critical_dependencies(matrix_text)
+    bridge_profile = _bridge_profile_census(reader)
     evidence = reader.scan_evidence_mentions([row.row_id for row in rows], EXPECTED_CLIENT_SHA256)
     coverage_rows = [
         {
@@ -184,6 +218,7 @@ def build_bundle(args: argparse.Namespace) -> dict:
         "critical_dependencies": dependencies,
         "recommended_next": recommended,
         "runtime": runtime,
+        "bridge_profile": bridge_profile,
         "keepalive": keepalive,
         "guardrails": {
             "surveyor_can_promote_canonical_status": False,

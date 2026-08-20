@@ -20,6 +20,19 @@ class EvidenceIndexTests(unittest.TestCase):
             self.assertEqual(1, index["C10"]["mention_count"])
             self.assertEqual(0, index["F08"]["mention_count"])
 
+    def test_list_paths_is_sorted_bounded_and_rejects_escape(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            profiles = root / "profiles"
+            profiles.mkdir()
+            (profiles / "b.json").write_text("{}", encoding="utf-8")
+            (profiles / "a.json").write_text("{}", encoding="utf-8")
+            (profiles / "ignore.txt").write_text("x", encoding="utf-8")
+            reader = LocalRepoReader(root)
+            self.assertEqual(["profiles/a.json", "profiles/b.json"], reader.list_paths("profiles", ".json"))
+            with self.assertRaises(Exception):
+                reader.list_paths("../outside", ".json")
+
     def test_large_evidence_file_is_not_scanned(self):
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)

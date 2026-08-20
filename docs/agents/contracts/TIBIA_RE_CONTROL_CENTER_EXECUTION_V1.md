@@ -2,35 +2,35 @@
 
 ```yaml
 contract_id: TIBIA-RE-CONTROL-CENTER-EXECUTION-V1
-version: 1.4
+version: 1.5
 major_version: 1
 status: normative_design
 producer_repository: blakinio/otclient
 runtime_authority: external
 runtime_access_of_this_document: none
 scenario_semantics: docs/agents/contracts/TIBIA_RE_CONTROL_CENTER_SCENARIO_V1.md
+adapter_semantics: docs/agents/contracts/TIBIA_RE_CONTROL_CENTER_ADAPTER_V1.md
 artifact_semantics: docs/agents/contracts/TIBIA_RE_CONTROL_CENTER_ARTIFACT_V1.md
 ```
 
 ## 1. Purpose
 
-Define concurrency, dispatch, cancellation, idempotency, side-effect accounting, recorder, privacy, artifact and crash-recovery semantics for every Control Center implementation.
+Define concurrency, dispatch, cancellation, idempotency, side-effect accounting, durable STOP/reset, recorder, privacy, artifact and crash-recovery semantics for every Control Center implementation.
 
 Normative separation:
 
 ```text
 scenario validity
+!= semantic field-schema support
 != capability support
 != evidence maturity
 != observation freshness
 != mutation authority
 ```
 
-No UI state, CLI option, scenario field, API credential, capability bit, cached authority status or prior preflight grants mutation authority.
+No UI state, CLI option, scenario field, semantic registry, API credential, capability bit, cached authority status or prior preflight grants mutation authority.
 
 For `OFFICIAL_TIBIA`, then-current trusted-base Track A lease/registration/Gate A/rebind/Gate B/target identity/GUI input lock/whole-lifetime supervisor remain the sole external mutation authority.
-
-Scenario typing/hashing/effect bounds are defined by Scenario v1. Durable run/safety artifact structure is defined by Artifact v1.
 
 ## 2. Core identities and durable control state
 
@@ -42,9 +42,16 @@ Every adapter exposes `adapter_generation`. Mutation may also bind `runtime_inst
 
 Changed required identity/fence invalidates pending mutation.
 
-STOP latching is not scoped away by a backend restart. Before accepting any mutation-capable work, every backend must recover the Artifact-v1 `ControlStateRecord` from the local safety store. A first-ever clean store is initialized durably before mutation admission. Missing/corrupt/contradictory prior control state is fail-closed and behaves as `stop_latched=true`/`SAFETY_RECOVERY_REQUIRED` until explicit operator recovery/reset is validly completed.
+Before accepting mutation-capable work, every backend must recover Artifact-v1 `ControlStateRecord` from the local safety store.
 
-A new backend may start a new numeric `control_generation` namespace because `backend_epoch` is always part of the fence, but it must carry forward the recovered STOP latch. Restart never implies reset.
+Rules:
+
+- restart always creates a fresh `backend_epoch`;
+- restart never implies STOP reset;
+- valid recovered `stop_latched=true` means the new backend starts STOPPED;
+- first-ever initialization must durably create ControlState before mutation admission;
+- missing/corrupt/contradictory prior control state is `SAFETY_RECOVERY_REQUIRED` and fail-closed;
+- new backend may use a new numeric generation namespace because `backend_epoch` is always part of every control fence.
 
 ## 3. MutationCoordinator
 
@@ -87,12 +94,10 @@ Rules:
 - unknown read concurrency safety means serialize/refuse;
 - lease grants no external authority;
 - STOP/abort/terminal run releases only local run ownership after bounded cleanup/accounting;
-- a dispatch-committed/ambiguous action remains represented in ledgers after lease release and may block overlapping side-effect domains;
+- dispatch-committed/ambiguous actions remain represented and may continue blocking overlapping side-effect domains after lease release;
 - backend epoch/control generation changes invalidate stale lease ownership.
 
-This prevents interleaving two mutation scenarios such as `A1 -> B1 -> A2`.
-
-## 5. Dispatch gate
+## 5. Dispatch gate and local safety I/O
 
 The coordinator has one small local `dispatch_gate` used only to linearize:
 
@@ -102,9 +107,7 @@ The coordinator has one small local `dispatch_gate` used only to linearize:
 
 Do not hold it while waiting for external/Track A authority, GUI/input locks, captures, network I/O, sleeps or adapter discovery.
 
-### 5.1 Narrow local durability exception
-
-The only I/O permitted while holding `dispatch_gate` is one bounded transaction against the local Control Center safety store. The transaction kind must be exactly one of:
+The **only** I/O permitted while holding `dispatch_gate` is one bounded transaction against the local Control Center safety store. Its kind must be exactly one of:
 
 ```text
 DISPATCH_COMMIT
@@ -112,25 +115,31 @@ STOP_TRANSITION
 RESET_TRANSITION
 ```
 
-`DISPATCH_COMMIT` atomically records:
+Every such transaction has:
+
+- a finite local deadline;
+- no external network dependency;
+- a crash-safe durability barrier.
+
+`DISPATCH_COMMIT` atomically records at minimum:
 
 ```text
-DISPATCH_COMMITTED
-POSSIBLY_DISPATCHED
-budget AT_RISK
+ActionLedger.lifecycle_state = DISPATCH_COMMITTED
+ActionLedger.dispatch_state = POSSIBLY_DISPATCHED
+all applicable reserved non-time effect dimensions -> AT_RISK
+backend/control/action/hash/adapter/runtime/session provenance
 ```
 
-`STOP_TRANSITION` atomically records the newly advanced control generation and `stop_latched=true` in Artifact-v1 `ControlStateRecord`.
+`STOP_TRANSITION` atomically records newly advanced `control_generation`, `stop_latched=true`, transition identity and reason.
 
-`RESET_TRANSITION` atomically records a newly advanced control generation and `stop_latched=false`, but only after all reset preconditions in §16 pass.
+`RESET_TRANSITION` atomically records newly advanced `control_generation` and `stop_latched=false` only after §16 reset preconditions pass.
 
-Every safety-store transaction under the gate must have a finite local deadline, no external network dependency and a crash-safe durability barrier.
+Failures:
 
-A failed/timeout `DISPATCH_COMMIT` means no physical dispatch.
-
-A failed/timeout STOP/control-state write is itself safety-critical: the in-process coordinator remains latched/refuses mutation and enters `SAFETY_STORE_FAILED`; it must not reopen mutation merely because persistence failed. After crash/restart, missing/corrupt/contradictory control state fails closed as described in §2.
-
-A failed/timeout reset leaves STOP latched.
+- failed/timeout `DISPATCH_COMMIT` -> no physical dispatch;
+- failed/timeout STOP write -> running coordinator remains STOPPED and enters `SAFETY_STORE_FAILED`; no mutation/reset reopening;
+- failed/timeout reset -> STOP remains latched;
+- crash/restart after uncertain safety-store write -> fail closed until safety recovery proves a coherent state.
 
 ## 6. Irreversible boundary
 
@@ -138,7 +147,7 @@ The physical irreversible boundary is the first external operation after which n
 
 The durable local dispatch commit occurs immediately before this boundary.
 
-`DISPATCH_COMMITTED` means possible effect must be assumed, budget is at-risk and automatic retry is unsafe. It does not prove the effect occurred.
+`DISPATCH_COMMITTED` means possible effect must be assumed, applicable non-time budget is at-risk and automatic retry is unsafe. It does not prove the effect occurred.
 
 ## 7. DispatchFence
 
@@ -157,6 +166,8 @@ DispatchFence:
 ```
 
 Official Track A authority/identity details remain current adapter-specific inputs, not generic scenario fields.
+
+The selected Scenario-v1 semantic registry is part of scenario validation/hash provenance; an unsupported/mismatched registry prevents action admission before this fence can commit.
 
 ## 8. Action lifecycle
 
@@ -186,11 +197,11 @@ TIMED_OUT_AFTER_DISPATCH
 AMBIGUOUS
 ```
 
-`CONFIRMED` is the only successful terminal lifecycle state in v1. It means the action has the required authoritative/scenario-declared confirmation needed for its action result; it is not merely a successful local function call. Once `CONFIRMED`, later callbacks may add evidence only and cannot move the action to another control state.
+`CONFIRMED` is the only successful terminal lifecycle state in v1. It requires the scenario-declared/authoritative confirmation needed for that action; successful local invocation alone is insufficient.
+
+A terminal action cannot be rewritten by late/stale callbacks. Later accepted information is evidence/reconciliation only.
 
 `AMBIGUOUS` means external effect cannot be proven either way and is never automatically retried.
-
-Stale old-backend/generation/session/runtime callbacks may be evidence only, never current control input.
 
 ## 9. Action idempotency
 
@@ -198,7 +209,7 @@ ActionLedger stores globally unique `action_id` plus Scenario-v1 canonical `acti
 
 - same action ID/hash -> existing state/result, no second dispatch;
 - same action ID/different hash -> `REFUSED_IDEMPOTENCY_CONFLICT`;
-- duplicate submission -> no second budget reservation;
+- duplicate submission -> no second non-time budget reservation;
 - explicit retry -> new action ID/attempt + fresh budget/fences/authority;
 - auto-retry forbidden after dispatch commit or any possible-dispatch state.
 
@@ -206,17 +217,18 @@ Control API RequestLedger handles transport/domain request idempotency separatel
 
 ## 10. Preparation
 
-Outside dispatch gate:
+Outside `dispatch_gate`:
 
-1. validate scenario/action;
+1. validate scenario, selected semantic registry and typed action;
 2. resolve capability;
-3. compute Scenario-v1 EffectBound and reserve budget;
-4. run advisory preflight;
-5. wait for/acquire external authority guard;
-6. acquire required GUI/input lock;
-7. prepare before-state evidence.
+3. compute Scenario-v1 EffectBound and verify SideEffectBudget/runtime deadline;
+4. reserve applicable non-time hard dimensions;
+5. run advisory preflight;
+6. wait for/acquire external authority guard;
+7. acquire required GUI/input lock;
+8. prepare before-state evidence.
 
-Every wait is bounded/cancellation-aware. Preparation never grants standing dispatch permission.
+Every wait is bounded/cancellation-aware and constrained by the action/run deadlines. Preparation never grants standing dispatch permission.
 
 For Official Tibia, Track A guard remains continuously held through final current Track A checks, local commit and physical effect.
 
@@ -227,7 +239,7 @@ prepare outside dispatch_gate
 -> hold required external authority guard
 -> enter dispatch_gate
 -> revalidate all final fences and stop_latched=false
--> atomically/durably transition ActionLedger + BudgetLedger to possible-dispatch/at-risk
+-> atomically/durably transition ActionLedger + applicable non-time BudgetLedger dimensions to POSSIBLY_DISPATCHED/AT_RISK
 -> durability barrier succeeds
 -> exit dispatch_gate
 -> with external authority guard still held, cross physical irreversible boundary exactly once
@@ -240,16 +252,17 @@ Inside dispatch gate verify immediately before commit:
 2. matching active mutation-run ownership where mutation-capable;
 3. backend epoch;
 4. control generation;
-5. durable/in-memory STOP latch and cancellation;
+5. recovered/in-memory STOP state and cancellation;
 6. adapter generation;
 7. runtime/session fences;
-8. valid budget reservation;
-9. current semantic capability;
-10. current external authority;
-11. current input lock where required;
-12. all current Official Tibia Track A final identity/authority requirements under the existing guard.
+8. selected semantic registry identity/version still supported;
+9. valid remaining runtime deadline and non-time reservations;
+10. current semantic capability;
+11. current external authority;
+12. current input lock where required;
+13. all current Official Tibia Track A final identity/authority requirements under the existing guard.
 
-Durable commit minimum:
+Durable dispatch record minimum:
 
 ```yaml
 backend_epoch:
@@ -258,7 +271,6 @@ action_id:
 action_request_hash:
 lifecycle_state: DISPATCH_COMMITTED
 dispatch_state: POSSIBLY_DISPATCHED
-budget_state: AT_RISK
 adapter_generation:
 runtime_instance_id:
 session_epoch:
@@ -274,11 +286,11 @@ Adapter execution receives coordinator-owned:
 commit_dispatch() -> COMMITTED | REFUSED
 ```
 
-It is one-shot. Adapter must not cross the physical mutation boundary unless this exact action returned COMMITTED.
+It is one-shot. Adapter must not cross the physical mutation boundary unless this exact action returned `COMMITTED`.
 
 Official Tibia external Track A guard remains continuously held through commit and physical effect.
 
-## 13. Crash after commit
+## 13. Crash after dispatch commit
 
 Crash after durable dispatch commit but before physical outcome is known recovers as:
 
@@ -297,20 +309,20 @@ STOP is a durable linearizable control transition.
 While holding the same dispatch gate used by commit, STOP:
 
 1. verifies generation can advance without overflow;
-2. sets the in-process STOP intent so no new commit can be admitted in the transition;
-3. performs one `STOP_TRANSITION` local safety transaction that atomically persists the newly advanced `control_generation`, `stop_latched=true`, `stop_transition_id`, current `backend_epoch` and reason code;
-4. after the durability barrier succeeds, publishes that generation/latch as the normal control state and releases the gate;
+2. sets in-process STOP intent so no new commit can be admitted;
+3. performs one bounded `STOP_TRANSITION` transaction recording the new generation, `stop_latched=true`, transition ID, current backend epoch and reason;
+4. after durability succeeds, publishes the new generation/latch and releases the gate;
 5. cancels queued/waiting old-generation work;
 6. signals cooperative cancellation;
 7. boundedly cleans harness-owned resources.
 
-If step 3 fails/times out, the coordinator enters `SAFETY_STORE_FAILED`, remains locally STOPPED and refuses all subsequent mutation/reset except an explicit safety-store recovery path. It never treats a failed STOP persistence as permission to continue.
+If persistence fails/times out, the coordinator remains locally STOPPED/`SAFETY_STORE_FAILED` and refuses subsequent mutation/reset except an explicit safety-store recovery path.
 
 Race:
 
 ```text
 STOP wins gate -> durable stop_latched=true + new generation -> stale action cannot commit -> no physical effect
-commit wins gate -> possible-dispatch/at-risk already durable -> STOP records a later generation and treats action as already committed
+commit wins gate -> possible-dispatch/at-risk already durable -> later STOP records a newer generation and treats action as already committed
 ```
 
 No third mutation-admission outcome exists.
@@ -335,27 +347,29 @@ Any compensating external action is a separate semantic action with fresh author
 
 STOP remains latched across requests and backend restarts until explicit reset succeeds.
 
-Reset is a local control transition; it grants no external authority.
+Reset is local and grants no external authority.
 
-Before reset may enter the dispatch gate, all of the following must be true:
+Before reset enters `dispatch_gate`, all must hold:
 
-1. the safety store and recovered `ControlStateRecord` are valid and non-contradictory;
+1. safety store and recovered ControlState are valid/non-contradictory;
 2. no unresolved safety-store failure exists;
-3. unresolved AMBIGUOUS actions and their overlapping side-effect blocks remain represented and are not cleared;
-4. no current mutation commit is in the gate;
-5. generation can advance without overflow.
+3. unresolved AMBIGUOUS actions and overlapping side-effect blocks remain represented and will not be cleared;
+4. generation can advance without overflow.
 
-Under the dispatch gate, reset performs one bounded `RESET_TRANSITION` transaction that advances `control_generation` and durably writes `stop_latched=false`. Only after its durability barrier succeeds may mutation admission reopen. Reset failure leaves STOP latched.
+Under the gate, reset performs one bounded `RESET_TRANSITION` that advances generation and durably writes `stop_latched=false`. Mutation admission reopens only after durability succeeds.
 
-Reset cannot reuse stale callbacks, cannot clear Action/Budget ambiguity, and cannot restore cached Track A authority. Every later mutation reacquires/revalidates authority normally.
-
-Generation overflow fails closed.
+Reset failure leaves STOP latched. Reset cannot reuse stale callbacks, clear Action/Budget ambiguity or restore cached Track A authority.
 
 ## 17. Pause/resume
 
-Pause stops scheduling new steps but does not suspend external authority expiry, identities, clocks or an already committed action.
+Pause stops scheduling new steps but does not suspend:
 
-Resume revalidates backend/control/adapter/runtime/session fences and declared predicates. Changed runtime/session invalidates pending mutation by default.
+- the Scenario-v1 absolute runtime deadline;
+- external authority expiry;
+- identities/generations;
+- an already committed action.
+
+Resume revalidates backend/control/adapter/runtime/session fences, semantic registry and declared predicates. Changed required runtime/session/registry identity invalidates pending mutation by default.
 
 Every later mutation is freshly authorized at final commit.
 
@@ -363,21 +377,21 @@ Every later mutation is freshly authorized at final commit.
 
 Every restart creates a fresh backend epoch, rejects old-epoch callbacks as control input, does not auto-resume mutation runs and reacquires all external authority.
 
-Before mutation admission the backend must recover:
+Before mutation admission recover:
 
 - ActionLedger/dispatch classes;
-- BudgetLedger;
+- non-time BudgetLedger state;
 - RequestLedger where Package B applies;
 - Artifact-v1 ControlState/STOP latch.
 
-Control-state recovery rules:
+Control-state recovery:
 
-- prior valid `stop_latched=true` -> new backend starts STOPPED; explicit reset is required;
-- prior valid `stop_latched=false` -> new backend may remain unlatched after all other safety recovery succeeds;
-- first-ever empty store -> durably initialize a non-latched ControlState before mutation admission;
-- missing/corrupt/contradictory state where prior safety state may have existed -> `SAFETY_RECOVERY_REQUIRED`, mutation refused, no implicit reset.
+- valid prior `stop_latched=true` -> start STOPPED; explicit reset required;
+- valid prior `stop_latched=false` -> may remain unlatched after all other safety recovery succeeds;
+- explicit first-ever store bootstrap -> durably initialize non-latched ControlState before mutation admission;
+- missing/corrupt/contradictory state where prior safety state may have existed -> `SAFETY_RECOVERY_REQUIRED`, refuse mutation, no implicit reset.
 
-Durable dispatch classes:
+Durable action dispatch classes:
 
 ```text
 NOT_DISPATCHED
@@ -385,16 +399,48 @@ POSSIBLY_DISPATCHED
 CONFIRMED
 ```
 
-- no durable commit -> NOT_DISPATCHED; reconsider only via explicit recovery + fresh validation;
+- no durable dispatch commit -> NOT_DISPATCHED; reconsider only through explicit recovery + fresh validation;
 - durable possible-dispatch without terminal proof -> AMBIGUOUS;
-- confirmed terminal authoritative result -> recover it as terminal `CONFIRMED`;
+- confirmed authoritative terminal result -> recover terminal `CONFIRMED`;
 - missing/corrupt/contradictory safety state -> fail closed.
 
 Artifact-v1 safety-state precedence applies.
 
-## 19. BudgetLedger
+## 19. SideEffectBudget and BudgetLedger
 
-Per hard dimension:
+Scenario v1 defines hard dimensions:
+
+```text
+max_runtime_seconds
+max_actions
+max_movement_tiles
+max_spells
+max_consumables
+max_items_moved
+max_gold
+max_tibia_coins
+max_irreversible_changes
+```
+
+### 19.1 Runtime dimension
+
+`max_runtime_seconds` is primarily an absolute monotonic run deadline, not an irreversible/value side effect.
+
+Rules:
+
+- deadline is fixed at run start from Scenario-v1 budget;
+- pause does not extend it;
+- every action total attempt timeout and every wait must fit within remaining runtime;
+- Action EffectBound includes `max_runtime_seconds = ceil(timeout_ms/1000)` for admission/fit checking;
+- elapsed runtime is measured from the run's monotonic clock and recorded for reporting/accounting;
+- ambiguity cannot extend the run deadline;
+- restart never auto-resumes the run, so no cross-backend monotonic continuation is invented.
+
+Implementations may represent runtime in the same BudgetLedger shape for uniform reporting, but `AT_RISK/uncertain` dispatch semantics below apply only to non-time side-effect dimensions. Runtime safety authority is the fixed deadline.
+
+### 19.2 Non-time hard dimensions
+
+Each uses:
 
 ```text
 limit
@@ -410,51 +456,39 @@ available = limit - reserved - at_risk - committed - uncertain
 
 Use checked non-negative arithmetic.
 
-Reserve Scenario-v1 maximum plausible EffectBound before dispatch.
+Reserve the action's conservative Scenario-v1 EffectBound before dispatch.
 
-At dispatch commit, move reservation -> at-risk in the same atomic local safety transaction.
+At dispatch commit, move applicable non-time reservation -> at-risk in the same atomic local `DISPATCH_COMMIT` transaction.
 
 Reconciliation:
 
-- authoritative/proven no effect -> release at-risk;
-- measured confirmed effect -> commit measured, release proven remainder;
+- authoritative/proven no external effect -> release at-risk;
+- measured confirmed external effect -> commit measured, release proven remainder;
 - dispatched but unmeasurable -> commit conservative maximum;
 - timeout/fail/cancel/ambiguity after commit -> maximum -> uncertain;
 - uncertain counts as consumed until reconciled;
 - duplicate same action ID -> no additional accounting;
 - retry action -> fresh reservation.
 
-Minimum dimensions:
-
-```text
-max_runtime_seconds
-max_actions
-max_movement_tiles
-max_spells
-max_consumables
-max_items_moved
-max_gold
-max_tibia_coins
-max_irreversible_changes
-```
-
-TC/irreversible default zero. Unbounded hard effect -> refuse.
+Tibia Coins and irreversible changes default to zero. Unbounded hard effect -> refuse before dispatch.
 
 ## 20. Capture-control boundary
 
-Ordinary snapshot/wait/capture operations are observational only.
+Ordinary snapshot/wait/semantic-field/capture operations are observational only.
 
 Passive capture may start only an already admitted passive producer.
 
-If enabling capture requires attach/injection/input/process/network mutation, passive `capture_start()` refuses with a typed requirement. Invasive enablement must be a separately declared semantic control action/contract through the normal mutation path.
+If enabling capture requires attach/injection/input/process/network mutation, passive `capture_start()` refuses with a typed requirement. Invasive enablement must be separately declared and pass the normal mutation path.
 
 Capture cleanup may close harness-owned resources but cannot introduce a new invasive action.
 
-## 21. Scenario semantics
+## 21. Scenario/adapter semantic registry relationship
 
-Scenario-v1 parser limits, hashes, stable IDs, predicates, semantic selectors, action parameter schemas, retries, SideEffectBudget, EffectBound and capture/privacy policies are normative.
+Scenario-v1 parser limits, hashes, stable IDs, immutable semantic registry, predicates, references, action schemas, retries, SideEffectBudget, EffectBound and capture/privacy policies are normative.
 
-Unknown authority/safety predicates fail closed. Mutation retry is allowed only after proven NOT_DISPATCHED and always uses a new action ID.
+Adapter-v1 registry descriptor/hash and typed projection semantics are normative at the adapter boundary.
+
+Unknown schema/path/action kind or unsupported required semantic version fails closed before action scheduling. Unknown authority/safety predicates fail closed. Mutation retry is allowed only after proven NOT_DISPATCHED and always uses a new action ID.
 
 ## 22. Recorder ordering/causal evidence
 
@@ -494,7 +528,7 @@ ACTIVE -> CLOSING -> FINALIZED
 
 Bounded CLOSING drains sources/watermarks where possible.
 
-Late events cannot change a terminal action lifecycle state, resume execution, authorize retry or rewrite finalized history. In particular a later callback cannot move `CONFIRMED` to another state or convert AMBIGUOUS to safe-to-retry without a separately admitted authoritative reconciliation record.
+Late events cannot change a terminal action lifecycle state, resume execution, authorize retry or rewrite finalized history.
 
 Later accepted evidence is append-only supplement.
 
@@ -530,9 +564,16 @@ No raw-payload fallback. Future payload mode requires separate approved sanitiza
 
 ## 26. Artifact durability
 
-Artifact v1 defines Request/Action/Budget/ControlState/Recovery ledgers, manifest, event/action evidence, staging/finalization, screenshot quarantine, supplements and hashes.
+Artifact v1 defines:
 
-Safety ledgers have precedence over report/presentation. Presentation failure cannot downgrade possible-dispatch/at-risk state or clear a STOP latch.
+- global RequestLedger/ControlState safety authority;
+- per-run Action/Budget/Recovery state;
+- manifest/event/action evidence;
+- staging/finalization;
+- screenshot quarantine;
+- supplements/hashes.
+
+Safety state has precedence over report/presentation. Presentation failure cannot downgrade possible-dispatch/at-risk state or clear STOP.
 
 PASS is forbidden for unresolved ambiguous required mutation or incomplete required finalization/privacy/cleanup state.
 
@@ -540,11 +581,13 @@ PASS is forbidden for unresolved ambiguous required mutation or incomplete requi
 
 Package B transport semantics are normative in Control API v1.
 
-Browser/CLI cannot bypass domain safety to concrete adapters.
+Browser/CLI cannot bypass domain safety to concrete adapters. Request/resource identity must be durable before protected scheduling/control transition.
 
 ## 28. Capability separation
 
 Generic adapters expose `read_supported` and `action_supported` independently.
+
+Semantic-registry support is independently negotiated and does not imply either capability or authority.
 
 Official Tibia additionally exposes Track A R0-R4/A0-A4 evidence maturity with refs.
 
@@ -566,7 +609,8 @@ No default byte-level protocol/internal-layout/renderer parity is required.
 
 Use deterministic manual clock/state scheduler and deterministic durability store capable of injecting:
 
-- authority/capability states;
+- authority/capability/semantic-registry states;
+- registry ID/version/hash mismatch;
 - backend/control/adapter/runtime/session changes;
 - second mutation-run conflict;
 - pre-commit/durability/post-commit failures;
@@ -577,7 +621,7 @@ Use deterministic manual clock/state scheduler and deterministic durability stor
 - restart with latched STOP;
 - reset durability failure;
 - duplicate actions;
-- budgets;
+- budgets/runtime deadline;
 - passive/invasive capture distinction;
 - multi-clock/late events;
 - secret rejection;
@@ -592,34 +636,36 @@ At minimum:
 1. second active mutation-capable run on same adapter is refused;
 2. read-only concurrency only when explicitly safe;
 3. stale backend/control/adapter/runtime/session fences refuse commit;
-4. duplicate action ID/hash dispatches once;
-5. conflicting action hash refuses;
-6. STOP wins gate -> durable latch/new generation/no effect;
-7. commit wins gate -> possible-dispatch/at-risk before later STOP;
-8. STOP linearizes while another action waits for external authority;
-9. dispatch-journal failure/timeout -> no effect;
-10. crash after durable commit -> AMBIGUOUS/no retry;
-11. budget reserve/at-risk/commit/uncertain semantics;
-12. arithmetic overflow fails closed;
-13. pause/resume stale identity refusal;
-14. restart fresh epoch/stale callback refusal;
-15. restart preserves a valid STOP latch until explicit reset;
-16. missing/corrupt control state on restart refuses mutation;
-17. STOP durability failure leaves mutation fail-closed;
-18. reset durability failure leaves STOP latched;
-19. explicit successful reset advances generation and does not clear ambiguous budget/action state;
-20. `CONFIRMED` is terminal and late callback cannot rewrite it;
-21. invasive capture hidden in read path refused;
-22. emergency-stop mutation attempt refused;
-23. multi-clock ordering truthfulness;
-24. late event cannot rewrite terminal result;
-25. secret construction barriers;
-26. artifact safety-state precedence/finalization.
+4. unsupported/mismatched semantic registry refuses before scheduling;
+5. duplicate action ID/hash dispatches once;
+6. conflicting action hash refuses;
+7. STOP wins gate -> durable latch/new generation/no effect;
+8. commit wins gate -> possible-dispatch/at-risk before later STOP;
+9. STOP linearizes while another action waits for external authority;
+10. dispatch-journal failure/timeout -> no effect;
+11. crash after durable commit -> AMBIGUOUS/no retry;
+12. non-time budget reserve/at-risk/commit/uncertain semantics;
+13. runtime deadline is not extended by pause/ambiguity/retry;
+14. arithmetic overflow fails closed;
+15. pause/resume stale identity/registry refusal;
+16. restart fresh epoch/stale callback refusal;
+17. restart preserves a valid STOP latch until explicit reset;
+18. missing/corrupt control state on restart refuses mutation;
+19. STOP durability failure leaves mutation fail-closed;
+20. reset durability failure leaves STOP latched;
+21. explicit successful reset advances generation and does not clear ambiguous budget/action state;
+22. `CONFIRMED` is terminal and late callback cannot rewrite it;
+23. invasive capture hidden in read path refused;
+24. emergency-stop mutation attempt refused;
+25. multi-clock ordering truthfulness;
+26. late event cannot rewrite terminal result;
+27. secret construction barriers;
+28. artifact safety-state precedence/finalization.
 
-Scenario/Artifact/Control API contracts add their own deterministic acceptance tests.
+Scenario/Adapter/Artifact/Control API contracts add their own deterministic acceptance tests.
 
 ## 33. Compatibility
 
 Execution major version 1 is additive-only.
 
-Changing mutation-run ownership, dispatch ordering, STOP linearization/durability, durability-before-effect, idempotency, budget ambiguity, secret construction boundary or restart fencing requires a new major version or separately reviewed compatible extension.
+Changing mutation-run ownership, dispatch ordering, STOP linearization/durability, durability-before-effect, semantic-registry final validation, idempotency, budget ambiguity, secret construction boundary or restart fencing requires a new major version or separately reviewed compatible extension.

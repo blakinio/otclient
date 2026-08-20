@@ -1,7 +1,7 @@
 ---
 task_id: OTC-20260820-surveyor-player-state-reader
-status: implementing
-phase: implement
+status: validating
+phase: physical_e2e
 agent: ChatGPT
 project_lane: otclient
 lane: P0-STATE
@@ -9,7 +9,7 @@ track_id: official-client-re
 task_kind: implementation
 risk: medium
 policy_version: 2
-execution_mode: chat_github_and_hosted_ci
+execution_mode: chat_github_and_synology_read_only
 execution_reason: current-build static resolver, deterministic tests, then one separately admitted physical read-only differential E2E
 decomposition_decision: phased
 decomposition_reason: one cohesive typed-reader lifecycle with hosted implementation followed by serialized physical validation
@@ -17,17 +17,17 @@ context_pressure: medium
 context_growth: stable
 context_score: 8
 estimate_confidence: medium
-runtime_access: none
-runtime_owner_task: NOT_APPLICABLE
-runtime_namespace: NOT_APPLICABLE
-canonical_registration: NOT_APPLICABLE
+runtime_access: read_only
+runtime_owner_task: OTC-20260820-surveyor-player-state-reader
+runtime_namespace: otclient-track-a-kasmvnc/display-1
+canonical_registration: UNKNOWN
 canonical_lease_generation: NOT_APPLICABLE
 registration_lease_generation: NOT_APPLICABLE
 gate_a: NOT_APPLICABLE
 generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
-target_uniqueness: NOT_APPLICABLE
+target_uniqueness: PROVEN
 mutation_authorized: false
 gui_input_authorized: false
 process_control_authorized: false
@@ -35,9 +35,10 @@ credentials_allowed: false
 login_allowed: false
 gameplay_allowed: false
 transaction_authorized: false
-base_main: 2a2b607bf11818cdd6bfc4377c932a170e4be2a9
-branch: feat/OTC-20260820-surveyor-player-state-reader
+base_main: 9376ad6ff13924628749a186f2586d438f2c60bd
+branch: docs/OTC-20260820-surveyor-player-state-postmerge-e2e
 implementation_pr: 634
+closeout_pr: PENDING
 physical_e2e_required: true
 owned_paths:
   - tools/tibia_re_surveyor/**
@@ -57,8 +58,8 @@ anti_stall:
   terminal_ci_checks_for_current_generation: 0
   repair_cycles: 0
   unchanged_state_checks: 0
-last_completed_step: implemented fail-closed current-build player-state reader; real exact-ELF resolver PASS; 30 focused tests PASS; repository-only collect-all reports 10 missing readers and privacy PASS
-next_action: publish exact implementation head to PR #634, run required CI/governance and fresh independent audit, merge, then perform one owner-controlled read-only movement differential E2E
+last_completed_step: implementation PR #634 merged as 9376ad6ff13924628749a186f2586d438f2c60bd; exact current runtime revalidated read-only as one PID 19590, size 52109920, SHA ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8, display :1 and one Tibia client window
+next_action: collect one read-only player-state baseline, require exactly one owner-performed 3-5 tile movement, collect the second snapshot, prove causal XYZ delta, then persist evidence and archive the task
 ---
 
 # Surveyor v2 P0 player-state typed reader

@@ -1,17 +1,17 @@
 ---
 task_id: OTC-20260820-local-model-single-residency-policy
-status: implementing
+status: ready
 agent: ChatGPT
 project_lane: otclient
 lane: governance
 track_id: local-ai-tooling
 task_kind: documentation_policy
-phase: implementation
+phase: closeout
 risk: low
 branch: docs/OTC-20260820-local-model-single-residency-policy
 base_branch: main
 created: 2026-08-20T13:13:00+02:00
-updated: 2026-08-20T13:13:00+02:00
+updated: 2026-08-20T13:26:00+02:00
 runtime_access: none
 runtime_owner_task: NOT_APPLICABLE
 runtime_namespace: NOT_APPLICABLE
@@ -49,10 +49,10 @@ Make the owner's resource rule repository-wide and fail closed: on one physical 
 
 ## Acceptance criteria
 
-- [ ] Root `AGENTS.md` requires the rule for all future local-model work.
-- [ ] A normative contract defines preflight, switching, unload and failure behavior.
-- [ ] The rule is discoverable in the module catalogue and changelog.
-- [ ] Documentation/static validation and exact-head CI pass.
+- [x] Root `AGENTS.md` requires the rule for all future local-model work.
+- [x] A normative contract defines preflight, switching, unload and failure behavior.
+- [x] The rule is discoverable in the module catalogue and changelog.
+- [x] Documentation/static validation and exact-head CI pass.
 - [ ] PR is squash-merged and task ownership is released.
 
 ## Scope and non-effects
@@ -62,3 +62,12 @@ Documentation/governance only. This task does not load a model, run inference, t
 ## Reuse
 
 PR #615 already implements a compatible `MAX_ONE_LOADED_MODEL` lifecycle on its blocked PoC branch. This task promotes only the durable repository-wide policy, not the unfinished PoC.
+
+## Validation checkpoint
+
+- implementation head `4219958c842d930a00a8871edd5391557f9aef3e`: `git diff --check` PASS;
+- exact-head CI, Track A agent runtime governance and Track A canonical live governance: PASS;
+- fresh independent read-only local-model review: PASS, P0/P1/P2 NONE, PR comment `5355217629`;
+- resource hygiene: one review model only with `keep_alive=0`; follow-up `ollama ps` empty.
+
+next_action: publish this ready checkpoint, obtain exact-head checks/review on the new task-only delta, then squash-merge PR #625 and archive/release ownership.

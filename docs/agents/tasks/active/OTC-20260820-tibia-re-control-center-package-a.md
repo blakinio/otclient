@@ -11,7 +11,7 @@ risk: medium
 branch: feat/OTC-20260820-tibia-re-control-center-package-a
 base_branch: main
 created: 2026-08-20T14:18:00+02:00
-updated: 2026-08-20T19:16:31+02:00
+updated: 2026-08-20T20:26:00+02:00
 initial_base_sha: 8620310a91c53e63abc0bf51fe40bdb8a3ee6cef
 related_pr: 628
 runtime_access: none
@@ -38,19 +38,19 @@ run_scope: autonomous_program
 continuation_policy: continue_until_real_stop
 task_completion_policy: finalize_archive_and_continue
 user_communication: terminal_only
-execution_mode: github_only_after_local_connector_loss
+execution_mode: remote_desktop_plus_github
 execution_reason: GitHub connector plus isolated GitHub-hosted validation preserves the in-progress branch after local terminal access became unavailable
 execution_budget_minutes: 120
 execution_budget_reason: cohesive Package A implementation, exact-head validation, independent validator role, merge and mandatory archive closeout
 invocation_started_at: 2026-08-20T14:18:00+02:00
-last_progress_at: 2026-08-20T19:16:31+02:00
+last_progress_at: 2026-08-20T20:26:00+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: candidate_pending_ci
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 2
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 1
+repair_cycles_for_current_gate: 2
 context_reconstruction_attempts: 2
 stall_warnings: 0
 heavy_validation_runs: 2
@@ -139,7 +139,7 @@ No Control API/browser/CLI listener is implemented here. No policy/Ollama loop i
 - [x] Exact Package A fake one-step journey is covered as non-UI E2E.
 - [x] No concrete official-client runtime or operator-facing adapter-bypass interface exists.
 - [x] Full exact-head validation and changed-file self-review are clean; module catalogue/changelog/task are current.
-- [x] Fresh independent exact-head validator role has no open material findings.
+- [ ] Fresh independent exact-head validator role has no open material findings.
 - [ ] Required exact-head GitHub checks pass, review threads are resolved and implementation PR reaches an intentional terminal state.
 - [ ] Post-merge archive closeout records terminal evidence and releases ownership.
 
@@ -151,32 +151,30 @@ No Control API/browser/CLI listener is implemented here. No policy/Ollama loop i
 - The same candidate exact head also has Track A runtime governance run `32395883691` PASS, Track A canonical-live governance run `32395883700` PASS and repository CI run `32395883738` PASS.
 - Full 17-file PR diff was re-read after reconciliation. No material self-review finding remains. One unrelated pre-existing changelog line is normalized from mojibake (`Âµ`/`Ã—`) to the intended UTF-8 glyphs (`µ`/`×`); this is documentation-only and has no runtime behavior impact.
 - Current `main@2a2b607bf11818cdd6bfc4377c932a170e4be2a9` was reconciled as the second parent of merge commit `9e188ff1d5d377d81c80ceb45791868a9f31e067`; current-main Surveyor/Track A semantics were preserved, PR #628 became mergeable, and the Package A catalogue/changelog union was restored in `f3b5783984684b47a23fb2ab9a259c4541535e00`.
+- Codex review at `eddc54d13d76b983d6bf82192dda90d2444ffe09` found four P1 defects (failed-STOP reset reopening, missing final abort revalidation, callback identity/session fencing, and clean-shutdown/in-flight fencing). Successor `eb12586a9f0e8cb0c5ccefd64158bd53a23bca59` repairs all four and removes the one-shot repair workflow/script.
+- After reconciling current `main@9376ad6ff13924628749a186f2586d438f2c60bd`, local predecessor `6f37fde3ef60a4c364f2c5b7ad084e47a870d6f1` passes 80/80 focused tests, `audit_package_a.py`, `audit_package_a_p1.py`, Ruff and `git diff --check`; all four P1 falsification checks report PASS. Fresh exact-head independent review and GitHub CI remain required after this checkpoint commit.
 
 ## Recovery checkpoint
 
 ```yaml
 recovery:
   policy_version: 1
-  generation: 4
-  session_id: package-a-github-only-20260820-1916
-  session_started_at: 2026-08-20T19:16:31+02:00
-  checkpointed_at: 2026-08-20T19:16:31+02:00
-  last_progress_at: 2026-08-20T19:16:31+02:00
+  generation: 5
+  session_id: package-a-recovery-20260820-2003
+  session_started_at: 2026-08-20T20:03:00+02:00
+  checkpointed_at: 2026-08-20T20:26:00+02:00
+  last_progress_at: 2026-08-20T20:26:00+02:00
   phase: validate
-  validated_predecessor_head: 9a959438ad6eaea49cb1e21bcd081bd094c27c29
+  validated_predecessor_head: 6f37fde3ef60a4c364f2c5b7ad084e47a870d6f1
   pull_request: 628
-  active_operation: final metadata checkpoint followed by one exact-head CI generation, Ready and merge
-  external_run_ids:
-    - 32395883691
-    - 32395883700
-    - 32395883708
-    - 32395883738
-  operation_started_at: 2026-08-20T19:16:31+02:00
+  active_operation: push final candidate, obtain fresh exact-head independent review, resolve remediated P1 threads, then final CI and merge
+  external_run_ids: []
+  operation_started_at: 2026-08-20T20:26:00+02:00
   wait_deadline_at: null
-  check_generation: candidate_pending_ci
+  check_generation: final_candidate_pending_ci
   checks_used: 0
   status: active
   safe_to_resume: true
   resume_condition: PR #628 remains the sole Package A writer and runtime_access remains none
-  next_action: verify all exact-head checks for this metadata-checkpoint successor, then Ready/merge if no review blocker exists
+  next_action: push this final candidate and request fresh exact-head independent review before Ready/merge
 ```

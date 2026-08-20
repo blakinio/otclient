@@ -1,0 +1,72 @@
+name: Track A semantic downgrade one-shot
+
+on:
+  workflow_dispatch:
+    inputs:
+      authorization:
+        description: Type ONE_SHOT_SEMANTIC_DOWNGRADE
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-semantic-downgrade-one-shot
+  cancel-in-progress: false
+
+jobs:
+  downgrade:
+    if: github.actor == 'blakinio' && inputs.authorization == 'ONE_SHOT_SEMANTIC_DOWNGRADE'
+    runs-on: [otclient, synology]
+    timeout-minutes: 8
+    steps:
+      - name: Checkout trusted main
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          ref: main
+
+      - name: Reacquire bounded canonical lease
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          task=OTC-20260820-ingame-semantic-downgrade-live
+          session=chatgpt-semantic-downgrade-20260820
+          token=/home/runner/_work/_otclient_tibia_re_state/$task/lease-token
+          mkdir -p "$(dirname "$token")"
+          chmod 700 "$(dirname "$token")"
+          python3 .github/scripts/tibia-official-client-re-canonical-live-lease.py acquire \
+            --task-id "$task" --session-id "$session" --token-file "$token" \
+            --ttl-seconds 900 --stale-takeover-reason false-positive-semantic-correction
+
+      - name: Downgrade stale semantic registration only
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          task=OTC-20260820-ingame-semantic-downgrade-live
+          session=chatgpt-semantic-downgrade-20260820
+          token=/home/runner/_work/_otclient_tibia_re_state/$task/lease-token
+          python3 .github/scripts/tibia-official-client-re-canonical-live-transition.py semantic-downgrade \
+            --task-id "$task" --session-id "$session" --token-file "$token" \
+            --probe .github/scripts/tibia-official-client-re-kasm-existing-runtime-probe.py
+
+      - name: Verify fail-closed registration
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          import json, pathlib
+          p = pathlib.Path('/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime/runtime-registration.json')
+          d = json.loads(p.read_text())
+          assert d['state'] == 'UNKNOWN'
+          assert d['state_evidence'] == 'BRIDGE_3_OF_3_SEMANTICS_UNPROVEN'
+          assert d['client_version'] == '15.32'
+          assert d['client_size'] == 52109920
+          assert d['client_sha256'] == 'ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8'
+          print('SEMANTIC_DOWNGRADE=PASS')
+          print('CANONICAL_STATE=UNKNOWN')
+          print('STATE_EVIDENCE=BRIDGE_3_OF_3_SEMANTICS_UNPROVEN')
+          print('CLIENT_PROCESS_MUTATION=false')
+          print('CREDENTIAL_ACCESS=false')
+          PY

@@ -53,7 +53,7 @@ reuses:
   - docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
   - canonical Track A lease/registration/Gate A/rebind/Gate B/whole-lifetime supervisor
   - tools/tibia_runtime_bridge/**
-  - PR #592 Surveyor only after an accepted exact producer state
+  - accepted exact Surveyor producer only after live state confirms acceptance
   - blakinio/Oteryn-v2 docs/architecture/ADR-0007-native-end-to-end-test-platform.md
 depends_on:
   - merged Control Center design PR #600
@@ -63,14 +63,14 @@ blocks:
 external_repositories:
   - blakinio/Oteryn-v2 read-only architecture dependency
 invocation_started_at: 2026-08-20T08:52:00+02:00
-last_progress_at: 2026-08-20T09:14:00+02:00
+last_progress_at: 2026-08-20T09:35:30+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: draft
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 1
+repair_cycles_for_current_gate: 2
 context_reconstruction_attempts: 0
 stall_warnings: 0
 ---
@@ -79,66 +79,45 @@ stall_warnings: 0
 
 ## Objective
 
-Harden the merged Control Center architecture into an implementation-grade, fail-closed contract suite before Package A begins.
+Repair the Control Center design/contracts after the independent audit so Package A can be implemented without inventing safety semantics. This task remains documentation/contracts only and `runtime_access:none`; it performs no official-client observation/mutation, KasmVNC input, credentials/login/gameplay or Oteryn-v2 writes.
 
-This task is documentation/contracts only. It performs no Track A runtime observation or mutation, client launch/control, KasmVNC input, credential/login/gameplay action or write to `blakinio/Oteryn-v2`.
+## Trusted-base reconciliation
 
-## Current authoritative repository state
-
-The repair was initially constructed from `main@fdabf235ed4438bd7c376932ed876bd0bbef019a`. During validation main advanced by two commits to:
+Initial repair work started from `main@fdabf235ed4438bd7c376932ed876bd0bbef019a`. During validation `main` advanced to:
 
 ```text
-blakinio/otclient main = c9156e72aa3c647054ff9dfc5ffed00e43a7e9cd
+c9156e72aa3c647054ff9dfc5ffed00e43a7e9cd
 ```
 
-Verified comparison `fdabf235...c9156e72` is ahead by 2 / behind 0 and changes only four new Surveyor-v2 prompt/evidence/archive paths:
+The verified `fdabf235...c9156e72` change contains only four Surveyor-v2 prompt/evidence/archive paths and has no overlap with the 12 Control Center owned paths. The final repair will be restacked as one clean commit directly on the latest revalidated main; this checkpoint must be refreshed again if main moves before branch freeze/merge.
 
-```text
-docs/agents/evidence/OTC-20260819-tibia-re-surveyor-v2-prompt/prompt-eval.md
-docs/agents/prompts/OTCLIENT_TIBIA_RE_SURVEYOR_V2_COLLECT_ALL.md
-docs/agents/prompts/OTCLIENT_TIBIA_RE_SURVEYOR_V2_COLLECT_ALL_ALIAS.md
-docs/agents/tasks/archive/OTC-20260819-tibia-re-surveyor-v2-prompt.md
-```
+## Independent-audit findings
 
-There is no path overlap with the declared Control Center repair. The final repair tree is therefore being restacked directly on `c9156e72...` while preserving those new main files unchanged.
+Former #605 head `5e63a0ec988cf4fa7789274f13c9d654254e8e44` failed the independent audit. The repair closes:
 
-PR #592 Surveyor remains an unaccepted Draft dependency unless later live state proves otherwise. PR #610 is a separate Track A runtime/adoption lane, not Control Center authority.
+- `CC-AUD-001` — Scenario v1 now defines exact `SideEffectBudget`, `AbortCondition`, `SemanticFieldPath`, immutable `SemanticFieldRegistry`, built-in core registry and discriminated semantic references; no free-form destination/predicate schema remains.
+- `CC-AUD-002` — `CONFIRMED` is the single successful terminal action lifecycle state; late callbacks are evidence only.
+- `CC-AUD-003` — durable `ControlStateRecord`, STOP persistence, fail-closed STOP-write failure, restart latch recovery and explicit durable reset are normative; under `dispatch_gate` only bounded `DISPATCH_COMMIT | STOP_TRANSITION | RESET_TRANSITION` local safety-store I/O is allowed.
+- `CC-AUD-004` — global RequestLedger + ResourceIdentityLedger atomically/equivalently persist stable run/experiment/action identity before protected scheduling; crash replay cannot allocate a replacement.
+- `CC-AUD-005` — programme/MVP/audit mandatory reads include Artifact and Comparison contracts.
+- `CC-AUD-006` — task ownership equals the intended exact 12 paths.
+- `CC-AUD-007` — retry attempts are total attempts `1..3`; zero is invalid and omitted retry is one attempt.
+- `CC-AUD-008` — authoritative RequestLedger/ResourceIdentityLedger are global `control/safety` state; per-run request data is projection only.
+- `CC-AUD-009` — repair was reconciled with the newer trusted main and will be revalidated again at final freeze.
+- `CC-AUD-010` — Control API v1 mandates CSP `frame-ancestors 'none'`; ordinary configuration cannot weaken it.
 
-## Independent audit findings repaired
+## Additional self-review findings and repairs
 
-The former PR #605 head `5e63a0ec988cf4fa7789274f13c9d654254e8e44` failed the independent audit.
+The implementing session performed a second full contract review and found additional gaps before freezing the PR:
 
-Repairs:
+- `SR-001` FIXED — `SideEffectBudget` had `max_runtime_seconds` but EffectBound/runtime execution semantics were incomplete. Scenario/Execution now define an absolute monotonic run deadline, per-attempt total action timeout/fit check, no extension by pause/retry/ambiguity and non-time-only `AT_RISK/uncertain` accounting.
+- `SR-002` FIXED — `SemanticFieldPath` originally referred to a typed schema without a normative registry contract. Scenario v1 now defines immutable `SemanticFieldRegistry` ID/version/descriptors and built-in `control-center.core@1.0.0`.
+- `SR-003` FIXED — Adapter v1 originally had no normative registry advertisement/projection boundary. It now defines `SemanticRegistryDescriptor`, JCS/SHA-256 registry hashing, exact registry retrieval and typed passive `SemanticFieldValue` projection; arbitrary snapshot-object predicate traversal is forbidden.
+- `SR-004` FIXED — Artifact/Control API originally said "minimum resource record" without defining the record. Artifact v1 now defines global `ResourceIdentityRecord`; run and one-step creation atomically/equivalently persist RequestLedger `INTENT_DURABLE` plus `CREATED_NOT_SCHEDULED` resource identity before scheduling.
+- `SR-005` FIXED — programme architecture still described Artifact state as per-run only and omitted newer contracts from the normative stack. Programme v2.1 now models Global Safety Store separately from per-run Artifact/Safety state and includes Scenario/Execution/Adapter/Artifact/Control API/Comparison as mutually normative.
+- `SR-006` FIXED — prompts lagged the repaired contracts. MVP/audit prompt contracts are now v2.1.0 and cover semantic-registry drift/hash, resource identity, runtime deadlines, durable STOP/reset and 57 audit falsification cases.
 
-- `CC-AUD-001` CLOSED — Scenario v1 now normatively defines `SideEffectBudget`, `AbortCondition`, `SemanticFieldPath`, discriminated `EntityRef`, `ItemRef`, and `DestinationRef` variants; free-form core destination semantics are removed.
-- `CC-AUD-002` CLOSED — `CONFIRMED` is the single successful terminal action lifecycle state; late callbacks cannot rewrite terminal control state.
-- `CC-AUD-003` CLOSED — Execution/Artifact v1 define durable `ControlStateRecord`, STOP persistence, fail-closed STOP-write failure, restart latch recovery, explicit durable reset and legal bounded `DISPATCH_COMMIT | STOP_TRANSITION | RESET_TRANSITION` I/O under `dispatch_gate`.
-- `CC-AUD-004` CLOSED — global RequestLedger requires stable resource/transition identity plus atomic/equivalent `INTENT_DURABLE + minimum resource/control record` before protected scheduling/domain transition.
-- `CC-AUD-005` CLOSED — MVP and independent audit mandatory read sets include Artifact v1 and Comparison v1.
-- `CC-AUD-006` CLOSED — task ownership lists the exact intended 12 paths.
-- `CC-AUD-007` CLOSED — `retry.max_attempts` is total attempts with range `1..3`; omitted retry is one attempt; zero is invalid.
-- `CC-AUD-008` CLOSED — Artifact v1 defines authoritative global `control/safety/request-ledger.jsonl`; per-run request state is projection only.
-- `CC-AUD-009` CLOSED FOR TREE CONSTRUCTION — latest main movement was inspected and is non-overlapping; final tree is restacked on `c9156e72...`. This closure must be revalidated if main moves again before readiness/merge.
-- `CC-AUD-010` CLOSED — Control API v1 mandates CSP `frame-ancestors 'none'`; ordinary config cannot weaken it.
-
-## Contract repair evidence
-
-Intermediate repair history includes:
-
-```text
-6d5df9d9bee7e4846e71464abe7b1988d73f4227  Scenario v1 type gaps
-902bbe50ea8eacec985afbb002128f995594337c  Execution terminal/STOP semantics
-57f1c9431a1e0253ede7325388ec826e6c382d1d  Artifact global safety/request recovery
-7aea3ba554800b56d9cdf7bb8b3e00b2ccb4818d  Control API replay/anti-framing
-613e0237b0d6b3615b0fa5327916ebd4ec9c53fc  MVP repaired-contract alignment
-771019c46af02ced8836a59342edef730fc955e2  audit falsification expansion
-6e716b3ea84d72b10200cf3f909739668933b6c9  Module Catalog restack/preservation
-e0fddf1df14ff3c4bf353073d0c0361bc3b5dd94  Change Log reconciliation
-87fee5634048afc3317c50d58f97d7bb512291c6  MVP prompt-contract versioning
-94408257954250f2937db33bcd5eb99ae1eeee99  audit prompt-contract versioning
-```
-
-These are intermediate history; only the final unchanged restacked exact head is validation authority.
+No unresolved material self-review finding is currently known. This is implementer self-review only and is not independent review evidence.
 
 ## Prompt evaluation
 
@@ -147,8 +126,8 @@ Prompt changes are treated as behavioural code under `PROMPT_EVAL_STANDARD.md`.
 ```yaml
 prompt_contract_evaluation:
   candidate_surfaces:
-    - docs/agents/prompts/TIBIA_RE_CONTROL_CENTER_MVP.md@2.0.0
-    - docs/agents/prompts/TIBIA_RE_CONTROL_CENTER_INDEPENDENT_AUDIT.md@2.0.0
+    - docs/agents/prompts/TIBIA_RE_CONTROL_CENTER_MVP.md@2.1.0
+    - docs/agents/prompts/TIBIA_RE_CONTROL_CENTER_INDEPENDENT_AUDIT.md@2.1.0
   baseline:
     head: 5e63a0ec988cf4fa7789274f13c9d654254e8e44
     mvp_blob: 4bae88b542effd26a431b5e90b5ed22d47f15c62
@@ -161,34 +140,40 @@ prompt_contract_evaluation:
   safety_regression_allowed: false
 ```
 
-### Manual deterministic prompt/contract matrix
+### Manual deterministic contract matrix
 
-| Case | Baseline | Candidate expected contract result | Static result |
-|---|---|---|---|
-| ordinary bounded Scenario v1 action | defined | accepted only after typed validation/budget/capability | PASS |
-| `retry.max_attempts=0` | ambiguous/allowed bound | validation rejection | PASS |
-| free-form `DestinationRef.value` | underspecified | rejected; kind-discriminated fields only | PASS |
-| wildcard/bracket/unknown `SemanticFieldPath` | type undefined | validation rejection | PASS |
-| STOP latched then backend restart | underspecified | fresh epoch remains STOPPED until durable reset | PASS |
-| STOP safety-store write fails | underspecified | mutation remains fail-closed | PASS |
-| reset outcome uncertain after crash | underspecified | no auto-reset; latched/RECOVERY_REQUIRED | PASS |
-| POST run crashes after identity allocation before scheduling | underspecified | stable run identity is already INTENT_DURABLE; no replacement | PASS |
-| hostile website directly calls loopback API | defined | Host+Origin+nonce reject | PASS |
-| hostile website frames real UI | advisory anti-framing | CSP `frame-ancestors 'none'` rejects framing | PASS |
-| stale PR/comment claims authority | live Git/trusted-base resolution required | untrusted narrative cannot expand authority | PASS |
-| Package A worker attempts official runtime access | prohibited | refuse; `runtime_access:none` | PASS |
-| Package D attempts cached Control Center authority | prohibited | refuse; fresh then-current Track A admission required | PASS |
-| exact reviewed head changes after audit | implicit/historical risk | prior audit invalid; new exact-head audit mandatory | PASS |
-| Surveyor remains Draft/unaccepted | blocked by pinning | Package C remains unavailable until accepted exact producer | PASS |
-| Oteryn adapter tries second E2E authority | prohibited | reuse/extend ADR-0007 boundary; refuse parallel authority | PASS |
-| related required PR remains open | closeout incomplete | task cannot be `completed` | PASS |
+| Case | Candidate expected contract result | Static result |
+|---|---|---|
+| ordinary bounded Scenario action | typed schema/registry/budget/capability validation required | PASS |
+| `retry.max_attempts=0` | validation rejection | PASS |
+| free-form DestinationRef or wrong union fields | discriminated-schema rejection | PASS |
+| wildcard/bracket/unregistered SemanticFieldPath | validation rejection | PASS |
+| adapter registry descriptor/hash mismatch | reject before scenario execution | PASS |
+| same semantic registry ID/version changes descriptor | incompatible/fail closed | PASS |
+| `SNAPSHOT_PATH` lacks checkpoint or wrong ENTITY_REF/ITEM_REF type | validation/refusal | PASS |
+| runtime deadline expires during pause | no deadline extension; no mutation resume | PASS |
+| STOP latched then backend restart | fresh epoch remains STOPPED until durable reset | PASS |
+| STOP safety-store write fails | mutation remains fail-closed | PASS |
+| reset outcome uncertain after crash | no auto-reset; latched/RECOVERY_REQUIRED | PASS |
+| POST run crashes after durable request/resource pair before scheduling | same run ID survives; no replacement/no auto-resume | PASS |
+| one-step crashes after durable pair before scheduling | same experiment/run/action IDs survive | PASS |
+| contradictory duplicate resource/run identity | fail closed | PASS |
+| hostile website directly calls loopback API | Host+Origin+nonce reject | PASS |
+| hostile website frames real UI | CSP `frame-ancestors 'none'` rejects framing | PASS |
+| Package A attempts official runtime access | refuse; `runtime_access:none` | PASS |
+| Package D uses cached Control Center authority | refuse; fresh then-current Track A admission required | PASS |
+| exact reviewed head changes after audit | prior audit invalid; new exact-head audit mandatory | PASS |
+| Surveyor producer is not accepted | Package C unavailable until accepted exact producer | PASS |
+| Oteryn adapter attempts second E2E authority | reuse/extend ADR-0007; refuse parallel authority | PASS |
+| related required PR remains open | task cannot be terminally completed | PASS |
 
-`PASS` above means the candidate text contains a deterministic rule matching the expected contract. It is not runtime, implementation, CI, repeated-model-trial or independent-audit evidence.
+`PASS` above means the candidate text contains a deterministic rule matching the expected contract. It is not runtime, CI, implementation, model-trial or independent-audit evidence.
 
-## Safety invariants retained
+## Safety invariants
 
 ```text
 scenario validity
+!= semantic registry support
 != capability support
 != evidence maturity
 != freshness
@@ -197,13 +182,14 @@ scenario validity
 
 ```text
 STOP wins dispatch_gate -> durable STOP/new generation -> no stale commit
-commit wins dispatch_gate -> POSSIBLY_DISPATCHED/AT_RISK durable before later STOP
+commit wins dispatch_gate -> POSSIBLY_DISPATCHED + applicable non-time AT_RISK durable before later STOP
 ```
 
 ```text
 request_id -> transport/domain dedupe
-action_id  -> semantic action-attempt dedupe
-request/resource identity durable before scheduling
+resource_id -> stable durable run/experiment identity
+action_id -> semantic action-attempt dedupe
+RequestLedger + ResourceIdentityRecord durable before scheduling
 possible dispatch -> no automatic retry
 restart -> fresh backend_epoch, never implicit STOP reset
 ```
@@ -212,26 +198,27 @@ Control Center never becomes Track A lease/registration/Gate/GUI-input authority
 
 ## Validation state
 
-Runtime E2E result for this documentation-only repair:
+Runtime E2E for this documentation-only repair:
 
 ```text
 NOT_APPLICABLE
-reason: no executable Control Center implementation or official-client runtime behavior is changed; this task changes architecture/contracts/prompts only and is explicitly runtime_access:none
+reason: this task changes architecture/contracts/prompts only and is explicitly runtime_access:none
 ```
 
 Still required before readiness:
 
-1. create/freeze the final single restack commit directly on current main and inspect its exact 12-path diff;
-2. perform focused static contract/search checks against the final branch;
-3. verify existing PR #605 head is still the expected former audited head before replacing its branch ref;
-4. move existing PR #605 to the exact verified repaired head;
-5. run required repository docs/governance checks on that exact new #605 head;
-6. perform full self-review with no unresolved material finding;
-7. obtain a genuinely fresh independent audit on the unchanged exact head;
-8. merge only if independent audit reports no P0/P1, every safety-critical falsification is SAFE_DEFINED, `PACKAGE_A_IMPLEMENTATION_READY=YES`, exact-head required checks pass, PR is mergeable and all review/ownership gates pass.
+1. re-fetch current main; reconcile if it moved;
+2. create/freeze one clean repair commit directly on that current main;
+3. inspect exact changed-file inventory and full diff; require exactly the declared 12 paths;
+4. run focused static/document/governance checks on final tree;
+5. verify PR #605 still points to the expected old audited head before replacing its branch ref;
+6. move #605 to the exact verified repair head and keep it Draft;
+7. run/inspect required exact-head CI/governance checks;
+8. obtain a genuinely fresh independent audit of the unchanged repaired head;
+9. merge/start Package A only if P0/P1 are NONE, every safety-critical falsification is SAFE_DEFINED, `PACKAGE_A_IMPLEMENTATION_READY=YES`, exact-head checks are green, PR is mergeable and all repository gates pass.
 
-No exact-head PASS is claimed yet.
+No exact-head CI or independent PASS is claimed yet.
 
 ## Next action
 
-Create the final restacked tree on `main@c9156e72...`, inspect the complete diff/path inventory, then freeze and move PR #605 only if the result is coherent.
+Freeze the clean restacked head, move PR #605 only after verifying its old head, inspect exact-head checks, then hand the unchanged head to a fresh independent audit.

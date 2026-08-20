@@ -18,6 +18,8 @@ _STORE_XY = re.compile(r"\bmovq\s+%xmm0,0x([0-9a-fA-F]+)\(%rdi\)")
 _STORE_Z = re.compile(r"\bmov\s+%eax,0x([0-9a-fA-F]+)\(%rdi\)")
 _INPUT_XY = re.compile(r"\bmovq\s+0x8\(%rax\),%xmm0")
 _INPUT_Z = re.compile(r"\bmov\s+0x10\(%rax\),%eax")
+_MUTATE_XY = re.compile(r"\bpaddd\s+%xmm1,%xmm0")
+_MUTATE_Z = re.compile(r"\badd\s+\$0x1,%eax")
 
 
 @dataclass(frozen=True)
@@ -83,8 +85,27 @@ def parse_relative_relocations(text: str) -> dict[int, int]:
 def derive_mirrored_position_offsets(disassembly: str) -> tuple[tuple[int, int, int], tuple[int, int, int]]:
     if not _INPUT_XY.search(disassembly) or not _INPUT_Z.search(disassembly):
         raise PlayerStateResolverError("world-coordinate input loads are missing")
-    xy = sorted({int(match.group(1), 16) for match in _STORE_XY.finditer(disassembly)})
-    z = sorted({int(match.group(1), 16) for match in _STORE_Z.finditer(disassembly)})
+    if not _MUTATE_XY.search(disassembly) or not _MUTATE_Z.search(disassembly):
+        raise PlayerStateResolverError("derived-coordinate mutation boundary is missing")
+
+    xy: set[int] = set()
+    z: set[int] = set()
+    xy_source_live = True
+    z_source_live = True
+    for line in disassembly.splitlines():
+        if _MUTATE_XY.search(line):
+            xy_source_live = False
+        if _MUTATE_Z.search(line):
+            z_source_live = False
+        if xy_source_live:
+            match = _STORE_XY.search(line)
+            if match:
+                xy.add(int(match.group(1), 16))
+        if z_source_live:
+            match = _STORE_Z.search(line)
+            if match:
+                z.add(int(match.group(1), 16))
+
     triples = sorted({(base, base + 4, base + 8) for base in xy if base + 8 in z})
     if len(triples) != 2:
         raise PlayerStateResolverError(f"mirrored world-coordinate stores are not unique: {triples}")

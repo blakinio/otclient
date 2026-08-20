@@ -37,7 +37,7 @@ gameplay_allowed: false
 transaction_authorized: false
 base_main: 2a2b607bf11818cdd6bfc4377c932a170e4be2a9
 branch: feat/OTC-20260820-surveyor-player-state-reader
-implementation_pr: null
+implementation_pr: 634
 physical_e2e_required: true
 owned_paths:
   - tools/tibia_re_surveyor/**
@@ -57,8 +57,8 @@ anti_stall:
   terminal_ci_checks_for_current_generation: 0
   repair_cycles: 0
   unchanged_state_checks: 0
-last_completed_step: freshly rediscovered current-build TPlayerData qt_metacast relocation/vtable and current playerPosition signed-i32 triplet offsets
-next_action: implement a fail-closed current-build resolver and provisional read-only player-state typed reader with deterministic hosted tests
+last_completed_step: implemented fail-closed current-build player-state reader; real exact-ELF resolver PASS; 30 focused tests PASS; repository-only collect-all reports 10 missing readers and privacy PASS
+next_action: publish exact implementation head to PR #634, run required CI/governance and fresh independent audit, merge, then perform one owner-controlled read-only movement differential E2E
 ---
 
 # Surveyor v2 P0 player-state typed reader

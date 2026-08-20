@@ -1,34 +1,21 @@
 ---
 task_id: OTC-20260819-tibia-re-control-center-hardening-r2
-status: validating
+status: completed
 agent: ChatGPT
 project_lane: otclient
 lane: P0-DESIGN-HARDENING
 track_id: official-client-re
 task_kind: architecture_contract_hardening
-phase: validation
+phase: close
 risk: medium
 branch: docs/OTC-20260819-tibia-re-control-center-hardening-r2
 base_branch: main
 created: 2026-08-19T23:40:48+02:00
-updated: 2026-08-20T10:18:27+02:00
+updated: 2026-08-20T13:49:00+02:00
 initial_base_sha: fdabf235ed4438bd7c376932ed876bd0bbef019a
 related_pr: 613
 supersedes_pr: 605
-independent_audit_review_id: 4976939865
-independent_audit_head: 5e63a0ec988cf4fa7789274f13c9d654254e8e44
-independent_audit_result: FAIL
 runtime_access: none
-runtime_owner_task: NOT_APPLICABLE
-runtime_namespace: NOT_APPLICABLE
-canonical_registration: NOT_APPLICABLE
-canonical_lease_generation: NOT_APPLICABLE
-registration_lease_generation: NOT_APPLICABLE
-gate_a: NOT_APPLICABLE
-generation_rebind: NOT_APPLICABLE
-gate_b: NOT_APPLICABLE
-bootstrap: NOT_APPLICABLE
-target_uniqueness: NOT_APPLICABLE
 mutation_authorized: false
 credentials_allowed: false
 login_allowed: false
@@ -41,110 +28,78 @@ prompting_standard_version: 2.1
 run_scope: autonomous_program
 continuation_policy: continue_until_real_stop
 task_completion_policy: finalize_archive_and_continue
-context_pressure: high
-context_growth: stable
-decomposition_decision: phased
-execution_mode: github_connector_after_local_runner_outage
-owned_paths:
-  - docs/agents/programs/TIBIA_RE_CONTROL_CENTER_E2E.md
-  - docs/agents/contracts/TIBIA_RE_CONTROL_CENTER_SCENARIO_V1.md
-  - docs/agents/contracts/TIBIA_RE_CONTROL_CENTER_EXECUTION_V1.md
-  - docs/agents/contracts/TIBIA_RE_CONTROL_CENTER_ADAPTER_V1.md
-  - docs/agents/contracts/TIBIA_RE_CONTROL_CENTER_CONTROL_API_V1.md
-  - docs/agents/contracts/TIBIA_RE_CONTROL_CENTER_ARTIFACT_V1.md
-  - docs/agents/contracts/TIBIA_RE_CONTROL_CENTER_COMPARISON_V1.md
-  - docs/agents/contracts/TIBIA_RE_CONTROL_CENTER_POLICY_BOUNDARY_V1.md
-  - docs/agents/prompts/TIBIA_RE_CONTROL_CENTER_MVP.md
-  - docs/agents/prompts/TIBIA_RE_CONTROL_CENTER_INDEPENDENT_AUDIT.md
-  - docs/agents/MODULE_CATALOG.md
-  - docs/agents/tasks/active/OTC-20260819-tibia-re-control-center-hardening-r2.md
-  - docs/agents/tasks/archive/OTC-20260819-tibia-re-control-center-hardening.md
-depends_on:
-  - merged Control Center design PR #600
-  - merged audit-prompt PR #602
-reuses:
-  - docs/agents/programs/OTCLIENT_TIBIA_RE_EXPERIMENT_EXECUTION_MODEL.md
-  - current trusted-main Track A authority/registration/Gate/supervisor/input-lock contracts
-  - tools/tibia_runtime_bridge/**
-  - accepted Surveyor v2 producer PR #616 / implementation merge 6f17e25af655854624b34e0b05f9888618269aba via tools/tibia_re_surveyor --collect-all
-  - trusted-main Surveyor v2 read-only operator docs/agents/operators/TRACK_A_SURVEYOR_V2_READONLY.md as a separate owner-gated runtime surface, never authority for this runtime_access:none task
-  - blakinio/Oteryn-v2 docs/architecture/ADR-0007-native-end-to-end-test-platform.md
-blocks:
-  - Package A until a repaired exact head has P0/P1 NONE and PACKAGE_A_IMPLEMENTATION_READY=YES from a fresh independent audit
+execution_mode: github_connector
+ownership_released: true
 ---
 
-# TIBIA RE Control Center hardening remediation r2
+# TIBIA RE Control Center hardening remediation r2 — completed
 
-## Goal
+## Result
 
-Close every material finding from independent audit review `4976939865`, reconcile the hardening with current `main`, and produce a truthful exact-head readiness candidate without implementing Package A or touching Track A runtime.
+The Control Center architecture/contract hardening successor to PR #605 is complete and merged. The task remained `runtime_access:none`; no official client, credentials, login, gameplay, process mutation, network listener, or physical runtime was used.
 
-## Verified starting state
+## Closed findings
 
-- Trusted `main` at initial claim: `fdabf235ed4438bd7c376932ed876bd0bbef019a`; live main advanced during remediation and must be rechecked at final validation.
-- PR #605 exact audited head: `5e63a0ec988cf4fa7789274f13c9d654254e8e44`.
-- Independent result on #605: `FAIL`, P0=0, P1=4, P2=4, `PACKAGE_A_IMPLEMENTATION_READY=NO`.
-- #605 was closed unmerged as superseded after its unchanged exact head was audited.
-- PR #613 is the sole Control Center hardening successor.
-- PR #609/Ollama PoC merged into main and remains a related future consumer only; Policy Boundary v1 prevents it from becoming Control Center/safety authority.
-- Surveyor v2 is accepted on trusted main via PR #616 implementation merge `6f17e25af655854624b34e0b05f9888618269aba`; lifecycle closeout `0447763982ef5db9efca652396cfac22e5a0cff4` closed stale #592 as superseded and released shared-path ownership. Package C may consume only a pinned read-only producer/schema/interface and must preserve missing typed readers as UNKNOWN/UNAVAILABLE.
-- This task has `runtime_access:none`; physical/runtime/browser E2E is `NOT_APPLICABLE` for this documentation/contract remediation.
+The successor closed all eight findings from the prior exact-head audit of #605, including:
 
-## Acceptance criteria
+- complete typed Scenario v1 safety structures and selectors;
+- terminal `CONFIRMED` success semantics;
+- durable STOP/reset plus backend-epoch and unclean-restart recovery;
+- backend-global RequestLedger with immutable pre-domain POST resource/control-transition reservation;
+- reconciled normative read sets and ownership;
+- retry bounds of 1..3 total attempts;
+- backend-global request-ledger topology;
+- explicit future Policy/Ollama boundary downstream of deterministic safety and authority.
 
-- [x] Define all Scenario v1 safety-critical types and selector schemas without free-form core action ambiguity.
-- [x] Make action success terminality and post-dispatch ambiguity semantics explicit.
-- [x] Make STOP/reset state durable and fail closed across backend restart without violating dispatch-gate I/O discipline.
-- [x] Close RequestLedger crash windows with durable pre-domain request/resource reservation and backend-global storage.
-- [x] Reconcile normative read sets, task ownership, retry bounds and request-ledger topology.
-- [x] Preserve the architecture boundary that Ollama/future policy is downstream of normalized state and bounded semantic requests, never deterministic safety/authority.
-- [ ] Run final changed-file/self-review plus repository-required exact-head documentation/governance/CI validation on PR #613.
-- [ ] Obtain a fresh genuinely independent audit of the final unchanged head before Package A readiness/merge.
+Additional self-review hardening separated the monotonic runtime deadline from external-effect ambiguity accounting and closed delayed STOP/reset replay plus failed-STOP-persistence/crash recovery gaps.
 
-## Remediation mapping
-
-- `CC-AUD-001`: Scenario v1 now normatively defines `SideEffectBudget`, `AbortCondition`, `SemanticFieldPath` and closed per-kind entity/item/destination references.
-- `CC-AUD-002`: Execution v1 makes `CONFIRMED` the only terminal successful lifecycle state.
-- `CC-AUD-003`: Artifact/Execution v1 define durable backend-global STOP/reset plus backend-active/unclean-restart `recovery_required` behavior, including STOP-persistence-failure followed by crash.
-- `CC-AUD-004`: Artifact/Control API v1 require preallocated final resource identity and durable RequestLedger `ACCEPTED` before resource creation/scheduling.
-- `CC-AUD-005`: programme/MVP/audit normative sets include Artifact/Comparison and the new Policy Boundary contract where applicable.
-- `CC-AUD-006`: successor owns the full changed contract/programme/prompt/task/catalog surface; #605 ownership is released/archived.
-- `CC-AUD-007`: `retry.max_attempts` is `1..3` total attempts.
-- `CC-AUD-008`: authoritative RequestLedger is backend-global and valid before any run directory exists.
-
-## Context checkpoint
+## Terminal evidence
 
 ```yaml
-checkpoint_version: 3
-updated_at: 2026-08-20T10:18:27+02:00
-reconciled_main_sha: 02fce7e25696ffea3e11c4fc89f458e27f47bef4
-branch: docs/OTC-20260819-tibia-re-control-center-hardening-r2
-pr: 613
-status: validating
-context_routes:
-  - TIBIA_RE_CONTROL_CENTER_E2E
-  - TIBIA_RE_CONTROL_CENTER_POLICY_BOUNDARY_V1
-  - Track_A_runtime_access_none
-proven:
-  - independent review 4976939865 blocked Package A on four P1 and four P2 gaps on unchanged #605 head
-  - all eight recorded #605 findings have explicit successor contract/task remediation
-  - successor adds conservative active-backend/recovery-required semantics for STOP-persistence-failure-plus-crash
-  - future policy/Ollama remains downstream of deterministic Control Center safety/authority
-  - current main reconciled through 02fce7e25696ffea3e11c4fc89f458e27f47bef4; Surveyor v2 implementation/lifecycle and its separate owner-gated read-only physical operator are present; none overlaps the 13 Control Center paths; MODULE_CATALOG preserves both Surveyor and Control Center rows
-  - accepted Surveyor v2 schemas are otclient.tibia-re-surveyor.collect-all.v2, alias-view.v2, telemetry.v2 and missing-readers.v2; its accepted collect-all surface is passive/read-only and does not promote semantic status
-  - no runtime access is required or authorized
-focused_validation:
-  diff_check: PASS
-  changed_paths_vs_main: 13_exact_declared_paths
-  conflict_markers: NONE
-  track_a_agent_runtime_governance: PASS
-  canonical_live_transition_tests_linux_archive: 17_PASS
-  kasm_existing_runtime_probe_tests_linux_archive: 10_PASS
-  windows_direct_canonical_test: NOT_APPLICABLE_due_to_fcntl_and_CRLF_platform; Linux archive rerun is authoritative local focused evidence
-unknown:
-  - final exact-head workflow/check result after the final metadata/content commit
-  - fresh independent exact-head audit result
-blockers:
-  - fresh independent exact-head Control Center audit is required before Package A readiness/merge
-next_action: finalize and publish the 02fce7e main reconciliation, verify exact-head workflows, then obtain a fresh independent audit on the unchanged #613 head
+closeout:
+  implementation_complete: true
+  vertical_slice_complete: true
+  audit:
+    result: PASS_WITH_FINDINGS
+    review_node_id: PRR_kwDOTVmdjs8AAAABKPf6Xw
+    audited_head: 6b2687799bb38055217ba9e8cccf78e69093e3ab
+    audited_main: db21b2f47f0b67436ee575fcad0037c4814c4508
+    p0_findings: 0
+    p1_findings: 0
+    p2_findings: 2
+    package_a_implementation_ready: true
+    safety_critical_falsifications: 50_SAFE_DEFINED
+    material_findings_open_for_package_a: 0
+  e2e:
+    result: NOT_APPLICABLE
+    reason: documentation/contract hardening only with runtime_access:none; no product/runtime behavior was implemented
+  final_ci:
+    head: 6b2687799bb38055217ba9e8cccf78e69093e3ab
+    result: PASS
+    required_checks:
+      - CI run 32365068234 SUCCESS
+      - Track A agent runtime governance run 32365067641 SUCCESS
+      - Track A canonical live governance run 32365067709 SUCCESS
+  pull_requests:
+    terminal_prs:
+      - blakinio/otclient#605 closed unmerged as superseded
+      - blakinio/otclient#613 merged
+    unresolved_review_threads_on_613: 0
+  merge:
+    pr: 613
+    merge_commit: 5fb9f4c9b77388eb0268055834a7c10948b4c3f7
+  task_status: completed
+  task_archived: true
+  ownership_released: true
 ```
+
+The two P2 audit findings are future-package prerequisites only:
+
+1. Package D must prove a current exact-client runtime-bridge semantic profile before official mutation.
+2. Package E must reconcile the canonical migrated Oteryn repository before implementation.
+
+Neither blocks Package A.
+
+## Programme handoff
+
+Package A / `control-core` is now contract-ready. Its next task must start from fresh trusted `main`, remain `runtime_access:none`, implement deterministic control-core behavior only, and satisfy the canonical Package A acceptance matrix (including the required deterministic test suite) before any Package B transport/UI work or Package D official-client mutation work.

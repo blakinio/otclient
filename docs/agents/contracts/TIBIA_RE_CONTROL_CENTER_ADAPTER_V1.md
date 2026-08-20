@@ -2,75 +2,125 @@
 
 ```yaml
 contract_id: TIBIA-RE-CONTROL-CENTER-ADAPTER-V1
-version: 1
-status: design_baseline
+version: 1.3
+major_version: 1
+status: hardened_design_baseline
 producer_repository: blakinio/otclient
 runtime_authority: external; never granted by this contract
+execution_semantics: docs/agents/contracts/TIBIA_RE_CONTROL_CENTER_EXECUTION_V1.md
+scenario_semantics: docs/agents/contracts/TIBIA_RE_CONTROL_CENTER_SCENARIO_V1.md
 ```
 
-## Purpose
+## 1. Purpose
 
-Define the stable semantic boundary between the Control Center Scenario Engine and a concrete client adapter. The first implementation target is the official Tibia Track A runtime. A future independently governed implementation may exist in `blakinio/Oteryn-v2`.
+Define the stable semantic boundary between the Control Center domain/Scenario Engine and concrete client adapters.
 
-The contract deliberately excludes client-specific function addresses, UI coordinates, packet opcodes and wire layouts.
+Common scenarios express semantic intent only. They do not expose client-specific:
 
-## 1. Adapter identity
+- GUI coordinates;
+- raw key presses;
+- QMeta IDs;
+- function addresses/vtables;
+- protocol opcodes;
+- wire layouts.
 
-Every adapter exposes:
+Execution safety is normative in `TIBIA_RE_CONTROL_CENTER_EXECUTION_V1.md` and action parameter/canonical-hash semantics in `TIBIA_RE_CONTROL_CENTER_SCENARIO_V1.md`.
+
+## 2. Version negotiation
+
+Adapters advertise:
 
 ```yaml
-adapter_id: string
-adapter_kind: OFFICIAL_TIBIA | OTERYN_V2 | FAKE_TEST
-adapter_version: string
-runtime_instance_id: string | null
-session_epoch: string | null
+supported_contracts:
+  adapter_contract_major: [1]
+  execution_contract_major: [1]
+  scenario_contract_major: [1]
 ```
 
-`runtime_instance_id` identifies the currently bound runtime instance. A changed instance invalidates outstanding mutation authorization and in-flight assumptions.
+No mutually supported required major version -> fail closed before run execution.
 
-## 2. Capability model
+Minor-version additions are additive. Unsupported required semantics are never silently ignored.
 
-Capabilities are explicit and independently versioned for read and action maturity.
+## 3. Adapter identity
 
 ```yaml
-capability_id: string
-available: bool
-read_gate: NONE | R0 | R1 | R2 | R3 | R4
-action_gate: NONE | A0 | A1 | A2 | A3 | A4
-source: string
-notes: string | null
+AdapterIdentity:
+  adapter_id: string
+  adapter_kind: OFFICIAL_TIBIA | OTERYN_V2 | FAKE_TEST
+  adapter_version: string
+  adapter_generation: string
+  runtime_instance_id: string | null
+  session_epoch: string | null
 ```
 
-The gate meanings are inherited from `OTCLIENT_TIBIA_RE_EXPERIMENT_EXECUTION_MODEL.md` for the official adapter. Oteryn may map its own implementation evidence into the same semantic levels for comparison, but must not claim official-client RE proof from Oteryn-only tests.
+`adapter_generation` changes whenever adapter process/binding state changes in a way that can invalidate queued assumptions.
 
-## 3. Normalized runtime status
+Changed adapter/runtime/session identity invalidates stale pending mutation.
+
+## 4. Generic capability model
+
+```yaml
+Capability:
+  capability_id: string
+  semantic_version: string
+  read_supported: bool
+  action_supported: bool
+  source: string
+  notes: string | null
+```
+
+Read and action support are independent.
+
+### 4.1 Official-client evidence extension
+
+Only `OFFICIAL_TIBIA` exposes Track A research maturity:
+
+```yaml
+OfficialEvidenceExtension:
+  capability_id: string
+  read_gate: NONE | R0 | R1 | R2 | R3 | R4
+  action_gate: NONE | A0 | A1 | A2 | A3 | A4
+  evidence_refs: [string]
+```
+
+Gate meanings come from `OTCLIENT_TIBIA_RE_EXPERIMENT_EXECUTION_MODEL.md`.
+
+Oteryn/fake adapters do not claim Track A R/A grades.
+
+## 5. Runtime status
 
 ```yaml
 RuntimeStatus:
   adapter_id: string
+  adapter_generation: string
   runtime_state: OFFLINE | DEGRADED | ONLINE | UNKNOWN
   client_state: NOT_FOUND | LOGIN_SCREEN | CHARACTER_SELECTION | IN_GAME | UNKNOWN
   recorder_state: STOPPED | RECORDING | ERROR | UNKNOWN
   authority_state: READ_ONLY | MUTATION_ALLOWED | EXPIRED | DENIED | UNKNOWN
   session_epoch: string | null
   runtime_instance_id: string | null
-  monotonic_ns: integer
+  observed_monotonic_ns: integer
+  freshness: FRESH | STALE | UNKNOWN
   reasons: [string]
 ```
 
-For the official Track A adapter, `MUTATION_ALLOWED` is valid only when the current external Track A admission/supervision chain authorizes the exact operation and target. Cached prior success is not sufficient.
+For `OFFICIAL_TIBIA`, `MUTATION_ALLOWED` is status only. It never constitutes standing authority for a later action.
 
-## 4. Snapshot model
+## 6. Snapshot model
 
-Adapters return only fields they can source truthfully.
+Adapters return only truthfully sourced fields:
 
 ```yaml
 GameSnapshot:
+  schema_version: 1
   snapshot_id: string
   adapter_id: string
+  adapter_generation: string
   session_epoch: string | null
   runtime_instance_id: string | null
-  monotonic_ns: integer
+  source_timestamp: integer | string | null
+  source_clock_domain: string | null
+  ingested_monotonic_ns: integer
   client_state: string
   player:
     hp: integer | null
@@ -86,8 +136,8 @@ GameSnapshot:
       x: integer | null
       y: integer | null
       z: integer | null
-  conditions: object
-  action_state: object
+  conditions: object | null
+  action_state: object | null
   target: object | null
   inventory: object | null
   containers: object | null
@@ -95,83 +145,115 @@ GameSnapshot:
   source_quality:
     field_sources: object
     unknown_fields: [string]
+    stale_fields: [string]
 ```
 
-Unknown data remains `null`/unknown. Adapters must not synthesize plausible values for UI completeness.
+Unknown remains null/UNKNOWN. Never fabricate plausible values for UI completeness.
 
-## 5. Semantic action request
+## 7. DispatchFence
+
+```yaml
+DispatchFence:
+  expected_backend_epoch: string
+  expected_control_generation: integer
+  expected_adapter_generation: string
+  expected_runtime_instance_id: string | null
+  expected_session_epoch: string | null
+```
+
+Official Track A lease/registration/Gate/target facts remain adapter-specific current authority inputs, not generic scenario fields.
+
+## 8. ActionRequest
 
 ```yaml
 ActionRequest:
+  schema_version: 1
   action_id: string
   run_id: string
   step_id: string
+  attempt_index: integer
   kind: string
   parameters: object
   timeout_ms: integer
   required_capability: string
   required_authority: READ_ONLY | MUTATION
-  expected_runtime_instance_id: string | null
-  expected_session_epoch: string | null
+  dispatch_fence: DispatchFence
+  effect_bound: EffectBound
+  action_request_hash: string
 ```
 
-Initial semantic action kinds:
+`parameters`, `EffectBound` and `action_request_hash` are produced according to Scenario v1.
+
+Login credentials/session secrets are never serialized into ActionRequest.
+
+## 9. ExecutionContext and one-shot commit
+
+Mutation-capable `execute()` receives coordinator-owned context conceptually equivalent to:
 
 ```text
-wait
-checkpoint
-logout
-move
-turn
-stop_movement
-say_controlled_text
-cast_spell
-use_consumable
-eat_food
-use_rune
-select_target
-attack
-cancel_attack
-follow
-cancel_follow
-open_container
-close_container
-use_item
-look_item
-move_item
-equip
-unequip
-open_panel
-close_panel
+ExecutionContext:
+  cancellation_token
+  commit_dispatch() -> COMMITTED | REFUSED
 ```
 
-Login/credential-bearing operations are not ordinary action payloads. A future session-capability request may trigger an already-approved external login ingress, but credentials must never be serialized into `ActionRequest` or run artifacts.
+`commit_dispatch()`:
 
-## 6. Action result
+- is one-shot;
+- performs final Execution-v1 dispatch-gate/fence checks;
+- makes `DISPATCH_COMMITTED/POSSIBLY_DISPATCHED` and budget `AT_RISK` durable;
+- refuses if STOP/generation/identity/authority/durability checks fail.
+
+The adapter must not cross a physical mutation boundary unless this exact action's commit returned `COMMITTED`.
+
+## 10. Official-client commit sequence
+
+For `OFFICIAL_TIBIA`:
+
+1. obtain/enter the then-current canonical Track A guarded mutation boundary using existing infrastructure;
+2. obtain/retain any current shared GUI/input lock required by trusted base;
+3. perform final current Track A identity/authority checks while the guard remains held;
+4. invoke coordinator `commit_dispatch()` immediately before the physical effect;
+5. if commit succeeds, cross the physical irreversible boundary exactly once while the same external guard remains continuously held;
+6. preserve the existing Track A whole-lifetime supervisor semantics for mutation descendants;
+7. reconcile result/evidence/budgets conservatively.
+
+The local `dispatch_gate` is not held while waiting to acquire Track A authority/locks. STOP therefore remains able to linearize while an action is blocked on external authority; the action later fails its stale control-generation commit.
+
+## 11. Action lifecycle/result
+
+Execution lifecycle is normative in Execution v1.
+
+Result envelope:
 
 ```yaml
 ActionResult:
+  schema_version: 1
   action_id: string
-  status: PASS | FAIL | REFUSED | TIMEOUT | CANCELLED | UNKNOWN
-  dispatched: bool
+  lifecycle_state: string
+  status: PASS | FAIL | REFUSED | TIMEOUT | CANCELLED | AMBIGUOUS | UNKNOWN
+  dispatch_state: NOT_DISPATCHED | POSSIBLY_DISPATCHED | DISPATCHED
   authoritative_confirmation: PROVEN | DERIVED | NOT_AVAILABLE | UNKNOWN
+  backend_epoch: string
+  control_generation: integer
+  adapter_generation: string
   runtime_instance_id: string | null
   session_epoch: string | null
   monotonic_started_ns: integer
   monotonic_finished_ns: integer
   normalized_delta: object | null
+  budget_effect: object
   evidence_refs: [string]
   reason_code: string | null
   safe_message: string | null
 ```
 
-`dispatched=false` is required when a preflight gate refuses the operation.
+`NOT_DISPATCHED` requires positive proof that the irreversible boundary was not crossed.
 
-A successful local function/UI dispatch is not automatically `PASS`; the adapter reports the evidence level available for the requested scenario assertion.
+After successful dispatch commit with uncertain physical outcome, return `POSSIBLY_DISPATCHED/AMBIGUOUS`, not a retryable pre-dispatch failure.
 
-## 7. Required adapter operations
+A successful local GUI/function call is not automatically PASS; PASS requires scenario-declared evidence.
 
-The domain-level adapter surface is logically:
+## 12. Required logical adapter operations
 
 ```text
 identity() -> AdapterIdentity
@@ -179,21 +261,22 @@ capabilities() -> CapabilitySet
 runtime_status() -> RuntimeStatus
 snapshot(request) -> GameSnapshot
 preflight(action_request) -> PreflightResult
-execute(action_request, cancellation_token) -> ActionResult
+execute(action_request, execution_context) -> ActionResult
 wait_for(condition, timeout, cancellation_token) -> WaitResult
 capture_start(policy) -> CaptureSession
 capture_stop(capture_session) -> CaptureSummary
 emergency_stop(reason) -> StopResult
 ```
 
-The implementation language/API shape may differ, but these responsibilities must remain distinct.
+Concrete language/API may differ, but these responsibilities cannot be bypassed.
 
-## 8. Preflight result
+## 13. Preflight
 
 ```yaml
 PreflightResult:
-  allowed: bool
+  allowed_now: bool
   action_id: string
+  adapter_generation: string
   runtime_instance_id: string | null
   session_epoch: string | null
   authority_state: string
@@ -202,153 +285,235 @@ PreflightResult:
   reason_codes: [string]
 ```
 
-For mutating official-client actions, preflight occurs immediately before dispatch and verifies all current Track A requirements applicable to that action. Scenario validation performed minutes earlier does not replace dispatch-time preflight.
+Preflight is advisory/diagnostic only. `allowed_now=true` never authorizes future dispatch.
 
-## 9. Normalized event envelope
+## 14. Snapshot/wait purity
 
-Every emitted event uses:
+`snapshot()` and ordinary `wait_for()` are observational operations.
+
+They must not:
+
+- send GUI input;
+- mutate client/network/process state;
+- perform a new debugger/instrumentation attach;
+- acquire mutation authority on behalf of a caller;
+- convert read support into action support.
+
+If the requested observation cannot be produced through currently admitted passive/read-only mechanisms, return UNKNOWN/UNSUPPORTED/REFUSED rather than silently performing an invasive action.
+
+## 15. Capture-control safety
+
+`capture_start()` may start only capture producers whose enablement is already proven passive under current read authority.
+
+Examples that are **not** ordinary passive capture and therefore cannot be hidden inside `capture_start()`:
+
+- new debugger/instrumentation attach;
+- process injection;
+- GUI input/window activation that changes client behavior;
+- process signal/restart;
+- network/proxy/client configuration mutation.
+
+If a capture mode requires such an invasive transition, `capture_start()` returns a typed requirement/refusal. The invasive transition needs a separately declared semantic control action/contract and the full MutationCoordinator/commit-dispatch/external-authority path.
+
+`capture_stop()` may close/release harness-owned capture resources. It cannot introduce a new invasive mutation merely to clean up.
+
+## 16. Emergency-stop safety
+
+`emergency_stop()` is cooperative harness cleanup/cancellation assistance only.
+
+It may:
+
+- cancel adapter-owned waits;
+- stop/close harness-owned passive capture streams;
+- release harness-owned local resources/locks;
+- signal cancellation to helper work already operating under prior authority.
+
+It must not use STOP as authority to:
+
+- issue `stop_movement` or any other gameplay command;
+- inject keyboard/mouse input;
+- kill/signal/restart the official client;
+- attach/detach debugger/instrumentation;
+- alter networking/proxy/client configuration;
+- perform any new external mutation.
+
+A compensating external action, if ever desired, is a normal semantic action with fresh authority/idempotency/budget. STOP itself grants none.
+
+## 17. Scenario step semantics
+
+Scenario structure, typed predicates, semantic selectors, action parameters, retry rules, parser bounds, canonical hashing, EffectBound and privacy/capture policy are normative in `TIBIA_RE_CONTROL_CENTER_SCENARIO_V1.md`.
+
+Unknown action kind/unsupported semantic version fails closed.
+
+## 18. Event envelope
 
 ```yaml
 Event:
   schema_version: 1
   event_id: string
-  seq: integer
-  monotonic_ns: integer
+  ingest_seq: integer
+  ingested_monotonic_ns: integer
   wall_time: string | null
+  source_timestamp: integer | string | null
+  source_clock_domain: string | null
+  source_sequence: integer | null
+  source_sequence_scope: string | null
+  ordering_confidence: KNOWN | PARTIAL | UNKNOWN
+  late: bool
+  backend_epoch: string
+  control_generation: integer
   adapter_id: string
+  adapter_generation: string
   runtime_instance_id: string | null
   session_epoch: string | null
   run_id: string | null
   experiment_id: string | null
   step_id: string | null
+  stimulus_id: string | BACKGROUND | null
   kind: SYSTEM | AUTHORITY | ACTION | TRACE | NET | STATE | SCREEN | SNAPSHOT | ASSERTION | RESULT | ERROR
   sensitivity: PUBLIC | RESEARCH_INTERNAL | PERSONAL_REDACTED | SECRET_REJECTED
   payload: object
 ```
 
-`SECRET_REJECTED` records that secret-class material was refused/redacted; the secret value itself is never placed in `payload`.
+`ingest_seq` is persistence order only, never universal causal source order.
 
-## 10. Network event minimum
+## 19. Causal event fields
+
+For Track A causal RE preserve when observable:
+
+```yaml
+message_direction: CLIENT_TO_SERVER | SERVER_TO_CLIENT | LOCAL | null
+message_sequence: integer | null
+message_type: string | null
+connection_lane: string | null
+thread_id: string | integer | null
+handler: string | null
+runtime_object: string | null
+object_instance_epoch: string | null
+before_state_hash: string | null
+after_state_hash: string | null
+semantic_delta: object | null
+evidence_ref: string | null
+```
+
+Do not infer unavailable fields or causal proof from timing.
+
+## 20. Network event minimum
 
 ```yaml
 payload:
   direction: CLIENT_TO_SERVER | SERVER_TO_CLIENT
   lane: string | null
-  sequence: integer | null
+  source_sequence: integer | null
   message_type: string | null
   size: integer
   correlation_id: string | null
   payload_capture: NONE | SANITIZED | APPROVED_NON_SECRET
 ```
 
-Raw payload capture is not the default. Auth/session-secret-bearing payloads are forbidden in persistent artifacts.
+Default is `NONE`.
 
-## 11. Scenario step contract
+`message_type` is set only when structurally known.
 
-A step is exactly one of:
+Raw payload fallback is forbidden. Auth/session-secret-bearing payload persistence is forbidden.
 
-```yaml
-snapshot:
-  name: string
+## 21. Privacy construction boundary
 
-action:
-  kind: string
-  parameters: object
-  timeout_ms: integer | null
+Classification/redaction/rejection occurs before ordinary Event/Error/Artifact construction.
 
-wait:
-  condition: object
-  timeout_ms: integer
+Requirements:
 
-assert:
-  condition: object
+- arbitrary exception/repr/debug output is untrusted and never persisted directly;
+- `safe_message` is reviewed static or sanitized safe text;
+- environment-variable values are never copied into evidence;
+- login/auth capture is structural only;
+- trace strings are filtered before Event construction;
+- private chat is omitted/redacted unless explicitly test-generated and permitted;
+- uncertain login/auth screenshots use quarantine/refusal outside normal artifacts;
+- `SECRET_REJECTED` contains category/reason only, never value/hash/reversible derivative;
+- export-time redaction is defense in depth only.
 
-checkpoint:
-  label: string
-```
-
-The Scenario Engine assigns stable `step_id` values during validation.
-
-## 12. Side-effect budget
-
-```yaml
-SideEffectBudget:
-  max_runtime_seconds: integer
-  max_actions: integer
-  max_movement_tiles: integer | null
-  max_spells: integer | null
-  max_consumables: integer | null
-  max_items_moved: integer | null
-  max_gold: integer
-  max_tibia_coins: integer
-  max_irreversible_changes: integer
-```
-
-The platform refuses a scenario if its declared effects cannot be bounded under the current authority and experiment contract.
-
-## 13. Cancellation and STOP ALL
-
-Cancellation is cooperative but mandatory at every bounded wait/dispatch boundary.
-
-`STOP ALL` behavior:
-
-1. latch a global harness cancellation generation;
-2. reject new mutations;
-3. cancel queued steps;
-4. request cancellation of the active adapter action;
-5. stop optional captures after bounded cleanup;
-6. emit terminal cancellation events;
-7. release task-local resources/locks owned by the harness;
-8. do not terminate the official client unless explicit current process-control authority separately allows that exact effect.
-
-A new run requires a new cancellation generation and a fresh authority status.
-
-## 14. Browser/CLI Control API semantics
-
-The transport API must expose domain operations without bypass routes. Minimum logical endpoints/commands:
+## 22. Late events/finalization
 
 ```text
-GET  status
-GET  capabilities
-GET  scenarios
-GET  runs
-GET  runs/<id>
-POST runs                    start validated scenario
-POST runs/<id>/pause
-POST runs/<id>/resume
-POST runs/<id>/abort
-POST experiments/one-step   create one-step scenario
-POST stop-all
-GET  events                  bounded stream/poll
+ACTIVE -> CLOSING -> FINALIZED
 ```
 
-The exact HTTP paths are implementation-specific. Browser controls and CLI commands must call the same backend operations.
+Bounded CLOSING may admit `late=true` events/source watermarks.
 
-## 15. Official-client safety invariants
+Late events cannot rewrite terminal action result, resume execution or authorize retry.
 
-For `adapter_kind=OFFICIAL_TIBIA`:
+Later accepted post-finalization evidence is append-only supplemental material referencing the original run.
 
-- a visible client/window is not authority;
-- stale registration/lease/generation cannot authorize dispatch;
-- target identity mismatch refuses dispatch;
+## 23. Official-client safety invariants
+
+For `OFFICIAL_TIBIA`:
+
+- visible client/window is not authority;
+- stale lease/registration/generation cannot authorize dispatch;
+- changed boot/PID/start/executable/window/display/session/runtime identity rejects stale work;
 - read-only admission never escalates to mutation;
-- GUI input must use the current shared lock/guard contract;
+- Track A guard remains continuously held across final authority checks, durable local commit and physical mutation;
+- GUI input uses current shared input lock/guard;
 - action parity/evidence gates remain external proof requirements;
-- credentials/login secrets never cross this adapter contract;
-- authority loss during a scenario aborts subsequent mutation steps.
+- credentials/login secrets never cross this semantic adapter contract;
+- ambiguous possible dispatch is never automatically retried;
+- passive capture cannot conceal a new invasive attach/input/process action;
+- emergency stop cannot create gameplay/process mutation.
 
-## 16. Oteryn-v2 invariants
+## 24. Oteryn v2 invariants
 
-For `adapter_kind=OTERYN_V2`:
+For `OTERYN_V2`:
 
-- implementation belongs to a separate task/PR in `blakinio/Oteryn-v2`;
-- it exposes test semantics without adding Tibia wire compatibility;
-- server-authoritative outcomes remain authoritative where Oteryn architecture requires them;
-- test-control hooks must not become unauthenticated production remote-control surfaces;
-- comparison uses normalized semantic states/transitions, not raw packet equality.
+- implementation belongs to a separate `blakinio/Oteryn-v2` task/branch/PR;
+- integrate with accepted Oteryn ADR-0007 or a versioned cross-repo semantic boundary;
+- retain `protocol-oteryn`;
+- client sends semantic intent;
+- server-authoritative outcomes remain authoritative;
+- test hooks cannot create unauthenticated production control;
+- production-default builds exclude/lock down test-only control according to Oteryn governance;
+- use generic semantic capability support, not Track A R/A grades;
+- compare normalized semantics rather than packet/internal-layout equality.
 
-## 17. Compatibility
+## 25. Differential comparison classes
 
-Contract v1 is additive-only within the major version. Removing/renaming action kinds, event fields or required safety semantics requires a new major contract and migration plan.
+```text
+EXACT
+NORMALIZED_EXACT
+SET_EQUIVALENT
+ORDERED_EQUIVALENT
+TOLERANCE
+REFERENCE_ONLY
+NOT_COMPARABLE
+```
 
-Adapters advertise their supported contract versions. The Scenario Engine fails closed when no compatible version exists.
+Default baseline:
+
+```text
+position                 NORMALIZED_EXACT
+hp                       NORMALIZED_EXACT
+mana                     NORMALIZED_EXACT
+conditions               SET_EQUIVALENT or profile NORMALIZED_EXACT
+target_state              NORMALIZED_EXACT
+inventory                 NORMALIZED_EXACT
+containers                ORDERED_EQUIVALENT when order/index is semantic
+equipment                 NORMALIZED_EXACT
+cooldown_state            NORMALIZED_EXACT
+cooldown_timing           TOLERANCE
+visual_effect_semantics   REFERENCE_ONLY unless both expose stable semantics
+pixel/frame output        NOT_COMPARABLE by default
+latency                   TOLERANCE or REFERENCE_ONLY
+protocol bytes            NOT_COMPARABLE
+internal object layout    NOT_COMPARABLE
+renderer implementation  NOT_COMPARABLE
+```
+
+Mismatch requires both sides to support/observe the field at the same normalized checkpoint, neither UNKNOWN, and candidate violation of the selected rule.
+
+Unknown/unobservable reference is a coverage gap, not candidate failure.
+
+## 26. Compatibility
+
+Adapter major version 1 is additive-only.
+
+Changing final commit semantics, passive-observation purity, capture-control safety, emergency-stop safety or external authority relationship requires a new major version or a separately reviewed compatible extension.

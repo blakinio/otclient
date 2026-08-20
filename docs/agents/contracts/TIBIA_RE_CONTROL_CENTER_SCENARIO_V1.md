@@ -2,7 +2,7 @@
 
 ```yaml
 contract_id: TIBIA-RE-CONTROL-CENTER-SCENARIO-V1
-version: 1.1
+version: 1.2
 major_version: 1
 status: normative_design
 producer_repository: blakinio/otclient
@@ -105,12 +105,74 @@ Examples:
 player.hp
 player.position.x
 target.state
-cooldowns.semantic_state
+conditions.active_keys
 ```
 
-A syntactically valid path is admissible only when the selected normalized snapshot/capability schema declares that exact typed field. Unknown paths fail scenario validation. Collection membership/indexing is expressed by the predicate/operator and typed normalized value, not by implementation-dependent path syntax.
-
 IDs and paths are non-secret and must not contain account names, credentials, tokens or arbitrary chat text.
+
+### 4.1 Normative semantic field registry
+
+Syntax alone does not make a field admissible. Every predicate path is resolved through one immutable `SemanticFieldRegistry` whose format is normative:
+
+```yaml
+SemanticFieldRegistry:
+  schema_version: 1
+  schema_id: SemanticKey
+  semantic_version: string
+  fields:
+    - path: SemanticFieldPath
+      value_type: BOOL | INTEGER | DECIMAL | STRING | SEMANTIC_KEY | POSITION | ENTITY_REF | ITEM_REF
+      cardinality: SCALAR | LIST | SET
+      allowed_ops: [EQ | NE | LT | LTE | GT | GTE | EXISTS | NOT_EXISTS | CHANGED | UNCHANGED | IN_SET | CONTAINS]
+```
+
+Registry rules:
+
+- `schema_id + semantic_version` identifies immutable semantics;
+- paths are unique and sorted canonically by UTF-8 byte order for deterministic registry hashing/tests;
+- no descriptor may use an arbitrary/free-form `OBJECT` value type;
+- `allowed_ops` must be type-compatible and is part of the immutable descriptor;
+- a scenario path absent from the selected registry is a validation failure, not runtime UNKNOWN;
+- runtime UNKNOWN is reserved for a registered field whose current value cannot be truthfully observed;
+- adapters may expose additive versioned registries but cannot silently change an existing descriptor under the same ID/version;
+- Scenario Engine validates the registry contract without contacting or mutating a live client.
+
+The built-in registry is:
+
+```yaml
+schema_id: control-center.core
+semantic_version: '1.0.0'
+fields:
+  - {path: client_state, value_type: SEMANTIC_KEY, cardinality: SCALAR}
+  - {path: player.hp, value_type: INTEGER, cardinality: SCALAR}
+  - {path: player.hp_max, value_type: INTEGER, cardinality: SCALAR}
+  - {path: player.mana, value_type: INTEGER, cardinality: SCALAR}
+  - {path: player.mana_max, value_type: INTEGER, cardinality: SCALAR}
+  - {path: player.soul, value_type: INTEGER, cardinality: SCALAR}
+  - {path: player.capacity, value_type: DECIMAL, cardinality: SCALAR}
+  - {path: player.stamina_seconds, value_type: INTEGER, cardinality: SCALAR}
+  - {path: player.level, value_type: INTEGER, cardinality: SCALAR}
+  - {path: player.speed, value_type: INTEGER, cardinality: SCALAR}
+  - {path: player.position.x, value_type: INTEGER, cardinality: SCALAR}
+  - {path: player.position.y, value_type: INTEGER, cardinality: SCALAR}
+  - {path: player.position.z, value_type: INTEGER, cardinality: SCALAR}
+  - {path: target.state, value_type: SEMANTIC_KEY, cardinality: SCALAR}
+  - {path: target.entity_id, value_type: INTEGER, cardinality: SCALAR}
+  - {path: conditions.active_keys, value_type: SEMANTIC_KEY, cardinality: SET}
+  - {path: cooldowns.active_keys, value_type: SEMANTIC_KEY, cardinality: SET}
+```
+
+For the built-in registry, scalar fields allow `EQ/NE/EXISTS/NOT_EXISTS/CHANGED/UNCHANGED`; numeric scalars additionally allow `LT/LTE/GT/GTE`; set fields allow `EQ/NE/EXISTS/NOT_EXISTS/CHANGED/UNCHANGED/IN_SET/CONTAINS`. These operator sets are normative even though abbreviated from the inline registry table above.
+
+A scenario may use only the built-in registry when no extension is declared. Adapter-specific fields require an explicit immutable registry requirement:
+
+```yaml
+adapter_requirements:
+  semantic_schema_id: SemanticKey | null
+  semantic_schema_version: string | null
+```
+
+Both fields are null together or non-null together. Null means `control-center.core@1.0.0`. A non-null pair binds scenario validation/execution to that exact negotiated registry. Registry identity is part of the validated scenario AST and therefore the scenario hash.
 
 ## 5. Stable step IDs
 
@@ -145,6 +207,8 @@ schema_version: 1
 id: ScenarioId
 name: string
 adapter_requirements:
+  semantic_schema_id: SemanticKey | null
+  semantic_schema_version: string | null
   reads: [SemanticKey]
   actions: [SemanticKey]
 preconditions: [Predicate]
@@ -179,10 +243,13 @@ Rules:
 
 - every value is a checked non-negative integer in `0..9223372036854775807`;
 - unknown dimensions are rejected rather than ignored;
-- `max_tibia_coins` and `max_irreversible_changes` default conceptually to zero and therefore must be written as `0` unless a separately accepted authority explicitly permits a finite non-zero ceiling;
-- the sum of admitted/reserved effects for the run may never exceed these values according to Execution v1 `BudgetLedger` semantics;
+- `max_runtime_seconds` is an absolute monotonic run deadline from run start; reaching it aborts further scheduling and never creates authority for cleanup mutation;
+- `max_tibia_coins` and `max_irreversible_changes` must be written as `0` unless a separately accepted authority explicitly permits a finite non-zero ceiling;
+- the sum of admitted/reserved non-time effects for the run may never exceed these values according to Execution v1 `BudgetLedger` semantics;
 - an action whose conservative `EffectBound` exceeds any remaining dimension is refused before dispatch;
 - a scenario with a mutation step but `max_actions: 0` is valid syntax but cannot admit that action and deterministically refuses before mutation.
+
+Runtime is enforced both by the absolute run deadline and by finite per-step deadlines. It is never extended because an action became ambiguous.
 
 This schema is the input budget. `EffectBound` in §11 is the per-action conservative maximum; the two are not interchangeable.
 
@@ -199,7 +266,8 @@ Predicate:
 
 Rules:
 
-- `EQ/NE/LT/LTE/GT/GTE/IN_SET/CONTAINS` require a compatible `value`;
+- `field` must exist in the selected `SemanticFieldRegistry` and `op` must appear in that descriptor's normative `allowed_ops`;
+- `EQ/NE/LT/LTE/GT/GTE/IN_SET/CONTAINS` require a registry-compatible `value`;
 - `EXISTS/NOT_EXISTS/CHANGED/UNCHANGED` require `value=null`;
 - `CHANGED/UNCHANGED` compare with `from_checkpoint` when supplied, otherwise with the step's declared baseline;
 - UNKNOWN never equals a concrete value;
@@ -252,7 +320,9 @@ Bounds:
 
 If `retry` is omitted, `max_attempts=1` and no retry is performed. `max_attempts` is the total number of attempts including the first attempt; zero-attempt actions do not exist in v1. If `max_attempts>1`, `retry_on` must contain at least one declared pre-dispatch state.
 
-For mutation-capable actions, a retry may occur only after positive proof of `NOT_DISPATCHED`. States at or beyond `DISPATCH_COMMITTED`, including AMBIGUOUS, are not retryable by this mechanism.
+For mutation-capable actions, `action.timeout_ms` is the total deadline for one attempt from admission/preparation start through terminal confirmation, including bounded authority wait, before-state capture, dispatch and confirmation. An implementation may use tighter internal sub-deadlines but may not extend the attempt beyond this total deadline.
+
+A retry may occur only after positive proof of `NOT_DISPATCHED`. States at or beyond `DISPATCH_COMMITTED`, including AMBIGUOUS, are not retryable by this mechanism.
 
 A retry creates a new action ID and attempt index and requires fresh budget reservation/fences/authority.
 
@@ -277,10 +347,11 @@ CREATURE_ID:
 
 SNAPSHOT_PATH:
   kind: SNAPSHOT_PATH
+  checkpoint_id: StepId
   path: SemanticFieldPath
 ```
 
-A `SNAPSHOT_PATH` must resolve to exactly one retained normalized entity reference at a named/current fenced checkpoint; raw runtime memory is never addressable.
+A `SNAPSHOT_PATH` must use a retained normalized checkpoint and the selected registry must type the path as `ENTITY_REF`. Raw runtime memory is never addressable. Missing/stale checkpoint or wrong field type is a deterministic refusal.
 
 ### 9.2 ItemRef
 
@@ -303,9 +374,12 @@ EQUIPMENT_SLOT:
 
 SNAPSHOT_PATH:
   kind: SNAPSHOT_PATH
+  checkpoint_id: StepId
   path: SemanticFieldPath
   expected_semantic_item: SemanticKey | null
 ```
+
+For ItemRef `SNAPSHOT_PATH`, the selected registry must type the path as `ITEM_REF`.
 
 ### 9.3 DestinationRef
 
@@ -331,7 +405,7 @@ GROUND_POSITION:
     z: integer  # 0..255
 ```
 
-Adapters resolve references against the fenced current normalized state and refuse stale, absent or ambiguous selectors. They must not reinterpret one union variant as another or accept implementation-private extension fields without a negotiated versioned extension.
+Adapters resolve references against fenced current normalized state and refuse stale, absent or ambiguous selectors. They must not reinterpret one union variant as another or accept implementation-private extension fields without a negotiated versioned extension.
 
 ## 10. Atomic semantic action parameter schemas
 
@@ -473,6 +547,7 @@ Before reservation, the adapter/domain effect model returns a conservative bound
 
 ```yaml
 EffectBound:
+  max_runtime_seconds: integer
   max_actions: integer
   max_movement_tiles: integer
   max_spells: integer
@@ -485,9 +560,19 @@ EffectBound:
   reason_codes: [string]
 ```
 
-Every numeric field is a checked non-negative integer. Package A fake adapter provides deterministic EffectBound fixtures.
+Every numeric field is a checked non-negative integer.
 
-Official/Oteryn adapters may provide tighter bounds but never larger effects than the admitted bound.
+For an action attempt:
+
+```text
+max_runtime_seconds = ceil(timeout_ms / 1000)
+```
+
+and must be at least 1. This is a conservative per-attempt scheduling bound; the run-level absolute `SideEffectBudget.max_runtime_seconds` deadline still dominates and is never extended. The engine refuses an action whose total attempt deadline cannot fit inside the remaining run runtime budget.
+
+Package A fake adapter provides deterministic EffectBound fixtures.
+
+Official/Oteryn adapters may provide tighter non-time effect bounds but never larger effects than the admitted bound and never a runtime bound larger than the action's declared total timeout.
 
 If a safe hard bound cannot be produced, the action is refused before reservation/dispatch.
 
@@ -560,6 +645,8 @@ ScenarioValidationResult:
   schema_version: integer
   scenario_id: string | null
   scenario_hash: string | null
+  semantic_schema_id: string
+  semantic_schema_version: string
   normalized_step_ids: [string]
   required_reads: [SemanticKey]
   required_actions: [SemanticKey]
@@ -576,6 +663,6 @@ Validation does not contact or mutate the official client and does not grant run
 
 Scenario major version 1 is additive-only.
 
-Changing the meaning of an existing action, predicate, field or hash canonicalization requires a new major version or an explicit versioned extension.
+Changing the meaning of an existing action, predicate, field, semantic-registry descriptor or hash canonicalization requires a new major version or an explicit versioned extension.
 
 Adapters and the Scenario Engine fail closed on unsupported required semantic versions.

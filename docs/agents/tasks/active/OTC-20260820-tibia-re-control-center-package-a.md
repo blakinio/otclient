@@ -11,7 +11,7 @@ risk: medium
 branch: feat/OTC-20260820-tibia-re-control-center-package-a
 base_branch: main
 created: 2026-08-20T14:18:00+02:00
-updated: 2026-08-20T20:26:00+02:00
+updated: 2026-08-20T21:13:23+02:00
 initial_base_sha: 8620310a91c53e63abc0bf51fe40bdb8a3ee6cef
 related_pr: 628
 runtime_access: none
@@ -43,14 +43,14 @@ execution_reason: GitHub connector plus isolated GitHub-hosted validation preser
 execution_budget_minutes: 120
 execution_budget_reason: cohesive Package A implementation, exact-head validation, independent validator role, merge and mandatory archive closeout
 invocation_started_at: 2026-08-20T14:18:00+02:00
-last_progress_at: 2026-08-20T20:26:00+02:00
+last_progress_at: 2026-08-20T21:13:23+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: candidate_pending_ci
+ci_check_generation: final_exact_head_pending_ci
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 2
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 2
+repair_cycles_for_current_gate: 3
 context_reconstruction_attempts: 2
 stall_warnings: 0
 heavy_validation_runs: 2
@@ -154,27 +154,33 @@ No Control API/browser/CLI listener is implemented here. No policy/Ollama loop i
 - Codex review at `eddc54d13d76b983d6bf82192dda90d2444ffe09` found four P1 defects (failed-STOP reset reopening, missing final abort revalidation, callback identity/session fencing, and clean-shutdown/in-flight fencing). Successor `eb12586a9f0e8cb0c5ccefd64158bd53a23bca59` repairs all four and removes the one-shot repair workflow/script.
 - After reconciling current `main@9376ad6ff13924628749a186f2586d438f2c60bd`, local predecessor `6f37fde3ef60a4c364f2c5b7ad084e47a870d6f1` passes 80/80 focused tests, `audit_package_a.py`, `audit_package_a_p1.py`, Ruff and `git diff --check`; all four P1 falsification checks report PASS. Fresh exact-head independent review and GitHub CI remain required after this checkpoint commit.
 
+- Fresh Codex review of `0fa92442675619305f4a8487e9403fb8bb5c920f` found four additional P1 defects (mutation-run admission race, failed-STOP cleanup early return, callback/reconciliation race, scenario artifact secret persistence) and one P2 abort-reason loss. Repair heads `6224791faf4635cf9f69aba4980845e595b6186b` / `00d0acaa6d95158080f8d191562eeff874605122` address all five. Local exact-code validation passes 84/84 focused tests, compileall, `audit_package_a.py`, expanded `audit_package_a_p1.py`, Ruff and `git diff --check`; the expanded audit reports PASS for mutation-run admission serialization, failed-STOP cleanup, callback/reconciliation serialization, scenario-artifact privacy, and final-gate abort-reason preservation. Exact-head Package A and both Track A governance workflows also PASS; repository CI run `32406952139` was still in progress at the last observation. A fresh independent review of the final metadata successor remains required.
+
 ## Recovery checkpoint
 
 ```yaml
 recovery:
   policy_version: 1
-  generation: 5
-  session_id: package-a-recovery-20260820-2003
-  session_started_at: 2026-08-20T20:03:00+02:00
-  checkpointed_at: 2026-08-20T20:26:00+02:00
-  last_progress_at: 2026-08-20T20:26:00+02:00
+  generation: 6
+  session_id: package-a-final-review-20260820-2113
+  session_started_at: 2026-08-20T21:13:23+02:00
+  checkpointed_at: 2026-08-20T21:13:23+02:00
+  last_progress_at: 2026-08-20T21:13:23+02:00
   phase: validate
-  validated_predecessor_head: 6f37fde3ef60a4c364f2c5b7ad084e47a870d6f1
+  validated_predecessor_head: 00d0acaa6d95158080f8d191562eeff874605122
   pull_request: 628
-  active_operation: push final candidate, obtain fresh exact-head independent review, resolve remediated P1 threads, then final CI and merge
-  external_run_ids: []
-  operation_started_at: 2026-08-20T20:26:00+02:00
+  active_operation: publish final metadata checkpoint, obtain fresh exact-head independent review, resolve verified findings, then final CI and merge
+  external_run_ids:
+    - 32406951896
+    - 32406951955
+    - 32406951866
+    - 32406952139
+  operation_started_at: 2026-08-20T21:13:23+02:00
   wait_deadline_at: null
-  check_generation: final_candidate_pending_ci
+  check_generation: final_exact_head_pending_ci
   checks_used: 0
   status: active
   safe_to_resume: true
-  resume_condition: PR #628 remains the sole Package A writer and runtime_access remains none
-  next_action: push this final candidate and request fresh exact-head independent review before Ready/merge
+  resume_condition: PR #628 remains the sole Package A writer, runtime_access remains none, and exact head is unchanged
+  next_action: request one fresh exact-head independent review after this metadata checkpoint is pushed; if no material findings remain, resolve remediated threads and complete Ready/CI/merge closeout
 ```

@@ -94,19 +94,31 @@ class DockerRuntimeProbe:
             windows.append({"xid": xid, "pid": int(pid_match.group(1)) if pid_match else None, "title_class": "CHARACTER_CONTEXT" if "Tibia - " in name_raw else "TIBIA_WINDOW"})
         return windows
 
-    def _candidate_containers(self) -> List[dict]:
+    def _candidate_containers(self) -> dict:
         names = self._run(["docker", "ps", "--format", "{{.Names}}"])
         candidates: List[dict] = []
+        unresolved_count = 0
         for name in sorted(filter(None, (line.strip() for line in names.splitlines()))):
             if not re.fullmatch(r"[A-Za-z0-9_.-]+", name):
                 continue
-            result = self.runner.run(["docker", "exec", name, "pgrep", "-x", "client"], timeout=5.0)
+            try:
+                result = self.runner.run(["docker", "exec", name, "pgrep", "-x", "client"], timeout=5.0)
+            except RuntimeProbeError:
+                if name == self.target_container:
+                    raise
+                unresolved_count += 1
+                continue
             if result.returncode not in (0, 1):
+                if name == self.target_container:
+                    raise RuntimeProbeError(
+                        f"target container client census failed with rc={result.returncode}"
+                    )
+                unresolved_count += 1
                 continue
             pids = [int(value) for value in result.stdout.split() if value.isdigit()]
             if pids:
                 candidates.append({"container": name, "pids": pids, "count": len(pids)})
-        return candidates
+        return {"candidates": candidates, "unresolved_count": unresolved_count}
 
     def _safe_json_file(self, path: str, fields: Sequence[str]) -> Optional[dict]:
         script = "import json,pathlib,sys; p=pathlib.Path(sys.argv[1]); d=json.loads(p.read_text()) if p.is_file() else None; print(json.dumps(None if d is None else {k:d.get(k) for k in sys.argv[2:]},sort_keys=True))"
@@ -127,15 +139,24 @@ class DockerRuntimeProbe:
         pids = [int(value) for value in pid_raw.split() if value.isdigit()]
         processes = [self._process_identity(pid) for pid in pids]
         windows = self._visible_tibia_windows()
-        candidates = self._candidate_containers()
+        candidate_probe = self._candidate_containers()
+        candidates = candidate_probe["candidates"]
+        unresolved_count = int(candidate_probe["unresolved_count"])
         total_candidates = sum(item["count"] for item in candidates)
         target_pid = pids[0] if len(pids) == 1 else None
         target_window = next((w for w in windows if w.get("pid") == target_pid), None)
-        unique = len(pids) == 1 and total_candidates == 1 and len(candidates) == 1 and candidates[0]["container"] == self.target_container and target_window is not None
+        unique = (
+            unresolved_count == 0
+            and len(pids) == 1
+            and total_candidates == 1
+            and len(candidates) == 1
+            and candidates[0]["container"] == self.target_container
+            and target_window is not None
+        )
         registration = self._safe_json_file(f"{CANONICAL_STATE_ROOT}/runtime-registration.json", ("schema_version", "runtime_id", "registration_generation", "lease_generation", "boot_id_sha256", "pid", "process_start_ticks", "client_version", "client_size", "client_sha256", "display", "remote_view_mapping", "state", "source_task", "source_run"))
         lease = self._safe_json_file(f"{CANONICAL_STATE_ROOT}/lease.json", ("schema_version", "runtime_id", "status", "generation", "controller_task", "acquired_at", "renewed_at", "expires_at", "takeover_from"))
         lease_expired = True
         if lease and isinstance(lease.get("expires_at"), (int, float)):
             lease_expired = int(lease["expires_at"]) <= now
         fence_match = len(processes) == 1 and bool(processes[0]["exact_fence_match"])
-        return {"observed_at_epoch": now, "target_container": self.target_container, "display": self.display, "target_running": True, "processes": processes, "visible_tibia_windows": windows, "candidate_containers": candidates, "candidate_process_count": total_candidates, "target_uniqueness": "PROVEN" if unique else "NOT_PROVEN", "exact_current_fence": {"version": EXPECTED_CLIENT_VERSION, "size": EXPECTED_CLIENT_SIZE, "sha256": EXPECTED_CLIENT_SHA256, "match": fence_match}, "canonical_control": {"registration_present": registration is not None, "registration": registration, "lease_present": lease is not None, "lease": lease, "lease_expired": lease_expired}, "runtime_access": "READ_ONLY_ADMITTED" if unique and fence_match else "READ_ONLY_NOT_ADMITTED"}
+        return {"observed_at_epoch": now, "target_container": self.target_container, "display": self.display, "target_running": True, "processes": processes, "visible_tibia_windows": windows, "candidate_containers": candidates, "candidate_process_count": total_candidates, "candidate_probe_unresolved_count": unresolved_count, "target_uniqueness": "PROVEN" if unique else "NOT_PROVEN", "exact_current_fence": {"version": EXPECTED_CLIENT_VERSION, "size": EXPECTED_CLIENT_SIZE, "sha256": EXPECTED_CLIENT_SHA256, "match": fence_match}, "canonical_control": {"registration_present": registration is not None, "registration": registration, "lease_present": lease is not None, "lease": lease, "lease_expired": lease_expired}, "runtime_access": "READ_ONLY_ADMITTED" if unique and fence_match else "READ_ONLY_NOT_ADMITTED"}

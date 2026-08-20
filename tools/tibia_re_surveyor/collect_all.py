@@ -231,26 +231,37 @@ def build_collect_all(bundle: Mapping[str, object], coverage_rows: Sequence[Mapp
             },
         }
         if reader_id is not None:
-            source_states["subsystem_typed_reader"] = {
-                "state": "UNAVAILABLE",
-                "evidence_level": "UNKNOWN",
-                "source": reader_id,
-                "reason": "NO_TYPED_READER_IMPLEMENTED",
-            }
-            unresolved = [row for row in rows if row.get("canonical_status") != "DONE"]
-            status_score = max((_STATUS_SCORE.get(str(row.get("canonical_status")), 0) for row in unresolved), default=0)
-            dependency_score = max((priority_by_row.get(str(row.get("row_id")), 0) for row in unresolved), default=0)
-            reader_gaps.append(
-                {
-                    "reader_id": reader_id,
-                    "alias": alias,
-                    "state": "UNAVAILABLE",
-                    "reason": "NO_TYPED_READER_IMPLEMENTED",
-                    "affected_rows": [row["row_id"] for row in unresolved],
-                    "canonical_priority_score": max(status_score, dependency_score),
-                    "semantic_promotion_allowed": False,
+            implemented = reader_id == "player_state_typed_reader"
+            typed = (bundle.get("typed_readers") or {}).get(reader_id) if implemented else None
+            if implemented:
+                source_states["subsystem_typed_reader"] = {
+                    "state": typed.get("state", "UNAVAILABLE") if isinstance(typed, dict) else "UNAVAILABLE",
+                    "evidence_level": "PROVEN" if isinstance(typed, dict) and typed.get("state") == "AVAILABLE" else "UNKNOWN",
+                    "source": reader_id,
+                    "value": typed,
+                    "reason": None if isinstance(typed, dict) and typed.get("state") == "AVAILABLE" else "RUNTIME_INPUT_UNAVAILABLE_THIS_RUN",
                 }
-            )
+            else:
+                source_states["subsystem_typed_reader"] = {
+                    "state": "UNAVAILABLE",
+                    "evidence_level": "UNKNOWN",
+                    "source": reader_id,
+                    "reason": "NO_TYPED_READER_IMPLEMENTED",
+                }
+                unresolved = [row for row in rows if row.get("canonical_status") != "DONE"]
+                status_score = max((_STATUS_SCORE.get(str(row.get("canonical_status")), 0) for row in unresolved), default=0)
+                dependency_score = max((priority_by_row.get(str(row.get("row_id")), 0) for row in unresolved), default=0)
+                reader_gaps.append(
+                    {
+                        "reader_id": reader_id,
+                        "alias": alias,
+                        "state": "UNAVAILABLE",
+                        "reason": "NO_TYPED_READER_IMPLEMENTED",
+                        "affected_rows": [row["row_id"] for row in unresolved],
+                        "canonical_priority_score": max(status_score, dependency_score),
+                        "semantic_promotion_allowed": False,
+                    }
+                )
         else:
             source_states["subsystem_typed_reader"] = {
                 "state": "NOT_REQUIRED",

@@ -74,6 +74,7 @@ Detailed maintenance boundaries are in `docs/architecture/LEGACY_OTCLIENT_ARCHIT
 
 | Item | Status | Paths | Note |
 |---|---|---|---|
+| Local model single-residency policy | PR #625 | Repository-wide fail-closed resource policy: at most one local model resident or inferencing per physical host/shared GPU pool; switches require unload plus residency verification | `AGENTS.md`, `docs/agents/contracts/LOCAL_MODEL_SINGLE_RESIDENCY_V1.md` | Applies to Ollama and future local providers. Parallel preparation is allowed, model execution is serialized. No model/Track A/credential/merge authority is created. |
 | Agent orchestrator control plane | merged PR #463; archived by #476; executor adapter PR #479 | `tools/agents/orchestrator*.py`, `tools/agents/orchestrator_worker_result.schema.json`, `.github/workflows/agent-orchestrator-smoke.yml`, `docs/agents/AGENT_ORCHESTRATOR.*` | Deterministic bounded-wave planner, result fan-in/barrier recomputation and context governor plus a provider-neutral fail-closed external-process worker adapter. Repository default remains dry-run/no-model; concrete provider/model/credential/funding activation is separately gated. |
 | Existing agent handoff | active PR #4 | `AGENT_HANDOFF.md` | Reconcile with root/nested agent docs; avoid contradictory rules. |
 | Official Tibia Linux runner analysis | draft operational PR #48 | dedicated workflow and task record | One-off non-merge operational analysis; does not own Rust workspace/product paths. |

@@ -94,16 +94,6 @@ PYTHONPATH=. python3 -m tools.tibia_re_surveyor \
 
 The collect-all path itself sends no keyboard/mouse/gameplay input, does not log in, does not attach/inject a helper, does not write process memory and does not perform an item/economic/network action. If no current reviewed typed reader exists, the result remains `UNKNOWN`/`UNAVAILABLE`.
 
-## Anti-idle contract
+## No input or anti-idle path
 
-The inherited v1 keepalive is a separate mutation-capable path and is **not** part of `--collect-all` semantics. `--keepalive` alone grants no input authority.
-
-When a different current task explicitly authorizes anti-idle input, the implementation reuses the Track A heartbeat and shared GUI lock:
-
-- heartbeat: `/tmp/otclient-track-a-last-activity`;
-- GUI input lock: `/tmp/otclient-track-a-gui-input.lock`;
-- trigger: 8 minutes by default;
-- preferred stimulus: one turn in place;
-- keepalive events always carry `semantic_evidence=false`.
-
-A positive keepalive path additionally requires a current external admission record proving the applicable canonical reuse/mutation authority, Gates, exact target uniqueness, GUI authority and whole-lifetime supervisor status. Anti-idle is never implicitly enabled by collect-all and never counts as subsystem semantic evidence.
+This accepted Surveyor v2 surface contains no keyboard/mouse/gameplay or anti-idle command path. The stale #592 keepalive prototype is intentionally not promoted by this successor because the current collect-all task has `runtime_access:none` and no current owner authorization to add anti-idle mutation. A future anti-idle feature, if ever required, must be introduced by a separate explicitly authorized task and current Track A mutation gates.

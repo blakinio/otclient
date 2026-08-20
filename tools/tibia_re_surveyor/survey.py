@@ -11,12 +11,6 @@ from typing import Optional, Sequence
 from .collect_all import build_collect_all, write_collect_all
 from .coverage import parse_critical_dependencies, parse_matrix, rank_next, status_counts
 from .evidence import DockerRepoReader, LocalRepoReader, RepoReader
-from .keepalive import (
-    DEFAULT_TRIGGER_SECONDS,
-    DockerKeepaliveTransport,
-    load_authority,
-    run_keepalive_once,
-)
 from .runtime import DockerRuntimeProbe, EXPECTED_CLIENT_SHA256
 
 MATRIX_PATH = "docs/agents/reports/OTCLIENT-20260818-full-client-re-matrix.md"
@@ -39,10 +33,6 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--runtime-container", default="otclient-track-a-kasmvnc")
     parser.add_argument("--control-container", default="otclient-synology-runner")
     parser.add_argument("--display", default=":1")
-    parser.add_argument("--keepalive", action="store_true")
-    parser.add_argument("--keepalive-authority", type=Path)
-    parser.add_argument("--keepalive-trigger-seconds", type=int, default=DEFAULT_TRIGGER_SECONDS)
-    parser.add_argument("--turn-modifier", choices=("ctrl", "shift", "alt"), default="ctrl")
     parser.add_argument("--top-next", type=int, default=20)
     return parser
 
@@ -75,7 +65,6 @@ def _json_write(path: Path, doc: object) -> None:
 def _summary_markdown(bundle: dict) -> str:
     counts = bundle["coverage_counts"]
     runtime = bundle.get("runtime")
-    keepalive = bundle.get("keepalive")
     lines = [
         "# TIBIA-RE Surveyor v1 — compact run summary",
         "",
@@ -101,20 +90,6 @@ def _summary_markdown(bundle: dict) -> str:
             f"- canonical lease expired: `{control.get('lease_expired')}`",
             "",
         ]
-    if keepalive:
-        lines += [
-            "## Anti-idle",
-            "",
-            f"- result: `{keepalive.get('result')}`",
-            f"- heartbeat age seconds: `{keepalive.get('heartbeat_age_seconds')}`",
-            f"- authority allowed: `{keepalive.get('authority_allowed')}`",
-            "- semantic evidence: `false` (anti-idle is excluded from subsystem proof)",
-            "",
-        ]
-        reasons = keepalive.get("authority_reasons") or []
-        if reasons:
-            lines.append("Authority/refusal reasons: " + ", ".join(f"`{reason}`" for reason in reasons))
-            lines.append("")
     lines += ["## Highest-priority canonical gaps", ""]
     for item in bundle["recommended_next"][:10]:
         deps = item.get("canonical_dependencies") or []
@@ -183,7 +158,6 @@ def build_bundle(args: argparse.Namespace) -> dict:
         for row in rows
     ]
     runtime = None
-    keepalive = None
     if args.runtime_docker:
         probe = DockerRuntimeProbe(
             target_container=args.runtime_container,
@@ -191,18 +165,6 @@ def build_bundle(args: argparse.Namespace) -> dict:
             control_container=args.control_container,
         )
         runtime = probe.snapshot()
-        if args.keepalive:
-            authority = load_authority(args.keepalive_authority)
-            transport = DockerKeepaliveTransport(args.runtime_container, args.display)
-            keepalive = run_keepalive_once(
-                runtime,
-                authority,
-                transport,
-                trigger_seconds=args.keepalive_trigger_seconds,
-                modifier=args.turn_modifier,
-            )
-    elif args.keepalive:
-        raise ValueError("--keepalive requires --runtime-docker")
 
     generated_at = datetime.now(timezone.utc).isoformat()
     recommended = rank_next(rows, dependencies, limit=args.top_next)
@@ -219,13 +181,11 @@ def build_bundle(args: argparse.Namespace) -> dict:
         "recommended_next": recommended,
         "runtime": runtime,
         "bridge_profile": bridge_profile,
-        "keepalive": keepalive,
         "guardrails": {
             "surveyor_can_promote_canonical_status": False,
             "evidence_mentions_are_semantic_proof": False,
-            "anti_idle_is_semantic_evidence": False,
-            "keepalive_requires_external_canonical_authority": True,
             "collect_all_runtime_mutation_allowed": False,
+            "collector_has_input_path": False,
         },
     }
 
@@ -273,8 +233,6 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     print(f"TIBIA_RE_SURVEYOR_ROWS={sum(bundle['coverage_counts'].values())}")
     if bundle.get("runtime"):
         print(f"TIBIA_RE_SURVEYOR_RUNTIME={bundle['runtime'].get('runtime_access')}")
-    if bundle.get("keepalive"):
-        print(f"TIBIA_RE_SURVEYOR_KEEPALIVE={bundle['keepalive'].get('result')}")
     if bundle.get("collect_all"):
         print(f"TIBIA_RE_SURVEYOR_COLLECT_ALL_ALIASES={bundle['collect_all']['alias_count']}")
         print(f"TIBIA_RE_SURVEYOR_MISSING_READERS={bundle['collect_all']['missing_reader_count']}")

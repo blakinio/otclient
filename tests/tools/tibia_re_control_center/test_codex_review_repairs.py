@@ -19,7 +19,10 @@ from tools.tibia_re_control_center.model import (
     SideEffectBudget,
 )
 from tools.tibia_re_control_center.recorder import Recorder
-from tools.tibia_re_control_center.scenario import action_request_hash, parse_and_validate
+from tools.tibia_re_control_center.scenario import (
+    action_request_hash,
+    parse_and_validate,
+)
 from tools.tibia_re_control_center.store import DeterministicDurableStore
 
 
@@ -168,7 +171,7 @@ class CodexP1RegressionTests(unittest.TestCase):
     def test_callback_cannot_terminalize_or_cross_adapter_session_fence(self):
         _, adapter, store, coordinator = make_stack()
         request = make_request(coordinator, adapter)
-        coordinator._reserve(coordinator.runs["repair-run"], request)  # noqa: SLF001
+        coordinator._reserve(coordinator.runs["repair-run"], request)
         original = adapter.identity()
 
         self.assertFalse(

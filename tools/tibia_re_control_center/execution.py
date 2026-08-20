@@ -30,7 +30,6 @@ from .model import (
 )
 from .store import DeterministicDurableStore
 
-
 _MISSING = object()
 
 
@@ -454,7 +453,7 @@ class MutationCoordinator:
             if final_commit_check is not None:
                 try:
                     final_check_passed = final_commit_check()
-                except Exception:
+                except Exception:  # noqa: BLE001 -- fail closed on any safety-hook failure
                     return False
                 if final_check_passed is not True:
                     return False
@@ -695,8 +694,7 @@ class MutationCoordinator:
             return result
 
     def stop_all(self, *, transition_id: str | None = None, reason_code: str = "STOP_ALL") -> bool:
-        with self.control_transition_lock:
-            with self.dispatch_gate:
+        with self.control_transition_lock, self.dispatch_gate:
                 try:
                     next_generation = checked_add(
                         self.control_generation,
@@ -732,8 +730,7 @@ class MutationCoordinator:
         return True
 
     def reset_stop(self, *, transition_id: str | None = None, reason_code: str = "EXPLICIT_RESET") -> bool:
-        with self.control_transition_lock:
-            with self.dispatch_gate:
+        with self.control_transition_lock, self.dispatch_gate:
                 if self.stop_durability_unresolved:
                     return False
                 for ledger in self.store.budget_ledgers.values():

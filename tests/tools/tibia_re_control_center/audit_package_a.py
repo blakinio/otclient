@@ -18,7 +18,10 @@ from tools.tibia_re_control_center.model import (
     SideEffectBudget,
 )
 from tools.tibia_re_control_center.recorder import Recorder
-from tools.tibia_re_control_center.scenario import action_request_hash, parse_and_validate
+from tools.tibia_re_control_center.scenario import (
+    action_request_hash,
+    parse_and_validate,
+)
 from tools.tibia_re_control_center.store import DeterministicDurableStore
 
 

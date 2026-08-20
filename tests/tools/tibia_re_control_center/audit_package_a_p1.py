@@ -18,7 +18,10 @@ from tools.tibia_re_control_center.model import (
     SideEffectBudget,
 )
 from tools.tibia_re_control_center.recorder import Recorder
-from tools.tibia_re_control_center.scenario import action_request_hash, parse_and_validate
+from tools.tibia_re_control_center.scenario import (
+    action_request_hash,
+    parse_and_validate,
+)
 from tools.tibia_re_control_center.store import DeterministicDurableStore
 
 
@@ -152,7 +155,7 @@ def main() -> None:
 
     _, adapter, store, coordinator = stack(epoch="audit-callback")
     request = request_for(coordinator, adapter, "audit-callback-action")
-    coordinator._reserve(coordinator.runs["audit-p1-run"], request)  # noqa: SLF001
+    coordinator._reserve(coordinator.runs["audit-p1-run"], request)
     identity = adapter.identity()
     assert coordinator.accept_callback(
         request.action_id,

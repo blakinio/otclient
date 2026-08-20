@@ -20,7 +20,10 @@ from tools.tibia_re_control_center.comparison import (
     compare_runs,
 )
 from tools.tibia_re_control_center.engine import ScenarioEngine
-from tools.tibia_re_control_center.execution import CancellationToken, MutationCoordinator
+from tools.tibia_re_control_center.execution import (
+    CancellationToken,
+    MutationCoordinator,
+)
 from tools.tibia_re_control_center.fake import FakeAdapter, ManualClock
 from tools.tibia_re_control_center.model import (
     MAX_U64,
@@ -38,7 +41,11 @@ from tools.tibia_re_control_center.model import (
     checked_add,
     negotiate_major,
 )
-from tools.tibia_re_control_center.recorder import Recorder, construct_screenshot, safe_error
+from tools.tibia_re_control_center.recorder import (
+    Recorder,
+    construct_screenshot,
+    safe_error,
+)
 from tools.tibia_re_control_center.scenario import (
     ACTION_KINDS,
     PredicateOutcome,
@@ -379,7 +386,7 @@ class PackageAMandatoryTests(unittest.TestCase):
     def test_17_stale_backend_callback_refusal(self):
         _, adapter, _, coordinator = stack()
         request = request_for(coordinator, adapter)
-        coordinator._reserve(coordinator.runs["run-1"], request)  # noqa: SLF001
+        coordinator._reserve(coordinator.runs["run-1"], request)
         self.assertFalse(coordinator.accept_callback(
             request.action_id,
             backend_epoch="old-backend",

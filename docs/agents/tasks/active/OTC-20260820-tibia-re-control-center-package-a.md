@@ -1,18 +1,19 @@
-﻿---
+---
 task_id: OTC-20260820-tibia-re-control-center-package-a
-status: implementing
+status: validating
 agent: ChatGPT
 project_lane: otclient
 lane: P1-CONTROL-CORE
 track_id: official-client-re
 task_kind: implementation
-phase: implement
+phase: validate
 risk: medium
 branch: feat/OTC-20260820-tibia-re-control-center-package-a
 base_branch: main
 created: 2026-08-20T14:18:00+02:00
-updated: 2026-08-20T14:18:00+02:00
+updated: 2026-08-20T16:27:00+02:00
 initial_base_sha: 8620310a91c53e63abc0bf51fe40bdb8a3ee6cef
+related_pr: 628
 runtime_access: none
 runtime_owner_task: NOT_APPLICABLE
 runtime_namespace: NOT_APPLICABLE
@@ -37,15 +38,29 @@ run_scope: autonomous_program
 continuation_policy: continue_until_real_stop
 task_completion_policy: finalize_archive_and_continue
 user_communication: terminal_only
-execution_mode: local_terminal_plus_github_connector
-execution_reason: full checkout, multi-file Python implementation and deterministic test loop required
+execution_mode: github_only_after_local_connector_loss
+execution_reason: GitHub connector plus isolated GitHub-hosted validation preserves the in-progress branch after local terminal access became unavailable
+execution_budget_minutes: 120
+execution_budget_reason: cohesive Package A implementation, exact-head validation, independent validator role, merge and mandatory archive closeout
+invocation_started_at: 2026-08-20T14:18:00+02:00
+last_progress_at: 2026-08-20T16:27:00+02:00
+ci_checks_for_current_head: 0
+ci_check_generation: draft
+terminal_ci_wait_started_at: null
+terminal_ci_checks_for_current_generation: 0
+unchanged_state_checks: 0
+identical_failure_retries: 0
+repair_cycles_for_current_gate: 1
+context_reconstruction_attempts: 1
+stall_warnings: 0
+heavy_validation_runs: 1
 decomposition_decision: phased
-decomposition_reason: one cohesive Package A control-core with shared safety state; split would duplicate contracts/ledgers
+decomposition_reason: one cohesive Package A control-core with shared safety state; split would duplicate contracts and ledgers
 context_pressure: high
 context_growth: stable
 context_score: 10
 estimate_confidence: medium
-validation_level: focused
+validation_level: full
 complete_user_facing_feature: false
 owned_paths:
   - tools/tibia_re_control_center/**
@@ -72,18 +87,6 @@ depends_on:
 blocks:
   - Package B Control API/browser/CLI
 cross_repository_tasks: []
-invocation_started_at: 2026-08-20T14:18:00+02:00
-last_progress_at: 2026-08-20T14:18:00+02:00
-ci_checks_for_current_head: 0
-ci_check_generation: draft
-terminal_ci_wait_started_at: null
-terminal_ci_checks_for_current_generation: 0
-unchanged_state_checks: 0
-identical_failure_retries: 0
-repair_cycles_for_current_gate: 0
-context_reconstruction_attempts: 0
-stall_warnings: 0
-heavy_validation_runs: 0
 ---
 
 # TIBIA RE Control Center Package A — control-core
@@ -98,7 +101,7 @@ feature_scope:
   frontend_required: false
   integration_required: true
   e2e_required: true
-implementation_status: package_a_in_progress
+implementation_status: package_a_implemented_validating
 user_facing_feature_complete: false
 missing_consumers:
   - Package B local Control API/browser/CLI
@@ -113,54 +116,61 @@ Implement Package A from the accepted current-main Control Center contracts with
 
 ## Scope boundary
 
-This task is permanently `runtime_access:none`. It may not connect to KasmVNC, inspect or mutate an official-client process, use credentials, login, send GUI/gameplay input, create a network listener, or claim Official Tibia capability evidence. Fake adapter success is test evidence only.
+This task is permanently `runtime_access:none`. It does not connect to KasmVNC, inspect or mutate an official-client process, use credentials, login, send GUI/gameplay input, create a network listener, or claim Official Tibia capability evidence. Fake adapter success is test evidence only.
 
 No Control API/browser/CLI listener is implemented here. No policy/Ollama loop is implemented. No Surveyor integration is implemented. No Official Tibia or Oteryn mutation adapter is implemented.
 
 ## Acceptance criteria
 
-- [ ] Typed Scenario/Execution/Adapter/Artifact/Comparison/Policy-boundary-compatible models and version negotiation fail closed.
-- [ ] Bounded JSON/YAML Scenario v1 parsing, duplicate/tag/alias rejection, semantic validation, deterministic JCS/SHA-256 hashes and stable step IDs.
-- [ ] Typed SideEffectBudget, AbortCondition, SemanticFieldPath, closed semantic references and every v1 action-family parameter schema.
-- [ ] Deterministic EffectBound model and refusal when hard effect cannot be bounded.
-- [ ] Manual clock, backend epoch/control generation, active-backend marker, durable STOP/reset/recovery and no fresh runtime window after restart.
-- [ ] MutationCoordinator serializes mutation, enforces action idempotency, one-shot dispatch commit and external-effect budget transitions.
-- [ ] Dispatch durability failure/timeout prevents effect; post-commit crash/effect uncertainty becomes conservative AMBIGUOUS/no auto-retry.
-- [ ] STOP-vs-commit and STOP-while-authority-waiting interleavings are deterministic and fail closed.
-- [ ] Recorder preserves source/ingest clocks, causal metadata and late-event immutability without claiming causality from ingestion order.
-- [ ] Construction-time privacy excludes secret, arbitrary exception/debug, environment values and unsafe screenshots from normal artifacts.
-- [ ] Artifact staging/finalization, hashes, safety-state precedence, incomplete crash behavior and append-only supplements satisfy Artifact v1 Package A scope.
-- [ ] Pure Comparison v1 profile/result types and coverage-gap semantics are implemented for Package A.
-- [ ] Deterministic fake adapter supports passive/invasive capture boundary and emergency-stop no-mutation invariant.
-- [ ] All 65 mandatory Package A tests in `TIBIA_RE_CONTROL_CENTER_MVP.md` are represented by focused automated tests and pass.
-- [ ] Exact Package A fake one-step journey passes as non-UI E2E.
-- [ ] No concrete official-client runtime or operator-facing adapter-bypass interface exists.
-- [ ] Full changed-file/diff self-review is clean; module catalogue/changelog/task are current.
-- [ ] Fresh independent exact-head audit has no open material findings.
+- [x] Typed Scenario/Execution/Adapter/Artifact/Comparison/Policy-boundary-compatible models and version negotiation fail closed.
+- [x] Bounded JSON/YAML Scenario v1 parsing, duplicate/tag/alias rejection, semantic validation, deterministic JCS/SHA-256 hashes and stable step IDs.
+- [x] Typed SideEffectBudget, AbortCondition, SemanticFieldPath, closed semantic references and every v1 action-family parameter schema.
+- [x] Deterministic EffectBound model and refusal when hard effect cannot be bounded.
+- [x] Manual clock, backend epoch/control generation, active-backend marker, durable STOP/reset/recovery and no fresh runtime window after restart.
+- [x] MutationCoordinator serializes mutation, enforces action idempotency, one-shot dispatch commit and external-effect budget transitions.
+- [x] Dispatch durability failure/timeout prevents effect; post-commit crash/effect uncertainty becomes conservative AMBIGUOUS/no auto-retry.
+- [x] STOP-vs-commit and STOP-while-authority-waiting interleavings are deterministic and fail closed.
+- [x] Recorder preserves source/ingest clocks, causal metadata and late-event immutability without claiming causality from ingestion order.
+- [x] Construction-time privacy excludes secret, arbitrary exception/debug, environment values and unsafe screenshots from normal artifacts.
+- [x] Artifact staging/finalization, hashes, safety-state precedence, incomplete crash behavior and append-only supplements satisfy Artifact v1 Package A scope.
+- [x] Pure Comparison v1 profile/result types and coverage-gap semantics are implemented for Package A.
+- [x] Deterministic fake adapter supports passive/invasive capture boundary and emergency-stop no-mutation invariant.
+- [x] All 65 mandatory Package A tests in `TIBIA_RE_CONTROL_CENTER_MVP.md` are represented by focused automated tests.
+- [x] Exact Package A fake one-step journey is covered as non-UI E2E.
+- [x] No concrete official-client runtime or operator-facing adapter-bypass interface exists.
+- [ ] Full exact-head validation and changed-file self-review are clean; module catalogue/changelog/task are current.
+- [ ] Fresh independent exact-head validator role has no open material findings.
 - [ ] Required exact-head GitHub checks pass, review threads are resolved and implementation PR reaches an intentional terminal state.
 - [ ] Post-merge archive closeout records terminal evidence and releases ownership.
+
+## Validation evidence so far
+
+- Interim head `a4a9a02168a3bfc39a498be01a117f5f4564ff69`, workflow run `32381505315`: compile PASS; 76/76 focused tests PASS; explicit mandatory inventory 65/65 PASS; `runtime_access:none` AST boundary PASS.
+- The same run failed only the final Ruff step. Six findings were isolated to test import/noqa formatting plus an engine wait-closure binding issue; the production closure issue has been repaired and lint validation is being regenerated.
+- Track A governance run `32381504968`: fresh admission behavior audit PASS; deterministic task policy failed only because the original task file carried a UTF-8 BOM before YAML front matter. This checkpoint removes the BOM and preserves the full `runtime_access:none` admission record.
+- Fresh Package A falsification is a separate GitHub-hosted validator job that does not consume the implementing test helpers and independently tests STOP-before-commit, dispatch durability failure, unclean-restart blocking, construction-time privacy, runtime-access-none source boundaries and the fake one-step E2E.
 
 ## Recovery checkpoint
 
 ```yaml
 recovery:
   policy_version: 1
-  generation: 1
-  session_id: package-a-20260820-1418
-  session_started_at: 2026-08-20T14:18:00+02:00
-  checkpointed_at: 2026-08-20T14:18:00+02:00
-  last_progress_at: 2026-08-20T14:18:00+02:00
-  phase: implement
-  exact_head: 8620310a91c53e63abc0bf51fe40bdb8a3ee6cef
-  pull_request: none
-  active_operation: none
+  generation: 2
+  session_id: package-a-github-only-20260820-1627
+  session_started_at: 2026-08-20T16:27:00+02:00
+  checkpointed_at: 2026-08-20T16:27:00+02:00
+  last_progress_at: 2026-08-20T16:27:00+02:00
+  phase: validate
+  exact_head: ec9d2ddafcbbc588237e4feb75854339adc3764c
+  pull_request: 628
+  active_operation: exact-head repair and documentation reconciliation
   external_run_ids: []
-  operation_started_at: null
+  operation_started_at: 2026-08-20T16:27:00+02:00
   wait_deadline_at: null
   check_generation: draft
   checks_used: 0
   status: active
   safe_to_resume: true
-  resume_condition: branch/ownership still non-conflicting and main contracts unchanged
-  next_action: implement Package A typed models, bounded scenario parser and deterministic core on the dedicated branch
+  resume_condition: PR #628 remains the sole Package A writer and runtime_access remains none
+  next_action: reconcile current-main catalogue/changelog, freeze the exact head, then run fresh validator plus required exact-head CI
 ```

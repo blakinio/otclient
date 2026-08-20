@@ -210,6 +210,7 @@ def build_collect_all(bundle: Mapping[str, object], coverage_rows: Sequence[Mapp
     for alias, row_ids in ALIAS_ROWS.items():
         rows = _row_documents(coverage_rows, row_ids)
         reader_id = TYPED_READER_IDS.get(alias)
+        reader_implemented = reader_id == "player_state_typed_reader"
         source_states = {
             "repository_evidence_index": {
                 "state": "AVAILABLE",
@@ -231,9 +232,8 @@ def build_collect_all(bundle: Mapping[str, object], coverage_rows: Sequence[Mapp
             },
         }
         if reader_id is not None:
-            implemented = reader_id == "player_state_typed_reader"
-            typed = (bundle.get("typed_readers") or {}).get(reader_id) if implemented else None
-            if implemented:
+            typed = (bundle.get("typed_readers") or {}).get(reader_id) if reader_implemented else None
+            if reader_implemented:
                 source_states["subsystem_typed_reader"] = {
                     "state": typed.get("state", "UNAVAILABLE") if isinstance(typed, dict) else "UNAVAILABLE",
                     "evidence_level": "PROVEN" if isinstance(typed, dict) and typed.get("state") == "AVAILABLE" else "UNKNOWN",
@@ -300,7 +300,7 @@ def build_collect_all(bundle: Mapping[str, object], coverage_rows: Sequence[Mapp
             ),
             "telemetry_file": f"telemetry/{TELEMETRY_FILES[alias]}" if alias in TELEMETRY_FILES else None,
             "canonical_rows": [row["row_id"] for row in rows],
-            "missing_reader": reader_id,
+            "missing_reader": None if reader_implemented else reader_id,
             "semantic_promotion_allowed": False,
         }
 

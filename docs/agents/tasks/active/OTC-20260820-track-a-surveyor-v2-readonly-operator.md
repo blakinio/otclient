@@ -1,11 +1,11 @@
 ---
 task_id: OTC-20260820-track-a-surveyor-v2-readonly-operator
-status: implementing
+status: ready
 agent: ChatGPT
 project_lane: otclient
 lane: RUNTIME
 task_kind: runtime_operator_implementation
-phase: implement
+phase: closeout
 branch: ci/OTC-20260820-track-a-surveyor-v2-readonly-operator
 base_branch: main
 base_sha: 0447763982ef5db9efca652396cfac22e5a0cff4
@@ -59,7 +59,7 @@ gameplay_allowed: false
 transaction_authorized: false
 owner_funded_ai_api_authorized: false
 current_blocker: none
-next_action: implement an owner-gated no-secret read-only Synology Surveyor v2 workflow and validate it without dispatching the physical runtime
+next_action: revalidate this checkpoint-only delta with fresh exact-head CI/governance, then mark PR #618 ready and squash-merge if all gates remain green
 ---
 
 # Surveyor v2 read-only physical operator
@@ -76,3 +76,43 @@ Acceptance:
 - collect-all output privacy scan must PASS before artifact upload;
 - output states explicitly distinguish `COLLECTOR_READY`, `STRUCTURAL_IN_GAME`, and `OWNER_LOGIN_REQUIRED`; unknown state never triggers a login request;
 - physical dispatch belongs to the resumed/current runtime task, not this implementation task.
+
+
+## Validation checkpoint
+
+```yaml
+checkpoint_version: 2
+status: ready
+phase: closeout
+audited_workflow_head: e291c879a441b49dd26da94880da280cd0ec8d40
+final_precheckpoint_head: 4b8591cacf54d0e10a454b064e9afd9f7d634162
+pr: 618
+runtime_access: none
+workflow_dispatched: false
+validation:
+  yaml_parse: PASS
+  diff_check: PASS
+  actionlint_initial: FAIL_SC2016_SUMMARY_CONSTANT_QUOTING
+  actionlint_fix: PASS_VIA_EXACT_HEAD_CI
+  ci_run: 32347624928
+  ci_result: SUCCESS
+  track_a_governance_run: 32347624634
+  track_a_governance_result: SUCCESS
+independent_audit:
+  review: 4980489547
+  result: PASS
+  material_findings_open: 0
+final_delta_revalidation:
+  review: 4980497129
+  result: PASS
+  material_findings_open: 0
+authority:
+  credentials_allowed: false
+  login_allowed: false
+  gui_input_authorized: false
+  process_control_authorized: false
+  mutation_authorized: false
+runtime_e2e: NOT_APPLICABLE
+runtime_e2e_reason: this PR implements the trusted operator only and intentionally does not dispatch the physical workflow before merge
+next_action: exact-head CI/governance on this checkpoint-only head, then mark ready and squash-merge if green
+```

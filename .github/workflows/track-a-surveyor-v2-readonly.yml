@@ -115,29 +115,29 @@ jobs:
         run: |
           set -Eeuo pipefail
           docker inspect -f '{{.State.Running}}' "$CONTAINER" | grep -Fx true >/dev/null
-          exact_total=0
-          target_exact=0
-          target_pid=''
-          while IFS= read -r name; do
-            [[ -n "$name" ]] || continue
-            while IFS= read -r pid; do
-              [[ "$pid" =~ ^[0-9]+$ ]] || continue
-              size="$(docker exec "$name" stat -Lc %s "/proc/$pid/exe" 2>/dev/null || true)"
-              [[ "$size" == "$EXPECTED_SIZE" ]] || continue
-              sha="$(docker exec "$name" sha256sum "/proc/$pid/exe" 2>/dev/null | awk '{print $1}' || true)"
-              [[ "$sha" == "$EXPECTED_SHA" ]] || continue
-              exact_total=$((exact_total + 1))
-              if [[ "$name" == "$CONTAINER" ]]; then
-                target_exact=$((target_exact + 1))
-                target_pid="$pid"
-              fi
-            done < <(docker exec "$name" pgrep -x client 2>/dev/null || true)
-          done < <(docker ps --format '{{.Names}}')
-          echo EXACT_CLIENT_CANDIDATES="$exact_total"
-          echo TARGET_EXACT_CLIENTS="$target_exact"
-          test "$exact_total" -eq 1
-          test "$target_exact" -eq 1
-          [[ "$target_pid" =~ ^[0-9]+$ ]]
+          set +e
+          pid_output="$(docker exec "$CONTAINER" pgrep -x client 2>/dev/null)"
+          pid_rc=$?
+          set -e
+          case "$pid_rc" in
+            0) ;;
+            1) pid_output='' ;;
+            *) echo TARGET_CLIENT_CENSUS=FAIL >&2; exit 2 ;;
+          esac
+          target_pids=()
+          while IFS= read -r pid; do
+            [[ "$pid" =~ ^[0-9]+$ ]] && target_pids+=("$pid")
+          done <<< "$pid_output"
+          echo TARGET_NAMESPACE_CLIENTS="${#target_pids[@]}"
+          test "${#target_pids[@]}" -eq 1
+          target_pid="${target_pids[0]}"
+          size="$(docker exec "$CONTAINER" stat -Lc %s "/proc/$target_pid/exe")"
+          test "$size" = "$EXPECTED_SIZE"
+          sha="$(docker exec "$CONTAINER" sha256sum "/proc/$target_pid/exe" | awk '{print $1}')"
+          test "$sha" = "$EXPECTED_SHA"
+          echo TARGET_EXACT_CLIENTS=1
+          echo TARGET_UNIQUENESS_SCOPE=DECLARED_RUNTIME_NAMESPACE
+          echo EXTERNAL_CONTAINERS_SCANNED=false
 
           docker exec -u kasm-user -e DISPLAY="$DISPLAY_NAME" "$CONTAINER" xdpyinfo >/dev/null
           matching_windows=0

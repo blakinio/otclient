@@ -1,12 +1,12 @@
-﻿---
+---
 task_id: OTC-20260820-runtime-namespace-hardening
-status: implementing
+status: validating
 agent: ChatGPT
 project_lane: otclient
 lane: P0-STATE
 track_id: official-client-re
 task_kind: implementation
-phase: implement
+phase: validate
 branch: fix/OTC-20260820-runtime-namespace-hardening
 base_branch: main
 base_sha: 272ea49f5bf2d8651e22dfa776537e8ea61758e2
@@ -71,7 +71,7 @@ gameplay_allowed: false
 transaction_authorized: false
 owner_funded_ai_api_authorized: false
 invocation_started_at: 2026-08-20T12:36:11+02:00
-last_progress_at: 2026-08-20T12:36:11+02:00
+last_progress_at: 2026-08-20T12:43:09+02:00
 context_pressure: medium
 context_growth: stable
 context_score: 6
@@ -81,7 +81,7 @@ repair_cycles: 0
 ci_checks_for_current_head: 0
 terminal_ci_checks_for_current_generation: 0
 current_blocker: none
-next_action: remove host-wide Docker discovery from Surveyor and the trusted read-only operator, bind observation only to the declared OTClient runtime target, add regression tests, and validate exact-head CI/audit
+next_action: commit and push the namespace-scoped implementation, then run exact-head CI and independent audit on PR #623
 ---
 
 # Track A Surveyor runtime namespace hardening
@@ -100,3 +100,34 @@ Make the Surveyor v2 and its trusted read-only operator observe only the explici
 - Focused tests prove no docker ps path exists, exact target singleton behavior is fail-closed, and external-container names never enter command execution.
 - Documentation, module catalogue and changelog describe the namespace-scoped boundary accurately.
 - Independent audit PASS, physical read-only E2E after merge PASS, final exact-head required CI PASS, zero review threads, terminal archive and ownership release.
+
+## Implementation validation checkpoint
+
+`yaml
+checkpoint_version: 2
+updated_at: 2026-08-20T12:43:09+02:00
+status: validating
+phase: validate
+pr: 623
+runtime_access: none
+implementation:
+  hostwide_docker_enumeration: removed
+  target_container: otclient-track-a-kasmvnc
+  control_container: otclient-synology-runner
+  external_containers_scanned: false
+  uniqueness_scope: DECLARED_RUNTIME_NAMESPACE
+focused_validation:
+  compileall: PASS
+  unittest_discover: 23_PASS
+  repository_only_collect_all: PASS
+  aliases: 12
+  telemetry_documents: 11
+  privacy_scan: PASS
+  manifest_present: true
+  yaml_parse: PASS
+  hostwide_discovery_refs: NONE
+  diff_check: PASS
+runtime_e2e: PENDING_POST_MERGE
+blockers: []
+next_action: exact-head CI and independent audit on the implementation head
+`

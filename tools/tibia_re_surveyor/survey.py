@@ -11,7 +11,12 @@ from typing import Optional, Sequence
 from .collect_all import build_collect_all, write_collect_all
 from .coverage import parse_critical_dependencies, parse_matrix, rank_next, status_counts
 from .evidence import DockerRepoReader, LocalRepoReader, RepoReader
-from .runtime import DockerRuntimeProbe, EXPECTED_CLIENT_SHA256
+from .runtime import (
+    DockerRuntimeProbe,
+    EXPECTED_CLIENT_SHA256,
+    EXPECTED_CONTROL_CONTAINER,
+    EXPECTED_TARGET_CONTAINER,
+)
 
 MATRIX_PATH = "docs/agents/reports/OTCLIENT-20260818-full-client-re-matrix.md"
 CHECKLIST_PATH = "docs/agents/reports/OTCLIENT-20260818-full-client-re-100-percent-checklist.md"
@@ -30,8 +35,16 @@ def _parser() -> argparse.ArgumentParser:
         help="emit Surveyor v2 telemetry, all twelve alias views, gap report and manifest",
     )
     parser.add_argument("--runtime-docker", action="store_true")
-    parser.add_argument("--runtime-container", default="otclient-track-a-kasmvnc")
-    parser.add_argument("--control-container", default="otclient-synology-runner")
+    parser.add_argument(
+        "--runtime-container",
+        default=EXPECTED_TARGET_CONTAINER,
+        help="fixed Track A runtime container; other values fail closed",
+    )
+    parser.add_argument(
+        "--control-container",
+        default=EXPECTED_CONTROL_CONTAINER,
+        help="fixed OTClient control container; other values fail closed",
+    )
     parser.add_argument("--display", default=":1")
     parser.add_argument("--top-next", type=int, default=20)
     return parser

@@ -80,7 +80,7 @@ Expected state without a runtime is `REPOSITORY_INPUT_ONLY`; `missing-readers.js
 
 A physical run must be started only by a separately current-admitted Track A runtime-validation task. The repository-side implementation task does not itself grant runtime access.
 
-When the physical task has proven the intended unique exact client and read-only observation is permitted:
+When the physical task has proven the intended unique exact client and read-only observation is permitted, Surveyor verifies only the declared Track A runtime namespace. It does not enumerate the Docker host or execute discovery commands in unrelated containers.
 
 ```bash
 PYTHONPATH=. python3 -m tools.tibia_re_surveyor \

@@ -14,7 +14,6 @@ from .model import (
     AdapterIdentity,
     Authority,
     DispatchFence,
-    ValidationError,
     negotiate_major,
 )
 from .recorder import Recorder
@@ -223,11 +222,18 @@ class ScenarioEngine:
                         predicate, _ = validate_predicate(step.body["condition"])
                         checkpoint = last_snapshot
 
-                        def ready() -> bool:
+                        def ready(
+                            bound_predicate=predicate,
+                            bound_checkpoint=checkpoint,
+                        ) -> bool:
                             observed = self._snapshot_mapping(self.adapter.snapshot())
                             return resolve_unknown_policy(
-                                evaluate_predicate(predicate, observed, checkpoint=checkpoint),
-                                predicate.unknown_policy,
+                                evaluate_predicate(
+                                    bound_predicate,
+                                    observed,
+                                    checkpoint=bound_checkpoint,
+                                ),
+                                bound_predicate.unknown_policy,
                             ) is True
 
                         wait_result = self.coordinator.wait_until(

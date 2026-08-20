@@ -122,6 +122,7 @@ class CollectAllModelTests(unittest.TestCase):
         self.assertEqual("TIBIA-RE-AUTH-SESSION", gaps[0]["alias"])
         self.assertEqual(125, gaps[0]["canonical_priority_score"])
         self.assertNotIn("TIBIA-RE-PLAYER-STATE", [gap["alias"] for gap in gaps])
+        self.assertIsNone(result["aliases"]["TIBIA-RE-PLAYER-STATE"]["missing_reader"])
         self.assertEqual(1, gaps[0]["rank"])
         self.assertFalse(gaps[0]["semantic_promotion_allowed"])
 

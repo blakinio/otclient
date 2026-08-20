@@ -18,16 +18,16 @@ estimate_confidence: medium
 decomposition_decision: single
 decomposition_reason: one typed reader with one exact-build structural resolver and one bounded read-only causal acceptance path
 runtime_access: read_only
-runtime_owner_task: OTC-20260820-surveyor-auth-session-reader
-runtime_namespace: synology:otclient-track-a-kasmvnc:display-1
-canonical_registration: UNKNOWN
-canonical_lease_generation: UNKNOWN
-registration_lease_generation: UNKNOWN
+runtime_owner_task: NOT_APPLICABLE
+runtime_namespace: synology:otclient-track-a-kasmvnc:display-1:client-19590
+canonical_registration: PRESENT
+canonical_lease_generation: 19
+registration_lease_generation: 19
 gate_a: NOT_APPLICABLE
 generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
-target_uniqueness: UNKNOWN
+target_uniqueness: PROVEN
 mutation_authorized: false
 gui_input_authorized: false
 process_control_authorized: false
@@ -37,8 +37,8 @@ gameplay_allowed: false
 transaction_authorized: false
 physical_e2e_required: true
 physical_e2e_result: NOT_RUN
-updated_at: 2026-08-20T23:08:00+02:00
-next_action: execute only the reviewed KasmVNC/Surveyor read-only preflight; stop before semantic observation if lease ownership conflicts, the exact fence fails, or target uniqueness is not proven
+updated_at: 2026-08-20T23:12:00+02:00
+next_action: run one fresh current-main passive collect-all against the exact admitted target, then perform bounded static discovery for the selected auth/session typed reader
 ---
 
 # Surveyor v2 next gap — auth/session typed reader
@@ -59,6 +59,29 @@ A fresh repository-only current-main Surveyor `--collect-all` run produced:
 
 `world_minimap_typed_reader` is not selected because current open PR #475 owns the physical world-map server-delivery frontier and open PR #593 owns current world-minimap static G1 evidence. Selecting it would create material overlap. `auth_session_typed_reader` therefore has the highest current blocker/dependency priority without that known overlap.
 
+## Fresh physical read-only admission
+
+The current KasmVNC/Surveyor preflight was re-run from scratch after this task was admitted for read-only preflight:
+
+- target container `otclient-track-a-kasmvnc`: running;
+- control container `otclient-synology-runner`: running;
+- display `:1`: connect PASS;
+- exact `client` PID: `19590`;
+- process start ticks: `76611792`;
+- executable: `/home/kasm-user/otclient-track-a/Tibia-32177065988-1/bin/client`;
+- executable size: `52109920`;
+- SHA-256: `ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8`;
+- exact target processes in declared namespace: `1`;
+- visible Tibia windows on display: `1`;
+- matching window owner count: `1`;
+- target uniqueness: `PROVEN`;
+- canonical lease: present, `released`, generation `19`, no active controller task;
+- canonical registration: present, generation `2`, lease generation `19`, identity matches PID/start/size/SHA/display, state `UNKNOWN`;
+- process environment read: false;
+- raw window title retained: false.
+
+Because the lease is released and no active controller owns the runtime, `runtime_owner_task=NOT_APPLICABLE` is proven for this read-only observation. Registration identity agrees with the freshly observed target. No Gate A/Gate B/rebind/bootstrap gate is required for non-invasive read-only observation; mutation remains forbidden.
+
 ## Scope
 
 Implement the smallest exact-current-build, fail-closed, secret-free typed auth/session reader that materially improves the ranked Surveyor gap. It may expose only bounded non-secret lifecycle/session facts whose semantics can be proven structurally and, where required, causally without login/relogin or agent-generated gameplay input.
@@ -74,7 +97,7 @@ Do not modify or take ownership of PR #475/#593 world-map surfaces, Control Cent
 
 ## Runtime boundary
 
-The task is now classified `runtime_access: read_only` solely to execute the reviewed non-invasive KasmVNC/Surveyor preflight. Until that preflight proves current control-plane non-conflict, exact client fence, exactly one target process, exactly one visible Tibia window owned by it, and target uniqueness, no semantic process-memory observation is permitted. Any conflicting active lease, registration mismatch, fence mismatch, duplicate target or ambiguous window fails closed.
+Only bounded semantic observation of the exact admitted target is permitted. Any lease/registration/PID/start/fence/display/window identity change triggers fresh re-admission before further observation.
 
 Read-only observation never authorizes login, input, process control, attach/debug/injection, memory writes, item/economic actions, network mutation, or secret-bearing memory access. `mutation_authorized=false` throughout this slice.
 

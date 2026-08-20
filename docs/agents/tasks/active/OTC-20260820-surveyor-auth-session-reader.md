@@ -17,17 +17,17 @@ context_score: 7
 estimate_confidence: medium
 decomposition_decision: single
 decomposition_reason: one typed reader with one exact-build structural resolver and one bounded read-only causal acceptance path
-runtime_access: none
-runtime_owner_task: NOT_APPLICABLE
-runtime_namespace: NOT_APPLICABLE
-canonical_registration: NOT_APPLICABLE
-canonical_lease_generation: NOT_APPLICABLE
-registration_lease_generation: NOT_APPLICABLE
+runtime_access: read_only
+runtime_owner_task: OTC-20260820-surveyor-auth-session-reader
+runtime_namespace: synology:otclient-track-a-kasmvnc:display-1
+canonical_registration: UNKNOWN
+canonical_lease_generation: UNKNOWN
+registration_lease_generation: UNKNOWN
 gate_a: NOT_APPLICABLE
 generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
-target_uniqueness: NOT_APPLICABLE
+target_uniqueness: UNKNOWN
 mutation_authorized: false
 gui_input_authorized: false
 process_control_authorized: false
@@ -37,8 +37,8 @@ gameplay_allowed: false
 transaction_authorized: false
 physical_e2e_required: true
 physical_e2e_result: NOT_RUN
-updated_at: 2026-08-20T23:00:00+02:00
-next_action: reclassify to read_only only after the reviewed Track A physical preflight can prove current ownership, namespace and exact target uniqueness
+updated_at: 2026-08-20T23:08:00+02:00
+next_action: execute only the reviewed KasmVNC/Surveyor read-only preflight; stop before semantic observation if lease ownership conflicts, the exact fence fails, or target uniqueness is not proven
 ---
 
 # Surveyor v2 next gap — auth/session typed reader
@@ -74,7 +74,9 @@ Do not modify or take ownership of PR #475/#593 world-map surfaces, Control Cent
 
 ## Runtime boundary
 
-Initial admission is `runtime_access: none`. No live official-client observation is authorized by this checkpoint. Before any runtime-related operation, update this task with a fresh `read_only` admission that proves current runtime ownership/non-conflict, namespace, exact target uniqueness, exact client fence and every current operator precondition. Read-only observation never authorizes login, input, process control, attach/debug/injection, memory writes, item/economic actions, or secret-bearing memory access.
+The task is now classified `runtime_access: read_only` solely to execute the reviewed non-invasive KasmVNC/Surveyor preflight. Until that preflight proves current control-plane non-conflict, exact client fence, exactly one target process, exactly one visible Tibia window owned by it, and target uniqueness, no semantic process-memory observation is permitted. Any conflicting active lease, registration mismatch, fence mismatch, duplicate target or ambiguous window fails closed.
+
+Read-only observation never authorizes login, input, process control, attach/debug/injection, memory writes, item/economic actions, network mutation, or secret-bearing memory access. `mutation_authorized=false` throughout this slice.
 
 `BRIDGE_3_OF_3` remains structural presence only and must not be treated as `IN_GAME` proof.
 

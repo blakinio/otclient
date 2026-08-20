@@ -1,0 +1,329 @@
+name: Track A Surveyor v2 read-only
+
+on:
+  workflow_dispatch:
+    inputs:
+      authorization:
+        description: Type ONE_SHOT_SURVEYOR_READ_ONLY for one passive physical snapshot
+        required: true
+        type: string
+      runtime_task_id:
+        description: Existing/current Track A runtime task whose owned runtime may be observed
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-surveyor-v2-read-only
+  cancel-in-progress: false
+
+env:
+  EXPECTED_SHA: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
+  EXPECTED_SIZE: '52109920'
+  CONTAINER: otclient-track-a-kasmvnc
+  DISPLAY_NAME: ':1'
+  CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime
+  CURRENT_HELPER_SOCKET: /tmp/otclient-native-login-current-sha/bridge.sock
+
+jobs:
+  snapshot:
+    if: github.actor == 'blakinio' && inputs.authorization == 'ONE_SHOT_SURVEYOR_READ_ONLY'
+    runs-on: [otclient, synology]
+    timeout-minutes: 8
+    steps:
+      - name: Validate bounded authorization and task identity
+        shell: bash
+        env:
+          RUNTIME_TASK_ID: ${{ inputs.runtime_task_id }}
+        run: |
+          set -Eeuo pipefail
+          [[ "$RUNTIME_TASK_ID" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$ ]]
+          echo AUTHORIZATION_GATE=PASS
+          echo RUNTIME_TASK_ID="$RUNTIME_TASK_ID"
+          echo CREDENTIAL_ACCESS=false
+          echo RUNTIME_MUTATION=false
+
+      - name: Checkout trusted main
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+          ref: main
+
+      - name: Read safe canonical control-plane metadata
+        shell: bash
+        env:
+          RUNTIME_TASK_ID: ${{ inputs.runtime_task_id }}
+        run: |
+          set -Eeuo pipefail
+          python3 - "$CANONICAL_STATE" "$RUNTIME_TASK_ID" "$RUNNER_TEMP/control.json" <<'PY'
+          import json, pathlib, sys, time
+          root = pathlib.Path(sys.argv[1])
+          requested_task = sys.argv[2]
+          out = pathlib.Path(sys.argv[3])
+          def load(name):
+              path = root / name
+              if not path.is_file():
+                  return None
+              try:
+                  value = json.loads(path.read_text(encoding='utf-8'))
+              except (OSError, json.JSONDecodeError):
+                  return {'_malformed': True}
+              return value if isinstance(value, dict) else {'_malformed': True}
+          lease = load('lease.json')
+          reg = load('runtime-registration.json')
+          now = int(time.time())
+          lease_safe = None
+          if lease is not None:
+              lease_safe = {k: lease.get(k) for k in (
+                  'schema_version','runtime_id','status','generation','controller_task',
+                  'controller_session','acquired_at','renewed_at','expires_at','takeover_from'
+              )}
+              lease_safe['fresh_active'] = bool(
+                  lease.get('status') == 'active'
+                  and isinstance(lease.get('expires_at'), (int, float))
+                  and int(lease['expires_at']) > now
+              )
+          reg_safe = None
+          if reg is not None:
+              reg_safe = {k: reg.get(k) for k in (
+                  'schema_version','runtime_id','registration_generation','lease_generation',
+                  'boot_id_sha256','pid','process_start_ticks','client_version','client_size',
+                  'client_sha256','display','state','source_task','source_run'
+              )}
+          if lease_safe and lease_safe.get('fresh_active'):
+              owner = lease_safe.get('controller_task')
+              if owner != requested_task:
+                  raise SystemExit(f'ACTIVE_RUNTIME_OWNER_CONFLICT={owner!r}')
+          doc = {
+              'observed_at_epoch': now,
+              'requested_runtime_task': requested_task,
+              'lease': lease_safe,
+              'registration': reg_safe,
+              'secret_fields_retained': False,
+          }
+          out.write_text(json.dumps(doc, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+          print('CONTROL_PLANE_READ=PASS')
+          print('CANONICAL_REGISTRATION=' + ('PRESENT' if reg is not None else 'ABSENT'))
+          print('CANONICAL_LEASE=' + ('PRESENT' if lease is not None else 'ABSENT'))
+          PY
+
+      - name: Prove one exact current native client and X11 owner
+        id: target
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          docker inspect -f '{{.State.Running}}' "$CONTAINER" | grep -Fx true >/dev/null
+          exact_total=0
+          target_exact=0
+          target_pid=''
+          while IFS= read -r name; do
+            [[ -n "$name" ]] || continue
+            while IFS= read -r pid; do
+              [[ "$pid" =~ ^[0-9]+$ ]] || continue
+              size="$(docker exec "$name" stat -Lc %s "/proc/$pid/exe" 2>/dev/null || true)"
+              [[ "$size" == "$EXPECTED_SIZE" ]] || continue
+              sha="$(docker exec "$name" sha256sum "/proc/$pid/exe" 2>/dev/null | awk '{print $1}' || true)"
+              [[ "$sha" == "$EXPECTED_SHA" ]] || continue
+              exact_total=$((exact_total + 1))
+              if [[ "$name" == "$CONTAINER" ]]; then
+                target_exact=$((target_exact + 1))
+                target_pid="$pid"
+              fi
+            done < <(docker exec "$name" pgrep -x client 2>/dev/null || true)
+          done < <(docker ps --format '{{.Names}}')
+          echo EXACT_CLIENT_CANDIDATES="$exact_total"
+          echo TARGET_EXACT_CLIENTS="$target_exact"
+          test "$exact_total" -eq 1
+          test "$target_exact" -eq 1
+          [[ "$target_pid" =~ ^[0-9]+$ ]]
+
+          docker exec -u kasm-user -e DISPLAY="$DISPLAY_NAME" "$CONTAINER" xdpyinfo >/dev/null
+          matching_windows=0
+          while IFS= read -r xid; do
+            [[ "$xid" =~ ^[0-9]+$ ]] || continue
+            owner="$(docker exec -u kasm-user -e DISPLAY="$DISPLAY_NAME" "$CONTAINER" xprop -id "$xid" _NET_WM_PID 2>/dev/null | sed -nE 's/.*= *([0-9]+).*/\1/p')"
+            [[ "$owner" == "$target_pid" ]] && matching_windows=$((matching_windows + 1))
+          done < <(docker exec -u kasm-user -e DISPLAY="$DISPLAY_NAME" "$CONTAINER" xdotool search --onlyvisible --name '^Tibia' 2>/dev/null || true)
+          echo TARGET_WINDOW_MATCHES="$matching_windows"
+          test "$matching_windows" -eq 1
+
+          start_ticks="$(docker exec "$CONTAINER" python3 - "$target_pid" <<'PY'
+          import pathlib, sys
+          raw = pathlib.Path('/proc/' + sys.argv[1] + '/stat').read_text(encoding='ascii')
+          fields = raw[raw.rfind(')') + 2:].split()
+          print(fields[19])
+          PY
+          )"
+          [[ "$start_ticks" =~ ^[0-9]+$ ]]
+          echo "pid=$target_pid" >> "$GITHUB_OUTPUT"
+          echo "start_ticks=$start_ticks" >> "$GITHUB_OUTPUT"
+          echo TARGET_UNIQUENESS=PROVEN
+          echo PROCESS_ENVIRONMENT_READ=false
+          echo WINDOW_TITLE_VALUE_RETAINED=false
+
+      - name: Validate registration binding when present and emit read-only admission
+        shell: bash
+        env:
+          TARGET_PID: ${{ steps.target.outputs.pid }}
+          TARGET_START: ${{ steps.target.outputs.start_ticks }}
+          RUNTIME_TASK_ID: ${{ inputs.runtime_task_id }}
+        run: |
+          set -Eeuo pipefail
+          python3 - "$RUNNER_TEMP/control.json" "$TARGET_PID" "$TARGET_START" "$EXPECTED_SIZE" "$EXPECTED_SHA" "$DISPLAY_NAME" <<'PY'
+          import json, pathlib, sys
+          control = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding='utf-8'))
+          pid, start, size, sha, display = int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4]), sys.argv[5], sys.argv[6]
+          reg = control.get('registration')
+          reg_state = 'ABSENT'
+          reg_gen = 'UNKNOWN'
+          reg_lease = 'UNKNOWN'
+          if reg is not None:
+              if reg.get('_malformed'):
+                  raise SystemExit('CANONICAL_REGISTRATION_MALFORMED')
+              expected = {
+                  'pid': pid,
+                  'process_start_ticks': start,
+                  'client_size': size,
+                  'client_sha256': sha,
+                  'display': display,
+              }
+              mismatches = [key for key, value in expected.items() if reg.get(key) != value]
+              if mismatches:
+                  raise SystemExit('CANONICAL_REGISTRATION_IDENTITY_MISMATCH=' + ','.join(mismatches))
+              reg_state = 'PRESENT'
+              reg_gen = reg.get('registration_generation', 'UNKNOWN')
+              reg_lease = reg.get('lease_generation', 'UNKNOWN')
+          lease = control.get('lease') or {}
+          lease_gen = lease.get('generation', 'UNKNOWN')
+          owner = lease.get('controller_task') if lease.get('fresh_active') else 'NOT_APPLICABLE'
+          print('TRACK_A_RUNTIME_ADMISSION_BEGIN')
+          print('runtime_access=read_only')
+          print('runtime_owner_task=' + str(owner))
+          print('runtime_namespace=synology:otclient-track-a-kasmvnc:display-1:client-' + str(pid))
+          print('canonical_registration=' + reg_state)
+          print('canonical_lease_generation=' + str(lease_gen))
+          print('registration_lease_generation=' + str(reg_lease))
+          print('gate_a=NOT_APPLICABLE')
+          print('generation_rebind=NOT_APPLICABLE')
+          print('gate_b=NOT_APPLICABLE')
+          print('bootstrap=NOT_APPLICABLE')
+          print('target_uniqueness=PROVEN')
+          print('mutation_authorized=false')
+          print('TRACK_A_RUNTIME_ADMISSION_END')
+          PY
+
+      - name: Probe current native helper structural state read-only
+        id: state
+        shell: bash
+        env:
+          TARGET_PID: ${{ steps.target.outputs.pid }}
+        run: |
+          set -Eeuo pipefail
+          result="$(docker exec -i -u kasm-user -e SOCKET="$CURRENT_HELPER_SOCKET" -e EXPECTED_PID="$TARGET_PID" "$CONTAINER" python3 - <<'PY'
+          import json, os, socket, struct
+          path = os.environ['SOCKET']
+          expected = int(os.environ['EXPECTED_PID'])
+          if not os.path.exists(path):
+              print('UNKNOWN:SOCKET_ABSENT')
+              raise SystemExit(0)
+          names = ('player_protocol_handler','gameserver_game_session','worldmap_handler')
+          def call(command):
+              s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+              s.settimeout(4)
+              try:
+                  s.connect(path)
+                  peer = struct.unpack('3i', s.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, 12))[0]
+                  if peer != expected:
+                      return None, 'PEER_PID_MISMATCH'
+                  s.sendall(command.encode('ascii') + b'\n')
+                  raw = b''
+                  while b'\n' not in raw:
+                      part = s.recv(4096)
+                      if not part:
+                          break
+                      raw += part
+                      if len(raw) > 1048576:
+                          return None, 'RESPONSE_TOO_LARGE'
+                  return json.loads(raw.split(b'\n',1)[0]), None
+              except Exception as exc:
+                  return None, type(exc).__name__
+              finally:
+                  s.close()
+          counts = []
+          for name in names:
+              doc, error = call('DISCOVER ' + name)
+              if error or not isinstance(doc, dict) or doc.get('ok') is not True or doc.get('target') != name or doc.get('scan_status') != 'OK' or not isinstance(doc.get('validated_hits'), int):
+                  print('UNKNOWN:DISCOVERY_UNPROVEN')
+                  raise SystemExit(0)
+              counts.append(doc['validated_hits'])
+          if counts == [1,1,1]:
+              print('PASS:BRIDGE_3_OF_3')
+          else:
+              print('NO:BRIDGE_NOT_3_OF_3')
+          PY
+          )"
+          echo STRUCTURAL_STATE_RESULT="$result"
+          case "$result" in
+            PASS:*) state=PASS; login=NO ;;
+            NO:*) state=NO; login=YES ;;
+            *) state=UNKNOWN; login=UNKNOWN ;;
+          esac
+          echo "structural_state=$state" >> "$GITHUB_OUTPUT"
+          echo "owner_login_required=$login" >> "$GITHUB_OUTPUT"
+
+      - name: Run Surveyor v2 passive collect-all
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          out="$RUNNER_TEMP/tibia-re-surveyor-v2-live"
+          PYTHONPATH=. python3 -m tools.tibia_re_surveyor \
+            --collect-all \
+            --runtime-docker \
+            --runtime-container "$CONTAINER" \
+            --control-container otclient-synology-runner \
+            --display "$DISPLAY_NAME" \
+            --output-dir "$out"
+          python3 - "$out" <<'PY'
+          import json, pathlib, sys
+          root = pathlib.Path(sys.argv[1])
+          privacy = json.loads((root/'privacy-scan.json').read_text(encoding='utf-8'))
+          if privacy.get('result') != 'PASS':
+              raise SystemExit('PRIVACY_SCAN_NOT_PASS')
+          aliases = list((root/'aliases').glob('*.json'))
+          missing = json.loads((root/'missing-readers.json').read_text(encoding='utf-8'))
+          print('LIVE_COLLECT_ALL=PASS')
+          print('ALIASES_WITH_DATA=' + str(len(aliases)) + '/12')
+          print('MISSING_TYPED_READERS=' + str(len(missing.get('reader_gaps', []))))
+          print('SECRETS_RETAINED=false')
+          print('RUNTIME_MUTATION=false')
+          PY
+
+      - name: Publish readiness verdict
+        shell: bash
+        env:
+          STRUCTURAL_STATE: ${{ steps.state.outputs.structural_state }}
+          OWNER_LOGIN_REQUIRED: ${{ steps.state.outputs.owner_login_required }}
+        run: |
+          set -Eeuo pipefail
+          echo COLLECTOR_READY=YES
+          echo STRUCTURAL_IN_GAME="$STRUCTURAL_STATE"
+          echo OWNER_LOGIN_REQUIRED="$OWNER_LOGIN_REQUIRED"
+          {
+            echo '## Track A Surveyor v2 read-only verdict'
+            echo
+            echo '- `COLLECTOR_READY=YES`'
+            echo "- \`STRUCTURAL_IN_GAME=$STRUCTURAL_STATE\`"
+            echo "- \`OWNER_LOGIN_REQUIRED=$OWNER_LOGIN_REQUIRED\`"
+            echo '- `RUNTIME_MUTATION=false`'
+            echo '- `CREDENTIAL_ACCESS=false`'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload sanitized Surveyor bundle
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: track-a-surveyor-v2-readonly-${{ github.run_id }}
+          path: ${{ runner.temp }}/tibia-re-surveyor-v2-live/
+          if-no-files-found: error
+          retention-days: 3

@@ -11,7 +11,7 @@ risk: medium
 branch: feat/OTC-20260820-tibia-re-control-center-package-a
 base_branch: main
 created: 2026-08-20T14:18:00+02:00
-updated: 2026-08-20T16:27:00+02:00
+updated: 2026-08-20T19:05:50+02:00
 initial_base_sha: 8620310a91c53e63abc0bf51fe40bdb8a3ee6cef
 related_pr: 628
 runtime_access: none
@@ -43,15 +43,15 @@ execution_reason: GitHub connector plus isolated GitHub-hosted validation preser
 execution_budget_minutes: 120
 execution_budget_reason: cohesive Package A implementation, exact-head validation, independent validator role, merge and mandatory archive closeout
 invocation_started_at: 2026-08-20T14:18:00+02:00
-last_progress_at: 2026-08-20T16:27:00+02:00
+last_progress_at: 2026-08-20T19:05:50+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: draft
+ci_check_generation: candidate_pending_ci
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
-unchanged_state_checks: 0
+unchanged_state_checks: 1
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 1
-context_reconstruction_attempts: 1
+context_reconstruction_attempts: 2
 stall_warnings: 0
 heavy_validation_runs: 1
 decomposition_decision: phased
@@ -149,28 +149,29 @@ No Control API/browser/CLI listener is implemented here. No policy/Ollama loop i
 - The same run failed only the final Ruff step. Six findings were isolated to test import/noqa formatting plus an engine wait-closure binding issue; the production closure issue has been repaired and lint validation is being regenerated.
 - Track A governance run `32381504968`: fresh admission behavior audit PASS; deterministic task policy failed only because the original task file carried a UTF-8 BOM before YAML front matter. This checkpoint removes the BOM and preserves the full `runtime_access:none` admission record.
 - Fresh Package A falsification is a separate GitHub-hosted validator job that does not consume the implementing test helpers and independently tests STOP-before-commit, dispatch durability failure, unclean-restart blocking, construction-time privacy, runtime-access-none source boundaries and the fake one-step E2E.
+- Current `main@2a2b607bf11818cdd6bfc4377c932a170e4be2a9` was reconciled as the second parent of merge commit `9e188ff1d5d377d81c80ceb45791868a9f31e067`; current-main Surveyor/Track A semantics were preserved, PR #628 became mergeable, and the Package A catalogue/changelog union was restored in `f3b5783984684b47a23fb2ab9a259c4541535e00`.
 
 ## Recovery checkpoint
 
 ```yaml
 recovery:
   policy_version: 1
-  generation: 2
-  session_id: package-a-github-only-20260820-1627
-  session_started_at: 2026-08-20T16:27:00+02:00
-  checkpointed_at: 2026-08-20T16:27:00+02:00
-  last_progress_at: 2026-08-20T16:27:00+02:00
+  generation: 3
+  session_id: package-a-github-only-20260820-1905
+  session_started_at: 2026-08-20T19:05:50+02:00
+  checkpointed_at: 2026-08-20T19:05:50+02:00
+  last_progress_at: 2026-08-20T19:05:50+02:00
   phase: validate
-  exact_head: ec9d2ddafcbbc588237e4feb75854339adc3764c
+  exact_head: f3b5783984684b47a23fb2ab9a259c4541535e00
   pull_request: 628
-  active_operation: exact-head repair and documentation reconciliation
+  active_operation: freeze metadata checkpoint, then exact-head validation and independent falsification
   external_run_ids: []
-  operation_started_at: 2026-08-20T16:27:00+02:00
+  operation_started_at: 2026-08-20T19:05:50+02:00
   wait_deadline_at: null
-  check_generation: draft
+  check_generation: candidate_pending_ci
   checks_used: 0
   status: active
   safe_to_resume: true
   resume_condition: PR #628 remains the sole Package A writer and runtime_access remains none
-  next_action: reconcile current-main catalogue/changelog, freeze the exact head, then run fresh validator plus required exact-head CI
+  next_action: run exact-head GitHub CI plus fresh falsification audit on the metadata-checkpoint successor, self-review the full diff, then Ready/merge if clean
 ```

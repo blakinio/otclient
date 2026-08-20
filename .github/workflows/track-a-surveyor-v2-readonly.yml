@@ -315,11 +315,11 @@ jobs:
           {
             echo '## Track A Surveyor v2 read-only verdict'
             echo
-            echo '- `COLLECTOR_READY=YES`'
+            echo "- \`COLLECTOR_READY=YES\`"
             echo "- \`STRUCTURAL_IN_GAME=$STRUCTURAL_STATE\`"
             echo "- \`OWNER_LOGIN_REQUIRED=$OWNER_LOGIN_REQUIRED\`"
-            echo '- `RUNTIME_MUTATION=false`'
-            echo '- `CREDENTIAL_ACCESS=false`'
+            echo "- \`RUNTIME_MUTATION=false\`"
+            echo "- \`CREDENTIAL_ACCESS=false\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload sanitized Surveyor bundle

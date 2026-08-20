@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260820-tibia-re-control-center-package-a
-status: validating
+status: blocked
 agent: ChatGPT
 project_lane: otclient
 lane: P1-CONTROL-CORE
@@ -11,7 +11,7 @@ risk: medium
 branch: feat/OTC-20260820-tibia-re-control-center-package-a
 base_branch: main
 created: 2026-08-20T14:18:00+02:00
-updated: 2026-08-20T21:13:23+02:00
+updated: 2026-08-20T21:23:56+02:00
 initial_base_sha: 8620310a91c53e63abc0bf51fe40bdb8a3ee6cef
 related_pr: 628
 runtime_access: none
@@ -43,9 +43,9 @@ execution_reason: GitHub connector plus isolated GitHub-hosted validation preser
 execution_budget_minutes: 120
 execution_budget_reason: cohesive Package A implementation, exact-head validation, independent validator role, merge and mandatory archive closeout
 invocation_started_at: 2026-08-20T14:18:00+02:00
-last_progress_at: 2026-08-20T21:13:23+02:00
+last_progress_at: 2026-08-20T21:23:56+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: final_exact_head_pending_ci
+ci_check_generation: final_exact_head_green_audit_blocked
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 2
@@ -156,31 +156,36 @@ No Control API/browser/CLI listener is implemented here. No policy/Ollama loop i
 
 - Fresh Codex review of `0fa92442675619305f4a8487e9403fb8bb5c920f` found four additional P1 defects (mutation-run admission race, failed-STOP cleanup early return, callback/reconciliation race, scenario artifact secret persistence) and one P2 abort-reason loss. Repair heads `6224791faf4635cf9f69aba4980845e595b6186b` / `00d0acaa6d95158080f8d191562eeff874605122` address all five. Local exact-code validation passes 84/84 focused tests, compileall, `audit_package_a.py`, expanded `audit_package_a_p1.py`, Ruff and `git diff --check`; the expanded audit reports PASS for mutation-run admission serialization, failed-STOP cleanup, callback/reconciliation serialization, scenario-artifact privacy, and final-gate abort-reason preservation. Exact-head Package A and both Track A governance workflows also PASS; repository CI run `32406952139` was still in progress at the last observation. A fresh independent review of the final metadata successor remains required.
 
+
+- Exact-head `e2fb467bfd57120041ec7528e0cdc6ca067f48b2` passed Package A run `32407757611`, Track A runtime governance `32407757604`, Track A canonical-live governance `32407757556` and repository CI `32407757969`.
+- Fresh Codex review anchored to repaired code head `00d0acaa6d95158080f8d191562eeff874605122` opened four additional P1 findings that remain applicable to the metadata-only successor: STOP cleanup/reset overlap, missing post-final-hook dispatch-fence revalidation, caller-trusted ActionRequest hash before deduplication, and unscanned adapter/runtime/session artifact metadata. These are review threads `PRRT_kwDOTVmdjs6a7eTJ`, `PRRT_kwDOTVmdjs6a7eTO`, `PRRT_kwDOTVmdjs6a7eTS`, and `PRRT_kwDOTVmdjs6a7eTW`.
+- The prior five repaired findings are resolved and 84/84 focused tests plus both Package A audits remain PASS, but the four new P1 findings block Ready/merge. The task has reached `repair_cycles_for_current_gate: 3`; repository anti-stall policy forbids a fourth repair cycle in this task without an explicitly authorized fresh isolation task.
+
 ## Recovery checkpoint
 
 ```yaml
 recovery:
   policy_version: 1
-  generation: 6
-  session_id: package-a-final-review-20260820-2113
-  session_started_at: 2026-08-20T21:13:23+02:00
-  checkpointed_at: 2026-08-20T21:13:23+02:00
-  last_progress_at: 2026-08-20T21:13:23+02:00
-  phase: validate
-  validated_predecessor_head: 00d0acaa6d95158080f8d191562eeff874605122
+  generation: 7
+  session_id: package-a-audit-blocked-20260820-2123
+  session_started_at: 2026-08-20T21:19:00+02:00
+  checkpointed_at: 2026-08-20T21:23:56+02:00
+  last_progress_at: 2026-08-20T21:23:56+02:00
+  phase: audit
+  validated_predecessor_head: e2fb467bfd57120041ec7528e0cdc6ca067f48b2
   pull_request: 628
-  active_operation: publish final metadata checkpoint, obtain fresh exact-head independent review, resolve verified findings, then final CI and merge
+  active_operation: blocked after third independent-audit repair cycle; preserve Draft PR and exact findings
   external_run_ids:
-    - 32406951896
-    - 32406951955
-    - 32406951866
-    - 32406952139
-  operation_started_at: 2026-08-20T21:13:23+02:00
+    - 32407757611
+    - 32407757604
+    - 32407757556
+    - 32407757969
+  operation_started_at: 2026-08-20T21:23:56+02:00
   wait_deadline_at: null
-  check_generation: final_exact_head_pending_ci
-  checks_used: 0
-  status: active
-  safe_to_resume: true
-  resume_condition: PR #628 remains the sole Package A writer, runtime_access remains none, and exact head is unchanged
-  next_action: request one fresh exact-head independent review after this metadata checkpoint is pushed; if no material findings remain, resolve remediated threads and complete Ready/CI/merge closeout
+  check_generation: final_exact_head_green_audit_blocked
+  checks_used: 2
+  status: blocked
+  safe_to_resume: false
+  resume_condition: a fresh isolation task is explicitly authorized under ANTI_STALL_AND_EXECUTION_BUDGET.md
+  next_action: create or authorize a fresh isolated repair task for the four remaining P1 findings, then repair and re-audit PR #628 without resetting this task's exhausted repair-cycle counter
 ```

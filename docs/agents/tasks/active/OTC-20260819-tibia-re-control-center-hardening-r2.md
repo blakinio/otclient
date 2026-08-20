@@ -11,7 +11,7 @@ risk: medium
 branch: docs/OTC-20260819-tibia-re-control-center-hardening-r2
 base_branch: main
 created: 2026-08-19T23:40:48+02:00
-updated: 2026-08-20T10:10:52+02:00
+updated: 2026-08-20T10:18:27+02:00
 initial_base_sha: fdabf235ed4438bd7c376932ed876bd0bbef019a
 related_pr: 613
 supersedes_pr: 605
@@ -67,6 +67,7 @@ reuses:
   - current trusted-main Track A authority/registration/Gate/supervisor/input-lock contracts
   - tools/tibia_runtime_bridge/**
   - accepted Surveyor v2 producer PR #616 / implementation merge 6f17e25af655854624b34e0b05f9888618269aba via tools/tibia_re_surveyor --collect-all
+  - trusted-main Surveyor v2 read-only operator docs/agents/operators/TRACK_A_SURVEYOR_V2_READONLY.md as a separate owner-gated runtime surface, never authority for this runtime_access:none task
   - blakinio/Oteryn-v2 docs/architecture/ADR-0007-native-end-to-end-test-platform.md
 blocks:
   - Package A until a repaired exact head has P0/P1 NONE and PACKAGE_A_IMPLEMENTATION_READY=YES from a fresh independent audit
@@ -115,8 +116,8 @@ Close every material finding from independent audit review `4976939865`, reconci
 
 ```yaml
 checkpoint_version: 3
-updated_at: 2026-08-20T10:10:52+02:00
-reconciled_main_sha: 0447763982ef5db9efca652396cfac22e5a0cff4
+updated_at: 2026-08-20T10:18:27+02:00
+reconciled_main_sha: 02fce7e25696ffea3e11c4fc89f458e27f47bef4
 branch: docs/OTC-20260819-tibia-re-control-center-hardening-r2
 pr: 613
 status: validating
@@ -129,7 +130,7 @@ proven:
   - all eight recorded #605 findings have explicit successor contract/task remediation
   - successor adds conservative active-backend/recovery-required semantics for STOP-persistence-failure-plus-crash
   - future policy/Ollama remains downstream of deterministic Control Center safety/authority
-  - current main reconciled through 0447763982ef5db9efca652396cfac22e5a0cff4; Surveyor v2 implementation/lifecycle is merged and shared-path ownership released; MODULE_CATALOG preserves both Surveyor and Control Center rows
+  - current main reconciled through 02fce7e25696ffea3e11c4fc89f458e27f47bef4; Surveyor v2 implementation/lifecycle and its separate owner-gated read-only physical operator are present; none overlaps the 13 Control Center paths; MODULE_CATALOG preserves both Surveyor and Control Center rows
   - accepted Surveyor v2 schemas are otclient.tibia-re-surveyor.collect-all.v2, alias-view.v2, telemetry.v2 and missing-readers.v2; its accepted collect-all surface is passive/read-only and does not promote semantic status
   - no runtime access is required or authorized
 focused_validation:
@@ -145,5 +146,5 @@ unknown:
   - fresh independent exact-head audit result
 blockers:
   - fresh independent exact-head Control Center audit is required before Package A readiness/merge
-next_action: commit the reconciled merge on current main, run focused diff/static validation, push #613, verify exact-head workflows, then obtain a fresh independent audit on the unchanged head
+next_action: finalize and publish the 02fce7e main reconciliation, verify exact-head workflows, then obtain a fresh independent audit on the unchanged #613 head
 ```

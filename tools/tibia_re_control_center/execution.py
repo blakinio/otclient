@@ -31,6 +31,9 @@ from .model import (
 from .store import DeterministicDurableStore
 
 
+_MISSING = object()
+
+
 @dataclass
 class CancellationToken:
     cancelled: bool = False
@@ -79,12 +82,14 @@ class MutationCoordinator:
         self.clock = clock
         self.backend_epoch = backend_epoch or f"backend-{uuid.uuid4().hex}"
         self.dispatch_gate = threading.RLock()
+        self.control_transition_lock = threading.RLock()
         self.mutation_execution_lock = threading.Lock()
         self.runs: dict[str, RunState] = {}
         self.results: dict[str, ActionResult] = {}
         self.active_mutation_run_id: str | None = None
         self.in_memory_stop = False
         self.mutation_disabled = False
+        self.stop_durability_unresolved = False
         self.activation_error: str | None = None
         self.control_state = self._activate_backend()
 
@@ -402,7 +407,13 @@ class MutationCoordinator:
         self.results[request.action_id] = result
         return result
 
-    def _final_commit(self, run: RunState, request: ActionRequest, token: CancellationToken | None) -> bool:
+    def _final_commit(
+        self,
+        run: RunState,
+        request: ActionRequest,
+        token: CancellationToken | None,
+        final_commit_check: Callable[[], bool] | None,
+    ) -> bool:
         with self.dispatch_gate:
             record = self.store.load_action(request.action_id)
             if record is None or record.action_request_hash != request.action_request_hash:
@@ -440,6 +451,13 @@ class MutationCoordinator:
                 return False
             if request.action_id not in run.budget.reservations:
                 return False
+            if final_commit_check is not None:
+                try:
+                    final_check_passed = final_commit_check()
+                except Exception:
+                    return False
+                if final_check_passed is not True:
+                    return False
             next_budget = self._move_reserved_to_at_risk(run.budget, request.action_id)
             committed = record.with_state(
                 LifecycleState.DISPATCH_COMMITTED,
@@ -458,7 +476,13 @@ class MutationCoordinator:
             run.budget = next_budget
             return True
 
-    def execute_action(self, request: ActionRequest, *, token: CancellationToken | None = None) -> ActionResult:
+    def execute_action(
+        self,
+        request: ActionRequest,
+        *,
+        token: CancellationToken | None = None,
+        final_commit_check: Callable[[], bool] | None = None,
+    ) -> ActionResult:
         run = self._run(request.run_id)
         with self.mutation_execution_lock:
             existing = self.store.load_action(request.action_id)
@@ -573,7 +597,9 @@ class MutationCoordinator:
                     run, request, LifecycleState.REFUSED,
                     ActionStatus.REFUSED, "PREFLIGHT_REFUSED",
                 )
-            one_shot = _OneShotCommit(lambda: self._final_commit(run, request, token))
+            one_shot = _OneShotCommit(
+                lambda: self._final_commit(run, request, token, final_commit_check)
+            )
             try:
                 execution = self.adapter.execute_committed(request, one_shot)
             except SimulatedCrash:
@@ -669,77 +695,89 @@ class MutationCoordinator:
             return result
 
     def stop_all(self, *, transition_id: str | None = None, reason_code: str = "STOP_ALL") -> bool:
-        with self.dispatch_gate:
-            try:
-                next_generation = checked_add(
-                    self.control_generation,
-                    1,
-                    maximum=MAX_U64,
-                    field_name="control_generation",
-                )
-            except ValidationError:
+        with self.control_transition_lock:
+            with self.dispatch_gate:
+                try:
+                    next_generation = checked_add(
+                        self.control_generation,
+                        1,
+                        maximum=MAX_U64,
+                        field_name="control_generation",
+                    )
+                except ValidationError:
+                    self.in_memory_stop = True
+                    self.mutation_disabled = True
+                    return False
                 self.in_memory_stop = True
+                next_state = self._new_control_state(
+                    stop_latched=True,
+                    recovery_required=self.control_state.recovery_required,
+                    generation=next_generation,
+                    transition_id=transition_id or f"stop:{self.backend_epoch}:{next_generation}",
+                    reason_code=reason_code,
+                    active_backend_epoch=self.backend_epoch,
+                )
+                try:
+                    self.store.write_control_state(next_state, operation="stop")
+                except (DurabilityError, DurabilityTimeout):
+                    self.stop_durability_unresolved = True
+                    self.mutation_disabled = True
+                    return False
+                self.control_state = next_state
+                self.stop_durability_unresolved = False
                 self.mutation_disabled = True
-                return False
-            self.in_memory_stop = True
-            next_state = self._new_control_state(
-                stop_latched=True,
-                recovery_required=self.control_state.recovery_required,
-                generation=next_generation,
-                transition_id=transition_id or f"stop:{self.backend_epoch}:{next_generation}",
-                reason_code=reason_code,
-                active_backend_epoch=self.backend_epoch,
-            )
-            try:
-                self.store.write_control_state(next_state, operation="stop")
-            except (DurabilityError, DurabilityTimeout):
-                self.mutation_disabled = True
-                return False
-            self.control_state = next_state
-            self.mutation_disabled = True
         for run in self.runs.values():
             run.cancelled = True
         self.adapter.emergency_stop(reason_code)
         return True
 
     def reset_stop(self, *, transition_id: str | None = None, reason_code: str = "EXPLICIT_RESET") -> bool:
-        with self.dispatch_gate:
-            for ledger in self.store.budget_ledgers.values():
-                if any(dimension.uncertain > 0 or dimension.at_risk > 0 for dimension in ledger.dimensions.values()):
+        with self.control_transition_lock:
+            with self.dispatch_gate:
+                if self.stop_durability_unresolved:
                     return False
-            if any(record.lifecycle_state == LifecycleState.AMBIGUOUS for record in self.store.action_ledgers.values()):
-                return False
-            try:
-                next_generation = checked_add(
-                    self.control_generation,
-                    1,
-                    maximum=MAX_U64,
-                    field_name="control_generation",
+                for ledger in self.store.budget_ledgers.values():
+                    if any(
+                        dimension.uncertain > 0 or dimension.at_risk > 0
+                        for dimension in ledger.dimensions.values()
+                    ):
+                        return False
+                if any(
+                    record.lifecycle_state == LifecycleState.AMBIGUOUS
+                    for record in self.store.action_ledgers.values()
+                ):
+                    return False
+                try:
+                    next_generation = checked_add(
+                        self.control_generation,
+                        1,
+                        maximum=MAX_U64,
+                        field_name="control_generation",
+                    )
+                except ValidationError:
+                    self.in_memory_stop = True
+                    self.mutation_disabled = True
+                    return False
+                next_state = self._new_control_state(
+                    stop_latched=False,
+                    recovery_required=False,
+                    generation=next_generation,
+                    transition_id=transition_id or f"reset:{self.backend_epoch}:{next_generation}",
+                    reason_code=reason_code,
+                    active_backend_epoch=self.backend_epoch,
                 )
-            except ValidationError:
-                self.in_memory_stop = True
-                self.mutation_disabled = True
-                return False
-            next_state = self._new_control_state(
-                stop_latched=False,
-                recovery_required=False,
-                generation=next_generation,
-                transition_id=transition_id or f"reset:{self.backend_epoch}:{next_generation}",
-                reason_code=reason_code,
-                active_backend_epoch=self.backend_epoch,
-            )
-            try:
-                self.store.write_control_state(next_state, operation="reset")
-            except (DurabilityError, DurabilityTimeout):
-                self.in_memory_stop = True
-                self.mutation_disabled = True
-                return False
-            self.control_state = next_state
-            self.in_memory_stop = False
-            self.mutation_disabled = False
-            for run in self.runs.values():
-                run.cancelled = False
-            return True
+                try:
+                    self.store.write_control_state(next_state, operation="reset")
+                except (DurabilityError, DurabilityTimeout):
+                    self.in_memory_stop = True
+                    self.mutation_disabled = True
+                    return False
+                self.control_state = next_state
+                self.in_memory_stop = False
+                self.mutation_disabled = False
+                for run in self.runs.values():
+                    run.cancelled = False
+                return True
 
     def pause_run(self, run_id: str) -> None:
         self._run(run_id).paused = True
@@ -836,11 +874,51 @@ class MutationCoordinator:
         backend_epoch: str,
         control_generation: int,
         lifecycle_state: LifecycleState,
+        adapter_generation: str | object = _MISSING,
+        runtime_instance_id: str | None | object = _MISSING,
+        session_epoch: str | None | object = _MISSING,
+        authoritative_confirmation: Confirmation = Confirmation.UNKNOWN,
     ) -> bool:
         record = self.store.load_action(action_id)
         if record is None or record.terminal:
             return False
-        if backend_epoch != self.backend_epoch or control_generation != self.control_generation:
+        if (
+            adapter_generation is _MISSING
+            or runtime_instance_id is _MISSING
+            or session_epoch is _MISSING
+        ):
+            return False
+        if (
+            backend_epoch != self.backend_epoch
+            or backend_epoch != record.backend_epoch
+            or control_generation != self.control_generation
+            or control_generation != record.control_generation
+        ):
+            return False
+        identity = self.adapter.identity()
+        if identity.adapter_id != record.adapter_id:
+            return False
+        if (
+            adapter_generation != record.adapter_generation
+            or identity.adapter_generation != record.adapter_generation
+            or runtime_instance_id != record.runtime_instance_id
+            or identity.runtime_instance_id != record.runtime_instance_id
+            or session_epoch != record.session_epoch
+            or identity.session_epoch != record.session_epoch
+        ):
+            return False
+        if authoritative_confirmation != Confirmation.UNKNOWN:
+            return False
+        if record.dispatch_state == DispatchState.NOT_DISPATCHED:
+            return False
+        allowed_transitions = {
+            LifecycleState.DISPATCH_COMMITTED: {
+                LifecycleState.DISPATCHING,
+                LifecycleState.CONFIRMING,
+            },
+            LifecycleState.DISPATCHING: {LifecycleState.CONFIRMING},
+        }
+        if lifecycle_state not in allowed_transitions.get(record.lifecycle_state, set()):
             return False
         try:
             updated = record.with_state(lifecycle_state, self.clock.now_ns())
@@ -851,21 +929,40 @@ class MutationCoordinator:
 
     def clean_shutdown(self) -> bool:
         self.mutation_disabled = True
-        try:
-            self.store.flush_safety_state()
-        except (DurabilityError, DurabilityTimeout):
+        if not self.mutation_execution_lock.acquire(blocking=False):
             return False
-        next_state = self._new_control_state(
-            stop_latched=self.control_state.stop_latched,
-            recovery_required=self.control_state.recovery_required,
-            generation=self.control_generation,
-            transition_id=f"backend-clean-shutdown:{self.backend_epoch}",
-            reason_code="BACKEND_CLEAN_SHUTDOWN",
-            active_backend_epoch=None,
-        )
         try:
-            self.store.write_control_state(next_state, operation="clean_shutdown")
-        except (DurabilityError, DurabilityTimeout):
-            return False
-        self.control_state = next_state
-        return True
+            with self.control_transition_lock:
+                if self.activation_error is not None or self.stop_durability_unresolved:
+                    return False
+                if any(
+                    record.dispatch_state != DispatchState.NOT_DISPATCHED and not record.terminal
+                    for record in self.store.action_ledgers.values()
+                ):
+                    return False
+                if any(
+                    dimension.at_risk > 0
+                    for ledger in self.store.budget_ledgers.values()
+                    for dimension in ledger.dimensions.values()
+                ):
+                    return False
+                try:
+                    self.store.flush_safety_state()
+                except (DurabilityError, DurabilityTimeout):
+                    return False
+                next_state = self._new_control_state(
+                    stop_latched=self.control_state.stop_latched,
+                    recovery_required=self.control_state.recovery_required,
+                    generation=self.control_generation,
+                    transition_id=f"backend-clean-shutdown:{self.backend_epoch}",
+                    reason_code="BACKEND_CLEAN_SHUTDOWN",
+                    active_backend_epoch=None,
+                )
+                try:
+                    self.store.write_control_state(next_state, operation="clean_shutdown")
+                except (DurabilityError, DurabilityTimeout):
+                    return False
+                self.control_state = next_state
+                return True
+        finally:
+            self.mutation_execution_lock.release()

@@ -247,7 +247,17 @@ class ScenarioEngine:
                             break
                     elif step.step_type == "action":
                         request = self._action_request(run_id, step)
-                        result = self.coordinator.execute_action(request)
+
+                        def final_commit_check(
+                            bound_scenario: ValidatedScenario = scenario,
+                        ) -> bool:
+                            observed = self._snapshot_mapping(self.adapter.snapshot())
+                            return self._abort_reason(bound_scenario, observed) is None
+
+                        result = self.coordinator.execute_action(
+                            request,
+                            final_commit_check=final_commit_check,
+                        )
                         action_results[request.action_id] = result
                         self.recorder.set_terminal_result(request.action_id, result.lifecycle_state.value)
                         self.recorder.record_event(

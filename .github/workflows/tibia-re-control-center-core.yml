@@ -130,3 +130,4 @@ jobs:
         run: |
           set -Eeuo pipefail
           PYTHONPATH=. python3 tests/tools/tibia_re_control_center/audit_package_a.py
+          PYTHONPATH=. python3 tests/tools/tibia_re_control_center/audit_package_a_p1.py

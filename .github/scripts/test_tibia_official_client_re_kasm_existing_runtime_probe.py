@@ -102,22 +102,22 @@ class Tests(unittest.TestCase):
     def setUp(self):
         self.m = load()
 
-    def test_exact_single_target_requires_structural_bridge_for_ingame(self):
+    def test_exact_single_target_bridge_presence_does_not_prove_ingame(self):
         fake = Fake()
         payload = self.m.collect(fake)
         self.assertEqual(payload["proof_kind"], self.m.PROOF_KIND)
         self.assertEqual(payload["candidate_count"], 1)
         self.assertTrue(payload["inventory_complete"])
-        self.assertEqual(payload["state"], "IN_GAME")
-        self.assertEqual(payload["state_evidence"], "BRIDGE_3_OF_3")
+        self.assertEqual(payload["state"], "UNKNOWN")
+        self.assertEqual(payload["state_evidence"], "BRIDGE_3_OF_3_SEMANTICS_UNPROVEN")
         self.assertNotIn("Redacted Character", payload["window_identity"])
         self.assertEqual(payload["client_sha256"], self.m.SHA)
         self.assertFalse(any("/proc/$pid/environ" in " ".join(cmd) for cmd in fake.commands))
 
-    def test_plain_tibia_title_is_valid_window_identity_when_bridge_proves_ingame(self):
+    def test_plain_tibia_title_and_bridge_presence_still_leave_state_unknown(self):
         payload = self.m.collect(Fake(plain_title=True))
-        self.assertEqual(payload["state"], "IN_GAME")
-        self.assertEqual(payload["state_evidence"], "BRIDGE_3_OF_3")
+        self.assertEqual(payload["state"], "UNKNOWN")
+        self.assertEqual(payload["state_evidence"], "BRIDGE_3_OF_3_SEMANTICS_UNPROVEN")
         self.assertIn("title_sha256:", payload["window_identity"])
 
     def test_title_alone_never_promotes_ingame_without_structural_bridge(self):

@@ -214,7 +214,7 @@ jobs:
           print('TRACK_A_RUNTIME_ADMISSION_END')
           PY
 
-      - name: Probe current native helper structural state read-only
+      - name: Probe current native helper structural objects read-only
         id: state
         shell: bash
         env:
@@ -259,19 +259,18 @@ jobs:
                   raise SystemExit(0)
               counts.append(doc['validated_hits'])
           if counts == [1,1,1]:
-              print('PASS:BRIDGE_3_OF_3')
+              print('UNKNOWN:BRIDGE_3_OF_3_SEMANTICS_UNPROVEN')
           elif all(value in (0, 1) for value in counts):
-              print('NO:BRIDGE_NOT_3_OF_3')
+              print('UNKNOWN:BRIDGE_OBJECT_COUNTS_NOT_GAME_STATE')
           else:
               print('UNKNOWN:AMBIGUOUS_DISCOVERY_HITS')
           PY
           )"
           echo STRUCTURAL_STATE_RESULT="$result"
-          case "$result" in
-            PASS:*) state=PASS; login=NO ;;
-            NO:*) state=NO; login=YES ;;
-            *) state=UNKNOWN; login=UNKNOWN ;;
-          esac
+          # Bridge object presence is not gameplay-state authority. A live login-screen
+          # regression produced 1/1/1 for these same objects, so fail closed.
+          state=UNKNOWN
+          login=UNKNOWN
           echo "structural_state=$state" >> "$GITHUB_OUTPUT"
           echo "owner_login_required=$login" >> "$GITHUB_OUTPUT"
 

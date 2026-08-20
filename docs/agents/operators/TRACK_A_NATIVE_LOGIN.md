@@ -41,7 +41,7 @@ The workflow must preserve all of these properties:
 - after native auth handoff, the replacement client is never killed or restarted by the workflow;
 - `bridge.sock` and `character.sock` must resolve through `SO_PEERCRED` to the live replacement client PID;
 - `character_count != 1` fails closed; only `CONFIRM_UNIQUE` is permitted;
-- success requires `validated_hits == 1` for `player_protocol_handler`, `gameserver_game_session` and `worldmap_handler`.
+- `validated_hits == 1` for `player_protocol_handler`, `gameserver_game_session` and `worldmap_handler` is structural diagnostic evidence only and must not be treated as login/gameplay success.
 
 ## Listener prerequisite
 
@@ -51,22 +51,14 @@ If preflight fails, inspect the exact failed prerequisite. A preflight failure d
 
 ## Expected terminal markers
 
-A successful run contains:
+The authentication and character-confirmation phases may succeed, but the current bridge-only final discriminator is intentionally fail-closed. When all three bridge objects are present, the workflow records:
 
 ```text
-AUTHORIZATION_GATE=PASS
-EXACT_HELPER_RUNTIME=PASS
-NATIVE_AUTH_INGRESS=PASS_WITH_PROCESS_HANDOFF
-SECRET_VALUES_LOGGED=false
-SECOND_SECRET_ATTEMPT=false
-CLIENT_TERMINATED_BY_WORKFLOW=false
-HANDOFF_HELPER_PROVENANCE=PASS
-NATIVE_CHARACTER_COUNT=1
-NATIVE_CHARACTER_CONFIRM=PASS
-RESULT=SUCCESS
-CHARACTER_ACTUALLY_LOGGED_INTO_GAME=YES
-CAUSAL_PROOF=COMPLETE
-STRUCTURAL_IN_GAME=PASS
+BRIDGE_3_OF_3=YES
+RESULT=INCONCLUSIVE
+CHARACTER_ACTUALLY_LOGGED_INTO_GAME=UNKNOWN
+CAUSAL_PROOF=INCOMPLETE
+STRUCTURAL_IN_GAME=UNKNOWN
 ```
 
-`PASS_RESPONSE` is also a valid bounded authentication result when no process handoff causes the response channel to disappear.
+and the job does not claim end-to-end success. A separate reviewed semantic/causal gameplay discriminator is required before this operator may again emit `CHARACTER_ACTUALLY_LOGGED_INTO_GAME=YES`. `PASS_RESPONSE` remains a valid bounded authentication result when no process handoff causes the response channel to disappear, but authentication success alone is not gameplay-state proof.

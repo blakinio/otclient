@@ -73,3 +73,19 @@ Verified runtime facts:
 The sanitized artifact `9403951368` contains 169 canonical coverage rows, all 12 alias views, 11 ranked typed-reader gaps, 11 subsystem telemetry documents, privacy scan PASS and a 30-entry manifest. Independent local artifact verification recomputed every manifest SHA-256 and returned PASS. GitHub's uploaded artifact digest is `b857f7affa6a046e16691e4b80e51b3db68af01086bf8a2b5489784d06ae96f4`.
 
 No login, logout, character selection, gameplay input, GUI input, restart, signal, kill, attach/injection or other process control was performed by this final validation.
+
+## P0 / P1 / P2 research handoff
+
+### P0-STATE
+
+Use `missing-readers.json` from artifact `9403951368` as the ranked queue for the next typed state-reader work. Start with static resolver/parser implementation on GitHub-hosted infrastructure. Any semantic check against the physical client must consume this durable Surveyor evidence or be separately admitted read-only; do not create another logged-in session and do not infer semantics that remain `UNKNOWN/UNAVAILABLE`.
+
+### P1-BRIDGE
+
+Use fresh `PASS:BRIDGE_3_OF_3` from run `32362197404` as the current structural baseline for player-protocol, game-session and worldmap handler discovery. Implement reacquisition, stale-state and lifecycle behavior in hosted tests first. Physical validation must remain serialized through the RUNTIME lane and fail closed if canonical identity or peer binding cannot be proven.
+
+### P2-NETWORK
+
+Consume the final `TIBIA-RE-ACTION-PROTOCOL` alias plus Surveyor coverage/evidence as the normalized starting point for writer ownership, framing, serialization and protocol research. Prefer static/synthetic hosted experiments. Request only bounded RUNTIME observation when a claim genuinely requires the physical session; no independent login, input or session ownership is implied.
+
+All three lanes must pin the evidence source to run `32362197404`, artifact `9403951368`, and main `7c7ad7a9abcce94b2add48b584fcb052e2d4a9b1` when making claims derived from this snapshot.

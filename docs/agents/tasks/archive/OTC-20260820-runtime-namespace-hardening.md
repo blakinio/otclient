@@ -33,9 +33,13 @@ post_merge_physical_run: 32362197404
 post_merge_physical_result: SUCCESS
 post_merge_artifact_id: 9403951368
 post_merge_artifact_sha256: b857f7affa6a046e16691e4b80e51b3db68af01086bf8a2b5489784d06ae96f4
+semantic_correction_task: OTC-20260820-ingame-state-false-positive
+post_merge_structural_ingame_claim: INVALIDATED_FALSE_POSITIVE
+post_merge_owner_login_required_claim: INVALIDATED_FALSE_POSITIVE
+post_merge_collector_bundle_valid: true
 ownership_released: true
 completed_at: 2026-08-20T13:09:00+02:00
-next_action: dispatch P0/P1/P2 research lanes from the final sanitized Surveyor bundle and missing-readers ranking; physical runtime remains read-only unless a separately admitted task proves fresh authority
+next_action: use the Surveyor bundle for non-semantic research only; do not reuse BRIDGE_3_OF_3 as IN_GAME authority, and require fresh semantic or bounded visual state proof before any in-game-dependent lane
 ---
 
 # Track A Surveyor runtime namespace hardening — completed
@@ -65,14 +69,20 @@ Verified runtime facts:
 - registration lease generation `17`
 - `STRUCTURAL_STATE_RESULT=PASS:BRIDGE_3_OF_3`
 - `COLLECTOR_READY=YES`
-- `STRUCTURAL_IN_GAME=PASS`
-- `OWNER_LOGIN_REQUIRED=NO`
+- `STRUCTURAL_IN_GAME=PASS` — historical workflow output, **invalidated as a false positive**
+- `OWNER_LOGIN_REQUIRED=NO` — historical workflow output, **invalidated as a false positive**
 - `RUNTIME_MUTATION=false`
 - `CREDENTIAL_ACCESS=false`
 
 The sanitized artifact `9403951368` contains 169 canonical coverage rows, all 12 alias views, 11 ranked typed-reader gaps, 11 subsystem telemetry documents, privacy scan PASS and a 30-entry manifest. Independent local artifact verification recomputed every manifest SHA-256 and returned PASS. GitHub's uploaded artifact digest is `b857f7affa6a046e16691e4b80e51b3db68af01086bf8a2b5489784d06ae96f4`.
 
 No login, logout, character selection, gameplay input, GUI input, restart, signal, kill, attach/injection or other process control was performed by this final validation.
+
+## Semantic correction
+
+A later fresh read-only observation proved that the same exact client was visibly at the login form while the exact bridge peer still returned one validated `player_protocol_handler`, `gameserver_game_session`, and `worldmap_handler`. Therefore the historical `BRIDGE_3_OF_3` result in this run is structural object-presence evidence only. It does not prove active gameplay state.
+
+The collector artifact, coverage, alias views, missing-reader ranking, privacy scan, manifest integrity, namespace proof and no-mutation facts remain valid. The `STRUCTURAL_IN_GAME=PASS` and `OWNER_LOGIN_REQUIRED=NO` verdicts are superseded by `OTC-20260820-ingame-state-false-positive` and must not be reused as evidence.
 
 ## P0 / P1 / P2 research handoff
 
@@ -82,7 +92,7 @@ Use `missing-readers.json` from artifact `9403951368` as the ranked queue for th
 
 ### P1-BRIDGE
 
-Use fresh `PASS:BRIDGE_3_OF_3` from run `32362197404` as the current structural baseline for player-protocol, game-session and worldmap handler discovery. Implement reacquisition, stale-state and lifecycle behavior in hosted tests first. Physical validation must remain serialized through the RUNTIME lane and fail closed if canonical identity or peer binding cannot be proven.
+Use fresh `BRIDGE_3_OF_3` from run `32362197404` only as a structural object-presence baseline for player-protocol, game-session and worldmap handler discovery. It is not an `IN_GAME` baseline and must not be used to infer login/session semantics. Implement reacquisition, stale-state and lifecycle behavior in hosted tests first. Physical validation must remain serialized through the RUNTIME lane and fail closed if canonical identity or peer binding cannot be proven.
 
 ### P2-NETWORK
 

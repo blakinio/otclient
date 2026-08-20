@@ -194,7 +194,10 @@ def structural_state(container_id: str, pid: int, runtime: dict[str, Any], runne
             raise ProbeError(f"bridge_{target}_failed")
         if row.get("scan_status") != "OK" or row.get("validated_hits") != 1:
             raise ProbeError(f"bridge_{target}_not_unique")
-    return "IN_GAME", "BRIDGE_3_OF_3"
+    # The three objects are lifecycle/structure evidence only. A 2026-08-20
+    # login-screen observation still produced one validated hit for all three, so
+    # their presence cannot independently establish active gameplay state.
+    return "UNKNOWN", "BRIDGE_3_OF_3_SEMANTICS_UNPROVEN"
 
 
 def collect(runner: Callable[[Sequence[str]], str] = run) -> dict[str, Any]:

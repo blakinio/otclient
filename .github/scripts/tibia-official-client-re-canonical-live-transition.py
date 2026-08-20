@@ -33,7 +33,7 @@ FIELDS = {
 }
 TRACKED_ROLES = {'client', 'xvfb', 'vnc', 'wireproxy'}
 ADOPTION_PROOF_KIND = 'existing_runtime_adoption_v1'
-ADOPTION_STATE_EVIDENCE = {'BRIDGE_3_OF_3', 'NO_STRUCTURAL_BRIDGE'}
+ADOPTION_STATE_EVIDENCE = {'BRIDGE_3_OF_3', 'BRIDGE_3_OF_3_SEMANTICS_UNPROVEN', 'NO_STRUCTURAL_BRIDGE'}
 
 
 class E(RuntimeError):
@@ -253,8 +253,6 @@ def _read() -> dict[str, Any] | None:
             raise E('adoption_registration_candidate_fingerprint_invalid')
         if data['state_evidence'] not in ADOPTION_STATE_EVIDENCE:
             raise E('adoption_registration_state_evidence_invalid')
-        if data['state'] == 'IN_GAME' and data['state_evidence'] != 'BRIDGE_3_OF_3':
-            raise E('adoption_registration_ingame_without_structural_proof')
     return data
 
 
@@ -353,8 +351,8 @@ def _manifest(path: Path) -> dict[str, Any]:
             raise E('adoption_runtime_locator_invalid')
         if data['state_evidence'] not in ADOPTION_STATE_EVIDENCE:
             raise E('adoption_state_evidence_invalid')
-        if data['state'] == 'IN_GAME' and data['state_evidence'] != 'BRIDGE_3_OF_3':
-            raise E('adoption_ingame_without_structural_proof')
+        if data['state'] == 'IN_GAME':
+            raise E('adoption_ingame_semantics_unproven')
         return data
 
     legacy = {'process_group_id', 'tracked_processes'}
@@ -365,6 +363,24 @@ def _manifest(path: Path) -> dict[str, Any]:
 
 def _is_adoption_manifest(manifest: dict[str, Any]) -> bool:
     return manifest.get('proof_kind') == ADOPTION_PROOF_KIND
+
+
+def _adoption_semantics_stale(registration: dict[str, Any]) -> bool:
+    return bool(
+        registration.get('proof_kind') == ADOPTION_PROOF_KIND
+        and registration.get('state') == 'IN_GAME'
+        and registration.get('state_evidence') == 'BRIDGE_3_OF_3'
+    )
+
+
+def _stable_adoption_identity(document: dict[str, Any]) -> tuple[Any, ...]:
+    window = str(document.get('window_identity', ''))
+    window_base = window.split(':title_sha256:', 1)[0]
+    return tuple(document.get(key) for key in (
+        'boot_id_sha256', 'pid', 'process_start_ticks', 'client_version', 'client_size',
+        'client_sha256', 'display', 'runtime_locator', 'inventory_scope',
+        'inventory_complete', 'candidate_count', 'candidate_fingerprint',
+    )) + (window_base,)
 
 
 def _adoption_signature(manifest: dict[str, Any]) -> tuple[Any, ...]:
@@ -486,6 +502,8 @@ def _probe_reg(
     registration = _read()
     if registration is None:
         raise E('registration_absent')
+    if _adoption_semantics_stale(registration):
+        raise E('adoption_registration_semantics_stale')
     registered_generation = int(registration['lease_generation'])
     if old and registered_generation >= generation:
         raise E('rebind_generation_not_older')
@@ -598,6 +616,78 @@ def _adopt_existing(
         path.unlink(missing_ok=True)
         if staged is not None:
             staged.unlink(missing_ok=True)
+
+def _semantic_downgrade(
+    args: argparse.Namespace,
+    guard: Any,
+    lease: Any,
+    manager: Any,
+    identity: Any,
+    generation: int,
+) -> None:
+    old = _read()
+    if old is None:
+        raise E('registration_absent')
+    if not _adoption_semantics_stale(old):
+        raise E('semantic_downgrade_not_required')
+    path = STATE / '.semantic-downgrade-manifest.json'
+    staged: Path | None = None
+    committed = False
+    try:
+        first = _probe(args.probe, path)
+        if not _is_adoption_manifest(first):
+            raise E('semantic_downgrade_adoption_manifest_required')
+        if first.get('state') != 'UNKNOWN' or first.get('state_evidence') != 'BRIDGE_3_OF_3_SEMANTICS_UNPROVEN':
+            raise E('semantic_downgrade_probe_not_fail_closed')
+        if _stable_adoption_identity(first) != _stable_adoption_identity(old):
+            raise E('semantic_downgrade_identity_mismatch')
+        _lease(manager, lease, identity, args.token_file, generation)
+        _cancel(guard)
+        new = dict(old)
+        new.update(
+            registration_generation=int(old['registration_generation']) + 1,
+            lease_generation=generation,
+            registered_at=int(time.time()),
+            display=first['display'],
+            window_identity=first['window_identity'],
+            remote_view_endpoint=first['remote_view_endpoint'],
+            remote_view_mapping=first['remote_view_mapping'],
+            state='UNKNOWN',
+            state_evidence='BRIDGE_3_OF_3_SEMANTICS_UNPROVEN',
+            source_task=args.task_id,
+            source_run=_runid(),
+        )
+        staged = _stage(new)
+        second = _probe(args.probe, path)
+        if _stable_adoption_identity(second) != _stable_adoption_identity(first):
+            raise E('semantic_downgrade_identity_changed_before_commit')
+        if second.get('state') != 'UNKNOWN' or second.get('state_evidence') != 'BRIDGE_3_OF_3_SEMANTICS_UNPROVEN':
+            raise E('semantic_downgrade_state_changed_before_commit')
+        _lease(manager, lease, identity, args.token_file, generation)
+        _cancel(guard)
+        committed = True
+        _commit(staged)
+        staged = None
+        if _read() != new:
+            raise E('semantic_downgrade_revalidation_failed')
+        third = _probe(args.probe, path)
+        _match(third, new)
+        _lease(manager, lease, identity, args.token_file, generation)
+        _cancel(guard)
+    except BaseException as exc:
+        if committed:
+            try:
+                _write(old)
+            except BaseException as rollback_exc:
+                raise E('semantic_downgrade_rollback_failed', str(rollback_exc)) from exc
+            if _read() != old:
+                raise E('semantic_downgrade_rollback_revalidation_failed') from exc
+        raise
+    finally:
+        path.unlink(missing_ok=True)
+        if staged is not None:
+            staged.unlink(missing_ok=True)
+
 
 def _bootstrap(
     args: argparse.Namespace,
@@ -774,7 +864,7 @@ def _child(args: argparse.Namespace, guard: Any, lock_fd: int, previous_mask: se
         identity = lease.LeaseIdentity(args.task_id, args.session_id)
         generation = _lease(manager, lease, identity, args.token_file)
         _cancel(guard)
-        {'bootstrap': _bootstrap, 'adopt-existing': _adopt_existing, 'rebind': _rebind, 'gate-b': _gateb}[args.operation](
+        {'bootstrap': _bootstrap, 'adopt-existing': _adopt_existing, 'semantic-downgrade': _semantic_downgrade, 'rebind': _rebind, 'gate-b': _gateb}[args.operation](
             args, guard, lease, manager, identity, generation
         )
         label = args.operation.upper().replace('-', '_')
@@ -850,7 +940,7 @@ def _supervise(args: argparse.Namespace) -> int:
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(description=__doc__)
     sub = result.add_subparsers(dest='operation', required=True)
-    for name in ('bootstrap', 'adopt-existing', 'rebind', 'gate-b'):
+    for name in ('bootstrap', 'adopt-existing', 'semantic-downgrade', 'rebind', 'gate-b'):
         command = sub.add_parser(name)
         command.add_argument('--task-id', required=True)
         command.add_argument('--session-id', required=True)

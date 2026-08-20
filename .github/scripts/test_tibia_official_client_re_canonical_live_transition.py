@@ -264,8 +264,8 @@ class Tests(unittest.TestCase):
             'window_identity': 'x11:0x9:pid:4242:class:client/Tibia:title_sha256:' + 'a' * 64,
             'remote_view_endpoint': 'https://synology:6902/',
             'remote_view_mapping': 'UNKNOWN',
-            'state': 'IN_GAME',
-            'state_evidence': 'BRIDGE_3_OF_3',
+            'state': 'UNKNOWN',
+            'state_evidence': 'BRIDGE_3_OF_3_SEMANTICS_UNPROVEN',
             'boot_id_sha256': self.identity['boot_id_sha256'],
             'process_start_ticks': self.identity['process_start_ticks'],
             'client_version': self.m.VER,
@@ -291,7 +291,7 @@ class Tests(unittest.TestCase):
         self.assertEqual(data['proof_kind'], self.m.ADOPTION_PROOF_KIND)
         self.assertEqual(data['runtime_locator'], manifest['runtime_locator'])
         self.assertEqual(data['candidate_fingerprint'], manifest['candidate_fingerprint'])
-        self.assertEqual(data['state_evidence'], 'BRIDGE_3_OF_3')
+        self.assertEqual(data['state_evidence'], 'BRIDGE_3_OF_3_SEMANTICS_UNPROVEN')
         killed.assert_not_called()
 
     def test_adopt_existing_identity_drift_before_commit_leaves_no_registration(self):
@@ -329,13 +329,71 @@ class Tests(unittest.TestCase):
         with self.assertRaisesRegex(self.m.E, 'adoption_target_not_unique'):
             self.m._manifest(path)
 
-    def test_adoption_manifest_rejects_ingame_without_structural_proof(self):
+    def test_adoption_manifest_rejects_ingame_even_with_legacy_bridge_marker(self):
         path = Path(self.temp.name) / 'adopt.json'
         data = self.adoption_manifest()
-        data['state_evidence'] = 'NO_STRUCTURAL_BRIDGE'
+        data['state'] = 'IN_GAME'
+        data['state_evidence'] = 'BRIDGE_3_OF_3'
         path.write_text(json.dumps(data))
-        with self.assertRaisesRegex(self.m.E, 'adoption_ingame_without_structural_proof'):
+        with self.assertRaisesRegex(self.m.E, 'adoption_ingame_semantics_unproven'):
             self.m._manifest(path)
+
+    def legacy_stale_adoption_registration(self):
+        data = self.adoption_manifest()
+        data.update({
+            'schema_version': 1,
+            'runtime_id': self.m.RID,
+            'registration_generation': 1,
+            'lease_generation': 1,
+            'registered_at': 1,
+            'state': 'IN_GAME',
+            'state_evidence': 'BRIDGE_3_OF_3',
+            'source_task': 'old',
+            'source_run': 'old',
+        })
+        return data
+
+    def test_legacy_bridge_ingame_registration_is_readable_but_stale(self):
+        old = self.legacy_stale_adoption_registration()
+        self.write(old)
+        loaded = self.m._read()
+        self.assertEqual(loaded, old)
+        self.assertTrue(self.m._adoption_semantics_stale(loaded))
+        with mock.patch.object(self.m, '_lease', return_value=1), mock.patch.object(self.m, '_probe') as probe:
+            with self.assertRaisesRegex(self.m.E, 'adoption_registration_semantics_stale'):
+                self.m._probe_reg(self.args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 1, False)
+        probe.assert_not_called()
+
+    def test_semantic_downgrade_rewrites_only_stale_adoption_state(self):
+        old = self.legacy_stale_adoption_registration()
+        self.write(old)
+        fresh = self.adoption_manifest()
+        with mock.patch.object(self.m, '_probe', side_effect=[dict(fresh), dict(fresh), dict(fresh)]), mock.patch.object(self.m, '_lease', return_value=1):
+            self.m._semantic_downgrade(self.args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 1)
+        data = self.m._read()
+        self.assertEqual(data['state'], 'UNKNOWN')
+        self.assertEqual(data['state_evidence'], 'BRIDGE_3_OF_3_SEMANTICS_UNPROVEN')
+        self.assertEqual(data['registration_generation'], 2)
+        self.assertEqual(data['lease_generation'], 1)
+        self.assertEqual(data['pid'], old['pid'])
+        self.assertEqual(data['candidate_fingerprint'], old['candidate_fingerprint'])
+
+    def test_semantic_downgrade_refuses_nonlegacy_registration(self):
+        current = self.adoption_manifest()
+        current.update({
+            'schema_version': 1, 'runtime_id': self.m.RID, 'registration_generation': 2,
+            'lease_generation': 1, 'registered_at': 1, 'source_task': 'new', 'source_run': 'new',
+        })
+        self.write(current)
+        with self.assertRaisesRegex(self.m.E, 'semantic_downgrade_not_required'):
+            self.m._semantic_downgrade(self.args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 1)
+
+    def test_parser_accepts_semantic_downgrade_probe_shape(self):
+        parsed = self.m.parser().parse_args([
+            'semantic-downgrade', '--task-id', 'OTC-TEST', '--session-id', 's',
+            '--token-file', str(Path(self.temp.name) / 'tok'), '--probe', str(WORKER),
+        ])
+        self.assertEqual(parsed.operation, 'semantic-downgrade')
 
     def test_adopted_registration_gate_match_binds_runtime_locator(self):
         manifest = self.adoption_manifest()

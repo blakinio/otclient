@@ -1,6 +1,6 @@
 # TIBIA-RE-CONTROL-CENTER-MVP
 
-Use this prompt only after the design PR containing this file is merged or an owner explicitly selects an exact unmerged head for implementation.
+Recommended reasoning effort: high / maximum.
 
 Repository:
 
@@ -14,114 +14,654 @@ Execution mode:
 AUTONOMOUS BOUNDED IMPLEMENTATION
 ```
 
-## Mission
+## 1. Mission
 
-Implement the first usable `TIBIA RE Control Center / E2E Lab` without performing real official-client mutation in the initial implementation package.
+Implement the first reusable `TIBIA RE Control Center / E2E Lab` exactly from current repository contracts.
 
-The product must support both:
+Do not reconstruct design from chat history. Git is authoritative.
 
-1. browser UI served from the Control Center backend;
-2. direct-machine CLI using the same backend/domain operations.
+Do not implement real official-client mutation in Package A or Package B.
 
-The long-term target is the architecture in:
+Do not prematurely implement an unrestricted gameplay bot. Preserve the stable future policy boundary while deterministic safety/authority remains outside any policy/model.
 
-- `docs/agents/programs/TIBIA_RE_CONTROL_CENTER_E2E.md`;
-- `docs/agents/contracts/TIBIA_RE_CONTROL_CENTER_ADAPTER_V1.md`.
+## 2. Normative design package
 
-Do not reconstruct the design from chat history. Git is authoritative.
+Read in full before editing:
 
-## Mandatory preflight
+```text
+docs/agents/programs/TIBIA_RE_CONTROL_CENTER_E2E.md
+docs/agents/contracts/TIBIA_RE_CONTROL_CENTER_SCENARIO_V1.md
+docs/agents/contracts/TIBIA_RE_CONTROL_CENTER_EXECUTION_V1.md
+docs/agents/contracts/TIBIA_RE_CONTROL_CENTER_ADAPTER_V1.md
+docs/agents/contracts/TIBIA_RE_CONTROL_CENTER_CONTROL_API_V1.md
+docs/agents/contracts/TIBIA_RE_CONTROL_CENTER_ARTIFACT_V1.md
+docs/agents/contracts/TIBIA_RE_CONTROL_CENTER_COMPARISON_V1.md
+docs/agents/contracts/TIBIA_RE_CONTROL_CENTER_POLICY_BOUNDARY_V1.md
+docs/agents/programs/OTCLIENT_TIBIA_RE_EXPERIMENT_EXECUTION_MODEL.md
+```
+
+This prompt defines procedure only. It does not weaken current Track A or Oteryn governance.
+
+## 3. Package A hard safety boundary
+
+```yaml
+runtime_access: none
+runtime_owner_task: NOT_APPLICABLE
+runtime_namespace: NOT_APPLICABLE
+canonical_registration: NOT_APPLICABLE
+canonical_lease_generation: NOT_APPLICABLE
+registration_lease_generation: NOT_APPLICABLE
+gate_a: NOT_APPLICABLE
+generation_rebind: NOT_APPLICABLE
+gate_b: NOT_APPLICABLE
+bootstrap: NOT_APPLICABLE
+target_uniqueness: NOT_APPLICABLE
+mutation_authorized: false
+credentials_allowed: false
+login_allowed: false
+gameplay_allowed: false
+network_listener_allowed: false
+official_client_access: false
+```
+
+Package A must be fully implementable/testable without KasmVNC, official-client processes, Track A runtime, credentials, login, GUI input, gameplay or network listener.
+
+Package B may add the local Control API/browser/CLI but remains read-only for real official-client state. Mutation-capable Package B tests use only the explicit fake adapter.
+
+Real official-client mutation is Package D under a separate fresh Track A task/admission.
+
+## 4. Mandatory preflight
 
 Before editing:
 
-1. read root `AGENTS.md` and `docs/agents/README.md`;
-2. read all current Track A admission/routing documents required by `docs/agents/README.md`;
-3. inspect current `main`, all open PRs and `docs/agents/tasks/active/**`;
-4. inspect `docs/agents/MODULE_CATALOG.md`, `REPOSITORY_MAP.md`, `KNOWN_RISKS.md`, `BUILD_TEST_MATRIX.md` and relevant cross-repo contracts;
-5. inspect the exact current state of PR #592 and do not assume it merged;
-6. search for an existing Control Center/scenario/adapter implementation before creating one;
-7. identify shared-path ownership conflicts before editing;
-8. create a dedicated task/branch/worktree and Draft PR before substantial implementation.
+1. fetch exact current `main`;
+2. read root `AGENTS.md`, `docs/agents/README.md` and applicable nested instructions;
+3. inspect all open PRs and `docs/agents/tasks/active/**` for overlapping Control Center/scenario/recorder/persistence/API/adapter work;
+4. read the complete normative design package above;
+5. inspect current Track A admission/routing/contracts referenced by `docs/agents/README.md` even though Package A itself uses no runtime;
+6. inspect current Surveyor producer/prompt status and do not assume merge/interface stability from historical PR numbers;
+7. inspect `tools/tibia_runtime_bridge/**` and existing test/runtime helpers for reuse;
+8. inspect `MODULE_CATALOG.md`, `REPOSITORY_MAP.md`, `KNOWN_RISKS.md`, `BUILD_TEST_MATRIX.md`, `CROSS_REPO_CONTRACTS.md`;
+9. search existing scenario, fake, recorder, persistence, HTTP, CLI, cancellation/idempotency and artifact infrastructure before creating abstractions;
+10. create one dedicated task, branch/worktree and Draft PR;
+11. persist the full `runtime_access:none` admission schema in the task;
+12. declare owned paths and resolve live overlaps.
 
-## Architecture constraint
+If current trusted-base state supersedes any example in this prompt, follow trusted base and record the discrepancy.
 
-The implementation must preserve this dependency direction:
+## 5. Non-negotiable architecture
 
 ```text
-Web UI / CLI
-      |
-      v
-Control API
-      |
-      v
-Scenario Engine
-      |
-      +---- Recorder
-      +---- Safety Controller
-      |
-      v
-Adapter contract
-      |
-      v
-Fake/read-only adapter first
+Browser UI ----\
+                -> Control API/domain service -> Run Manager -> Scenario Engine
+CLI -----------/                                      |
+                                                     v
+                                              MutationCoordinator
+                                                     |
+                                              Safety Controller
+                                                     |
+                                               Semantic Adapter
 ```
 
-The web UI must not call official-client tooling directly.
+Recorder/Artifact Store observe the normal path; they never create authority.
 
-## Package split
+Future policy/automation is a downstream consumer only:
+
+```text
+Normalized Observation -> Policy Decision -> bounded semantic proposal
+                       -> ordinary Control Center domain/Scenario path
+                       -> deterministic Safety/Authority -> Adapter -> Recorder -> Result
+```
+
+Forbidden:
+
+```text
+CLI -> concrete adapter
+Browser -> raw action/debug endpoint
+Quick Action -> raw keyboard/mouse/bridge call
+Scenario -> direct Track A lease/registration mutation
+Recorder/Artifact Store -> evidence promotion
+Passive capture -> hidden attach/injection/input mutation
+STOP -> new gameplay/process-control action
+Policy/model -> credentials/shell/process/raw-memory/raw-input/concrete adapter
+Policy/model -> direct Track A authority or safety bypass
+```
+
+## 6. Package split
 
 Do not implement all phases in one PR.
 
-### Package A — control-core
+```text
+Package A  control-core + Scenario/Execution/Recorder + fake adapter/durability tests
+Package B  Control API v1 + browser + CLI + persistent safety/request store
+Package C  accepted Surveyor/read-only integration
+Package D  separately admitted official Track A mutation adapter
+Package E  separately governed Oteryn-v2 adapter
+Future     policy/automation consumer only after stable research interfaces; never a safety authority
+```
 
-Implement the smallest reusable core and tests:
+## 7. Package A — control-core
 
-- typed/domain models corresponding to Adapter Contract v1;
-- capability model;
-- normalized runtime status;
-- normalized snapshots;
-- event envelope;
-- scenario schema and validation;
-- side-effect budgets;
-- cancellation generation;
-- one-step experiment representation;
-- fake adapter;
-- deterministic tests for validation, refusal, timeout, cancellation and event ordering.
-
-No network listener. No official-client access. `runtime_access: none`.
-
-Recommended future path after checking repository conventions:
+Recommended path only after confirming repository conventions:
 
 ```text
 tools/tibia_re_control_center/
 ```
 
-Do not create that path if another live PR/task already owns an equivalent abstraction.
+### A1. Contract types/version negotiation
 
-### Package B — read-only browser + CLI
+Implement typed models for:
+
+- Scenario v1;
+- Execution v1;
+- Adapter v1;
+- Artifact v1 safety/result records required by Package A;
+- adapter/execution/scenario/artifact major-version negotiation;
+- generic capabilities;
+- official-only evidence extension;
+- runtime/freshness/snapshot state;
+- events/artifacts/ledgers.
+
+Preserve the Policy Boundary v1-compatible normalized observation/action/result interfaces without implementing an autonomous policy loop in Package A.
+
+Unsupported required major semantics fail closed.
+
+### A2. Bounded Scenario v1 parser
+
+Implement the contract literally:
+
+- JSON/YAML -> one typed AST;
+- byte/depth/collection/string/step limits;
+- reject duplicate keys;
+- reject custom YAML tags/object constructors;
+- aliases disabled or strictly bounded before expansion;
+- reject non-finite/out-of-domain numbers;
+- UTF-8 validation;
+- typed `SideEffectBudget`, `AbortCondition`, `SemanticFieldPath` and closed semantic reference unions;
+- action-specific parameter schemas;
+- semantic selectors only;
+- typed predicates with no implicit coercion;
+- deterministic abort/privacy/capture policies.
+
+### A3. Canonical hashes and step IDs
+
+Implement JCS/RFC-8785 canonicalization exactly as Scenario v1 defines.
+
+Verify known deterministic vectors for:
+
+- scenario hash;
+- action request hash;
+- explicit local step IDs;
+- generated ordinal step IDs.
+
+Runtime fences/timestamps/current authority are not part of semantic action hash.
+
+### A4. EffectBound
+
+Before reservation, obtain deterministic finite maximum plausible external effect per action.
+
+Fake adapter must support exact EffectBound fixtures.
+
+If any required hard external effect cannot be bounded, refuse before dispatch.
+
+### A5. Backend epoch/control generation and activation marker
+
+- create a fresh unique backend epoch for every simulated backend lifetime;
+- control generation is monotonic only within that epoch;
+- STOP advances generation;
+- no wrap/reuse on overflow;
+- stale old-epoch callbacks cannot control new work;
+- load global Artifact-v1 ControlState before mutation admission;
+- durably mark `active_backend_epoch=<current>` before admitting mutation;
+- prior non-null different active backend => unclean lifetime => `recovery_required=true` and mutation disabled until explicit recovery/reset;
+- active-marker durability failure => mutation disabled.
+
+### A6. MutationCoordinator
+
+Exactly one coordinator per adapter instance.
+
+It owns:
+
+- one-at-a-time mutation commit;
+- ActionLedger;
+- BudgetLedger;
+- backend-global STOP/reset/recovery ControlState;
+- `dispatch_gate`;
+- one-shot `commit_dispatch()`.
+
+It does not own Track A authority.
+
+### A7. Dispatch gate discipline
+
+Never hold `dispatch_gate` while waiting for external/fake authority, GUI locks, capture, network or arbitrary I/O.
+
+The only I/O permitted while holding it is one of two bounded local safety transactions defined by Execution v1:
+
+1. ActionLedger/BudgetLedger possible-dispatch/at-risk write-ahead commit;
+2. backend-global ControlState STOP or explicit reset transition.
+
+Both have deterministic finite timeout/failure paths and no external network dependency. No report/capture/general persistence work is permitted under the gate.
+
+### A8. Idempotent action ledger
+
+Store:
+
+```text
+action_id
+action_request_hash
+lifecycle/dispatch state
+backend/control/adapter/runtime/session fences
+result/evidence refs
+```
+
+Rules:
+
+- same ID/hash -> same logical action/result, no second dispatch;
+- same ID/different hash -> conflict refusal;
+- duplicate submission -> no second budget reservation;
+- possible-dispatch -> no auto-retry;
+- explicit retry -> new ID + fresh attempt/budget/fences/authority;
+- `CONFIRMED` is terminal successful lifecycle state and cannot be rewritten by late callbacks.
+
+### A9. Runtime deadline and external-effect BudgetLedger
+
+Runtime is not an ambiguous effect bucket. Derive one monotonic deadline exactly once at run activation:
+
+```text
+runtime_deadline = checked_add(run_started_monotonic, max_runtime_seconds)
+```
+
+Rules:
+
+- overflow fails closed;
+- every wait is capped by the earlier of its own timeout and the run deadline;
+- pause, restart and authority waiting never freeze or extend the deadline;
+- expiry stops new scheduling/dispatch;
+- recovery preserves the original activation/deadline and never grants a fresh runtime window.
+
+For external-effect dimensions only:
+
+```text
+limit
+reserved
+at_risk
+committed
+uncertain
+```
+
+Use checked arithmetic.
+
+Before dispatch reserve Scenario-v1 EffectBound against the explicit SideEffectBudget external-effect dimensions.
+
+At durable dispatch commit, move reserved -> at-risk atomically with ActionLedger possible-dispatch transition.
+
+Reconcile conservatively according to Execution v1. `max_actions` counts semantic actions capable of crossing an external-effect boundary, not parser/refusal attempts.
+
+### A10. Preparation
+
+Outside dispatch gate:
+
+- validate action;
+- capability check;
+- external-effect budget reservation;
+- verify run deadline remains unexpired;
+- advisory preflight;
+- await fake authority;
+- before-state capture.
+
+Every wait is deterministic/bounded/cancellable and cannot extend the run deadline.
+
+Preflight never grants standing dispatch permission.
+
+### A11. One-shot `commit_dispatch()`
+
+Immediately before fake irreversible effect:
+
+1. enter dispatch gate;
+2. verify exact action/hash not previously committed;
+3. verify backend/control generation;
+4. verify durable + in-memory STOP/recovery-required/cancellation state;
+5. verify adapter/runtime/session fences;
+6. verify run runtime deadline remains unexpired;
+7. verify external-effect budget reservation;
+8. verify capability;
+9. verify current fake authority;
+10. atomically make ActionLedger `DISPATCH_COMMITTED/POSSIBLY_DISPATCHED` and external-effect budget `AT_RISK` durable;
+11. complete durability barrier;
+12. leave dispatch gate;
+13. only then allow exactly one fake physical effect.
+
+Durability failure/timeout -> no effect.
+
+### A12. STOP ALL
+
+STOP races with commit on the same dispatch gate.
+
+Required deterministic outcomes:
+
+```text
+STOP first -> in-memory STOP -> durable global STOP/control generation -> stale commit refused -> no effect
+commit first -> possible-dispatch/at-risk durable -> STOP sees already committed work
+```
+
+STOP remains durably latched across backend restart until explicit durable reset.
+
+STOP persistence failure leaves the current process mutation-disabled. Because the backend-active marker was already durable before mutation admission, a later crash/restart must detect an unclean prior lifetime and remain recovery-required/mutation-disabled rather than reopening work.
+
+STOP then cancels queued/waiting work and harness-owned passive captures, but grants no new external action.
+
+### A13. Reset/recovery
+
+Reset is local only and runs its ControlState transition under the dispatch gate.
+
+It does not restore cached authority and must respect unresolved AMBIGUOUS overlapping side-effect domains.
+
+It may clear STOP/recovery-required only after relevant Action/Budget/Request safety state is consistent and the clear transition is durable. Durability failure leaves mutation blocked.
+
+### A14. Restart/crash recovery
+
+Deterministic store must simulate:
+
+- crash before dispatch commit;
+- dispatch durability failure;
+- crash after durable commit before effect;
+- crash after effect before result;
+- STOP persistence failure followed by crash;
+- backend-active marker durability failure;
+- unclean backend restart with prior active marker;
+- reset persistence failure;
+- corrupt/missing/contradictory ControlState/ledger;
+- runtime deadline expiry/overflow;
+- restart after elapsed runtime proving no fresh deadline is granted.
+
+Expected classes:
+
+```text
+NOT_DISPATCHED
+POSSIBLY_DISPATCHED -> AMBIGUOUS unless reconciled
+CONFIRMED
+```
+
+On every restart use a fresh backend epoch, load/validate global control state, classify an uncleared prior active backend as recovery-required, durably install the current active marker, then recover per-run safety state before any mutation admission.
+
+Recovery preserves the original run activation/deadline. No automatic mutation resume/retry.
+
+### A15. Pause/resume
+
+Pause does not suspend external generations/deadlines and does not freeze or extend the run's monotonic runtime deadline.
+
+Resume revalidates backend/control/adapter/runtime/session fences, original run deadline and declared predicates.
+
+Changed runtime/session or an expired run deadline invalidates pending mutation by default.
+
+### A16. Recorder core
+
+Preserve:
+
+- ingestion sequence/time;
+- source timestamp/clock domain;
+- source-local sequence/scope;
+- ordering confidence;
+- backend/control/adapter/runtime/session fences;
+- run/step/stimulus;
+- late/sensitivity.
+
+Track A causal metadata is retained when supplied.
+
+Never turn ingestion order/timestamp proximity into causal proof.
+
+### A17. Late-event/finalization model
+
+```text
+ACTIVE -> CLOSING -> FINALIZED
+```
+
+Late events enrich evidence only; they cannot rewrite terminal results or restart execution.
+
+Finalized result is immutable except explicit append-only supplements.
+
+### A18. Construction-time privacy
+
+Implement constructors/barriers such that secret-class data cannot enter normal Event/Error/Artifact objects.
+
+Tests must cover:
+
+- secret-shaped event fields;
+- arbitrary exception/repr/debug text;
+- environment-variable-shaped data;
+- private-chat-shaped data;
+- screenshot SAFE/QUARANTINED/REJECTED states;
+- `SECRET_REJECTED` metadata only.
+
+### A19. Passive capture boundary
+
+Fake adapter distinguishes passive capture from invasive enablement.
+
+Read-only `capture_start()` refuses any fixture classified as requiring attach/injection/input/process/network mutation.
+
+### A20. Emergency-stop boundary
+
+Fake `emergency_stop()` may only cancel/release harness-owned work.
+
+A test must prove it cannot create a gameplay/process mutation path.
+
+### A21. Artifact model
+
+Support Artifact v1 literally for Package A scope:
+
+- backend-global durable ControlState including STOP/recovery/active-backend marker;
+- original run activation/runtime deadline persistence;
+- incomplete/staging run;
+- per-run safety-critical dispatch journal separate from report presentation;
+- deterministic flush/finalization;
+- manifest provenance/hashes;
+- crash -> incomplete, never PASS;
+- append-only supplement.
+
+RequestLedger storage/types may be introduced in A if the persistence abstraction benefits from one shared global store, but Package B is the first package required to expose/consume transport request IDs.
+
+### A22. Fake adapter
+
+Use deterministic manual clock/state scheduler and fault injection for every required interleaving.
+
+Fake success is never official-client evidence.
+
+## 8. Package A mandatory tests
+
+Package A is not complete until all pass with `runtime_access:none`:
+
+1. safe bounded JSON scenario acceptance;
+2. safe bounded YAML scenario acceptance;
+3. duplicate-key rejection;
+4. custom YAML tag/object-constructor rejection;
+5. alias/depth/size/collection/string/step limits;
+6. invalid/non-finite number rejection;
+7. canonical scenario hash vector;
+8. canonical action-request hash vector;
+9. stable explicit/generated step IDs;
+10. typed predicate UNKNOWN/type mismatch behavior;
+11. semantic action parameter validation for every v1 action family;
+12. stale/ambiguous semantic selector refusal;
+13. unsupported capability refusal;
+14. EffectBound generation/refusal when unbounded;
+15. read-only mutation refusal;
+16. fresh backend epoch on restart;
+17. stale backend callback refusal;
+18. authority loss exactly before commit;
+19. adapter/runtime/session change exactly before commit;
+20. two mutation requests serialize;
+21. same action ID/hash dispatches at most once;
+22. same action ID/different hash conflict;
+23. duplicate action creates no second reservation;
+24. STOP wins dispatch gate -> no effect;
+25. commit wins dispatch gate -> possible-dispatch/at-risk before STOP;
+26. STOP can linearize while action waits for authority;
+27. durability barrier failure -> no effect;
+28. durability barrier timeout -> no effect;
+29. crash after durable commit before effect -> AMBIGUOUS/no retry;
+30. crash after effect before result -> AMBIGUOUS/no retry unless reconciled;
+31. external-effect budget reservation/exhaustion;
+32. external-effect budget arithmetic overflow refusal;
+33. commit atomically moves reserved -> at-risk;
+34. ambiguous consumable/item action consumes conservative external-effect budget;
+35. explicit retry only after proven NOT_DISPATCHED and uses new action ID;
+36. pause/resume after session/runtime change refuses pending mutation;
+37. wait timeout/cancellation;
+38. before-commit versus after-commit cancellation classification;
+39. multi-clock source/ingest ordering stays distinct;
+40. ingestion order cannot claim causal order;
+41. late event cannot rewrite terminal result;
+42. causal fields preserve supplied Track A metadata;
+43. secret-shaped event rejected before object creation;
+44. unsanitized exception text excluded from safe_message;
+45. environment-shaped secret excluded;
+46. screenshot unknown/auth-risk quarantined/rejected;
+47. passive capture refuses invasive enablement;
+48. emergency stop cannot create gameplay/process mutation;
+49. artifact crash remains incomplete;
+50. finalized result not silently rewritten;
+51. fake one-step experiment success;
+52. no operator-facing adapter bypass type/interface exists;
+53. typed SideEffectBudget/AbortCondition/SemanticFieldPath/closed destination schemas reject invalid/free-form inputs;
+54. `CONFIRMED` is terminal successful state and stale/duplicate callbacks cannot rewrite/redispatch it;
+55. durable STOP ControlState survives clean backend restart and refuses mutation until reset;
+56. reset durability failure leaves STOP/recovery-required blocking mutation;
+57. backend-active marker must be durable before mutation admission;
+58. prior uncleared active-backend marker forces recovery-required on the next backend;
+59. STOP persistence failure followed by crash cannot reopen mutation after restart;
+60. clean-shutdown marker failure causes conservative recovery-required next start;
+61. missing/corrupt initialized ControlState is fail-closed;
+62. runtime deadline overflow fails closed;
+63. runtime deadline expiry while waiting prevents later dispatch;
+64. pause does not extend the runtime deadline;
+65. restart/recovery does not grant a fresh runtime deadline.
+
+## 9. Package B — Control API v1 + browser + CLI
 
 Consume merged Package A.
 
-Implement:
+Before exposing mutation-capable fake operations, select/extend the local persistent store so it satisfies:
 
-- loopback-only Control API by default;
-- browser UI;
-- CLI;
-- status/capabilities/scenario/run views;
-- bounded live event view;
-- run/artifact browser;
-- `STOP ALL` and scenario cancellation;
-- no official-client mutation.
+- backend-global ControlState;
+- backend-global RequestLedger;
+- per-run runtime deadline and Action/Budget dispatch-journal semantics;
+- Artifact-v1 safety-state precedence.
 
-UI baseline:
+Implement Control API v1 literally:
 
-Top bar:
+- exact loopback bind policy;
+- fresh >=256-bit control nonce per backend epoch;
+- nonce never in URL/log/artifact/command-line arg;
+- all `/v1/*` requests require nonce;
+- exact Host allowlist;
+- exact same-origin browser Origin policy;
+- no permissive CORS/cookie ambient auth;
+- durable request IDs/hashes;
+- for every POST, preallocate the final logical resource/control-transition identity and durably persist RequestLedger ACCEPTED **before** domain execution;
+- run/experiment/action-domain execution must use that exact reserved identity;
+- STOP/reset must use the reserved control-transition identity as `ControlState.transition_id`;
+- crash after ACCEPTED-before-domain execution and crash after resource/control transition before COMPLETED both replay to the same identity;
+- delayed replay of an old STOP/reset after newer control transitions returns the old durable result and must not mutate current ControlState;
+- duplicate POST resource/result reuse;
+- FAILED request identity is replayed as the same failed logical request; deliberate retry uses a new request ID;
+- request/page/event/subscriber bounds;
+- slow-subscriber backpressure;
+- stable safe error envelope;
+- graceful shutdown preserving global/per-run safety state;
+- no wildcard/non-loopback mode;
+- no raw/debug/adapter endpoint.
 
-```text
-RUNTIME | CLIENT | RECORDER | AUTHORITY | SESSION | STOP ALL | PAUSE
+Browser and CLI are thin clients of the same backend/domain operations.
+
+Mutating UI controls may execute only against explicit fake adapters in Package B. Real Track A remains read-only/refused.
+
+### Package B mandatory tests
+
+Run every mandatory test defined by current Control API v1 plus:
+
+- browser/CLI semantic parity;
+- authority/capability/evidence/freshness shown separately;
+- `MUTATION_ALLOWED` is not locally grantable;
+- browser reload/new tab cannot duplicate active work;
+- UI UNKNOWN/STALE/UNSUPPORTED/NOT_PROVEN truthfulness;
+- shutdown/restart preserves ControlState/RequestLedger/runtime deadline/Action/Budget safety state;
+- no real official-client mutation path exists.
+
+## 10. Package C — Surveyor/read-only integration
+
+Only after the current Surveyor work has an accepted exact producer state.
+
+Pin:
+
+```yaml
+surveyor_schema_version:
+producer_commit:
+producer_interface:
 ```
 
-Tabs:
+Consume outputs; never copy internal logic.
+
+Expose read-only coverage/evidence/runtime/provenance/bundle status.
+
+Schema mismatch -> explicit `UNAVAILABLE/INCOMPATIBLE`.
+
+Control Center cannot promote/overwrite Surveyor-owned evidence state.
+
+## 11. Package D — Official Track A mutation adapter
+
+This prompt does **not** authorize Package D execution.
+
+Package D is a separate runtime-sensitive task.
+
+Before any real action:
+
+1. read then-current trusted-base Track A contracts;
+2. create/persist a current runtime admission task;
+3. satisfy exact current lease/registration/Gate A/rebind/Gate B/uniqueness/whole-lifetime supervisor rules;
+4. satisfy current GUI input lock when applicable;
+5. prove action capability/evidence/reference-path parity;
+6. produce safe Scenario-v1 EffectBound;
+7. acquire Track A guard without holding local dispatch gate;
+8. while Track A guard remains held, perform final current Track A checks;
+9. immediately before physical effect invoke one-shot durable `commit_dispatch()`;
+10. if COMMITTED, perform exactly one physical effect while Track A guard remains held;
+11. reconcile action/budget/evidence conservatively.
+
+Start with one smallest already-proven semantic action.
+
+Never build a second Track A authority system.
+
+## 12. Package E — Oteryn v2 adapter
+
+Separate task/branch/PR in:
+
+```text
+blakinio/Oteryn-v2
+```
+
+Read current Oteryn governance and accepted ADR-0007.
+
+Integrate with its shared E2E architecture or an explicitly versioned cross-repo semantic boundary.
+
+Do not create:
+
+- Tibia wire compatibility shortcut;
+- second Oteryn E2E/scenario authority;
+- hidden authoritative client mutation;
+- unauthenticated production test-control surface.
+
+Retain `protocol-oteryn`; client sends intent; server remains authoritative.
+
+## 13. UI requirements
+
+Always-visible:
+
+```text
+RUNTIME | CLIENT | RECORDER | AUTHORITY | CAPABILITY | EVIDENCE | FRESHNESS | SESSION
+STOP ALL | PAUSE
+```
+
+Required tabs:
 
 ```text
 Main Runtime Movement Healing Spells Consumables Combat Targeting
@@ -129,204 +669,111 @@ Inventory Containers Equipment Chat Conditions Scenarios Recorder
 Network Experiments Compare Logger
 ```
 
-Main layout:
+Quick Actions are exactly one-step experiments through Scenario Engine.
 
-- left: Quick Activator, Profile/Target, Session Info;
-- center top: Character State, Conditions, Actions, Target Info;
-- center middle: Quick Actions;
-- center bottom: Engine Benchmark, Live Events, Active Scenario;
-- right: Mini Map, Backpack, Battle List, Hotkeys.
+No raw manual mutation shortcut.
 
-For Package B, mutating Quick Actions are visible but disabled/refused unless backed only by the fake adapter. The UI must clearly show `READ_ONLY` for real Track A state.
+## 14. Differential comparison
 
-Keep the browser implementation lightweight. Inspect repository dependency policy before adding any framework. Prefer a thin local UI over a new build ecosystem unless evidence justifies it.
+Use `TIBIA_RE_CONTROL_CENTER_COMPARISON_V1.md` and the programme's versioned semantic comparison profile.
 
-### Package C — Surveyor integration
+Never report Oteryn mismatch when official reference is UNKNOWN/unobservable. Report coverage gap.
 
-Only after PR #592 has an accepted exact state.
+Never require byte-level protocol, internal object or renderer equivalence.
 
-Consume Surveyor outputs/interfaces; do not copy its code.
+## 15. Future policy/automation preparation
 
-Expose in Control Center:
+Do not implement an unrestricted policy loop as a convenience feature of Package A/B/C.
 
-- coverage summary;
-- evidence/index status;
-- read-only runtime snapshot;
-- current-client fence/provenance;
-- compact agent bundle link/status.
-
-Any #592 API mismatch should be repaired by a bounded integration contract change, not by duplicating Surveyor internals.
-
-### Package D — official Track A action adapter
-
-This is a separate runtime-sensitive task and is NOT authorized by this prompt merely because Packages A-C exist.
-
-Before any real action:
-
-- create a current Track A runtime task;
-- obtain the applicable runtime access class;
-- satisfy current canonical registration/lease/Gate A/rebind/Gate B/target-uniqueness/supervisor requirements;
-- prove current action capability/evidence gate;
-- use the shared GUI input lock when applicable;
-- define effect budget and abort behavior;
-- preserve reference-path parity evidence.
-
-Start with the smallest already-proven action surface. Do not batch many gameplay families into the first mutation PR.
-
-### Package E — Oteryn v2 adapter
-
-Separate repository task/branch/PR in:
+Preserve `TIBIA_RE_CONTROL_CENTER_POLICY_BOUNDARY_V1.md`:
 
 ```text
-blakinio/Oteryn-v2
+ObservationPort -> normalized non-secret state
+PolicyIngress   -> untrusted bounded semantic proposal
+ResultPort      -> canonical accepted/refused/result/evidence projection
 ```
 
-Read that repository's current governance before acting.
+A future policy/Ollama engine must re-enter the ordinary Scenario/ActionRequest/domain path. It never receives credentials, Control API nonce, direct adapter handles, shell/process/raw-memory/unrestricted-input authority or Track A writable authority.
 
-Do not implement new Rust product code under historical `blakinio/otclient/oteryn-client/**`.
+Deterministic code, outside the policy/model, owns schema validation, rate limits, runtime deadlines, external-effect budgets, idempotency, STOP, recovery, capability/freshness checks and final external authority.
 
-The Oteryn adapter exposes semantic snapshots/actions for E2E comparison. It must not add Tibia wire compatibility as a test shortcut.
+Model failure/unavailability must not disable manual research, STOP or deterministic safety.
 
-## Required UI behavior
+## 16. Validation procedure for every package PR
 
-### Authority
+1. inspect exact current main/open PR/task overlap;
+2. inspect full final changed-file list and diff;
+3. run focused deterministic tests;
+4. select commands from current `BUILD_TEST_MATRIX.md`; never invent presets;
+5. run required exact-head GitHub checks;
+6. perform full self-review for architecture/security/failure paths/claims;
+7. re-run race/idempotency/durability/privacy tests after related changes;
+8. obtain independent review when current risk policy requires it;
+9. record exact commands/outcomes/SHA in task/PR;
+10. update `MODULE_CATALOG.md`/`CHANGELOG.md` when required and resolve live path ownership;
+11. merge only through current repository policy.
 
-The top status bar always shows one of:
+## 17. Mandatory non-claims
+
+Never claim:
+
+- official-client action capability from fake tests;
+- Track A authority from Control Center/API state;
+- runtime compatibility from repository-only tests;
+- causal proof from timing/ingest ordering alone;
+- no external effect merely because result call timed out;
+- safe retry after durable possible-dispatch without authoritative no-effect proof;
+- passive capture when enablement actually attaches/injects/mutates;
+- STOP reversal of already-committed effect;
+- restart as an implicit STOP/recovery reset;
+- restart/pause as a way to extend the original runtime deadline;
+- remote/LAN security from loopback API design;
+- safe secret handling from export-time redaction alone;
+- policy/model output as authority/capability/evidence;
+- Oteryn parity before separate adapter/evidence exists.
+
+## 18. Package A terminal acceptance
 
 ```text
-READ_ONLY
-MUTATION_ALLOWED
-EXPIRED
-DENIED
-UNKNOWN
+runtime_access=none
+network_listener=none
+official_client_access=none
+Scenario v1 parser/hash/action semantics=PASS
+backend epoch/generation fencing=PASS
+backend activation/unclean-restart recovery=PASS
+MutationCoordinator serialization=PASS
+STOP-vs-commit linearizability=PASS
+durable STOP/reset/recovery state=PASS
+bounded local durability-before-effect=PASS
+ActionLedger idempotency=PASS
+runtime deadline overflow/expiry/pause/restart semantics=PASS
+external-effect BudgetLedger at-risk/uncertain accounting=PASS
+crash/restart ambiguity handling=PASS
+multi-clock Recorder=PASS
+construction-time secret exclusion=PASS
+capture/emergency-stop bypass tests=PASS
+artifact finalization=PASS
+future Policy Boundary remains downstream/no-bypass=PASS
+no adapter/operator bypass=PASS
+all mandatory deterministic tests=PASS
+self-review=no material findings
+required independent review=PASS
+exact-head CI=PASS
 ```
 
-Unknown/stale/expired authority disables mutation.
+A fresh competent agent must be able to continue solely from Git/task/PR without this chat.
 
-### Quick Actions
+## 19. Desired first operator result
 
-Every manual action is internally a validated one-step scenario:
+After Packages A-C the operator can:
 
-```text
-snapshot before
--> action
--> bounded wait/assertion
--> snapshot after
--> result
-```
+- launch Control Center locally;
+- use browser or CLI through the same secured loopback backend;
+- inspect truthful read-only Track A/Surveyor status;
+- see authority/capability/evidence/freshness separately;
+- browse scenarios/runs/actions/events/artifacts;
+- run deterministic fake one-step experiments;
+- prove STOP/idempotency/durability/restart/privacy behavior;
+- export privacy-safe `agent_bundle.json`;
 
-No separate unrecorded manual mutation path.
-
-### STOP ALL
-
-`STOP ALL` must:
-
-- latch harness cancellation;
-- reject new mutation requests;
-- cancel queued steps;
-- request bounded cancellation of active work;
-- release harness-owned local locks/resources;
-- emit a terminal event;
-- never kill the official client without separate current process-control authority.
-
-### Unknown data
-
-Render unknown/unproven fields as unknown. Do not fabricate HP, position, inventory, battle list, minimap or capability values to make the UI look complete.
-
-## Recorder requirements
-
-Use one normalized event envelope and monotonic ordering.
-
-Required event kinds:
-
-```text
-SYSTEM AUTHORITY ACTION TRACE NET STATE SCREEN SNAPSHOT ASSERTION RESULT ERROR
-```
-
-Default network capture is metadata-only.
-
-Never persist:
-
-- email/password/2FA;
-- auth/session tokens;
-- cookies/tickets;
-- secret-bearing process memory;
-- secret-bearing packet payloads;
-- unnecessary private chat text/personal data.
-
-## Artifact requirements
-
-Per run:
-
-```text
-manifest.json
-scenario.yaml
-events.jsonl
-actions.jsonl
-state/
-network/
-traces/
-screenshots/
-result.json
-report.md
-agent_bundle.json
-```
-
-Store large/raw captures outside Git unless current evidence policy explicitly permits them. Git stores normalized evidence, hashes and minimal necessary excerpts.
-
-## Testing
-
-Package A must have deterministic unit tests for at least:
-
-- schema acceptance/rejection;
-- unsupported capability refusal;
-- mutation refusal under read-only authority;
-- budget exhaustion;
-- runtime/session identity change;
-- timeout;
-- cancellation/STOP ALL;
-- monotonic event ordering;
-- secret-class event rejection/redaction;
-- fake-adapter successful one-step experiment.
-
-Package B must test:
-
-- loopback default bind;
-- API refusal paths;
-- UI rendering of authority states;
-- disabled mutating controls under read-only state;
-- browser/CLI parity for shared backend operations;
-- bounded event/run history.
-
-Select exact commands from current `BUILD_TEST_MATRIX.md`; do not invent preset names.
-
-## Completion boundaries
-
-A package is not complete because the UI renders.
-
-For each PR:
-
-- inspect full diff and changed-file set;
-- run focused tests;
-- run exact-head required CI;
-- perform mandatory self-review;
-- obtain independent review when current risk policy requires it;
-- record exact evidence in the task/PR;
-- update module catalogue/changelog when the reusable implementation is actually added;
-- merge only through current repository policy.
-
-Do not claim:
-
-- real official-client action capability from fake tests;
-- real runtime compatibility from repository-only tests;
-- Oteryn parity before a separate Oteryn-v2 adapter exists;
-- remote/LAN security before a dedicated exposure design is tested;
-- protocol semantic proof from timestamp correlation alone.
-
-## Owner-funded AI
-
-Do not invoke Codex/OpenAI API/other owner-funded AI merely because this prompt exists. Follow current repository authorization rules exactly. Central Spark advisory review, if eligible, remains separate from implementation authority.
-
-## Desired first terminal result
-
-After Packages A-C, the operator should be able to launch the Control Center locally, open the dense browser UI or CLI, inspect read-only Track A/Surveyor state, browse scenarios/runs/events, execute deterministic fake-adapter one-step experiments, cancel them safely and export `agent_bundle.json` — while all real official-client mutation remains fail-closed until Package D receives its own current runtime admission.
+while every real official-client mutation remains fail-closed until a separately admitted Package D exists and every future policy/automation consumer remains downstream of the deterministic Control Center boundary.

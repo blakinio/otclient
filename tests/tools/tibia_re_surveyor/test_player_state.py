@@ -38,8 +38,12 @@ d19efc: movq 0x8(%rax),%xmm0
 d19f09: mov 0x10(%rax),%eax
 d19f01: movq %xmm0,0x408(%rdi)
 d19f0c: movq %xmm0,0x2f0(%rdi)
+d19f14: paddd %xmm1,%xmm0
 d19f18: mov %eax,0x410(%rdi)
 d19f1e: mov %eax,0x2f8(%rdi)
+d19f24: add $0x1,%eax
+d19f27: mov %eax,0x310(%rdi)
+d19f37: movq %xmm0,0x308(%rdi)
 """}
         self.assertEqual(
             CURRENT_LAYOUT,
@@ -57,8 +61,12 @@ d19efc:\tf3 0f 7e 40 08       \tmovq   0x8(%rax),%xmm0
 d19f01:\t66 0f d6 87 08 04 00 00 \tmovq   %xmm0,0x408(%rdi)
 d19f09:\t8b 40 10             \tmov    0x10(%rax),%eax
 d19f0c:\t66 0f d6 87 f0 02 00 00 \tmovq   %xmm0,0x2f0(%rdi)
+d19f14:\t66 0f fe c1          \tpaddd  %xmm1,%xmm0
 d19f18:\t89 87 10 04 00 00    \tmov    %eax,0x410(%rdi)
 d19f1e:\t89 87 f8 02 00 00    \tmov    %eax,0x2f8(%rdi)
+d19f24:\t83 c0 01             \tadd    $0x1,%eax
+d19f27:\t89 87 10 03 00 00    \tmov    %eax,0x310(%rdi)
+d19f37:\t66 0f d6 87 08 03 00 00 \tmovq   %xmm0,0x308(%rdi)
 """
         self.assertEqual(
             ((0x2F0, 0x2F4, 0x2F8), (0x408, 0x40C, 0x410)),
@@ -70,6 +78,8 @@ d19f1e:\t89 87 f8 02 00 00    \tmov    %eax,0x2f8(%rdi)
 2: mov 0x10(%rax),%eax
 3: movq %xmm0,0x100(%rdi)
 4: mov %eax,0x108(%rdi)
+5: paddd %xmm1,%xmm0
+6: add $0x1,%eax
 """
         with self.assertRaises(PlayerStateResolverError):
             derive_mirrored_position_offsets(text)

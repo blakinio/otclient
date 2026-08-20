@@ -7,7 +7,7 @@ It is not login authority or runtime mutation authority. The workflow:
 - requires owner actor `blakinio` and exact workflow-dispatch phrase `ONE_SHOT_SURVEYOR_READ_ONLY`;
 - requires the caller to name the current/existing Track A runtime task whose runtime may be observed;
 - refuses an active canonical lease owned by a different task;
-- inventories all running Docker containers for the exact current native-Linux client fence and requires exactly one candidate globally;
+- scopes observation to the declared Track A runtime container `otclient-track-a-kasmvnc`; it requires exactly one `client` PID there, exact current size/SHA and matching X11 ownership, and never enumerates or executes discovery commands in unrelated Docker containers;
 - requires exactly one visible Tibia X11 window owned by that exact PID on the designated KasmVNC display;
 - validates an existing canonical registration against the fresh PID/start/size/SHA/display identity when present;
 - emits the Track A `read_only` admission record before semantic collection and keeps `mutation_authorized=false`;
@@ -18,4 +18,4 @@ It is not login authority or runtime mutation authority. The workflow:
 
 A workflow result of `OWNER_LOGIN_REQUIRED=YES` is valid only when `COLLECTOR_READY=YES` and the current structural helper produced a successful scan proving `BRIDGE_NOT_3_OF_3`. `UNKNOWN` never requests owner login. `OWNER_LOGIN_REQUIRED=NO` means a current exact-peer `BRIDGE_3_OF_3` observation can be reused.
 
-The runtime task, lease/registration identity and exact target are re-evaluated on every dispatch. Historical run IDs, PIDs, displays or prior `IN_GAME` state are discovery context only.
+The runtime task, lease/registration identity and exact declared target are re-evaluated on every dispatch. `target_uniqueness=PROVEN` is explicitly scoped to the declared Track A runtime namespace, not to every Docker container on the shared host. Historical run IDs, PIDs, displays or prior `IN_GAME` state are discovery context only.

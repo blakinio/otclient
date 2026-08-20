@@ -31,10 +31,14 @@ class CollectAllModelTests(unittest.TestCase):
             "recommended_next": [],
             "runtime": {
                 "observed_at_epoch": 1,
-                "target_container": "target",
+                "target_container": "otclient-track-a-kasmvnc",
+                "control_container": "otclient-synology-runner",
                 "display": ":1",
                 "target_running": True,
-                "candidate_process_count": 1,
+                "runtime_namespace_scope": "DECLARED_TARGET_ONLY",
+                "external_containers_scanned": False,
+                "target_process_count": 1,
+                "target_uniqueness_scope": "DECLARED_RUNTIME_NAMESPACE",
                 "target_uniqueness": "PROVEN",
                 "runtime_access": "READ_ONLY_ADMITTED",
                 "visible_tibia_windows": [
@@ -77,6 +81,10 @@ class CollectAllModelTests(unittest.TestCase):
         self.assertEqual("AVAILABLE", runtime["state"])
         self.assertFalse(runtime["value"]["window_title_values_retained"])
         self.assertEqual(123, runtime["value"]["process"]["pid"])
+        self.assertFalse(runtime["value"]["external_containers_scanned"])
+        self.assertEqual("DECLARED_TARGET_ONLY", runtime["value"]["runtime_namespace_scope"])
+        self.assertEqual("DECLARED_RUNTIME_NAMESPACE", runtime["value"]["target_uniqueness_scope"])
+        self.assertNotIn("candidate_process_count", runtime["value"])
 
     def test_missing_reader_ranking_uses_canonical_priority(self):
         coverage = [

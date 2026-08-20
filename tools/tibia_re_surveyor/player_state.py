@@ -8,24 +8,42 @@ from typing import Callable, Mapping
 from .runtime import EXPECTED_CLIENT_SHA256, EXPECTED_CLIENT_SIZE, EXPECTED_TARGET_CONTAINER
 
 READER_ID = "player_state_typed_reader"
-TYPE_NAME = "tibia::game::TPlayerData"
-MANGLED_TYPE_NAME = "N5tibia4game11TPlayerDataE"
-POSITION_KEY = "playerPosition"
+TYPE_NAME = "tibia::cyclopedia::TCyclopediaMapStorage"
+MANGLED_TYPE_NAME = "N5tibia10cyclopedia21TCyclopediaMapStorageE"
+POSITION_SIGNAL = "playerPositionChanged"
+POSITION_HANDLER = "onPlayerPositionWasUpdated"
 _STRING = re.compile(r"^\s*([0-9a-fA-F]+)\s+(.+?)\s*$")
 _XREF = re.compile(r"^\s*([0-9a-fA-F]+):.*#\s*([0-9a-fA-F]+)\b")
-_MOVSLQ = re.compile(r"^\s*([0-9a-fA-F]+):(?:\s+[0-9a-fA-F]{2})*\s+movslq\s+(-?0x[0-9a-fA-F]+)\(%([a-z0-9]+)\),%[a-z0-9]+(?:\s*)$")
+_STORE_XY = re.compile(r"\bmovq\s+%xmm0,0x([0-9a-fA-F]+)\(%rdi\)")
+_STORE_Z = re.compile(r"\bmov\s+%eax,0x([0-9a-fA-F]+)\(%rdi\)")
+_INPUT_XY = re.compile(r"\bmovq\s+0x8\(%rax\),%xmm0")
+_INPUT_Z = re.compile(r"\bmov\s+0x10\(%rax\),%eax")
+
 
 @dataclass(frozen=True)
 class PlayerStateLayout:
     vptr: int
+    typeinfo: int
     metacast: int
-    position_xref: int
-    offsets: tuple[int, int, int]
+    position_handler: int
+    primary_offsets: tuple[int, int, int]
+    mirror_offsets: tuple[int, int, int]
 
     def evidence(self) -> dict[str, object]:
-        return {"tplayerdata_vptr_offset": hex(self.vptr), "qt_metacast_offset": hex(self.metacast),
-                "position_serializer_xref": hex(self.position_xref), "position_offsets": [hex(v) for v in self.offsets],
-                "representation": "signed_i32_x3", "semantic_state": "CANDIDATE_PENDING_CAUSAL_E2E"}
+        return {
+            "source_object": TYPE_NAME,
+            "source_handler": POSITION_HANDLER,
+            "source_signal": POSITION_SIGNAL,
+            "cyclopedia_vptr_offset": hex(self.vptr),
+            "cyclopedia_typeinfo_offset": hex(self.typeinfo),
+            "qt_metacast_offset": hex(self.metacast),
+            "position_handler_offset": hex(self.position_handler),
+            "position_primary_offsets": [hex(v) for v in self.primary_offsets],
+            "position_mirror_offsets": [hex(v) for v in self.mirror_offsets],
+            "representation": "signed_i32_x3_mirrored",
+            "semantic_state": "CANDIDATE_PENDING_CAUSAL_E2E",
+        }
+
 
 class PlayerStateResolverError(RuntimeError):
     pass
@@ -34,18 +52,18 @@ class PlayerStateResolverError(RuntimeError):
 def parse_strings(text: str) -> dict[str, list[int]]:
     out: dict[str, list[int]] = {}
     for line in text.splitlines():
-        m = _STRING.match(line)
-        if m:
-            out.setdefault(m.group(2), []).append(int(m.group(1), 16))
+        match = _STRING.match(line)
+        if match:
+            out.setdefault(match.group(2), []).append(int(match.group(1), 16))
     return out
 
 
 def parse_xrefs(text: str, targets: set[int]) -> list[tuple[int, int]]:
-    out = []
+    out: list[tuple[int, int]] = []
     for line in text.splitlines():
-        m = _XREF.match(line)
-        if m:
-            pair = (int(m.group(1), 16), int(m.group(2), 16))
+        match = _XREF.match(line)
+        if match:
+            pair = (int(match.group(1), 16), int(match.group(2), 16))
             if pair[1] in targets:
                 out.append(pair)
     return sorted(set(out))
@@ -61,81 +79,87 @@ def parse_relative_relocations(text: str) -> dict[int, int]:
             out[int(parts[0], 16)] = int(parts[-1], 16)
     return out
 
-def derive_position_offsets(disassembly: str, *, xref: int) -> tuple[int, int, int]:
-    by_base: dict[str, list[tuple[int, int]]] = {}
-    for line in disassembly.splitlines():
-        m = _MOVSLQ.match(line)
-        if not m:
-            continue
-        address, displacement = int(m.group(1), 16), int(m.group(2), 16)
-        if address < xref and xref - address <= 0x240:
-            by_base.setdefault(m.group(3), []).append((address, displacement))
-    candidates: set[tuple[int, int, int]] = set()
-    for loads in by_base.values():
-        offsets = sorted({d for _, d in loads if 0 <= d <= 0x1000})
-        for first in offsets:
-            triple = (first, first + 4, first + 8)
-            if all(v in offsets for v in triple):
-                addresses = [a for a, d in loads if d in triple]
-                if addresses and max(addresses) - min(addresses) <= 0x100:
-                    candidates.add(triple)
-    if len(candidates) != 1:
-        raise PlayerStateResolverError(f"position movslq triplet is not unique: {sorted(candidates)}")
-    return next(iter(candidates))
+
+def derive_mirrored_position_offsets(disassembly: str) -> tuple[tuple[int, int, int], tuple[int, int, int]]:
+    if not _INPUT_XY.search(disassembly) or not _INPUT_Z.search(disassembly):
+        raise PlayerStateResolverError("world-coordinate input loads are missing")
+    xy = sorted({int(match.group(1), 16) for match in _STORE_XY.finditer(disassembly)})
+    z = sorted({int(match.group(1), 16) for match in _STORE_Z.finditer(disassembly)})
+    triples = sorted({(base, base + 4, base + 8) for base in xy if base + 8 in z})
+    if len(triples) != 2:
+        raise PlayerStateResolverError(f"mirrored world-coordinate stores are not unique: {triples}")
+    return triples[0], triples[1]
 
 
-def resolve_layout(*, strings_text: str, relocations_text: str, xrefs_text: str,
-                   position_disassembly: Mapping[int, str]) -> PlayerStateLayout:
+def resolve_layout(
+    *,
+    strings_text: str,
+    relocations_text: str,
+    metacast_disassembly: Mapping[int, str],
+    position_handler_disassembly: Mapping[int, str],
+) -> PlayerStateLayout:
     strings = parse_strings(strings_text)
-    type_strings = set(strings.get(TYPE_NAME, [])); mangled = set(strings.get(MANGLED_TYPE_NAME, []))
-    position_strings = set(strings.get(POSITION_KEY, []))
-    if not type_strings or not mangled or not position_strings:
-        raise PlayerStateResolverError("required TPlayerData/playerPosition strings are missing")
+    type_strings = set(strings.get(TYPE_NAME, []))
+    mangled = set(strings.get(MANGLED_TYPE_NAME, []))
+    if not type_strings or not mangled or not strings.get(POSITION_SIGNAL) or not strings.get(POSITION_HANDLER):
+        raise PlayerStateResolverError("required Cyclopedia player-position strings are missing")
+
     relative = parse_relative_relocations(relocations_text)
-    xrefs = parse_xrefs(xrefs_text, type_strings | position_strings)
-    type_xrefs = [src for src, target in xrefs if target in type_strings]
-    position_xrefs = [src for src, target in xrefs if target in position_strings]
-    if not type_xrefs or not position_xrefs:
-        raise PlayerStateResolverError("required static xrefs are missing")
-    metacast_candidates: list[tuple[int, int]] = []
-    for slot, target in relative.items():
-        if not any(0 <= xref - target <= 0x60 for xref in type_xrefs):
+    typeinfos = {slot - 8 for slot, target in relative.items() if target in mangled}
+    vptr_candidates: list[tuple[int, int, int]] = []
+    for typeinfo_slot, typeinfo in relative.items():
+        if typeinfo not in typeinfos:
             continue
-        typeinfo = relative.get(slot - 0x10)
-        if typeinfo is None or relative.get(slot - 0x08) is None or relative.get(slot + 0x08) is None:
+        vptr = typeinfo_slot + 8
+        first_virtual = relative.get(vptr)
+        metacast = relative.get(vptr + 8)
+        if first_virtual is None or metacast is None:
             continue
-        if relative.get(typeinfo + 0x08) in mangled:
-            metacast_candidates.append((slot, target))
-    if len(metacast_candidates) != 1:
-        raise PlayerStateResolverError(f"TPlayerData qt_metacast/vtable candidate is not unique: {metacast_candidates}")
-    metacast_slot, metacast = metacast_candidates[0]
-    position_candidates = []
-    for xref in sorted(set(position_xrefs)):
-        text = position_disassembly.get(xref)
-        if not text:
-            continue
+        disassembly = metacast_disassembly.get(metacast, "")
+        if parse_xrefs(disassembly, type_strings):
+            vptr_candidates.append((vptr, typeinfo, metacast))
+    if len(vptr_candidates) != 1:
+        raise PlayerStateResolverError(f"Cyclopedia vptr/qt_metacast candidate is not unique: {vptr_candidates}")
+
+    handler_candidates: list[tuple[int, tuple[int, int, int], tuple[int, int, int]]] = []
+    for address, disassembly in position_handler_disassembly.items():
         try:
-            offsets = derive_position_offsets(text, xref=xref)
+            primary, mirror = derive_mirrored_position_offsets(disassembly)
         except PlayerStateResolverError:
             continue
-        position_candidates.append((xref, offsets))
-    if len(position_candidates) != 1:
-        raise PlayerStateResolverError(f"playerPosition serializer candidate is not unique: {position_candidates}")
-    position_xref, offsets = position_candidates[0]
-    return PlayerStateLayout(metacast_slot - 0x08, metacast, position_xref, offsets)
+        handler_candidates.append((address, primary, mirror))
+    if len(handler_candidates) != 1:
+        raise PlayerStateResolverError(f"position handler candidate is not unique: {handler_candidates}")
+
+    vptr, typeinfo, metacast = vptr_candidates[0]
+    handler, primary, mirror = handler_candidates[0]
+    return PlayerStateLayout(vptr, typeinfo, metacast, handler, primary, mirror)
+
+
+def validate_mirrored_position(primary: tuple[int, int, int], mirror: tuple[int, int, int]) -> tuple[int, int, int]:
+    if primary != mirror:
+        raise PlayerStateResolverError(f"mirrored position mismatch: {primary} != {mirror}")
+    x, y, z = primary
+    if not (1 <= x <= 65535 and 1 <= y <= 65535 and 0 <= z <= 15):
+        raise PlayerStateResolverError(f"implausible Tibia world coordinate: {primary}")
+    return primary
 
 
 CURRENT_LAYOUT = PlayerStateLayout(
-    vptr=0x30C1810,
-    metacast=0xD40470,
-    position_xref=0x82D101,
-    offsets=(0x78, 0x7C, 0x80),
+    vptr=0x30C2738,
+    typeinfo=0x30C0AA0,
+    metacast=0xD1EEF0,
+    position_handler=0xD19EF0,
+    primary_offsets=(0x2F0, 0x2F4, 0x2F8),
+    mirror_offsets=(0x408, 0x40C, 0x410),
 )
+
 
 READ_ONLY_PROBE = r'''
 import hashlib,json,os,pathlib,struct,sys
 pid=int(sys.argv[1]); start=int(sys.argv[2]); size=int(sys.argv[3]); sha=sys.argv[4]
-vptr_off=int(sys.argv[5],16); offsets=tuple(int(x,16) for x in sys.argv[6:9])
+vptr_off=int(sys.argv[5],16)
+primary=tuple(int(x,16) for x in sys.argv[6:9]); mirror=tuple(int(x,16) for x in sys.argv[9:12])
 def ticks():
  raw=pathlib.Path(f"/proc/{pid}/stat").read_text(encoding="ascii")
  return int(raw[raw.rfind(")")+2:].split()[19])
@@ -147,8 +171,6 @@ def digest(path):
 if ticks()!=start: raise SystemExit("START_TICKS_MISMATCH")
 exe=pathlib.Path(os.path.realpath(f"/proc/{pid}/exe"))
 if exe.stat().st_size!=size or digest(exe)!=sha: raise SystemExit("EXACT_FENCE_MISMATCH")
-'''
-READ_ONLY_PROBE += r'''
 regions=[]
 for line in pathlib.Path(f"/proc/{pid}/maps").read_text().splitlines():
  parts=line.split(maxsplit=5); begin,end=(int(x,16) for x in parts[0].split("-"))
@@ -162,37 +184,53 @@ fd=os.open(f"/proc/{pid}/mem",os.O_RDONLY|os.O_CLOEXEC)
 pat=struct.pack("<Q",expected_vptr); hits=[]
 try:
  for begin,end,perms,off,path in rw:
-  cur=begin
+  cur=begin; tail=b""
   while cur<end:
    want=min(1024*1024,end-cur)
    try: data=os.pread(fd,want,cur)
-   except OSError: cur+=want; continue
-   pos=0
+   except OSError: cur+=want; tail=b""; continue
+   if not data: cur+=want; tail=b""; continue
+   merged=tail+data; merged_base=cur-len(tail); pos=0
    while True:
-    idx=data.find(pat,pos)
+    idx=merged.find(pat,pos)
     if idx<0: break
-    obj=cur+idx
+    obj=merged_base+idx
     if obj%8==0:
      try: private=struct.unpack("<Q",os.pread(fd,8,obj+8))[0]
      except Exception: private=0
      if private and in_rw(private): hits.append(obj)
     pos=idx+1
-   cur+=len(data) if data else want
+   tail=merged[-7:]; cur+=len(data)
  hits=sorted(set(hits))
- if len(hits)!=1: raise SystemExit("TPLAYERDATA_OBJECT_COUNT="+str(len(hits)))
- obj=hits[0]; vals=[]
- for off in offsets: vals.append(struct.unpack("<i",os.pread(fd,4,obj+off))[0])
+ if len(hits)!=1: raise SystemExit("CYCLOPEDIA_OBJECT_COUNT="+str(len(hits)))
+ obj=hits[0]
+ def read_triplet(offsets): return tuple(struct.unpack("<i",os.pread(fd,4,obj+off))[0] for off in offsets)
+ a=read_triplet(primary); b=read_triplet(mirror)
+ if a!=b: raise SystemExit("CYCLOPEDIA_POSITION_MIRROR_MISMATCH")
+ x,y,z=a
+ if not (1<=x<=65535 and 1<=y<=65535 and 0<=z<=15): raise SystemExit("CYCLOPEDIA_POSITION_IMPLAUSIBLE")
 finally: os.close(fd)
-print(json.dumps({"state":"AVAILABLE","reader_id":"player_state_typed_reader","position":{"x":vals[0],"y":vals[1],"z":vals[2]},"object_count":1,"process_memory_access":"read_only","semantic_state":"CANDIDATE_PENDING_CAUSAL_E2E"},sort_keys=True))
+print(json.dumps({"state":"AVAILABLE","reader_id":"player_state_typed_reader","position":{"x":x,"y":y,"z":z},"object_count":1,"position_mirror_consistent":True,"process_memory_access":"read_only","semantic_state":"CANDIDATE_PENDING_CAUSAL_E2E"},sort_keys=True))
 '''
 
-def read_player_state(*, pid:int, start_ticks:int, runner:Callable[[list[str]], str], container:str=EXPECTED_TARGET_CONTAINER) -> dict[str, object]:
-    layout=CURRENT_LAYOUT
-    args=["docker","exec",container,"python3","-c",READ_ONLY_PROBE,str(pid),str(start_ticks),str(EXPECTED_CLIENT_SIZE),EXPECTED_CLIENT_SHA256,hex(layout.vptr),*(hex(v) for v in layout.offsets)]
+
+def read_player_state(*, pid: int, start_ticks: int, runner: Callable[[list[str]], str], container: str = EXPECTED_TARGET_CONTAINER) -> dict[str, object]:
+    layout = CURRENT_LAYOUT
+    args = [
+        "docker", "exec", container, "python3", "-c", READ_ONLY_PROBE,
+        str(pid), str(start_ticks), str(EXPECTED_CLIENT_SIZE), EXPECTED_CLIENT_SHA256,
+        hex(layout.vptr), *(hex(v) for v in layout.primary_offsets), *(hex(v) for v in layout.mirror_offsets),
+    ]
     try:
-        raw=runner(args).strip()
-        doc=json.loads(raw)
+        raw = runner(args).strip()
+        doc = json.loads(raw)
     except Exception as exc:
-        return {"state":"UNAVAILABLE","reader_id":READER_ID,"reason":f"READ_FAILED:{type(exc).__name__}","semantic_promotion_allowed":False}
-    doc["layout_evidence"]=layout.evidence(); doc["semantic_promotion_allowed"]=False
+        return {
+            "state": "UNAVAILABLE",
+            "reader_id": READER_ID,
+            "reason": f"READ_FAILED:{type(exc).__name__}",
+            "semantic_promotion_allowed": False,
+        }
+    doc["layout_evidence"] = layout.evidence()
+    doc["semantic_promotion_allowed"] = False
     return doc

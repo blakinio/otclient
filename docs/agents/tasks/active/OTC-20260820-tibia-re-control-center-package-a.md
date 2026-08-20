@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260820-tibia-re-control-center-package-a
-status: blocked
+status: waiting
 agent: ChatGPT
 project_lane: otclient
 lane: P1-CONTROL-CORE
@@ -11,7 +11,7 @@ risk: medium
 branch: feat/OTC-20260820-tibia-re-control-center-package-a
 base_branch: main
 created: 2026-08-20T14:18:00+02:00
-updated: 2026-08-20T21:23:56+02:00
+updated: 2026-08-20T21:37:00+02:00
 initial_base_sha: 8620310a91c53e63abc0bf51fe40bdb8a3ee6cef
 related_pr: 628
 runtime_access: none
@@ -43,7 +43,7 @@ execution_reason: GitHub connector plus isolated GitHub-hosted validation preser
 execution_budget_minutes: 120
 execution_budget_reason: cohesive Package A implementation, exact-head validation, independent validator role, merge and mandatory archive closeout
 invocation_started_at: 2026-08-20T14:18:00+02:00
-last_progress_at: 2026-08-20T21:23:56+02:00
+last_progress_at: 2026-08-20T21:37:00+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: final_exact_head_green_audit_blocked
 terminal_ci_wait_started_at: null
@@ -62,9 +62,8 @@ context_score: 10
 estimate_confidence: medium
 validation_level: full
 complete_user_facing_feature: false
+delegated_repair_task: OTC-20260820-tibia-re-control-center-package-a-p1-isolation
 owned_paths:
-  - tools/tibia_re_control_center/**
-  - tests/tools/tibia_re_control_center/**
   - .github/workflows/tibia-re-control-center-core.yml
   - docs/agents/tasks/active/OTC-20260820-tibia-re-control-center-package-a.md
   - docs/agents/tasks/archive/OTC-20260820-tibia-re-control-center-package-a.md
@@ -184,8 +183,8 @@ recovery:
   wait_deadline_at: null
   check_generation: final_exact_head_green_audit_blocked
   checks_used: 2
-  status: blocked
+  status: waiting
   safe_to_resume: false
-  resume_condition: a fresh isolation task is explicitly authorized under ANTI_STALL_AND_EXECUTION_BUDGET.md
-  next_action: create or authorize a fresh isolated repair task for the four remaining P1 findings, then repair and re-audit PR #628 without resetting this task's exhausted repair-cycle counter
+  resume_condition: delegated repair task OTC-20260820-tibia-re-control-center-package-a-p1-isolation reaches terminal PASS
+  next_action: reconcile the delegated isolation result into PR #628 closeout after the child task is terminal
 ```

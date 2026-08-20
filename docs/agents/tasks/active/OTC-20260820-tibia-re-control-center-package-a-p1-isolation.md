@@ -11,17 +11,28 @@ risk: medium
 branch: feat/OTC-20260820-tibia-re-control-center-package-a
 base_branch: main
 created: 2026-08-20T21:37:00+02:00
-updated: 2026-08-20T21:45:00+02:00
+updated: 2026-08-20T21:59:00+02:00
 initial_base_sha: 9376ad6ff13924628749a186f2586d438f2c60bd
 related_pr: 628
 parent_task: OTC-20260820-tibia-re-control-center-package-a
 fresh_isolation_authorized_by_owner: true
 fresh_isolation_authorized_at: 2026-08-20T21:37:00+02:00
 runtime_access: none
+runtime_owner_task: NOT_APPLICABLE
+runtime_namespace: NOT_APPLICABLE
+canonical_registration: NOT_APPLICABLE
+canonical_lease_generation: NOT_APPLICABLE
+registration_lease_generation: NOT_APPLICABLE
+gate_a: NOT_APPLICABLE
+generation_rebind: NOT_APPLICABLE
+gate_b: NOT_APPLICABLE
+bootstrap: NOT_APPLICABLE
+target_uniqueness: NOT_APPLICABLE
 mutation_authorized: false
 credentials_allowed: false
 login_allowed: false
 gameplay_allowed: false
+transaction_authorized: false
 network_listener_allowed: false
 official_client_access: false
 policy_version: 2
@@ -34,14 +45,14 @@ execution_mode: remote_desktop_plus_github
 execution_budget_minutes: 120
 execution_budget_reason: owner-authorized fresh isolation after parent task exhausted three audit repair cycles
 invocation_started_at: 2026-08-20T21:37:00+02:00
-last_progress_at: 2026-08-20T21:45:00+02:00
+last_progress_at: 2026-08-20T21:59:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: isolation_candidate_pending_ci
+ci_check_generation: isolation_governance_repair_pending_ci
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 1
+repair_cycles_for_current_gate: 2
 context_reconstruction_attempts: 0
 stall_warnings: 0
 validation_level: full
@@ -96,19 +107,19 @@ recovery:
   generation: 1
   session_id: package-a-p1-isolation-20260820-2137
   session_started_at: 2026-08-20T21:37:00+02:00
-  checkpointed_at: 2026-08-20T21:45:00+02:00
-  last_progress_at: 2026-08-20T21:45:00+02:00
+  checkpointed_at: 2026-08-20T21:59:00+02:00
+  last_progress_at: 2026-08-20T21:59:00+02:00
   phase: validate
-  exact_head: pending_commit
+  exact_head: 1953043e50791af958c5ecf3a503d1b405c2ad0a
   pull_request: 628
-  active_operation: publish isolation candidate then run exact-head CI and fresh independent review
+  active_operation: repair deterministic Track A admission metadata, then publish exact-head successor for CI and fresh independent review
   external_run_ids: []
   operation_started_at: 2026-08-20T21:45:00+02:00
   wait_deadline_at: null
-  check_generation: isolation_candidate_pending_ci
+  check_generation: isolation_governance_repair_pending_ci
   checks_used: 0
   status: active
   safe_to_resume: true
   resume_condition: PR #628 remains Draft and this isolation task remains sole writer for delegated repair paths
-  next_action: commit and push the validated isolation candidate, then request fresh exact-head Codex review and inspect exact-head CI
+  next_action: validate the admission metadata repair, commit/push the exact-head successor, then request fresh exact-head Codex review and inspect exact-head CI
 ```

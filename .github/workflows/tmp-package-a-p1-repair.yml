@@ -25,7 +25,7 @@ jobs:
       - name: Verify one-shot parent
         shell: bash
         env:
-          EXPECTED_PARENT: 599070d22d1803100fe7c69f3e4178630c5701ab
+          EXPECTED_PARENT: feacb118b750caa2d7e6213b585f6b600dfac242
         run: |
           set -Eeuo pipefail
           test "$(git rev-parse HEAD^)" = "$EXPECTED_PARENT"

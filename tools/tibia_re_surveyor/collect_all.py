@@ -87,9 +87,13 @@ def _safe_runtime(runtime: object) -> dict:
     value = {
         "observed_at_epoch": runtime.get("observed_at_epoch"),
         "target_container": runtime.get("target_container"),
+        "control_container": runtime.get("control_container"),
         "display": runtime.get("display"),
         "target_running": runtime.get("target_running"),
-        "candidate_process_count": runtime.get("candidate_process_count"),
+        "runtime_namespace_scope": runtime.get("runtime_namespace_scope"),
+        "external_containers_scanned": runtime.get("external_containers_scanned"),
+        "target_process_count": runtime.get("target_process_count"),
+        "target_uniqueness_scope": runtime.get("target_uniqueness_scope"),
         "target_uniqueness": runtime.get("target_uniqueness"),
         "runtime_access": runtime.get("runtime_access"),
         "exact_current_fence": {

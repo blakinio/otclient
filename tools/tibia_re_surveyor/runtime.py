@@ -11,6 +11,8 @@ EXPECTED_CLIENT_VERSION = "15.32"
 EXPECTED_CLIENT_SIZE = 52_109_920
 EXPECTED_CLIENT_SHA256 = "ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8"
 CANONICAL_STATE_ROOT = "/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime"
+EXPECTED_TARGET_CONTAINER = "otclient-track-a-kasmvnc"
+EXPECTED_CONTROL_CONTAINER = "otclient-synology-runner"
 
 
 class RuntimeProbeError(RuntimeError):
@@ -37,10 +39,14 @@ class CommandRunner:
 
 
 class DockerRuntimeProbe:
-    def __init__(self, target_container: str = "otclient-track-a-kasmvnc", display: str = ":1", control_container: str = "otclient-synology-runner", runner: Optional[CommandRunner] = None, now_fn=time.time):
+    def __init__(self, target_container: str = EXPECTED_TARGET_CONTAINER, display: str = ":1", control_container: str = EXPECTED_CONTROL_CONTAINER, runner: Optional[CommandRunner] = None, now_fn=time.time):
         for name in (target_container, control_container):
             if not re.fullmatch(r"[A-Za-z0-9_.-]+", name):
                 raise ValueError(f"invalid container name: {name!r}")
+        if target_container != EXPECTED_TARGET_CONTAINER:
+            raise ValueError("target container is outside the declared Track A runtime namespace")
+        if control_container != EXPECTED_CONTROL_CONTAINER:
+            raise ValueError("control container is outside the declared OTClient control namespace")
         if not re.fullmatch(r":\d+", display):
             raise ValueError("display must look like :N")
         self.target_container = target_container
@@ -94,31 +100,24 @@ class DockerRuntimeProbe:
             windows.append({"xid": xid, "pid": int(pid_match.group(1)) if pid_match else None, "title_class": "CHARACTER_CONTEXT" if "Tibia - " in name_raw else "TIBIA_WINDOW"})
         return windows
 
-    def _candidate_containers(self) -> dict:
-        names = self._run(["docker", "ps", "--format", "{{.Names}}"])
-        candidates: List[dict] = []
-        unresolved_count = 0
-        for name in sorted(filter(None, (line.strip() for line in names.splitlines()))):
-            if not re.fullmatch(r"[A-Za-z0-9_.-]+", name):
-                continue
-            try:
-                result = self.runner.run(["docker", "exec", name, "pgrep", "-x", "client"], timeout=5.0)
-            except RuntimeProbeError:
-                if name == self.target_container:
-                    raise
-                unresolved_count += 1
-                continue
-            if result.returncode not in (0, 1):
-                if name == self.target_container:
-                    raise RuntimeProbeError(
-                        f"target container client census failed with rc={result.returncode}"
-                    )
-                unresolved_count += 1
-                continue
-            pids = [int(value) for value in result.stdout.split() if value.isdigit()]
-            if pids:
-                candidates.append({"container": name, "pids": pids, "count": len(pids)})
-        return {"candidates": candidates, "unresolved_count": unresolved_count}
+    def _target_client_pids(self) -> List[int]:
+        """Return client PIDs from the declared Track A runtime container only.
+
+        Surveyor is a verifier for a known runtime namespace, not a Docker-host
+        inventory scanner.  It must never enumerate or execute discovery commands
+        in unrelated containers on the shared Synology host.
+        """
+        result = self.runner.run(
+            ["docker", "exec", self.target_container, "pgrep", "-x", "client"],
+            timeout=5.0,
+        )
+        if result.returncode == 1:
+            return []
+        if result.returncode != 0:
+            raise RuntimeProbeError(
+                f"target container client census failed with rc={result.returncode}"
+            )
+        return [int(value) for value in result.stdout.split() if value.isdigit()]
 
     def _safe_json_file(self, path: str, fields: Sequence[str]) -> Optional[dict]:
         script = "import json,pathlib,sys; p=pathlib.Path(sys.argv[1]); d=json.loads(p.read_text()) if p.is_file() else None; print(json.dumps(None if d is None else {k:d.get(k) for k in sys.argv[2:]},sort_keys=True))"
@@ -135,28 +134,16 @@ class DockerRuntimeProbe:
         running = self._run(["docker", "inspect", "-f", "{{.State.Running}}", self.target_container], required=False).strip() == "true"
         if not running:
             return {"observed_at_epoch": now, "target_container": self.target_container, "display": self.display, "target_running": False, "target_uniqueness": "NOT_PROVEN", "runtime_access": "READ_ONLY_UNAVAILABLE"}
-        pid_raw = self._docker_exec(self.target_container, ["pgrep", "-x", "client"], required=False)
-        pids = [int(value) for value in pid_raw.split() if value.isdigit()]
+        pids = self._target_client_pids()
         processes = [self._process_identity(pid) for pid in pids]
         windows = self._visible_tibia_windows()
-        candidate_probe = self._candidate_containers()
-        candidates = candidate_probe["candidates"]
-        unresolved_count = int(candidate_probe["unresolved_count"])
-        total_candidates = sum(item["count"] for item in candidates)
         target_pid = pids[0] if len(pids) == 1 else None
         target_window = next((w for w in windows if w.get("pid") == target_pid), None)
-        unique = (
-            unresolved_count == 0
-            and len(pids) == 1
-            and total_candidates == 1
-            and len(candidates) == 1
-            and candidates[0]["container"] == self.target_container
-            and target_window is not None
-        )
+        unique = len(pids) == 1 and target_window is not None
         registration = self._safe_json_file(f"{CANONICAL_STATE_ROOT}/runtime-registration.json", ("schema_version", "runtime_id", "registration_generation", "lease_generation", "boot_id_sha256", "pid", "process_start_ticks", "client_version", "client_size", "client_sha256", "display", "remote_view_mapping", "state", "source_task", "source_run"))
         lease = self._safe_json_file(f"{CANONICAL_STATE_ROOT}/lease.json", ("schema_version", "runtime_id", "status", "generation", "controller_task", "acquired_at", "renewed_at", "expires_at", "takeover_from"))
         lease_expired = True
         if lease and isinstance(lease.get("expires_at"), (int, float)):
             lease_expired = int(lease["expires_at"]) <= now
         fence_match = len(processes) == 1 and bool(processes[0]["exact_fence_match"])
-        return {"observed_at_epoch": now, "target_container": self.target_container, "display": self.display, "target_running": True, "processes": processes, "visible_tibia_windows": windows, "candidate_containers": candidates, "candidate_process_count": total_candidates, "candidate_probe_unresolved_count": unresolved_count, "target_uniqueness": "PROVEN" if unique else "NOT_PROVEN", "exact_current_fence": {"version": EXPECTED_CLIENT_VERSION, "size": EXPECTED_CLIENT_SIZE, "sha256": EXPECTED_CLIENT_SHA256, "match": fence_match}, "canonical_control": {"registration_present": registration is not None, "registration": registration, "lease_present": lease is not None, "lease": lease, "lease_expired": lease_expired}, "runtime_access": "READ_ONLY_ADMITTED" if unique and fence_match else "READ_ONLY_NOT_ADMITTED"}
+        return {"observed_at_epoch": now, "target_container": self.target_container, "control_container": self.control_container, "display": self.display, "target_running": True, "processes": processes, "visible_tibia_windows": windows, "runtime_namespace_scope": "DECLARED_TARGET_ONLY", "external_containers_scanned": False, "target_process_count": len(pids), "target_uniqueness_scope": "DECLARED_RUNTIME_NAMESPACE", "target_uniqueness": "PROVEN" if unique else "NOT_PROVEN", "exact_current_fence": {"version": EXPECTED_CLIENT_VERSION, "size": EXPECTED_CLIENT_SIZE, "sha256": EXPECTED_CLIENT_SHA256, "match": fence_match}, "canonical_control": {"registration_present": registration is not None, "registration": registration, "lease_present": lease is not None, "lease": lease, "lease_expired": lease_expired}, "runtime_access": "READ_ONLY_ADMITTED" if unique and fence_match else "READ_ONLY_NOT_ADMITTED"}

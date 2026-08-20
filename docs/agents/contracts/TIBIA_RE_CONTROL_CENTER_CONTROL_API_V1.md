@@ -2,46 +2,43 @@
 
 ```yaml
 contract_id: TIBIA-RE-CONTROL-CENTER-CONTROL-API-V1
-version: 1.1
+version: 1.2
 major_version: 1
 status: normative_design
 producer_repository: blakinio/otclient
 runtime_authority: none
 remote_exposure: forbidden_in_v1
+artifact_semantics: docs/agents/contracts/TIBIA_RE_CONTROL_CENTER_ARTIFACT_V1.md
 ```
 
 ## 1. Purpose
 
-Define one bounded, local-only operator transport for the Control Center so browser and CLI invoke exactly the same domain operations without creating a second execution implementation.
+Define one bounded local-only operator transport so browser and CLI invoke exactly the same Control Center domain operations without creating a second execution implementation.
 
-This contract covers transport authentication, same-origin/Host policy, clickjacking resistance, request idempotency, replay behavior, bounds, event delivery and shutdown. It does not grant Track A authority and does not authorize remote/LAN control.
+This contract covers transport authentication, Host/Origin/anti-framing trust, request/resource idempotency, crash replay, bounds, event delivery and shutdown. It does not grant Track A authority and does not authorize remote/LAN control.
 
-Normative execution semantics remain in `TIBIA_RE_CONTROL_CENTER_EXECUTION_V1.md`. Durable global RequestLedger and control-state semantics are normative in `TIBIA_RE_CONTROL_CENTER_ARTIFACT_V1.md`.
+Normative execution semantics remain in Execution v1. Global RequestLedger, ResourceIdentityLedger and ControlState persistence are normative in Artifact v1.
 
 ## 2. Threat model
 
-Loopback binding reduces network exposure but is not sufficient by itself.
-
-The local API must defend against at least:
+Loopback binding is insufficient by itself. Defend against at least:
 
 - unrelated local web pages attempting cross-origin requests;
-- DNS rebinding to a loopback-bound service;
-- hostile framing/clickjacking of the real same-origin operator UI;
-- browser retries/reloads;
-- CLI retries;
-- connection loss after the backend accepted a request;
-- crash after request acceptance but before response/resource scheduling;
+- DNS rebinding to loopback;
+- hostile framing/clickjacking of the real operator UI;
+- browser/CLI retries and lost responses;
+- crash after request identity allocation but before scheduling/response;
 - duplicate tabs/operators;
 - oversized/malformed requests;
 - slow event consumers;
 - backend restart;
 - accidental wildcard/non-loopback bind.
 
-This contract is not a hostile-local-user privilege boundary. Another process running as the same trusted OS user may be able to read the local control credential or access the same files. Hardening against a malicious same-user process requires a separate OS security design.
+This is not a hostile same-OS-user privilege boundary. A malicious process under the same trusted user may access local credential/files; that requires a separate OS security design.
 
 ## 3. Bind policy
 
-Control API v1 binds exactly to IPv4 loopback by default:
+Default:
 
 ```text
 127.0.0.1:<ephemeral-or-configured-port>
@@ -49,19 +46,15 @@ Control API v1 binds exactly to IPv4 loopback by default:
 
 Rules:
 
-- wildcard addresses (`0.0.0.0`, `::`) are forbidden;
-- non-loopback addresses are forbidden;
-- IPv6 `::1` may be enabled only explicitly and must preserve all v1 Host/origin/token rules;
-- bind failure is terminal for the API listener; do not silently fall back to another interface;
-- the chosen authority (`host:port`) is recorded as non-secret runtime status, not as mutation authority.
-
-Remote/LAN exposure requires a new separately reviewed security profile/major contract. There is no v1 convenience flag that weakens this rule.
+- `0.0.0.0`, `::` and all non-loopback addresses are forbidden;
+- `::1` may be enabled only explicitly and must preserve all v1 trust rules;
+- bind failure is terminal; no silent fallback to another interface;
+- chosen `host:port` is non-secret runtime status, not mutation authority;
+- remote/LAN exposure requires a separately reviewed new security profile/major contract.
 
 ## 4. Backend control credential
 
-Each backend process creates a fresh random `control_nonce` bound to its `backend_epoch`.
-
-Requirements:
+Each backend process creates a fresh random `control_nonce` bound to its fresh `backend_epoch`.
 
 ```yaml
 entropy_bits_minimum: 256
@@ -70,44 +63,39 @@ persist_to_run_artifacts: false
 loggable: false
 ```
 
-The nonce is Control Center local-control secret material, not Tibia account/auth material.
+Requirements:
 
-Storage/handling:
-
-- store only in memory and/or a mode-0600 backend runtime file owned by the current OS user;
-- never place it in scenario files, Event payloads, reports, agent bundles, URLs, query strings, fragments or browser history;
-- never print it in logs/errors;
-- rotate on every backend epoch;
-- delete/overwrite the runtime file on clean shutdown where practical; stale nonce is invalid because backend epoch changes.
+- memory and/or mode-0600 backend runtime file owned by current OS user only;
+- never scenario/Event/report/agent bundle/URL/query/fragment/browser history/log/error;
+- rotate every backend epoch;
+- clean shutdown deletes/overwrites runtime file where practical;
+- stale nonce is invalid after backend epoch changes.
 
 ## 5. Browser bootstrap and mandatory anti-framing
 
-The browser UI is served by the same backend origin as the Control API.
+The browser UI is served by the same backend origin as Control API.
 
-The initial HTML/bootstrap response may provision the current nonce to same-origin JavaScript through a non-URL mechanism such as an inline boot object or a same-origin protected bootstrap response.
+Current nonce may be provisioned to same-origin JavaScript only through a non-URL mechanism such as an inline boot object protected by CSP or a protected same-origin bootstrap response.
 
 Requirements:
 
-- nonce must never appear in a URL/query/fragment;
-- every HTML/bootstrap response containing the nonce uses `Cache-Control: no-store`;
-- no third-party scripts/resources are required for the initial implementation;
-- the initial implementation **MUST** emit a Content Security Policy that is self-contained/same-origin and includes `frame-ancestors 'none'`;
-- the UI **MUST NOT** be frameable by another origin or by arbitrary same-site pages; an implementation may also emit `X-Frame-Options: DENY` as defense in depth;
-- weakening/removing `frame-ancestors 'none'` requires a separately reviewed integration/security profile; it is not a v1 runtime flag;
-- browser code sends the control nonce only in the required custom request header;
-- no script loaded by the UI may send the nonce to another origin.
+- nonce never in URL/query/fragment;
+- any response containing nonce uses `Cache-Control: no-store`;
+- no required third-party script/resource in initial implementation;
+- CSP **MUST** be same-origin/self-contained and include `frame-ancestors 'none'`;
+- ordinary config cannot weaken/remove `frame-ancestors 'none'`;
+- `X-Frame-Options: DENY` may be emitted as defense in depth;
+- browser sends nonce only in required custom header and never to another origin.
 
-Origin+nonce protect direct hostile requests; mandatory anti-framing protects the real authenticated same-origin UI from being driven through clickjacking.
+Origin+nonce protect direct hostile requests; anti-framing protects the authenticated real UI from clickjacking.
 
 ## 6. CLI credential access
 
-CLI obtains the current nonce from the backend's mode-0600 runtime metadata/control file or an equivalent local IPC bootstrap approved by the implementation.
+CLI reads current nonce from mode-0600 runtime metadata/control file or equivalent approved local IPC bootstrap.
 
-CLI must not accept the control nonce via ordinary command-line argument because process argument listings can expose it.
+Nonce must not be accepted as ordinary command-line argument. Environment transport is discouraged and not default.
 
-Environment-variable transport is discouraged and must not be the default because environment dumps/debugging can leak it.
-
-## 7. Required request authentication
+## 7. Request authentication
 
 Every `/v1/*` request, including reads, requires:
 
@@ -115,61 +103,53 @@ Every `/v1/*` request, including reads, requires:
 X-Tibia-RE-Control-Nonce: <current nonce>
 ```
 
-Missing, malformed or stale nonce -> `401 CONTROL_AUTH_REQUIRED` without revealing expected values.
+Missing/malformed/stale -> `401 CONTROL_AUTH_REQUIRED` without disclosing expected value.
 
-The backend compares nonce values using a constant-time comparison where practical.
+Constant-time compare where practical.
 
-A successful local control nonce proves only access to the Control API. It grants no Track A mutation authority.
+Nonce proves only local API access, never Track A mutation authority.
 
 ## 8. Host and DNS-rebinding defense
 
-The backend records its configured/actual loopback authorities at listener creation.
-
-Every HTTP request must have a `Host` header matching exactly one allowed authority for that listener, including the actual port.
+Every request must carry exact allowed `Host`, including actual port, for the listener.
 
 Examples:
 
 ```text
 127.0.0.1:49152
-localhost:49152      only if explicitly enabled and resolved/served intentionally
-[::1]:49152          only if IPv6 loopback was explicitly enabled
+localhost:49152     only if explicitly enabled
+[::1]:49152         only if explicitly enabled
 ```
 
 Unknown Host -> `421 CONTROL_HOST_REJECTED`.
 
-Do not accept arbitrary DNS names merely because they resolve to `127.0.0.1`.
-
-Do not infer trust from client source IP alone.
+Never trust arbitrary DNS name merely because it resolves to loopback. Never infer trust from source IP alone.
 
 ## 9. Origin/CORS policy
 
-Browser requests must be same-origin.
+Browser requests are exact same-origin.
 
-Rules:
-
-- do not emit permissive CORS (`*` or reflected arbitrary origins);
-- requests with an `Origin` header must match the backend's exact allowed origin (`scheme://host:port`);
+- no `Access-Control-Allow-Origin: *`;
+- no reflected arbitrary origin;
+- present `Origin` must exactly equal allowed `scheme://host:port`;
 - mismatched/null/untrusted browser Origin -> `403 CONTROL_ORIGIN_REJECTED`;
-- preflight requests from untrusted origins are rejected;
-- same-origin UI uses the custom nonce header;
-- CLI/non-browser clients may omit `Origin` but still require valid Host and nonce;
-- do not enable cookie-based ambient authentication for v1.
-
-This prevents an unrelated website from turning the user's browser into an authenticated Control Center operator through a direct request.
+- reject preflight from untrusted origin;
+- CLI/non-browser may omit Origin but still needs exact Host+nonce;
+- no cookie ambient authentication.
 
 ## 10. HTTP method policy
 
-Only explicitly declared methods/routes exist.
+Only declared methods/routes exist.
 
 Unknown route -> `404 CONTROL_ROUTE_NOT_FOUND`.
 
-Unsupported method on a known route -> `405 CONTROL_METHOD_NOT_ALLOWED`.
+Unsupported method on known route -> `405 CONTROL_METHOD_NOT_ALLOWED`.
 
-No generic RPC, eval, shell, raw-adapter, raw-input or debug mutation endpoint is permitted.
+No generic RPC, eval, shell, raw-adapter, raw-input or debug mutation endpoint.
 
 ## 11. API routes
 
-Minimum v1 routes:
+Minimum:
 
 ```text
 GET  /v1/status
@@ -189,36 +169,19 @@ POST /v1/stop-all
 POST /v1/reset-stop
 ```
 
-Implementations may add additive bounded read-only routes inside major version 1. New mutation-capable operations require explicit domain semantics and idempotency and must not bypass Scenario Engine/MutationCoordinator.
+Additive bounded read-only routes are allowed in major v1. New mutation-capable operation requires explicit domain semantics/idempotency and cannot bypass Scenario Engine/MutationCoordinator.
 
-## 12. Request IDs and POST idempotency
+## 12. Request IDs and request hash
 
-Every POST requires a caller-provided:
+Every POST requires caller-provided non-secret:
 
 ```text
-X-Tibia-RE-Request-Id: <opaque non-secret ID>
+X-Tibia-RE-Request-Id: <request_id>
 ```
 
-`request_id` is distinct from `action_id`.
+`request_id` is distinct from semantic `action_id`.
 
-- `request_id` deduplicates transport/domain requests such as creating a run or issuing STOP;
-- `action_id` deduplicates logical semantic action attempts inside runs.
-
-The authoritative RequestLedger is global and uses Artifact v1 `RequestLedgerRecord`:
-
-```yaml
-request_id:
-request_hash:
-operation:
-resource_id:
-transition_id:
-backend_epoch_created:
-status: INTENT_DURABLE | ACCEPTED | COMPLETED | FAILED | RECOVERY_REQUIRED
-response_code:
-response_body_hash:
-```
-
-The request hash is:
+Request hash:
 
 ```text
 request_hash = lowercase_hex(SHA-256(UTF8(JCS({
@@ -229,86 +192,112 @@ request_hash = lowercase_hex(SHA-256(UTF8(JCS({
 }))))
 ```
 
-Headers carrying nonce, request ID, timestamps or transport metadata do not participate in the request hash.
+Nonce/request-id/timestamp/transport headers are excluded from hash.
+
+All bodies are parsed into typed bounded domain structs before hashing; duplicate JSON keys, unsafe/unknown required fields, polymorphic arbitrary objects, non-finite/out-of-domain values and secrets are rejected.
+
+One-step/scenario bodies additionally satisfy Scenario v1.
+
+## 13. Global RequestLedger and ResourceIdentityLedger
+
+Artifact v1 global safety state is authoritative.
+
+`RequestLedgerRecord` fixes:
+
+```text
+request_id
+request_hash
+operation
+resource_id or transition_id
+status
+```
+
+Resource-creating operations additionally use Artifact-v1 `ResourceIdentityRecord` to fix stable logical IDs before scheduling.
 
 Duplicate rules:
 
-- same `request_id` + same request hash -> return/recover the existing logical response/resource/transition; do not allocate a second identity or re-execute a completed domain side effect;
-- same `request_id` + different request hash -> `409 CONTROL_IDEMPOTENCY_CONFLICT`;
-- repeated `POST /v1/runs` with the same request ID returns the same `run_id`, never creates a second run;
-- repeated one-step experiment request resolves to the same experiment/run/action identities;
-- duplicate STOP request resolves the same logical `transition_id`; it must not create accidental additional semantic effects merely due to transport retry;
-- duplicate reset request resolves the same logical `transition_id`; uncertain reset recovery never silently clears STOP.
+- same request ID/hash -> return/recover same resource/transition/result; never allocate replacement;
+- same request ID/different hash/operation -> `409 CONTROL_IDEMPOTENCY_CONFLICT`;
+- repeated `POST /v1/runs` -> same `run_id`;
+- repeated one-step POST -> same `experiment_id`, `run_id`, initial `action_ids`;
+- duplicate STOP/reset -> same logical transition ID;
+- duplicate transport delivery never creates extra semantic effect by itself.
 
-## 13. Crash-safe request admission protocol
+## 14. Crash-safe resource-creating POST protocol
 
-For every POST capable of creating durable identity, scheduling work or changing durable control state, use the following ordering:
+For `POST /v1/runs` and `POST /v1/experiments/one-step`:
 
 ```text
 parse + normalize + validate
 -> compute request_hash
 -> serialize on request_id in local safety store
 -> check existing request_id/hash
--> allocate stable logical resource_id/transition_id in memory
--> atomically durably write RequestLedger INTENT_DURABLE
-   + minimum corresponding domain/control record
+-> allocate stable run/experiment/action identities in memory
+-> atomically durably write:
+     RequestLedger(status=INTENT_DURABLE, resource_id=<stable resource>)
+   + ResourceIdentityRecord(state=CREATED_NOT_SCHEDULED, all stable child IDs)
 -> durability barrier succeeds
--> only then schedule/execute the domain operation
--> persist ACCEPTED/COMPLETED/FAILED transition
+-> only now mark resource SCHEDULED and schedule domain work
+-> persist ACCEPTED/COMPLETED/FAILED request transition
 -> return response
 ```
 
-The `INTENT_DURABLE + minimum corresponding record` atomicity is normative in Artifact v1.
+For `/v1/runs`:
 
-Examples:
+```text
+resource_kind = RUN
+resource_id = run_id
+```
 
-- `POST /v1/runs`: durable mapping plus `RunRecord(CREATED/NOT_SCHEDULED)` precedes scheduling;
-- one-step experiment: durable experiment/run/action identities with action `NOT_DISPATCHED` precede scheduling;
-- pause/resume/abort: durable request/transition identity precedes the idempotent run-state transition;
-- STOP/reset: durable request/transition identity precedes the Execution-v1 control transition; `ControlStateRecord.last_transition_id` proves whether that transition committed.
+For one-step:
 
-Failure before the durable intent means the conforming backend was forbidden to create/schedule the protected resource, so a later same request may safely allocate it once.
+```text
+resource_kind = ONE_STEP_EXPERIMENT
+resource_id = experiment_id
+ResourceIdentityRecord fixes experiment_id + run_id + initial action_ids
+```
 
-Failure after durable intent means the identity already exists. Recovery must never allocate a replacement.
+Failure semantics:
 
-Mutation-capable work is never automatically resumed solely because an intent/resource survived restart.
+- before durable pair -> protected resource was not scheduled; later same request may allocate once;
+- after durable pair but before scheduling -> same request recovers same IDs; no replacement and no mutation auto-resume;
+- uncertain/corrupt pair -> `RECOVERY_REQUIRED`, fail closed, no replacement/re-execution.
 
-### 13.1 STOP/reset recovery
+## 15. Crash-safe run-control POST protocol
 
-For a STOP intent whose transition is not yet proven committed, recovery may complete the **same** STOP transition ID because doing so only strengthens the fail-closed state.
+Pause/resume/abort do not allocate a new run. They use stable `transition_id` in RequestLedger before applying the idempotent run-state transition.
 
-For a reset intent whose transition is not proven committed, recovery must leave STOP latched and return `RECOVERY_REQUIRED`; it must not auto-apply reset. A new explicit reset may be issued only after the recovered state is validated under Execution v1.
+A duplicate request resolves the same transition. If recovery cannot prove whether a transition completed, domain recovery must use the existing run state and fail closed rather than create a new run/action.
 
-## 14. Request-ledger durability and retention
+Pause/resume never cache or manufacture external authority; later mutation final commit is freshly checked.
 
-Package B persists the global RequestLedger in the selected Control Center safety store.
+## 16. STOP/reset request recovery
 
-After backend restart:
+STOP/reset use RequestLedger `transition_id` plus Execution/Artifact `ControlStateRecord.last_transition_id`.
 
-- valid same request ID/hash retrieves the existing durable resource/result;
-- an `INTENT_DURABLE` resource remains the same identity even when scheduling never started;
-- missing/corrupt contradictory state after a protected intent may have existed fails closed and must not silently recreate mutation-capable work;
-- request IDs are never reused for a different operation/body.
+Ordering:
 
-The ledger may retain completed non-mutating requests for a bounded retention window, but any entry needed to prevent duplicate side effects/resources must remain at least as long as the corresponding run/action/control recovery state.
+```text
+RequestLedger INTENT_DURABLE(request_id, request_hash, transition_id)
+-> Execution-v1 STOP_TRANSITION or RESET_TRANSITION under dispatch_gate
+-> persist request terminal status
+```
 
-## 15. Normalized request bodies
+Recovery:
 
-All JSON request bodies are validated into typed domain request structs before hashing or execution.
+- uncommitted/uncertain STOP intent may complete the **same** STOP transition ID because this strengthens fail-closed state;
+- uncommitted/uncertain reset intent must **not** auto-apply reset; remain latched and return `RECOVERY_REQUIRED` until a new explicit reset is validly admitted;
+- committed transition is recognized by matching durable ControlState transition ID and replay returns that logical result.
 
-Rules:
+## 17. Retention
 
-- duplicate JSON keys are rejected by the parser/decoder path selected by the implementation;
-- unknown required/unsafe fields are rejected;
-- no polymorphic arbitrary object deserialization;
-- strings/collections/numbers obey finite route-specific bounds;
-- no secret values belong in ordinary API request types.
+RequestLedger/ResourceIdentity records required to prevent duplicate resources/effects remain at least as long as corresponding run/action/control recovery state.
 
-One-step experiment/scenario bodies must satisfy `TIBIA_RE_CONTROL_CENTER_SCENARIO_V1.md`.
+Eviction cannot turn missing history into permission to allocate/retry.
 
-## 16. Default bounds
+## 18. Default bounds
 
-Initial defaults, configurable only downward without a security review:
+Initial defaults, configurable only downward without security review:
 
 ```yaml
 max_request_body_bytes: 262144
@@ -321,28 +310,24 @@ max_queued_events_per_subscriber: 2048
 max_open_runs_returned_per_page: 1000
 ```
 
-Tighter route/domain limits still apply.
+Tighter route/domain limits still apply. Increasing limits requires amplification review.
 
-A future need to increase these limits requires review for memory/CPU/artifact amplification.
+## 19. Event delivery/backpressure
 
-## 17. Event delivery and backpressure
+Initial implementation may use bounded polling or same-origin SSE. WebSocket not required.
 
-Initial implementation may use bounded polling or same-origin SSE. WebSocket is not required.
+Each subscriber has bounded queue.
 
-Every subscriber has a bounded queue.
+Slow consumer:
 
-If a subscriber cannot keep up:
+- never blocks Recorder/Scenario Engine indefinitely;
+- disconnect/drop with stable `CONTROL_EVENT_BACKPRESSURE` or require cursor resync;
+- never drop execution-safety state to preserve UI stream;
+- persisted run/event state is source for later retrieval.
 
-- do not block Recorder/Scenario Engine indefinitely;
-- close/drop the subscriber with a stable `CONTROL_EVENT_BACKPRESSURE` indication or require explicit cursor resynchronization;
-- never drop execution-safety state solely to preserve a slow UI stream;
-- canonical persisted event/run state remains the source for later retrieval.
+Event cursors are non-authoritative observation positions.
 
-Event cursors are non-authoritative observation positions only.
-
-## 18. Error envelope
-
-Errors use stable non-secret structure:
+## 20. Error envelope
 
 ```yaml
 ControlApiError:
@@ -353,88 +338,80 @@ ControlApiError:
   retryable: bool
 ```
 
-No raw exception, stack trace, environment value, secret nonce, adapter stderr or arbitrary repr/debug text is returned to clients by default.
+No raw exception, stack trace, environment value, nonce, adapter stderr or arbitrary repr/debug text is returned by default.
 
-HTTP status alone is not the semantic error contract; `code` is stable within major version 1.
+## 21. Browser reload and multiple tabs
 
-## 19. Browser reload and multiple tabs
-
-The backend owns run/action lifecycle.
-
-Browser state is only a view/controller.
+Backend owns run/action lifecycle. Browser is view/controller only.
 
 On reload/new tab:
 
 - discover active runs via GET;
-- reuse known durable request/run/action IDs when retrying the same logical request;
-- never infer that missing local JavaScript state means a new action should be created;
-- concurrent tabs are serialized/deduplicated by the backend ledgers/coordinator.
+- reuse durable request/run/action identities for same logical retry;
+- missing JavaScript state never implies new action/resource;
+- concurrent tabs are serialized/deduplicated by safety store/coordinator.
 
-## 20. Shutdown
+## 22. Shutdown
 
-Graceful backend shutdown:
+Graceful shutdown:
 
 1. stop accepting new scheduling/mutation-capable POSTs;
-2. expose `SHUTTING_DOWN` status;
-3. latch cancellation/STOP semantics for harness work according to the execution contract;
-4. flush required RequestLedger, ControlState, action dispatch journal, budget ledger and event/artifact state;
+2. expose `SHUTTING_DOWN`;
+3. latch cancellation/STOP semantics according to Execution v1;
+4. flush RequestLedger, ResourceIdentityLedger, ControlState, Action/Budget journal and required evidence;
 5. boundedly stop harness-owned subscribers/captures/resources;
-6. mark unresolved runs/actions truthfully incomplete/ambiguous as required;
-7. invalidate/delete current control nonce;
+6. mark unresolved runs/actions truthfully incomplete/ambiguous;
+7. invalidate/delete current nonce;
 8. exit.
 
-Forced/crash shutdown is recovered according to Execution v1 and persistent ledgers. It never implies successful cleanup or PASS.
+Crash shutdown recovers through durable safety state and never implies successful cleanup/PASS.
 
-## 21. No remote/LAN mode in v1
+## 23. No remote/LAN mode in v1
 
-Control API v1 does not define remote authentication, TLS termination, user identity, role-based authorization, proxy trust, CSRF across origins, network rate limiting or multi-user tenancy.
+V1 defines no remote auth/TLS/user identity/RBAC/proxy trust/network rate limiting/multi-user tenancy. Non-loopback exposure is unsupported and must fail closed.
 
-Therefore non-loopback exposure is unsupported and must fail closed.
+## 24. Browser/CLI parity
 
-A later remote-control feature requires a separate security-sensitive task and new accepted contract/profile before deployment.
+Both surfaces call the same backend/domain operations.
 
-## 22. Browser/CLI parity acceptance
+CLI cannot import/call concrete adapters to bypass HTTP/domain safety.
 
-For every domain operation exposed to both surfaces, tests must prove the same backend command path and result semantics.
+A future in-process CLI transport must invoke the exact same domain service with identical request/idempotency/authority semantics and no adapter escape hatch.
 
-The CLI is not permitted to import/call concrete adapters to bypass HTTP/domain safety merely because it runs locally.
-
-If an in-process CLI transport is introduced later for performance, it must call the exact same domain service with the same request/idempotency/authority semantics and have no adapter escape hatch.
-
-## 23. Package B mandatory security/replay tests
+## 25. Mandatory Package B security/replay tests
 
 At minimum:
 
-1. binds only `127.0.0.1` by default;
-2. wildcard/non-loopback bind rejected;
+1. default bind only `127.0.0.1`;
+2. wildcard/non-loopback rejected;
 3. missing nonce rejected;
-4. stale nonce after backend restart rejected;
-5. nonce absent from URLs/loggable error objects;
-6. unrecognized Host rejected even from loopback client;
-7. cross-origin browser request rejected;
-8. permissive CORS absent;
-9. browser UI cannot be framed because CSP contains `frame-ancestors 'none'`;
-10. CLI without Origin works only with valid Host + nonce;
+4. stale nonce after restart rejected;
+5. nonce absent URLs/loggable errors;
+6. unrecognized Host rejected even from loopback;
+7. hostile cross-origin request rejected;
+8. permissive/reflected CORS absent;
+9. UI cannot be framed because CSP includes `frame-ancestors 'none'`;
+10. CLI without Origin requires valid Host+nonce;
 11. oversized body/header rejected before expensive parsing;
 12. duplicate JSON keys rejected;
-13. same request ID/body returns same run/resource;
-14. same request ID/different body returns idempotency conflict;
-15. repeated `POST /runs` across transport retry creates one run;
-16. crash after durable run intent but before scheduling preserves the same run ID;
-17. repeated request after backend restart resolves existing durable resource when ledger is valid;
-18. corrupt/missing safety-critical RequestLedger does not silently re-execute mutation-capable work;
-19. one-step intent persists stable experiment/run/action IDs before scheduling;
-20. STOP replay resolves one logical transition ID;
-21. uncertain reset replay remains latched/RECOVERY_REQUIRED rather than silently resetting;
-22. slow event subscriber cannot block execution and receives deterministic backpressure behavior;
+13. same request ID/body -> same run/resource;
+14. same request ID/different body -> idempotency conflict;
+15. `POST /runs` durable Request+Resource pair fixes run ID before scheduling;
+16. one-step durable pair fixes experiment/run/action IDs before scheduling;
+17. crash after durable pair before scheduling -> same IDs, no auto-resume;
+18. corrupt/uncertain pair -> recovery required, no replacement;
+19. repeated request after restart resolves existing durable resource;
+20. STOP replay resolves same transition ID;
+21. uncertain reset replay remains latched/RECOVERY_REQUIRED;
+22. slow subscriber cannot block execution;
 23. page/event bounds enforced;
 24. unknown raw/debug/action endpoint absent;
-25. browser reload/new tab cannot duplicate an active run/action solely due to lost client state;
+25. browser reload/new tab cannot duplicate active resource/action;
 26. graceful shutdown flushes required ledgers/control state and invalidates nonce;
-27. crash recovery follows Execution v1 rather than auto-resuming mutation.
+27. crash recovery never auto-resumes mutation.
 
-## 24. Compatibility
+## 26. Compatibility
 
 Control API major version 1 is local-only and additive-only.
 
-Changing nonce authentication, Host/origin/anti-framing trust, request-intent durability/idempotency semantics, remote exposure policy or domain bypass guarantees requires a new major contract or an explicitly reviewed security profile.
+Changing nonce authentication, Host/origin/anti-framing trust, request/resource durability/idempotency, remote exposure policy or domain bypass guarantees requires a new major contract or explicitly reviewed security profile.

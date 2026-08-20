@@ -11,7 +11,7 @@ risk: medium
 branch: docs/OTC-20260819-tibia-re-control-center-hardening-r2
 base_branch: main
 created: 2026-08-19T23:40:48+02:00
-updated: 2026-08-20T00:17:54+02:00
+updated: 2026-08-20T10:10:52+02:00
 initial_base_sha: fdabf235ed4438bd7c376932ed876bd0bbef019a
 related_pr: 613
 supersedes_pr: 605
@@ -57,7 +57,6 @@ owned_paths:
   - docs/agents/prompts/TIBIA_RE_CONTROL_CENTER_MVP.md
   - docs/agents/prompts/TIBIA_RE_CONTROL_CENTER_INDEPENDENT_AUDIT.md
   - docs/agents/MODULE_CATALOG.md
-  - docs/agents/CHANGELOG.md
   - docs/agents/tasks/active/OTC-20260819-tibia-re-control-center-hardening-r2.md
   - docs/agents/tasks/archive/OTC-20260819-tibia-re-control-center-hardening.md
 depends_on:
@@ -67,7 +66,7 @@ reuses:
   - docs/agents/programs/OTCLIENT_TIBIA_RE_EXPERIMENT_EXECUTION_MODEL.md
   - current trusted-main Track A authority/registration/Gate/supervisor/input-lock contracts
   - tools/tibia_runtime_bridge/**
-  - current Surveyor producer only after an accepted exact schema/commit/interface exists
+  - accepted Surveyor v2 producer PR #616 / implementation merge 6f17e25af655854624b34e0b05f9888618269aba via tools/tibia_re_surveyor --collect-all
   - blakinio/Oteryn-v2 docs/architecture/ADR-0007-native-end-to-end-test-platform.md
 blocks:
   - Package A until a repaired exact head has P0/P1 NONE and PACKAGE_A_IMPLEMENTATION_READY=YES from a fresh independent audit
@@ -87,7 +86,7 @@ Close every material finding from independent audit review `4976939865`, reconci
 - #605 was closed unmerged as superseded after its unchanged exact head was audited.
 - PR #613 is the sole Control Center hardening successor.
 - PR #609/Ollama PoC merged into main and remains a related future consumer only; Policy Boundary v1 prevents it from becoming Control Center/safety authority.
-- Surveyor remains a future accepted-producer dependency for Package C; historical PR numbers are discovery hints, not acceptance authority.
+- Surveyor v2 is accepted on trusted main via PR #616 implementation merge `6f17e25af655854624b34e0b05f9888618269aba`; lifecycle closeout `0447763982ef5db9efca652396cfac22e5a0cff4` closed stale #592 as superseded and released shared-path ownership. Package C may consume only a pinned read-only producer/schema/interface and must preserve missing typed readers as UNKNOWN/UNAVAILABLE.
 - This task has `runtime_access:none`; physical/runtime/browser E2E is `NOT_APPLICABLE` for this documentation/contract remediation.
 
 ## Acceptance criteria
@@ -115,9 +114,9 @@ Close every material finding from independent audit review `4976939865`, reconci
 ## Context checkpoint
 
 ```yaml
-checkpoint_version: 2
-updated_at: 2026-08-20T00:17:54+02:00
-content_head_before_checkpoint_commit: 1bd53e79a01b62b12b2cad102fff45f4d8ea29fa
+checkpoint_version: 3
+updated_at: 2026-08-20T10:10:52+02:00
+reconciled_main_sha: 0447763982ef5db9efca652396cfac22e5a0cff4
 branch: docs/OTC-20260819-tibia-re-control-center-hardening-r2
 pr: 613
 status: validating
@@ -130,12 +129,21 @@ proven:
   - all eight recorded #605 findings have explicit successor contract/task remediation
   - successor adds conservative active-backend/recovery-required semantics for STOP-persistence-failure-plus-crash
   - future policy/Ollama remains downstream of deterministic Control Center safety/authority
-  - current-main drift observed through c9156e72aa3c647054ff9dfc5ffed00e43a7e9cd touched only Surveyor-v2 prompt/evidence/task paths and did not overlap Control Center-owned paths
+  - current main reconciled through 0447763982ef5db9efca652396cfac22e5a0cff4; Surveyor v2 implementation/lifecycle is merged and shared-path ownership released; MODULE_CATALOG preserves both Surveyor and Control Center rows
+  - accepted Surveyor v2 schemas are otclient.tibia-re-surveyor.collect-all.v2, alias-view.v2, telemetry.v2 and missing-readers.v2; its accepted collect-all surface is passive/read-only and does not promote semantic status
   - no runtime access is required or authorized
+focused_validation:
+  diff_check: PASS
+  changed_paths_vs_main: 13_exact_declared_paths
+  conflict_markers: NONE
+  track_a_agent_runtime_governance: PASS
+  canonical_live_transition_tests_linux_archive: 17_PASS
+  kasm_existing_runtime_probe_tests_linux_archive: 10_PASS
+  windows_direct_canonical_test: NOT_APPLICABLE_due_to_fcntl_and_CRLF_platform; Linux archive rerun is authoritative local focused evidence
 unknown:
   - final exact-head workflow/check result after the final metadata/content commit
   - fresh independent exact-head audit result
 blockers:
   - fresh independent exact-head Control Center audit is required before Package A readiness/merge
-next_action: inspect exact #613 diff/current main/open overlap, resolve any stale/contradictory text, then validate exact-head workflows and persist the final audit handoff SHA
+next_action: commit the reconciled merge on current main, run focused diff/static validation, push #613, verify exact-head workflows, then obtain a fresh independent audit on the unchanged head
 ```

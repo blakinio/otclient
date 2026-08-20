@@ -11,7 +11,7 @@ risk: medium
 branch: feat/OTC-20260820-tibia-re-control-center-package-a
 base_branch: main
 created: 2026-08-20T14:18:00+02:00
-updated: 2026-08-20T19:05:50+02:00
+updated: 2026-08-20T19:16:31+02:00
 initial_base_sha: 8620310a91c53e63abc0bf51fe40bdb8a3ee6cef
 related_pr: 628
 runtime_access: none
@@ -43,17 +43,17 @@ execution_reason: GitHub connector plus isolated GitHub-hosted validation preser
 execution_budget_minutes: 120
 execution_budget_reason: cohesive Package A implementation, exact-head validation, independent validator role, merge and mandatory archive closeout
 invocation_started_at: 2026-08-20T14:18:00+02:00
-last_progress_at: 2026-08-20T19:05:50+02:00
+last_progress_at: 2026-08-20T19:16:31+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: candidate_pending_ci
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
-unchanged_state_checks: 1
+unchanged_state_checks: 2
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 1
 context_reconstruction_attempts: 2
 stall_warnings: 0
-heavy_validation_runs: 1
+heavy_validation_runs: 2
 decomposition_decision: phased
 decomposition_reason: one cohesive Package A control-core with shared safety state; split would duplicate contracts and ledgers
 context_pressure: high
@@ -138,17 +138,18 @@ No Control API/browser/CLI listener is implemented here. No policy/Ollama loop i
 - [x] All 65 mandatory Package A tests in `TIBIA_RE_CONTROL_CENTER_MVP.md` are represented by focused automated tests.
 - [x] Exact Package A fake one-step journey is covered as non-UI E2E.
 - [x] No concrete official-client runtime or operator-facing adapter-bypass interface exists.
-- [ ] Full exact-head validation and changed-file self-review are clean; module catalogue/changelog/task are current.
-- [ ] Fresh independent exact-head validator role has no open material findings.
+- [x] Full exact-head validation and changed-file self-review are clean; module catalogue/changelog/task are current.
+- [x] Fresh independent exact-head validator role has no open material findings.
 - [ ] Required exact-head GitHub checks pass, review threads are resolved and implementation PR reaches an intentional terminal state.
 - [ ] Post-merge archive closeout records terminal evidence and releases ownership.
 
 ## Validation evidence so far
 
 - Interim head `a4a9a02168a3bfc39a498be01a117f5f4564ff69`, workflow run `32381505315`: compile PASS; 76/76 focused tests PASS; explicit mandatory inventory 65/65 PASS; `runtime_access:none` AST boundary PASS.
-- The same run failed only the final Ruff step. Six findings were isolated to test import/noqa formatting plus an engine wait-closure binding issue; the production closure issue has been repaired and lint validation is being regenerated.
-- Track A governance run `32381504968`: fresh admission behavior audit PASS; deterministic task policy failed only because the original task file carried a UTF-8 BOM before YAML front matter. This checkpoint removes the BOM and preserves the full `runtime_access:none` admission record.
-- Fresh Package A falsification is a separate GitHub-hosted validator job that does not consume the implementing test helpers and independently tests STOP-before-commit, dispatch durability failure, unclean-restart blocking, construction-time privacy, runtime-access-none source boundaries and the fake one-step E2E.
+- Track A governance run `32381504968`: fresh admission behavior audit PASS; deterministic task policy failed only because the original task file carried a UTF-8 BOM before YAML front matter. The subsequent checkpoint removed the BOM and preserved the full `runtime_access:none` admission record.
+- Candidate head `9a959438ad6eaea49cb1e21bcd081bd094c27c29`, Package A workflow run `32395883708`: both `Package A deterministic core` and `Fresh Package A falsification audit` PASS; 76/76 focused tests PASS; explicit mandatory inventory 65/65 PASS; Ruff 0.16.1 PASS; `git diff --check` PASS; `PACKAGE_A_CHANGED_PATHS=17_DECLARED_ONLY`; `PACKAGE_A_FRESH_AUDIT=PASS`; `MATERIAL_FINDINGS_OPEN=0`; `RUNTIME_ACCESS_NONE=PASS`; `FAKE_ONE_STEP_E2E=PASS`.
+- The same candidate exact head also has Track A runtime governance run `32395883691` PASS, Track A canonical-live governance run `32395883700` PASS and repository CI run `32395883738` PASS.
+- Full 17-file PR diff was re-read after reconciliation. No material self-review finding remains. One unrelated pre-existing changelog line is normalized from mojibake (`Âµ`/`Ã—`) to the intended UTF-8 glyphs (`µ`/`×`); this is documentation-only and has no runtime behavior impact.
 - Current `main@2a2b607bf11818cdd6bfc4377c932a170e4be2a9` was reconciled as the second parent of merge commit `9e188ff1d5d377d81c80ceb45791868a9f31e067`; current-main Surveyor/Track A semantics were preserved, PR #628 became mergeable, and the Package A catalogue/changelog union was restored in `f3b5783984684b47a23fb2ab9a259c4541535e00`.
 
 ## Recovery checkpoint
@@ -156,22 +157,26 @@ No Control API/browser/CLI listener is implemented here. No policy/Ollama loop i
 ```yaml
 recovery:
   policy_version: 1
-  generation: 3
-  session_id: package-a-github-only-20260820-1905
-  session_started_at: 2026-08-20T19:05:50+02:00
-  checkpointed_at: 2026-08-20T19:05:50+02:00
-  last_progress_at: 2026-08-20T19:05:50+02:00
+  generation: 4
+  session_id: package-a-github-only-20260820-1916
+  session_started_at: 2026-08-20T19:16:31+02:00
+  checkpointed_at: 2026-08-20T19:16:31+02:00
+  last_progress_at: 2026-08-20T19:16:31+02:00
   phase: validate
-  exact_head: f3b5783984684b47a23fb2ab9a259c4541535e00
+  validated_predecessor_head: 9a959438ad6eaea49cb1e21bcd081bd094c27c29
   pull_request: 628
-  active_operation: freeze metadata checkpoint, then exact-head validation and independent falsification
-  external_run_ids: []
-  operation_started_at: 2026-08-20T19:05:50+02:00
+  active_operation: final metadata checkpoint followed by one exact-head CI generation, Ready and merge
+  external_run_ids:
+    - 32395883691
+    - 32395883700
+    - 32395883708
+    - 32395883738
+  operation_started_at: 2026-08-20T19:16:31+02:00
   wait_deadline_at: null
   check_generation: candidate_pending_ci
   checks_used: 0
   status: active
   safe_to_resume: true
   resume_condition: PR #628 remains the sole Package A writer and runtime_access remains none
-  next_action: run exact-head GitHub CI plus fresh falsification audit on the metadata-checkpoint successor, self-review the full diff, then Ready/merge if clean
+  next_action: verify all exact-head checks for this metadata-checkpoint successor, then Ready/merge if no review blocker exists
 ```

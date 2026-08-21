@@ -1,8 +1,8 @@
 name: Track A Surveyor auth-session physical acceptance
 
 on:
-  pull_request_target:
-    types: [opened, reopened, synchronize]
+  issue_comment:
+    types: [created]
 
 permissions:
   contents: read
@@ -20,22 +20,22 @@ env:
   DISPLAY_NAME: ':1'
   CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime
   RUNTIME_TASK_ID: OTC-20260820-surveyor-auth-session-reader
+  REPORT_PR: '641'
 
 jobs:
   authority:
     if: >-
       github.actor == 'blakinio' &&
-      github.event.pull_request.base.ref == 'main' &&
-      github.event.pull_request.head.repo.full_name == 'blakinio/otclient' &&
-      github.event.pull_request.head.ref == 'test/OTC-20260820-surveyor-auth-session-physical-trigger' &&
-      github.event.pull_request.head.sha == '579249c982fefeaeaa614c871eda34c8b8eb8331'
+      github.event.issue.number == 641 &&
+      github.event.issue.pull_request != null &&
+      github.event.comment.body == 'ONE_SHOT_SURVEYOR_AUTH_READ_ONLY'
     runs-on: ubuntu-24.04
     timeout-minutes: 2
     permissions:
       contents: read
       issues: write
     steps:
-      - name: Validate immutable one-shot trigger
+      - name: Validate immutable owner comment trigger
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -50,7 +50,6 @@ jobs:
         shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPORT_PR: ${{ github.event.pull_request.number }}
         run: |
           set -Eeuo pipefail
           python3 - <<'PY'
@@ -292,7 +291,6 @@ jobs:
         shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPORT_PR: ${{ github.event.pull_request.number }}
           AUTHORITY_RESULT: ${{ needs.authority.result }}
           ACCEPTANCE_RESULT: ${{ needs.acceptance.result }}
           ACCEPTANCE_JSON: ${{ needs.acceptance.outputs.acceptance_json }}

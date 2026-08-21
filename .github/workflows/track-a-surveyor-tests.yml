@@ -1,0 +1,70 @@
+name: Track A Surveyor tests
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "tools/tibia_re_surveyor/**"
+      - "tests/tools/tibia_re_surveyor/**"
+      - ".github/workflows/track-a-surveyor-tests.yml"
+  push:
+    branches: [main]
+    paths:
+      - "tools/tibia_re_surveyor/**"
+      - "tests/tools/tibia_re_surveyor/**"
+      - ".github/workflows/track-a-surveyor-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Surveyor focused validation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Compile Surveyor Python
+        run: python3 -m compileall -q tools/tibia_re_surveyor tests/tools/tibia_re_surveyor
+
+      - name: Run focused Surveyor tests
+        env:
+          PYTHONPATH: .
+        run: python3 -m unittest discover -s tests/tools/tibia_re_surveyor -p 'test_*.py' -q
+
+      - name: Verify repository-only collect-all
+        env:
+          PYTHONPATH: .
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="${RUNNER_TEMP}/surveyor"
+          python3 -m tools.tibia_re_surveyor --collect-all --output-dir "$out"
+          python3 - "$out" <<'PY'
+          import json, pathlib, sys
+          root = pathlib.Path(sys.argv[1])
+          gaps = json.loads((root / "missing-readers.json").read_text())
+          privacy = json.loads((root / "privacy-scan.json").read_text())
+          aliases = list((root / "aliases").glob("*.json"))
+          rows = json.loads((root / "surveyor" / "coverage.json").read_text())["rows"]
+          gap_aliases = {item["alias"] for item in gaps["reader_gaps"]}
+          assert len(rows) == 169, len(rows)
+          assert len(aliases) == 12, len(aliases)
+          assert len(gaps["reader_gaps"]) == 9, len(gaps["reader_gaps"])
+          assert "TIBIA-RE-AUTH-SESSION" not in gap_aliases
+          assert "TIBIA-RE-PLAYER-STATE" not in gap_aliases
+          assert privacy["result"] == "PASS", privacy
+          print("SURVEYOR_ROWS=169")
+          print("SURVEYOR_ALIASES=12")
+          print("SURVEYOR_MISSING_READERS=9")
+          print("SURVEYOR_PRIVACY=PASS")
+          PY
+
+      - name: Check whitespace
+        shell: bash
+        run: git diff --check HEAD^ HEAD

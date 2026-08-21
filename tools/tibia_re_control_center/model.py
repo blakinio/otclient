@@ -532,6 +532,8 @@ class ActionRequest:
         validate_opaque_id(self.run_id, field_name="run_id")
         validate_opaque_id(self.step_id, field_name="step_id", max_bytes=192)
         checked_non_negative(self.attempt_index, maximum=MAX_I32, field_name="attempt_index")
+        if not isinstance(self.required_authority, Authority):
+            raise ValidationError("INVALID_ACTION_AUTHORITY", "required_authority must be an Authority enum")
         if not HEX_SHA256_RE.fullmatch(self.action_request_hash):
             raise ValidationError("INVALID_ACTION_HASH", "action_request_hash must be lowercase SHA-256")
 

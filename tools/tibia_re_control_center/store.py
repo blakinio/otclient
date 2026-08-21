@@ -103,6 +103,10 @@ class DeterministicDurableStore:
         self._before_write("recovery")
         self.recovery_records[run_id] = copy.deepcopy(record)
 
+    def load_recovery(self, run_id: str) -> dict[str, Any] | None:
+        value = self.recovery_records.get(run_id)
+        return None if value is None else copy.deepcopy(value)
+
     def flush_safety_state(self) -> None:
         self._before_write("safety_flush")
         self.safety_flush_count += 1

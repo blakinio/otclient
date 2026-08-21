@@ -205,6 +205,17 @@ class MutationCoordinator:
             )
             self.store.write_budget(ledger, operation="budget_init")
             identity = self.adapter.identity()
+            self.store.write_recovery(
+                run_id,
+                {
+                    "backend_epoch": self.backend_epoch,
+                    "control_generation": self.control_generation,
+                    "adapter_generation": identity.adapter_generation,
+                    "runtime_instance_id": identity.runtime_instance_id,
+                    "session_epoch": identity.session_epoch,
+                    "mutation_capable": mutation_capable,
+                },
+            )
             run = RunState(run_id, ledger, identity.adapter_generation, identity.runtime_instance_id, identity.session_epoch, mutation_capable)
             self.runs[run_id] = run
             if mutation_capable:
@@ -214,18 +225,29 @@ class MutationCoordinator:
     def recover_run(self, run_id: str, *, mutation_capable: bool = True) -> RunState:
         activation = self.store.load_run_activation(run_id)
         ledger = self.store.load_budget(run_id)
-        if activation is None or ledger is None:
-            raise ValidationError("RECOVERY_STATE_MISSING", "run recovery requires original activation and budget ledger")
+        recovery = self.store.load_recovery(run_id)
+        if activation is None or ledger is None or recovery is None:
+            raise ValidationError("RECOVERY_STATE_MISSING", "run recovery requires original activation, budget, and recovery fences")
         if (ledger.started_monotonic_ns, ledger.deadline_monotonic_ns) != activation:
             raise ValidationError("RECOVERY_STATE_CONTRADICTORY", "runtime activation/deadline contradict durable budget state")
+        if bool(recovery.get("mutation_capable")) != mutation_capable:
+            raise ValidationError("RECOVERY_AUTHORITY_CONTRADICTION", "run recovery cannot change mutation capability")
         identity = self.adapter.identity()
+        origin_matches = (
+            recovery.get("backend_epoch") == self.backend_epoch
+            and recovery.get("control_generation") == self.control_generation
+            and recovery.get("adapter_generation") == identity.adapter_generation
+            and recovery.get("runtime_instance_id") == identity.runtime_instance_id
+            and recovery.get("session_epoch") == identity.session_epoch
+        )
         run = RunState(
             run_id,
             ledger,
-            identity.adapter_generation,
-            identity.runtime_instance_id,
-            identity.session_epoch,
+            str(recovery.get("adapter_generation")),
+            recovery.get("runtime_instance_id"),
+            recovery.get("session_epoch"),
             mutation_capable,
+            cancelled=bool(mutation_capable and (not origin_matches or not self.mutation_admission_allowed())),
         )
         self.runs[run_id] = run
         return run
@@ -255,6 +277,15 @@ class MutationCoordinator:
             run = self._run(run_id)
             if not run.mutation_capable:
                 raise ValidationError("RUN_READ_ONLY", "read-only run cannot acquire mutation ownership")
+            if run.cancelled:
+                raise ValidationError("RUN_CANCELLED", "cancelled/recovered mutation run cannot reacquire ownership")
+            identity = self.adapter.identity()
+            if (
+                identity.adapter_generation != run.expected_adapter_generation
+                or identity.runtime_instance_id != run.expected_runtime_instance_id
+                or identity.session_epoch != run.expected_session_epoch
+            ):
+                raise ValidationError("RUN_IDENTITY_FENCE_MISMATCH", "run identity fence no longer matches the adapter")
             if not self.mutation_admission_allowed():
                 raise ValidationError("MUTATION_LOCALLY_BLOCKED", "local safety state blocks mutation ownership")
             if self.active_mutation_run_id not in {None, run_id}:

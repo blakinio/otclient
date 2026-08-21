@@ -298,7 +298,11 @@ class ScenarioEngine:
                 final_control_generation=self.coordinator.control_generation,
                 budget_summary=self._budget_summary(run_id),
                 assertions=assertions,
-                safety_actions=self.coordinator.store.action_ledgers,
+                safety_actions={
+                    action_id: record
+                    for action_id, record in self.coordinator.store.action_ledgers.items()
+                    if record.run_id == run_id
+                },
                 reason_codes=reason_codes,
             )
             return EngineRunResult(

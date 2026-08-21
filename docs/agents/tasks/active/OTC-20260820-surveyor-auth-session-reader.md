@@ -40,8 +40,8 @@ branch: feat/OTC-20260820-surveyor-auth-session-reader
 implementation_pr: 636
 physical_e2e_required: true
 physical_e2e_result: NOT_RUN
-updated_at: 2026-08-21T07:36:00+02:00
-next_action: finish exact-head focused validation and repository-required independent audit for PR #636, merge only if green, then freshly re-admit the unchanged or newly proven runtime for post-merge passive collect-all acceptance
+updated_at: 2026-08-21T07:44:00+02:00
+next_action: validate the exact PR head with the dedicated hosted Surveyor test workflow and normal CI/governance, then perform fresh exact-head audit and merge only if all gates are green
 ---
 
 # Surveyor v2 next gap — auth/session typed reader
@@ -104,14 +104,18 @@ PR #636 now contains:
 - exact Qt `isRunning()`-equivalent lifecycle boolean;
 - explicit `TYPED_AUTH_LIFECYCLE_ONLY`, `in_game_claimed=false`, `semantic_promotion_allowed=false` output;
 - collect-all integration registering both auth/session and player-state readers as implemented;
-- focused auth/session tests plus updated Surveyor gap expectations: repository-only collect-all is expected to report 9 missing readers after this slice.
+- focused auth/session tests plus updated Surveyor gap expectations: repository-only collect-all is expected to report 9 missing readers after this slice;
+- a dedicated GitHub-hosted Surveyor test workflow is authorized in this task so these Python tests and repository-only collect-all assertions run on the exact PR head and future matching changes.
+
+A validation pass found the original Qt lifecycle comparison regex ended with a word-boundary assertion after `(%rax)`, which cannot match a normal line ending. The implementation was repaired before readiness to use the exact objdump-compatible comparison shape without that invalid terminal boundary.
 
 ## Scope
 
-Owned implementation paths remain limited to:
+Owned implementation paths are limited to:
 
 - `tools/tibia_re_surveyor/**`;
 - `tests/tools/tibia_re_surveyor/**`;
+- `.github/workflows/track-a-surveyor-tests.yml` for non-secret GitHub-hosted deterministic Surveyor validation only;
 - `docs/agents/evidence/OTC-20260820-surveyor-auth-session-reader/**`;
 - this task record and required closeout/catalog/changelog metadata.
 

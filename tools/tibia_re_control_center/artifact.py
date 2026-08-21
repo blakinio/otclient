@@ -78,6 +78,15 @@ class ArtifactStore:
         scenario_ast_snapshot = copy.deepcopy(dict(scenario_ast))
         adapter_identity_snapshot = copy.deepcopy(dict(adapter_identity))
         privacy_policy_snapshot = copy.deepcopy(dict(privacy_policy))
+        privacy_policy_for_scan = {
+            f"policy_{key}": value for key, value in privacy_policy_snapshot.items()
+        }
+        ensure_no_secret_material(privacy_policy_for_scan, key_path="privacy_policy")
+        if privacy_policy_snapshot != scenario_ast_snapshot.get("privacy_policy"):
+            raise ValidationError(
+                "PRIVACY_POLICY_CONTRADICTION",
+                "privacy policy must match the validated scenario AST",
+            )
         ensure_no_secret_material(
             {
                 "run_id": run_id,
@@ -87,14 +96,22 @@ class ArtifactStore:
             },
             key_path="artifact_metadata",
         )
-        privacy_scan_ast = {key: value for key, value in scenario_ast_snapshot.items() if key != "privacy_policy"}
+        privacy_scan_ast = {
+            key: value for key, value in scenario_ast_snapshot.items() if key != "privacy_policy"
+        }
         ensure_no_secret_material(privacy_scan_ast, key_path="scenario")
         if scenario_hash != sha256_jcs(scenario_ast_snapshot):
-            raise ValidationError("SCENARIO_HASH_CONTRADICTION", "scenario hash does not match canonical Scenario-v1 AST")
+            raise ValidationError(
+                "SCENARIO_HASH_CONTRADICTION",
+                "scenario hash does not match canonical Scenario-v1 AST",
+            )
         if run_id in self.runs:
             existing = self.runs[run_id]
             if existing.scenario_hash != scenario_hash:
-                raise ValidationError("RUN_ARTIFACT_CONFLICT", "run_id already exists with different scenario hash")
+                raise ValidationError(
+                    "RUN_ARTIFACT_CONFLICT",
+                    "run_id already exists with different scenario hash",
+                )
             return existing
         run = RunArtifact(
             run_id=run_id,
@@ -111,21 +128,45 @@ class ArtifactStore:
         self.runs[run_id] = run
         return run
 
-    def write_stage(self, run_id: str, path: str, data: bytes) -> None:
+    def _write_stage(
+        self,
+        run_id: str,
+        path: str,
+        data: bytes,
+        *,
+        privacy_approved: bool,
+    ) -> None:
         run = self.runs[run_id]
         if run.state == RunArtifactState.FINALIZED:
             raise ValidationError("FINALIZED_IMMUTABLE", "finalized run artifacts are immutable")
         logical = _safe_relative_path(path)
+        if not privacy_approved:
+            try:
+                staged_text = bytes(data).decode("utf-8", "strict")
+            except UnicodeDecodeError as exc:
+                raise ValidationError(
+                    "ARTIFACT_PRIVACY_UNCLASSIFIED",
+                    "binary staged artifact requires a typed privacy-approved path",
+                ) from exc
+            ensure_no_secret_material(staged_text, key_path=f"artifact_stage.{logical}")
         if self.fail_next_presentation_write:
             self.fail_next_presentation_write = False
             run.state = RunArtifactState.INCOMPLETE
             raise OSError("simulated presentation write failure")
         run.stage[logical] = bytes(data)
 
+    def write_stage(self, run_id: str, path: str, data: bytes) -> None:
+        self._write_stage(run_id, path, data, privacy_approved=False)
+
     def store_screenshot(self, run_id: str, record: ScreenshotRecord) -> None:
         run = self.runs[run_id]
         if record.disposition == ScreenshotDisposition.SAFE and record.normal_artifact_bytes is not None:
-            self.write_stage(run_id, f"screenshots/{record.screenshot_id}.bin", record.normal_artifact_bytes)
+            self._write_stage(
+                run_id,
+                f"screenshots/{record.screenshot_id}.bin",
+                record.normal_artifact_bytes,
+                privacy_approved=True,
+            )
         elif record.disposition == ScreenshotDisposition.QUARANTINED and record.quarantine_bytes is not None:
             run.quarantine[record.screenshot_id] = record.quarantine_bytes
 
@@ -218,7 +259,9 @@ class ArtifactStore:
                 jcs_dumps({"action_id": action_id, **projection})
                 for action_id, projection in sorted(action_projection.items())
             ]
-            run.stage["actions.jsonl"] = (("\n".join(action_lines) + "\n") if action_lines else "").encode("utf-8")
+            run.stage["actions.jsonl"] = (
+                (("\n".join(action_lines) + "\n") if action_lines else "").encode("utf-8")
+            )
             result = {
                 "schema_version": 1,
                 "run_id": run_id,
@@ -228,7 +271,10 @@ class ArtifactStore:
                 "assertions": dict(assertions or {}),
                 "action_outcomes": action_projection,
                 "budget_outcome": dict(budget_summary),
-                "recorder_outcome": {"events": len(recorder.events), "late_supplements": len(recorder.supplemental_events)},
+                "recorder_outcome": {
+                    "events": len(recorder.events),
+                    "late_supplements": len(recorder.supplemental_events),
+                },
                 "privacy_outcome": {"ok": privacy_ok},
                 "cleanup_outcome": {"ok": cleanup_ok},
                 "evidence_refs": sorted(run.stage),
@@ -264,7 +310,9 @@ class ArtifactStore:
             run.finalized["manifest.json"] = jcs_dumps(manifest).encode("utf-8")
             run.final_hashes = {path: sha256_bytes(data) for path, data in run.finalized.items()}
             run.final_result = result
-            run.state = RunArtifactState.FINALIZED if status != "INCOMPLETE" else RunArtifactState.INCOMPLETE
+            run.state = (
+                RunArtifactState.FINALIZED if status != "INCOMPLETE" else RunArtifactState.INCOMPLETE
+            )
             recorder.finalize()
             return result
         except Exception:
@@ -295,7 +343,10 @@ class ArtifactStore:
 
     def validate_hashes(self, run_id: str) -> bool:
         run = self.runs[run_id]
-        return all(sha256_bytes(run.finalized[path]) == digest for path, digest in run.final_hashes.items())
+        return all(
+            sha256_bytes(run.finalized[path]) == digest
+            for path, digest in run.final_hashes.items()
+        )
 
     def validate_report_status(self, run_id: str, report_status: str) -> None:
         run = self.runs[run_id]
@@ -308,19 +359,27 @@ class ArtifactStore:
         run = self.runs[run_id]
         validate_opaque_id(supplement_id, field_name="supplement_id")
         if run.final_result is None:
-            raise ValidationError("SUPPLEMENT_BEFORE_FINALIZATION", "supplement requires an original final result")
+            raise ValidationError(
+                "SUPPLEMENT_BEFORE_FINALIZATION",
+                "supplement requires an original final result",
+            )
         if supplement_id in run.supplements:
             raise ValidationError("SUPPLEMENT_EXISTS", "supplement ID already exists")
         safe_files = {_safe_relative_path(path): bytes(data) for path, data in files.items()}
         if "result.json" in safe_files or "manifest.json" in safe_files:
-            raise ValidationError("SUPPLEMENT_REWRITE_FORBIDDEN", "supplement cannot replace original result/manifest")
+            raise ValidationError(
+                "SUPPLEMENT_REWRITE_FORBIDDEN",
+                "supplement cannot replace original result/manifest",
+            )
         manifest = {
             "schema_version": 1,
             "supplement_id": supplement_id,
             "parent_run_id": run_id,
             "created_monotonic_ns": 0,
             "reason": "LATE_ADMITTED_EVIDENCE",
-            "artifact_hashes": {path: sha256_bytes(data) for path, data in safe_files.items()},
+            "artifact_hashes": {
+                path: sha256_bytes(data) for path, data in safe_files.items()
+            },
             "evidence_refs": sorted(safe_files),
         }
         safe_files["supplement-manifest.json"] = jcs_dumps(manifest).encode("utf-8")

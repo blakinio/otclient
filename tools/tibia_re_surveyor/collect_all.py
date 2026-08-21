@@ -8,6 +8,8 @@ from pathlib import Path
 import re
 from typing import Dict, Iterable, List, Mapping, Sequence
 
+from .reader_registry import IMPLEMENTED_TYPED_READER_IDS
+
 SCHEMA_VERSION = "otclient.tibia-re-surveyor.collect-all.v2"
 ALIAS_SCHEMA_VERSION = "otclient.tibia-re-surveyor.alias-view.v2"
 TELEMETRY_SCHEMA_VERSION = "otclient.tibia-re-surveyor.telemetry.v2"
@@ -58,10 +60,6 @@ TYPED_READER_IDS = {
     alias: alias.lower().replace("tibia-re-", "").replace("-", "_") + "_typed_reader"
     for alias in ALIAS_ROWS
     if alias != "TIBIA-RE-COORDINATOR"
-}
-IMPLEMENTED_TYPED_READER_IDS = {
-    "auth_session_typed_reader",
-    "player_state_typed_reader",
 }
 
 _STATUS_SCORE = {"BLOCKED": 100, "NOT_STARTED": 60, "PARTIAL": 40, "DONE": 0}

@@ -27,7 +27,7 @@ physical_e2e_result: PASS
 physical_e2e_run: 32478932597
 physical_e2e_job: 96760979049
 physical_e2e_artifact: 9445354500
-closeout_pr: PENDING
+closeout_pr: 644
 ---
 
 # Surveyor v2 auth/session typed reader — completed

@@ -32,7 +32,11 @@ jobs:
           p = Path('tools/tibia_re_control_center/fake.py')
           text = p.read_text(encoding='utf-8')
           if 'import threading\n' not in text:
-              text = text.replace('from __future__ import annotations\n\n', 'from __future__ import annotations\n\nimport threading\nfrom contextlib import contextmanager\n', 1)
+              text = text.replace(
+                  'from __future__ import annotations\n\n',
+                  'from __future__ import annotations\n\nimport threading\nfrom contextlib import contextmanager\n',
+                  1,
+              )
           elif 'from contextlib import contextmanager\n' not in text:
               text = text.replace('import threading\n', 'import threading\nfrom contextlib import contextmanager\n', 1)
           init_anchor = '        self.clock = clock\n'
@@ -44,12 +48,16 @@ jobs:
               hook_anchor = '        self.after_commit_hook: Callable[[], None] | None = None\n'
               if hook_anchor not in text:
                   raise SystemExit('fake dispatch hook anchor missing')
-              text = text.replace(hook_anchor, hook_anchor + '        self.dispatch_guard_hook: Callable[[], None] | None = None\n', 1)
+              text = text.replace(
+                  hook_anchor,
+                  hook_anchor + '        self.dispatch_guard_hook: Callable[[], None] | None = None\n',
+                  1,
+              )
           identity_anchor = '    def identity(self) -> AdapterIdentity:\n        return self._identity\n'
           if 'def dispatch_guard(self, request: ActionRequest):' not in text:
               if identity_anchor not in text:
                   raise SystemExit('fake identity anchor missing')
-              guard = '''    @property\n    def allow_mutation(self) -> bool:\n        with self._dispatch_state_lock:\n            return self._allow_mutation\n\n    @allow_mutation.setter\n    def allow_mutation(self, value: bool) -> None:\n        with self._dispatch_state_lock:\n            self._allow_mutation = bool(value)\n\n    @property\n    def authority_available(self) -> bool:\n        with self._dispatch_state_lock:\n            return self._authority_available\n\n    @authority_available.setter\n    def authority_available(self, value: bool) -> None:\n        with self._dispatch_state_lock:\n            self._authority_available = bool(value)\n\n    @contextmanager\n    def dispatch_guard(self, request: ActionRequest):\n        with self._dispatch_state_lock:\n            if self.dispatch_guard_hook is not None:\n                self.dispatch_guard_hook()\n            identity = self._identity\n            capability = self._capabilities.get(request.required_capability)\n            authority_current = (\n                True\n                if request.required_authority == Authority.READ_ONLY\n                else bool(self._allow_mutation and self._authority_available)\n            )\n            yield identity, capability, authority_current\n\n    def identity(self) -> AdapterIdentity:\n        with self._dispatch_state_lock:\n            return self._identity\n'''
+              guard = '''    @property\n    def allow_mutation(self) -> bool:\n        with self._dispatch_state_lock:\n            return self._allow_mutation\n\n    @allow_mutation.setter\n    def allow_mutation(self, value: bool) -> None:\n        with self._dispatch_state_lock:\n            self._allow_mutation = bool(value)\n\n    @property\n    def authority_available(self) -> bool:\n        with self._dispatch_state_lock:\n            return self._authority_available\n\n    @authority_available.setter\n    def authority_available(self, value: bool) -> None:\n        with self._dispatch_state_lock:\n            self._authority_available = bool(value)\n\n    @contextmanager\n    def dispatch_guard(self, request: ActionRequest):\n        with self._dispatch_state_lock:\n            callback_failed = False\n            try:\n                if self.dispatch_guard_hook is not None:\n                    self.dispatch_guard_hook()\n                # Preserve prior callback-driven revalidation semantics, then snapshot\n                # the authoritative backing state only after every callback has run.\n                self.current_authority(request.required_authority)\n                self.capability(request.required_capability)\n            except Exception:\n                callback_failed = True\n            identity = self._identity\n            capability = None if callback_failed else self._capabilities.get(request.required_capability)\n            authority_current = (\n                False\n                if callback_failed\n                else True\n                if request.required_authority == Authority.READ_ONLY\n                else bool(self._allow_mutation and self._authority_available)\n            )\n            yield identity, capability, authority_current\n\n    def identity(self) -> AdapterIdentity:\n        with self._dispatch_state_lock:\n            return self._identity\n'''
               text = text.replace(identity_anchor, guard, 1)
           set_identity_old = '''        self._identity = replace(\n            self._identity,\n            adapter_generation=self._identity.adapter_generation if adapter_generation is None else adapter_generation,\n            runtime_instance_id=self._identity.runtime_instance_id if runtime_instance_id is ... else runtime_instance_id,\n            session_epoch=self._identity.session_epoch if session_epoch is ... else session_epoch,\n        )\n'''
           set_identity_new = '''        with self._dispatch_state_lock:\n            self._identity = replace(\n                self._identity,\n                adapter_generation=self._identity.adapter_generation if adapter_generation is None else adapter_generation,\n                runtime_instance_id=self._identity.runtime_instance_id if runtime_instance_id is ... else runtime_instance_id,\n                session_epoch=self._identity.session_epoch if session_epoch is ... else session_epoch,\n            )\n'''
@@ -136,12 +144,13 @@ jobs:
                   raise SystemExit('artifact status constant anchor missing')
               statuses = '''_RUN_RESULT_STATUSES = {\n    "PASS",\n    "FAIL",\n    "REFUSED",\n    "CANCELLED",\n    "TIMEOUT",\n    "AMBIGUOUS",\n    "INCOMPLETE",\n}\n\n\n'''
               text = text.replace(const_anchor, const_anchor + statuses, 1)
-          finalize_anchor = '''        run = self.runs[run_id]\n        if run.state == RunArtifactState.FINALIZED:\n'''
-          finalize_fixed = '''        run = self.runs[run_id]\n        ensure_no_secret_material(requested_status, key_path="artifact.requested_status")\n        if requested_status not in _RUN_RESULT_STATUSES:\n            raise ValidationError(\n                "INVALID_RUN_RESULT_STATUS",\n                "requested_status must be an Artifact v1 terminal status",\n            )\n        if run.state == RunArtifactState.FINALIZED:\n'''
-          if finalize_fixed not in text:
-              if finalize_anchor not in text:
-                  raise SystemExit('artifact finalize status anchor missing')
-              text = text.replace(finalize_anchor, finalize_fixed, 1)
+          finalize_pos = text.index('    def finalize(\n')
+          run_anchor = '        run = self.runs[run_id]\n'
+          run_pos = text.index(run_anchor, finalize_pos) + len(run_anchor)
+          final_section = text[finalize_pos:text.index('\n    def validate_safety_precedence(', finalize_pos)]
+          if 'INVALID_RUN_RESULT_STATUS' not in final_section:
+              insertion = '''        ensure_no_secret_material(requested_status, key_path="artifact.requested_status")\n        if requested_status not in _RUN_RESULT_STATUSES:\n            raise ValidationError(\n                "INVALID_RUN_RESULT_STATUS",\n                "requested_status must be an Artifact v1 terminal status",\n            )\n'''
+              text = text[:run_pos] + insertion + text[run_pos:]
           p.write_text(text, encoding='utf-8')
           PY
 
@@ -162,10 +171,13 @@ jobs:
               ProfileField,
               compare_runs,
           )
+          from tools.tibia_re_control_center.engine import ScenarioEngine
+          from tools.tibia_re_control_center.execution import MutationCoordinator
           from tools.tibia_re_control_center.fake import FakeAdapter, ManualClock
           from tools.tibia_re_control_center.model import ActionStatus, PrivacyError, ValidationError
           from tools.tibia_re_control_center.recorder import Recorder
           from tools.tibia_re_control_center.scenario import parse_and_validate
+          from tools.tibia_re_control_center.store import DeterministicDurableStore
 
 
           class IsolationSevenRegressionTests(unittest.TestCase):
@@ -212,7 +224,7 @@ jobs:
                               "value": 10,
                               "unknown_policy": "FAIL",
                           },
-                          "reason_code": "PLAYER_HP_ABORT",
+                          "reason_code": "CLIENT_NOT_IN_GAME",
                       }
                   ]
                   scenario_data["steps"] = [
@@ -239,13 +251,6 @@ jobs:
                   clock = ManualClock()
                   adapter = FakeAdapter(clock)
                   adapter.add_capability("move")
-                  store_clock, _, _, coordinator = make_stack(epoch="wait-abort")
-                  # Use the same deterministic clock for adapter/coordinator.
-                  del store_clock, coordinator
-                  from tools.tibia_re_control_center.execution import MutationCoordinator
-                  from tools.tibia_re_control_center.store import DeterministicDurableStore
-                  from tools.tibia_re_control_center.engine import ScenarioEngine
-
                   coordinator = MutationCoordinator(
                       adapter,
                       DeterministicDurableStore(),
@@ -258,22 +263,20 @@ jobs:
                       adapter_id=adapter.identity().adapter_id,
                       adapter_generation=adapter.identity().adapter_generation,
                   )
-                  original_snapshot = adapter.snapshot
-                  calls = 0
 
-                  def sequenced_snapshot():
-                      nonlocal calls
-                      calls += 1
+                  def controlled_wait(run_id, predicate, *, timeout_ms, token=None, poll_ms=1):
+                      del run_id, timeout_ms, token, poll_ms
                       player = adapter.snapshot_values["player"]
-                      if calls == 3:
-                          player["hp"] = 5
-                          player["mana"] = 100
-                      elif calls >= 4:
-                          player["hp"] = 100
-                          player["mana"] = 0
-                      return original_snapshot()
+                      player["hp"] = 5
+                      player["mana"] = 100
+                      first = predicate()
+                      player["hp"] = 100
+                      player["mana"] = 0
+                      if first:
+                          return "READY"
+                      return "READY" if predicate() else "TIMEOUT"
 
-                  adapter.snapshot = sequenced_snapshot
+                  coordinator.wait_until = controlled_wait
                   result = ScenarioEngine(
                       adapter=adapter,
                       coordinator=coordinator,
@@ -281,7 +284,7 @@ jobs:
                       recorder=recorder,
                   ).run(scenario, run_id="wait-abort-run")
                   self.assertEqual("CANCELLED", result.status)
-                  self.assertIn("PLAYER_HP_ABORT", result.reason_codes)
+                  self.assertIn("CLIENT_NOT_IN_GAME", result.reason_codes)
                   self.assertEqual([], adapter.physical_effects)
 
               def test_required_comparison_without_checkpoints_is_incomplete(self) -> None:

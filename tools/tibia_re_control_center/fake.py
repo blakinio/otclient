@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import threading
 from collections.abc import Callable, Mapping
+from contextlib import contextmanager
 from dataclasses import replace
 from typing import Any
 
@@ -59,6 +61,7 @@ class FakeAdapter:
         concurrency_safe_reads: bool = True,
     ) -> None:
         self.clock = clock
+        self._dispatch_state_lock = threading.RLock()
         self._identity = AdapterIdentity(
             adapter_id=adapter_id,
             adapter_kind=AdapterKind.FAKE_TEST,
@@ -79,6 +82,7 @@ class FakeAdapter:
         self.authority_wait_hook: Callable[[], None] | None = None
         self.before_commit_hook: Callable[[], None] | None = None
         self.after_commit_hook: Callable[[], None] | None = None
+        self.dispatch_guard_hook: Callable[[], None] | None = None
         self.execution_fault: str | None = None
         self.snapshot_values: dict[str, Any] = {
             "client_state": "IN_GAME",
@@ -99,8 +103,53 @@ class FakeAdapter:
         }
         self.selector_state: dict[str, str] = {}
 
+    @property
+    def allow_mutation(self) -> bool:
+        with self._dispatch_state_lock:
+            return self._allow_mutation
+
+    @allow_mutation.setter
+    def allow_mutation(self, value: bool) -> None:
+        with self._dispatch_state_lock:
+            self._allow_mutation = bool(value)
+
+    @property
+    def authority_available(self) -> bool:
+        with self._dispatch_state_lock:
+            return self._authority_available
+
+    @authority_available.setter
+    def authority_available(self, value: bool) -> None:
+        with self._dispatch_state_lock:
+            self._authority_available = bool(value)
+
+    @contextmanager
+    def dispatch_guard(self, request: ActionRequest):
+        with self._dispatch_state_lock:
+            callback_failed = False
+            try:
+                if self.dispatch_guard_hook is not None:
+                    self.dispatch_guard_hook()
+                # Preserve prior callback-driven revalidation semantics, then read
+                # authoritative backing state after every callback has completed.
+                self.current_authority(request.required_authority)
+                self.capability(request.required_capability)
+            except Exception:  # noqa: BLE001 -- fail closed on adapter guard callback failure
+                callback_failed = True
+            identity = self._identity
+            capability = None if callback_failed else self._capabilities.get(request.required_capability)
+            authority_current = (
+                False
+                if callback_failed
+                else True
+                if request.required_authority == Authority.READ_ONLY
+                else bool(self._allow_mutation and self._authority_available)
+            )
+            yield identity, capability, authority_current
+
     def identity(self) -> AdapterIdentity:
-        return self._identity
+        with self._dispatch_state_lock:
+            return self._identity
 
     def set_identity(
         self,
@@ -109,26 +158,29 @@ class FakeAdapter:
         runtime_instance_id: str | None | object = ...,
         session_epoch: str | None | object = ...,
     ) -> None:
-        self._identity = replace(
-            self._identity,
-            adapter_generation=self._identity.adapter_generation if adapter_generation is None else adapter_generation,
-            runtime_instance_id=self._identity.runtime_instance_id if runtime_instance_id is ... else runtime_instance_id,
-            session_epoch=self._identity.session_epoch if session_epoch is ... else session_epoch,
-        )
+        with self._dispatch_state_lock:
+            self._identity = replace(
+                self._identity,
+                adapter_generation=self._identity.adapter_generation if adapter_generation is None else adapter_generation,
+                runtime_instance_id=self._identity.runtime_instance_id if runtime_instance_id is ... else runtime_instance_id,
+                session_epoch=self._identity.session_epoch if session_epoch is ... else session_epoch,
+            )
 
     def add_capability(self, capability_id: str, *, read: bool = True, action: bool = True) -> None:
-        self._capabilities[capability_id] = Capability(
-            capability_id,
-            read_supported=read,
-            action_supported=action,
-            source="fake-fixture",
-        )
+        with self._dispatch_state_lock:
+            self._capabilities[capability_id] = Capability(
+                capability_id,
+                read_supported=read,
+                action_supported=action,
+                source="fake-fixture",
+            )
 
     def capabilities(self) -> tuple[Capability, ...]:
         return tuple(self._capabilities.values())
 
     def capability(self, capability_id: str) -> Capability | None:
-        return self._capabilities.get(capability_id)
+        with self._dispatch_state_lock:
+            return self._capabilities.get(capability_id)
 
     def set_effect_bound(self, kind: str, bound: EffectBound | None) -> None:
         self._effect_bounds[kind] = bound
@@ -225,9 +277,10 @@ class FakeAdapter:
         return bool(capability.read_supported)
 
     def current_authority(self, required: Authority) -> bool:
-        if required == Authority.READ_ONLY:
-            return True
-        return bool(self.allow_mutation and self.authority_available)
+        with self._dispatch_state_lock:
+            if required == Authority.READ_ONLY:
+                return True
+            return bool(self._allow_mutation and self._authority_available)
 
     def cross_irreversible_boundary(self, request: ActionRequest) -> dict[str, Any]:
         if not self.allow_mutation:

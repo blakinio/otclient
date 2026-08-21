@@ -525,49 +525,41 @@ class MutationCoordinator:
                 return False
             if self.in_memory_stop or self.stop_cleanup_in_progress or self.control_state.stop_latched or self.control_state.recovery_required or self.mutation_disabled:
                 return False
-            identity = self.adapter.identity()
-            if identity.adapter_generation != fence.expected_adapter_generation:
-                return False
-            if identity.runtime_instance_id != fence.expected_runtime_instance_id:
-                return False
-            if identity.session_epoch != fence.expected_session_epoch:
-                return False
-            if self._deadline_expired(run):
-                return False
-            capability = self.adapter.capability(request.required_capability)
-            if capability is None:
-                return False
-            if request.required_authority == Authority.MUTATION and not capability.action_supported:
-                return False
-            if request.required_authority == Authority.READ_ONLY and not capability.read_supported:
-                return False
-            if not self.adapter.current_authority(request.required_authority):
-                return False
-            capability = self.adapter.capability(request.required_capability)
-            if capability is None or not capability.action_supported:
-                return False
-            if request.action_id not in run.budget.reservations:
-                return False
-            if self.clock.now_ns() >= action_deadline_ns:
-                final_commit_refusal_reason[0] = "ACTION_TIMEOUT_EXPIRED"
-                return False
-            next_budget = self._move_reserved_to_at_risk(run.budget, request.action_id)
-            committed = record.with_state(
-                LifecycleState.DISPATCH_COMMITTED,
-                self.clock.now_ns(),
-                dispatch_state=DispatchState.POSSIBLY_DISPATCHED,
-                backend_epoch=self.backend_epoch,
-                control_generation=self.control_generation,
-                adapter_generation=identity.adapter_generation,
-                runtime_instance_id=identity.runtime_instance_id,
-                session_epoch=identity.session_epoch,
-            )
-            try:
-                self.store.atomic_dispatch_commit(committed, next_budget)
-            except (DurabilityError, DurabilityTimeout):
-                return False
-            run.budget = next_budget
-            return True
+            with self.adapter.dispatch_guard(request) as (identity, capability, authority_current):
+                if identity.adapter_generation != fence.expected_adapter_generation:
+                    return False
+                if identity.runtime_instance_id != fence.expected_runtime_instance_id:
+                    return False
+                if identity.session_epoch != fence.expected_session_epoch:
+                    return False
+                if request.required_authority != Authority.MUTATION:
+                    return False
+                if capability is None or not capability.action_supported or not authority_current:
+                    return False
+                if self._deadline_expired(run):
+                    return False
+                if request.action_id not in run.budget.reservations:
+                    return False
+                if self.clock.now_ns() >= action_deadline_ns:
+                    final_commit_refusal_reason[0] = "ACTION_TIMEOUT_EXPIRED"
+                    return False
+                next_budget = self._move_reserved_to_at_risk(run.budget, request.action_id)
+                committed = record.with_state(
+                    LifecycleState.DISPATCH_COMMITTED,
+                    self.clock.now_ns(),
+                    dispatch_state=DispatchState.POSSIBLY_DISPATCHED,
+                    backend_epoch=self.backend_epoch,
+                    control_generation=self.control_generation,
+                    adapter_generation=identity.adapter_generation,
+                    runtime_instance_id=identity.runtime_instance_id,
+                    session_epoch=identity.session_epoch,
+                )
+                try:
+                    self.store.atomic_dispatch_commit(committed, next_budget)
+                except (DurabilityError, DurabilityTimeout):
+                    return False
+                run.budget = next_budget
+                return True
 
     def execute_action(
         self,

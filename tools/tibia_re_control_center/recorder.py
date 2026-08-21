@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import copy
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any
@@ -45,7 +45,7 @@ def ensure_no_secret_material(value: Any, *, key_path: str = "payload") -> None:
                 raise PrivacyError("PRIVATE_CHAT", "unapproved private-chat content is not admitted")
             ensure_no_secret_material(child, key_path=f"{key_path}.{key}")
         return
-    if isinstance(value, (list, tuple)):
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
         for child in value:
             ensure_no_secret_material(child, key_path=key_path)
         return
@@ -58,11 +58,11 @@ def ensure_no_secret_material(value: Any, *, key_path: str = "payload") -> None:
 def _freeze_event_value(value: Any) -> Any:
     if isinstance(value, Mapping):
         return MappingProxyType({key: _freeze_event_value(child) for key, child in value.items()})
-    if isinstance(value, list):
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
         return tuple(_freeze_event_value(child) for child in value)
-    if isinstance(value, tuple):
-        return tuple(_freeze_event_value(child) for child in value)
-    return value
+    if value is None or isinstance(value, (str, bool, int, float)):
+        return value
+    raise ValidationError("EVENT_PAYLOAD_TYPE_INVALID", "event payload must contain only admitted JSON value types")
 
 
 def safe_error(code: str, *, safe_message: str, exception: BaseException | None = None) -> dict[str, str]:

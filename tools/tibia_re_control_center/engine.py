@@ -223,12 +223,19 @@ class ScenarioEngine:
                     elif step.step_type == "wait":
                         predicate, _ = validate_predicate(step.body["condition"])
                         checkpoint = last_snapshot
+                        latched_abort_reason: list[str | None] = [None]
 
                         def ready(
                             bound_predicate=predicate,
                             bound_checkpoint=checkpoint,
+                            bound_scenario: ValidatedScenario = scenario,
+                            bound_abort_latch=latched_abort_reason,
                         ) -> bool:
                             observed = self._snapshot_mapping(self.adapter.snapshot())
+                            abort_reason = self._abort_reason(bound_scenario, observed)
+                            if abort_reason is not None:
+                                bound_abort_latch[0] = abort_reason
+                                return True
                             return resolve_unknown_policy(
                                 evaluate_predicate(
                                     bound_predicate,
@@ -243,6 +250,10 @@ class ScenarioEngine:
                             ready,
                             timeout_ms=int(step.body["timeout_ms"]),
                         )
+                        if latched_abort_reason[0] is not None:
+                            status = "CANCELLED"
+                            reason_codes.append(latched_abort_reason[0])
+                            break
                         if wait_result != "READY":
                             status = "TIMEOUT" if wait_result == "TIMEOUT" else "CANCELLED"
                             reason_codes.append(f"WAIT_{wait_result}")

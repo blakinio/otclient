@@ -296,9 +296,22 @@ def compare_runs(
             (),
             reason_code="SCENARIO_MISMATCH",
         )
+    pairs = tuple(checkpoint_pairs)
+    if not pairs and any(field.required for field in profile.fields):
+        return ComparisonResult(
+            comparison_id,
+            profile.profile_id,
+            profile.profile_version,
+            reference_run_id,
+            candidate_run_id,
+            scenario_id,
+            ComparisonStatus.COVERAGE_INCOMPLETE,
+            (),
+            reason_code="REQUIRED_CHECKPOINT_COVERAGE_MISSING",
+        )
     results: list[FieldComparisonResult] = []
     required_by_path = {field.path: field.required for field in profile.fields}
-    for pair in checkpoint_pairs:
+    for pair in pairs:
         for rule in profile.fields:
             reference = reference_observations.get((pair.reference_step_id, rule.path))
             candidate = candidate_observations.get((pair.candidate_step_id, rule.path))

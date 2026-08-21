@@ -1,12 +1,12 @@
 ---
 task_id: OTC-20260821-tibia-re-control-center-package-a-p1-isolation-7
-status: in_progress
+status: waiting
 agent: ChatGPT
 project_lane: otclient
 lane: P1-CONTROL-CORE
 track_id: official-client-re
 task_kind: repair
-phase: validate
+phase: audit
 risk: medium
 branch: feat/OTC-20260820-tibia-re-control-center-package-a
 base_branch: main
@@ -42,7 +42,7 @@ continuation_policy: continue_until_real_stop
 task_completion_policy: full_closeout
 execution_mode: github_connector_plus_actions
 execution_budget_minutes: 120
-repair_cycles_for_current_gate: 1
+repair_cycles_for_current_gate: 3
 validation_level: full
 complete_user_facing_feature: false
 owned_paths:
@@ -80,3 +80,7 @@ One-shot isolation-seven repair driver is staged on the Package A branch. It wil
 ## Required gates
 
 Focused deterministic regressions for all five findings; full Package A suite; both audits; Ruff; diff-check; exact-current-main; fresh independent exact-head review with zero P0/P1/material findings; Ready + squash merge only after all gates pass.
+
+## Final repair-pass evidence
+
+Isolation-seven pass 2 established 121/121 tests PASS, both Package A audits PASS, `RUNTIME_ACCESS_NONE=PASS`, fake one-step E2E PASS; it stopped only on Ruff B023/BLE001. Pass 3 fixes only those lint bindings while retaining the validated five-finding repair logic. Fresh exact-head independent review remains required after this commit.

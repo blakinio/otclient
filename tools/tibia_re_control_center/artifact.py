@@ -24,6 +24,16 @@ from .recorder import (
     ensure_no_secret_material,
 )
 
+_RUN_RESULT_STATUSES = {
+    "PASS",
+    "FAIL",
+    "REFUSED",
+    "CANCELLED",
+    "TIMEOUT",
+    "AMBIGUOUS",
+    "INCOMPLETE",
+}
+
 
 def _safe_relative_path(path: str) -> str:
     if not isinstance(path, str) or not path or path.startswith(("/", "\\")) or "\x00" in path:
@@ -269,6 +279,12 @@ class ArtifactStore:
         reason_codes: list[str] | tuple[str, ...] | None = None,
     ) -> Mapping[str, Any]:
         run = self.runs[run_id]
+        ensure_no_secret_material(requested_status, key_path="artifact.requested_status")
+        if requested_status not in _RUN_RESULT_STATUSES:
+            raise ValidationError(
+                "INVALID_RUN_RESULT_STATUS",
+                "requested_status must be an Artifact v1 terminal status",
+            )
         if run.state == RunArtifactState.FINALIZED:
             if run.final_result is None:
                 raise ValidationError("FINALIZATION_CONTRADICTION", "finalized run lacks result")

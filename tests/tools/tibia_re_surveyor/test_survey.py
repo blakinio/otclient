@@ -89,16 +89,10 @@ class CollectAllModelTests(unittest.TestCase):
     def test_missing_reader_ranking_uses_canonical_priority(self):
         coverage = [
             {
-                "row_id": "A15",
-                "title": "Restart/relogin stability",
+                "row_id": "F01",
+                "title": "World/minimap surface",
                 "canonical_status": "BLOCKED",
                 "evidence_index": {"mention_count": 1, "current_sha_match_count": 1},
-            },
-            {
-                "row_id": "C10",
-                "title": "Authoritative local-player XYZ",
-                "canonical_status": "BLOCKED",
-                "evidence_index": {"mention_count": 1, "current_sha_match_count": 0},
             },
             {
                 "row_id": "G24",
@@ -111,17 +105,19 @@ class CollectAllModelTests(unittest.TestCase):
             "generated_at": "2026-08-20T07:00:00+00:00",
             "runtime": None,
             "recommended_next": [
-                {"row_id": "C10", "priority_score": 125},
-                {"row_id": "A15", "priority_score": 125},
+                {"row_id": "F01", "priority_score": 125},
                 {"row_id": "G24", "priority_score": 40},
             ],
         }
         result = build_collect_all(bundle, coverage)
         gaps = result["missing_readers"]["reader_gaps"]
-        self.assertEqual(10, len(gaps))
-        self.assertEqual("TIBIA-RE-AUTH-SESSION", gaps[0]["alias"])
+        self.assertEqual(9, len(gaps))
+        self.assertEqual("TIBIA-RE-WORLD-MINIMAP", gaps[0]["alias"])
         self.assertEqual(125, gaps[0]["canonical_priority_score"])
-        self.assertNotIn("TIBIA-RE-PLAYER-STATE", [gap["alias"] for gap in gaps])
+        gap_aliases = [gap["alias"] for gap in gaps]
+        self.assertNotIn("TIBIA-RE-AUTH-SESSION", gap_aliases)
+        self.assertNotIn("TIBIA-RE-PLAYER-STATE", gap_aliases)
+        self.assertIsNone(result["aliases"]["TIBIA-RE-AUTH-SESSION"]["missing_reader"])
         self.assertIsNone(result["aliases"]["TIBIA-RE-PLAYER-STATE"]["missing_reader"])
         self.assertEqual(1, gaps[0]["rank"])
         self.assertFalse(gaps[0]["semantic_promotion_allowed"])
@@ -198,7 +194,7 @@ class CollectAllOutputTests(unittest.TestCase):
             bundle = build_bundle(args)
             self.assertEqual(169, sum(bundle["coverage_counts"].values()))
             self.assertEqual(12, bundle["collect_all"]["alias_count"])
-            self.assertEqual(10, bundle["collect_all"]["missing_reader_count"])
+            self.assertEqual(9, bundle["collect_all"]["missing_reader_count"])
             self.assertEqual("NO_EXACT_CURRENT_PROFILE", bundle["bridge_profile"]["state"])
             self.assertEqual(0, bundle["bridge_profile"]["exact_current_profile_count"])
             self.assertTrue((output / "surveyor" / "coverage.json").is_file())
@@ -210,6 +206,9 @@ class CollectAllOutputTests(unittest.TestCase):
             missing = json.loads((output / "missing-readers.json").read_text(encoding="utf-8"))
             self.assertEqual("NO_RUNTIME_INPUT_THIS_RUN", missing["run_unavailable_inputs"][0]["reason"])
             self.assertFalse(missing["guardrails"]["gap_authorizes_runtime_mutation"])
+            gap_aliases = [gap["alias"] for gap in missing["reader_gaps"]]
+            self.assertNotIn("TIBIA-RE-AUTH-SESSION", gap_aliases)
+            self.assertNotIn("TIBIA-RE-PLAYER-STATE", gap_aliases)
 
 
 if __name__ == "__main__":

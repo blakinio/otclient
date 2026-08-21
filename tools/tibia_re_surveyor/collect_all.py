@@ -8,7 +8,6 @@ from pathlib import Path
 import re
 from typing import Dict, Iterable, List, Mapping, Sequence
 
-
 SCHEMA_VERSION = "otclient.tibia-re-surveyor.collect-all.v2"
 ALIAS_SCHEMA_VERSION = "otclient.tibia-re-surveyor.alias-view.v2"
 TELEMETRY_SCHEMA_VERSION = "otclient.tibia-re-surveyor.telemetry.v2"
@@ -59,6 +58,10 @@ TYPED_READER_IDS = {
     alias: alias.lower().replace("tibia-re-", "").replace("-", "_") + "_typed_reader"
     for alias in ALIAS_ROWS
     if alias != "TIBIA-RE-COORDINATOR"
+}
+IMPLEMENTED_TYPED_READER_IDS = {
+    "auth_session_typed_reader",
+    "player_state_typed_reader",
 }
 
 _STATUS_SCORE = {"BLOCKED": 100, "NOT_STARTED": 60, "PARTIAL": 40, "DONE": 0}
@@ -195,7 +198,6 @@ def build_collect_all(bundle: Mapping[str, object], coverage_rows: Sequence[Mapp
         for item in bundle.get("recommended_next", [])
         if isinstance(item, dict) and item.get("row_id")
     }
-    all_rows = {str(item["row_id"]): item for item in coverage_rows}
 
     if runtime_observation["state"] == "UNKNOWN":
         run_unavailable_inputs.append(
@@ -210,7 +212,7 @@ def build_collect_all(bundle: Mapping[str, object], coverage_rows: Sequence[Mapp
     for alias, row_ids in ALIAS_ROWS.items():
         rows = _row_documents(coverage_rows, row_ids)
         reader_id = TYPED_READER_IDS.get(alias)
-        reader_implemented = reader_id == "player_state_typed_reader"
+        reader_implemented = reader_id in IMPLEMENTED_TYPED_READER_IDS
         source_states = {
             "repository_evidence_index": {
                 "state": "AVAILABLE",

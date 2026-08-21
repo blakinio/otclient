@@ -9,6 +9,7 @@ import sys
 import subprocess
 from typing import Optional, Sequence
 
+from .auth_session import read_auth_session
 from .collect_all import build_collect_all, write_collect_all
 from .coverage import parse_critical_dependencies, parse_matrix, rank_next, status_counts
 from .evidence import DockerRepoReader, LocalRepoReader, RepoReader
@@ -198,6 +199,9 @@ def build_bundle(args: argparse.Namespace) -> dict:
                     raise RuntimeError(completed.stderr.strip() or f"reader command rc={completed.returncode}")
                 return completed.stdout
 
+            typed_readers["auth_session_typed_reader"] = read_auth_session(
+                pid=int(proc["pid"]), start_ticks=int(proc["process_start_ticks"]), runner=_runner
+            )
             typed_readers["player_state_typed_reader"] = read_player_state(
                 pid=int(proc["pid"]), start_ticks=int(proc["process_start_ticks"]), runner=_runner
             )

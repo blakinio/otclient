@@ -111,14 +111,16 @@ class CollectAllModelTests(unittest.TestCase):
         }
         result = build_collect_all(bundle, coverage)
         gaps = result["missing_readers"]["reader_gaps"]
-        self.assertEqual(9, len(gaps))
+        self.assertEqual(8, len(gaps))
         self.assertEqual("TIBIA-RE-WORLD-MINIMAP", gaps[0]["alias"])
         self.assertEqual(125, gaps[0]["canonical_priority_score"])
         gap_aliases = [gap["alias"] for gap in gaps]
         self.assertNotIn("TIBIA-RE-AUTH-SESSION", gap_aliases)
         self.assertNotIn("TIBIA-RE-PLAYER-STATE", gap_aliases)
+        self.assertNotIn("TIBIA-RE-ACTION-PROTOCOL", gap_aliases)
         self.assertIsNone(result["aliases"]["TIBIA-RE-AUTH-SESSION"]["missing_reader"])
         self.assertIsNone(result["aliases"]["TIBIA-RE-PLAYER-STATE"]["missing_reader"])
+        self.assertIsNone(result["aliases"]["TIBIA-RE-ACTION-PROTOCOL"]["missing_reader"])
         self.assertEqual(1, gaps[0]["rank"])
         self.assertFalse(gaps[0]["semantic_promotion_allowed"])
 
@@ -194,7 +196,7 @@ class CollectAllOutputTests(unittest.TestCase):
             bundle = build_bundle(args)
             self.assertEqual(169, sum(bundle["coverage_counts"].values()))
             self.assertEqual(12, bundle["collect_all"]["alias_count"])
-            self.assertEqual(9, bundle["collect_all"]["missing_reader_count"])
+            self.assertEqual(8, bundle["collect_all"]["missing_reader_count"])
             self.assertEqual("NO_EXACT_CURRENT_PROFILE", bundle["bridge_profile"]["state"])
             self.assertEqual(0, bundle["bridge_profile"]["exact_current_profile_count"])
             self.assertTrue((output / "surveyor" / "coverage.json").is_file())
@@ -209,6 +211,7 @@ class CollectAllOutputTests(unittest.TestCase):
             gap_aliases = [gap["alias"] for gap in missing["reader_gaps"]]
             self.assertNotIn("TIBIA-RE-AUTH-SESSION", gap_aliases)
             self.assertNotIn("TIBIA-RE-PLAYER-STATE", gap_aliases)
+            self.assertNotIn("TIBIA-RE-ACTION-PROTOCOL", gap_aliases)
 
 
 if __name__ == "__main__":

@@ -190,9 +190,11 @@ jobs:
           print('TARGET_UNIQUENESS=PROVEN')
           print('CANONICAL_REGISTRATION='+('PRESENT_MATCHING' if reg else 'ABSENT'))
           PY
-          echo "pid=$pid" >> "$GITHUB_OUTPUT"
-          echo "start=$start" >> "$GITHUB_OUTPUT"
-          echo "exe=$exe" >> "$GITHUB_OUTPUT"
+          {
+            echo "pid=$pid"
+            echo "start=$start"
+            echo "exe=$exe"
+          } >> "$GITHUB_OUTPUT"
           echo PROCESS_ENVIRONMENT_READ=false
           echo WINDOW_TITLE_VALUE_RETAINED=false
 

@@ -63,9 +63,9 @@ estimate_confidence: medium
 decomposition_decision: phased
 decomposition_reason: discovery selected one non-overlapping reader; the same task now owns implementation through validation, physical acceptance and closeout
 invocation_started_at: 2026-08-21T21:27:00+02:00
-last_progress_at: 2026-08-21T21:52:51+02:00
+last_progress_at: 2026-08-21T21:54:41+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: audit_metadata_head_pending
+ci_check_generation: final_audit_head_pending
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -73,7 +73,7 @@ identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 0
 stall_warnings: 0
-next_action: obtain a fresh independent exact-diff validator audit, verify exact metadata-head CI/governance, merge PR #658, then run trusted-main read-only physical acceptance
+next_action: obtain fresh independent exact-head audit, verify exact-head CI/governance and zero review threads, then merge PR #658
 ---
 
 # Surveyor v2 next non-overlap typed-reader slice
@@ -101,9 +101,13 @@ Fresh repository-only collect-all on exact starting `main@dce8bbd0e78ceea3681a1f
 
 The implementation is deliberately bounded to the exact-build `tibia::config::TClientOptions` compiled model plus the two previously causally proven Master Volume persistence fields in `packages/Tibia/conf/clientoptions.json`. The reader does not claim complete settings semantics, live UI application state, `TClientOptions -> clientoptions.json` linkage, or QSettings linkage. It uses no process-memory access.
 
+## Implementer falsification checkpoint
+
+SELF-658-001 (pre-audit, not an independent finding): the first wrapper revision checked the embedded probe state/type but did not independently validate every bounded payload field before semantic wrapping. The final candidate now fail-closes on malformed static type/literal counts, reader identity, both Master Volume integer ranges, fixed relative persistence path, read-only filesystem marker, and no-process-memory marker. Two negative tests were added. Final local validation after this repair: focused UI/settings 6/6 PASS; all Surveyor tests 57/57 PASS; collect-all 169 rows / 12 aliases / 7 missing readers / privacy PASS; Track A runtime governance PASS; git diff --check PASS.
+
 ## Pre-audit exact code-head validation
 
-Code candidate 15398146d7fd46cf047aba1f3aa7317990092b84 passed all applicable GitHub gates before this metadata-only audit checkpoint: repository CI run 32520242535, Track A Surveyor tests run 32520242610, and Track A agent runtime governance run 32520242396, all success. No reader/source/test/workflow content changes follow this checkpoint unless a material audit finding requires remediation.
+Code candidate 15398146d7fd46cf047aba1f3aa7317990092b84 passed all applicable GitHub gates before this metadata-only audit checkpoint: repository CI run 32520242535, Track A Surveyor tests run 32520242610, and Track A agent runtime governance run 32520242396, all success. Implementer falsification immediately after this checkpoint found that the outer UI/settings wrapper validated only probe `state`/type and not the full bounded payload. That candidate is superseded by a fail-closed payload-shape validation repair before independent audit.
 
 ## Runtime boundary
 

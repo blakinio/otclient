@@ -70,6 +70,37 @@ class UiSettingsReaderTests(unittest.TestCase):
         self.assertNotIn("arbitrary", json.dumps(doc))
         self.assertFalse(doc["semantic_promotion_allowed"])
 
+    def test_malformed_static_payload_fails_closed(self):
+        def runner(command):
+            return json.dumps(
+                {
+                    "state": "AVAILABLE",
+                    "type_name": TYPE_NAME,
+                    "type_string_count": 1,
+                    "clientoptions_literal_count": 2,
+                }
+            )
+
+        doc = read_ui_settings(pid=123, start_ticks=456, runner=runner)
+        self.assertEqual("UNAVAILABLE", doc["state"])
+        self.assertEqual("STATIC_SETTINGS_MODEL_FAILED:RuntimeError", doc["reason"])
+
+    def test_malformed_live_payload_fails_closed(self):
+        calls = []
+
+        def runner(command):
+            calls.append(command)
+            if len(calls) == 1:
+                return self._static()
+            payload = json.loads(self._live())
+            payload["master_volume"] = True
+            return json.dumps(payload)
+
+        doc = read_ui_settings(pid=123, start_ticks=456, runner=runner)
+        self.assertEqual("UNAVAILABLE", doc["state"])
+        self.assertEqual("LIVE_SETTINGS_READ_FAILED:RuntimeError", doc["reason"])
+        self.assertEqual(TYPE_NAME, doc["static_evidence"]["type_name"])
+
     def test_live_known_failure_is_bounded_and_keeps_static_evidence(self):
         calls = []
 

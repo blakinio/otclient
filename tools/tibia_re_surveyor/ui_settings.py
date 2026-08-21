@@ -115,7 +115,15 @@ def read_ui_settings(
             ]
         ).strip()
         static = json.loads(raw_static)
-        if static.get("state") != "AVAILABLE" or static.get("type_name") != TYPE_NAME:
+        if (
+            not isinstance(static, dict)
+            or static.get("state") != "AVAILABLE"
+            or static.get("type_name") != TYPE_NAME
+            or isinstance(static.get("type_string_count"), bool)
+            or not isinstance(static.get("type_string_count"), int)
+            or static["type_string_count"] < 1
+            or static.get("clientoptions_literal_count") != 1
+        ):
             raise RuntimeError("static settings model unavailable")
     except Exception as exc:
         return {
@@ -133,7 +141,22 @@ def read_ui_settings(
             ]
         ).strip()
         doc = json.loads(raw_live)
-        if doc.get("state") != "AVAILABLE":
+        master = doc.get("master_volume") if isinstance(doc, dict) else None
+        master_old = doc.get("master_volume_old") if isinstance(doc, dict) else None
+        if (
+            not isinstance(doc, dict)
+            or doc.get("state") != "AVAILABLE"
+            or doc.get("reader_id") != READER_ID
+            or isinstance(master, bool)
+            or not isinstance(master, int)
+            or not 0 <= master <= 100
+            or isinstance(master_old, bool)
+            or not isinstance(master_old, int)
+            or not 0 <= master_old <= 100
+            or doc.get("persistence_relative_path") != "packages/Tibia/conf/clientoptions.json"
+            or doc.get("filesystem_access") != "read_only"
+            or doc.get("process_memory_access") != "not_used"
+        ):
             raise RuntimeError("settings snapshot unavailable")
     except Exception as exc:
         return {

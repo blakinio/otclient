@@ -48,6 +48,8 @@ Therefore `ui_settings_typed_reader` is the highest-ranked current P0/P1-family 
 
 The implementation exact-fences PID start identity plus client size/SHA before static/runtime reads. It requires compiled `tibia::config::TClientOptions` presence and the unique `clientoptions.json` literal, then reads only the two causally established Master Volume integer fields from the process user's fixed Tibia `conf/clientoptions.json` path.
 
+Both embedded probe outputs are revalidated by the outer reader before acceptance; malformed or inconsistent static/live payloads fail closed without retaining arbitrary exception text.
+
 It explicitly does **not**:
 
 - read or write `/proc/<pid>/mem`;
@@ -63,10 +65,10 @@ After implementation:
 
 ```text
 python -m unittest tests.tools.tibia_re_surveyor.test_ui_settings -v
-4/4 PASS
+6/6 PASS
 
 python -m unittest discover -s tests/tools/tibia_re_surveyor -p 'test_*.py' -v
-55/55 PASS
+57/57 PASS
 
 git diff --check
 PASS

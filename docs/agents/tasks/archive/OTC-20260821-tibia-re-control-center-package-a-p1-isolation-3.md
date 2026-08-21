@@ -1,17 +1,17 @@
 ---
 task_id: OTC-20260821-tibia-re-control-center-package-a-p1-isolation-3
-status: in_progress
+status: completed
 agent: ChatGPT
 project_lane: otclient
 lane: P1-CONTROL-CORE
 track_id: official-client-re
 task_kind: repair
-phase: implement
+phase: close
 risk: medium
 branch: feat/OTC-20260820-tibia-re-control-center-package-a
 base_branch: main
 created: 2026-08-21T08:46:00+02:00
-updated: 2026-08-21T11:32:00+02:00
+updated: 2026-08-21T17:18:00+02:00
 initial_base_sha: 5707af6c413cd9949f6c33b17744801cedef6eaf
 related_pr: 628
 parent_task: OTC-20260820-tibia-re-control-center-package-a
@@ -72,6 +72,7 @@ reuses:
   - docs/agents/contracts/TIBIA_RE_CONTROL_CENTER_EXECUTION_V1.md
   - docs/agents/contracts/TIBIA_RE_CONTROL_CENTER_ARTIFACT_V1.md
   - tests/tools/tibia_re_control_center/test_codex_cycle2_repairs.py
+ownership_released: true
 ---
 
 # Package A P1 isolation 3
@@ -103,3 +104,45 @@ Fresh bounded repair task opened after independent exact-head review of PR #628 
 ## Driver checkpoint
 
 The first one-shot repair failed before touching implementation because its test insertion anchor did not match the existing file layout. Repair driver v2 creates a dedicated deterministic regression module and is the active bounded cycle.
+
+## Terminal Package A lifecycle closeout
+
+Package A / `control-core` is terminally complete. Source PR #628 squash-merged as `13b3f02a07a176662d766352d9af39619775a73d` after exact-head validation and a fresh independent Codex Spark review of `d66b59724e9f1856a8007a4f57d9c644600a6134` returned no major/material findings. This record becomes authoritative when lifecycle closeout PR #649 merges.
+
+```yaml
+closeout:
+  implementation_complete: true
+  vertical_slice_complete: true
+  delivery_classification: backend_only
+  user_facing_feature_complete: false
+  audit:
+    result: PASS
+    independent_validator: Codex Spark exact-head review
+    audited_head: d66b59724e9f1856a8007a4f57d9c644600a6134
+    material_findings_open: 0
+  e2e:
+    result: NOT_APPLICABLE
+    reason: lifecycle closeout is documentation-only; Package A behavior was validated by the fake one-step non-UI E2E with runtime_access:none before source merge
+  final_ci:
+    head: d66b59724e9f1856a8007a4f57d9c644600a6134
+    result: PASS
+    required_checks:
+      - TIBIA RE Control Center Package A run 32495289822 SUCCESS
+      - Track A agent runtime governance run 32495289937 SUCCESS
+      - repository CI run 32495290189 SUCCESS
+  merge:
+    pr: 628
+    merge_commit: 13b3f02a07a176662d766352d9af39619775a73d
+  pull_requests:
+    open_related_prs: 0
+    unresolved_review_threads: 0
+    terminal_prs:
+      - blakinio/otclient#628 merged as 13b3f02a07a176662d766352d9af39619775a73d
+      - blakinio/otclient#649 merged lifecycle closeout (effective when this archive reaches main)
+  task_status: completed
+  task_archived: true
+  ownership_released: true
+  stale_branches_reconciled: true
+```
+
+No official Tibia runtime, credentials, login, GUI/gameplay input, network listener, local Ollama/model, or Track A mutation was used by this lifecycle closeout. Package B and later packages remain separate work and are not claimed complete here.

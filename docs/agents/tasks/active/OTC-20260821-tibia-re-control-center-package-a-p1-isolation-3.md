@@ -11,7 +11,7 @@ risk: medium
 branch: feat/OTC-20260820-tibia-re-control-center-package-a
 base_branch: main
 created: 2026-08-21T08:46:00+02:00
-updated: 2026-08-21T08:52:00+02:00
+updated: 2026-08-21T11:32:00+02:00
 initial_base_sha: 5707af6c413cd9949f6c33b17744801cedef6eaf
 related_pr: 628
 parent_task: OTC-20260820-tibia-re-control-center-package-a
@@ -46,14 +46,14 @@ execution_mode: github_connector_plus_codex
 execution_budget_minutes: 120
 execution_budget_reason: owner-authorized fresh isolation after exact-head Codex review b42b5449 opened five new P1 findings
 invocation_started_at: 2026-08-21T08:46:00+02:00
-last_progress_at: 2026-08-21T08:52:00+02:00
+last_progress_at: 2026-08-21T11:32:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: isolation3_repair_driver
+ci_check_generation: isolation3_repair_driver_v2
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 1
+repair_cycles_for_current_gate: 2
 context_reconstruction_attempts: 0
 stall_warnings: 0
 validation_level: full
@@ -62,6 +62,7 @@ owned_paths:
   - tools/tibia_re_control_center/execution.py
   - tools/tibia_re_control_center/artifact.py
   - tests/tools/tibia_re_control_center/test_codex_cycle2_repairs.py
+  - tests/tools/tibia_re_control_center/test_isolation3_repairs.py
   - tests/tools/tibia_re_control_center/audit_package_a_p1.py
   - docs/agents/tasks/active/OTC-20260821-tibia-re-control-center-package-a-p1-isolation-3.md
   - docs/agents/tasks/archive/OTC-20260821-tibia-re-control-center-package-a-p1-isolation-3.md
@@ -98,3 +99,7 @@ Fresh bounded repair task opened after independent exact-head review of PR #628 
 - exact-current-main reconciliation;
 - fresh independent exact-head review with zero P0/P1/material findings;
 - Ready + squash merge only after all gates pass.
+
+## Driver checkpoint
+
+The first one-shot repair failed before touching implementation because its test insertion anchor did not match the existing file layout. Repair driver v2 creates a dedicated deterministic regression module and is the active bounded cycle.

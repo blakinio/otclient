@@ -21,7 +21,7 @@ The run is not task-level E2E PASS because `ui_settings_typed_reader` returned `
 
 ## Read-only metadata discriminator
 
-After persisting the same task's fresh read-only admission, two metadata-only probes were used. They read no settings JSON and no process memory.
+A temporary same-task read-only admission was persisted for two bounded metadata-only probes, then released before the repair returned to pre-merge audit. The probes read no settings JSON and no process memory.
 
 The process user home was `/home/kasm-user`. `.local/share` existed, but the historical isolated-runtime component `CipSoft GmbH` did not exist there. A bounded name-only census found four retained `clientoptions.json` files under old package roots, proving that a home search would be ambiguous and is not an acceptable selector.
 
@@ -37,12 +37,14 @@ Its own package root is therefore:
 /home/kasm-user/otclient-track-a/Tibia-32177065988-1
 ```
 
-Within that exact package root, `conf/clientoptions.json` exists, is a regular non-symlink file, and is owned by UID `1000`, matching the target process UID. This supplies a unique identity anchor without scanning or selecting among historical package directories.
+Within that exact package root, `conf/clientoptions.json` exists, is a regular non-symlink file, and is owned by UID `1000`, matching the target process UID. This supplies a candidate identity anchor without scanning or selecting among historical package directories.
 
 ## Repair boundary
 
-The reader now derives only `exe.parent.parent` after the existing PID/start/size/SHA exact fence and requires the executable layout to be exactly `.../bin/client`. It opens that package root, then `conf`, then `clientoptions.json` with directory/file descriptors and mandatory `O_DIRECTORY` / `O_NOFOLLOW`; absence of those Linux primitives fails closed. The opened file must remain a regular file owned by the target UID.
+The first #659 repair derived `exe.parent.parent` after the PID/start/size/SHA fence, opened the package root with `O_NOFOLLOW`, and used directory descriptors for `conf/clientoptions.json`. Codex audit `4997251226` correctly found a remaining rename/replacement TOCTOU: pathname-derived `root_fd` could point to a replacement tree after the executable had been hashed.
 
-The reader no longer derives settings from passwd HOME and never searches for config files. The output path is truthfully reported as `conf/clientoptions.json`, relative to the exact executable package root. The exact static/live key allowlists and rebuilt dictionaries from `AUD-658-001` remain unchanged.
+The remediated reader therefore holds an open `/proc/<pid>/exe` descriptor for the entire live read. It verifies exact size/SHA on that descriptor, opens `root/bin/client` through the held package-root directory descriptor, and requires the package executable's `(st_dev, st_ino)` to equal the held live-executable descriptor before it opens `conf/clientoptions.json` through that same root descriptor. It rechecks process start ticks and current `/proc/<pid>/exe` descriptor identity before publication. A root pathname replacement cannot redirect the config read to an unrelated tree without failing the executable-inode binding.
+
+`O_DIRECTORY` and `O_NOFOLLOW` remain mandatory and fail closed if unavailable. The opened config must be a regular file owned by the target UID. The reader never derives settings from passwd HOME and never searches historical package roots. The output path remains `conf/clientoptions.json`, relative to the descriptor-bound exact executable package root. The exact static/live key allowlists and rebuilt dictionaries from `AUD-658-001` remain unchanged.
 
 No gameplay input, login/relogin, client restart, process signal/control, process-memory write, credential access, network mutation, transaction, or economy action occurred during diagnosis.

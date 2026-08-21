@@ -8,7 +8,6 @@ on:
 
 permissions:
   contents: read
-  issues: write
 
 concurrency:
   group: track-a-surveyor-auth-session-postmerge
@@ -26,10 +25,63 @@ env:
   REPORT_PR: '637'
 
 jobs:
+  authority:
+    if: contains(github.event.head_commit.message, 'ONE_SHOT_SURVEYOR_AUTH_READ_ONLY')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Validate owner-authored trusted-main request
+        shell: bash
+        env:
+          COMMIT_AUTHOR_USERNAME: ${{ github.event.head_commit.author.username }}
+        run: |
+          set -Eeuo pipefail
+          test "$GITHUB_REPOSITORY" = 'blakinio/otclient'
+          test "$GITHUB_REF" = 'refs/heads/main'
+          test "$COMMIT_AUTHOR_USERNAME" = 'blakinio'
+          echo AUTHORIZATION_GATE=PASS
+          echo OWNER_AUTHORED_REQUEST=PASS
+          echo RUNTIME_MUTATION=false
+
+      - name: Publish authorized run id
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          import json, os, urllib.request
+          repo=os.environ['GITHUB_REPOSITORY']; run=os.environ['GITHUB_RUN_ID']; pr=os.environ['REPORT_PR']
+          sha=os.environ['GITHUB_SHA']; implementation=os.environ['IMPLEMENTATION_SHA']
+          body=(
+              '## Trusted-main auth/session acceptance run authorized\n\n'
+              f'Run: `{run}`  \nTrusted-main SHA: `{sha}`  \nImplementation merge: `{implementation}`\n\n'
+              '**State: AUTHORIZED — physical read-only job pending/running**\n\n'
+              'This marker proves only that the protected-main one-shot gate accepted the owner-authored request. '
+              'It is not physical acceptance and is never treated as PASS.'
+          )
+          data=json.dumps({'body':body}).encode()
+          req=urllib.request.Request(
+              f'https://api.github.com/repos/{repo}/issues/{pr}/comments', data=data, method='POST',
+              headers={'Authorization':'Bearer '+os.environ['GITHUB_TOKEN'],'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','User-Agent':'otclient-surveyor-readonly'}
+          )
+          with urllib.request.urlopen(req, timeout=30) as response:
+              if response.status not in (200,201): raise SystemExit('RUN_ID_REPORT_FAILED='+str(response.status))
+          print('AUTHORIZED_RUN_ID_REPORT=PASS')
+          PY
+
   acceptance:
-    if: github.actor == 'blakinio' && contains(github.event.head_commit.message, 'ONE_SHOT_SURVEYOR_AUTH_READ_ONLY')
+    needs: authority
+    if: needs.authority.result == 'success'
     runs-on: [otclient, synology]
     timeout-minutes: 8
+    permissions:
+      contents: read
+    outputs:
+      acceptance_json: ${{ steps.assert.outputs.acceptance_json }}
     steps:
       - name: Declare immutable read-only authority
         shell: bash
@@ -136,6 +188,7 @@ jobs:
           echo WINDOW_TITLE_VALUE_RETAINED=false
 
       - name: Run post-merge passive collect-all and assert causal implementation delta
+        id: assert
         shell: bash
         env:
           TARGET_PID: ${{ steps.target.outputs.pid }}
@@ -150,10 +203,11 @@ jobs:
             --control-container "$CONTROL_CONTAINER" \
             --display "$DISPLAY_NAME" \
             --output-dir "$out"
-          python3 - "$out" "$RUNNER_TEMP/control.json" "$TARGET_PID" "$TARGET_START" "$IMPLEMENTATION_SHA" "$GITHUB_SHA" <<'PY'
+          python3 - "$out" "$RUNNER_TEMP/control.json" "$TARGET_PID" "$TARGET_START" "$IMPLEMENTATION_SHA" "$GITHUB_SHA" "$GITHUB_OUTPUT" <<'PY'
           import json, pathlib, sys
           root=pathlib.Path(sys.argv[1]); control=json.loads(pathlib.Path(sys.argv[2]).read_text())
           pid=int(sys.argv[3]); start=int(sys.argv[4]); implementation_sha=sys.argv[5]; acceptance_sha=sys.argv[6]
+          output=pathlib.Path(sys.argv[7])
           privacy=json.loads((root/'privacy-scan.json').read_text())
           missing=json.loads((root/'missing-readers.json').read_text())
           auth=json.loads((root/'telemetry'/'auth-session.json').read_text())
@@ -200,6 +254,8 @@ jobs:
               'process_memory_access':'read_only','runtime_mutation':False,
           }
           (root/'acceptance.json').write_text(json.dumps(result,indent=2,sort_keys=True)+'\n')
+          compact=json.dumps(result,separators=(',',':'),sort_keys=True)
+          with output.open('a',encoding='utf-8') as handle: handle.write('acceptance_json='+compact+'\n')
           print('POSTMERGE_AUTH_SESSION_E2E=PASS')
           print('IMPLEMENTATION_MERGE_SHA='+implementation_sha)
           print('CANONICAL_ROWS=169')
@@ -220,69 +276,64 @@ jobs:
           if-no-files-found: error
           retention-days: 3
 
-      - name: Report sanitized acceptance verdict
+  report:
+    needs: [authority, acceptance]
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Publish sanitized final verdict
         shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -Eeuo pipefail
-          python3 - "$RUNNER_TEMP/tibia-re-surveyor-auth-session-postmerge/acceptance.json" <<'PY'
-          import json, os, pathlib, sys, urllib.request
-          result=json.loads(pathlib.Path(sys.argv[1]).read_text())
-          repo=os.environ['GITHUB_REPOSITORY']; run=os.environ['GITHUB_RUN_ID']; pr=os.environ['REPORT_PR']
-          body=(
-              '## Trusted-main auth/session read-only acceptance\n\n'
-              f"Run: `{run}`  \nTrusted-main SHA: `{result['acceptance_trusted_main_sha']}`  \n"
-              f"Implementation merge: `{result['implementation_merge_sha']}`\n\n"
-              '**Result: PASS**\n\n'
-              f"- exact target PID/start: `{result['pid']}` / `{result['process_start_ticks']}`\n"
-              f"- client size/SHA: `{result['client_size']}` / `{result['client_sha256']}`\n"
-              f"- target uniqueness: `{result['target_uniqueness']}`; runtime owner: `{result['runtime_owner_task']}`\n"
-              f"- canonical registration present/generation/state: `{result['canonical_registration_present']}` / `{result['canonical_registration_generation']}` / `{result['canonical_registration_state']}`\n"
-              f"- lease status/generation: `{result['canonical_lease_status']}` / `{result['canonical_lease_generation']}`\n"
-              f"- canonical rows / aliases: `{result['canonical_rows']}` / `{result['aliases']}`\n"
-              f"- auth typed reader: `{result['reader_before']} -> {result['reader_after']}`\n"
-              f"- missing typed readers: `{result['missing_readers_before']} -> {result['missing_readers_after']}`\n"
-              f"- privacy: `{result['privacy_before']} -> {result['privacy_after']}`\n"
-              f"- auth state-machine running: `{str(result['authentication_state_machine_running']).lower()}`\n"
-              f"- semantic state: `{result['semantic_state']}`; IN_GAME claimed: `false`\n"
-              '- process memory: `read_only`; runtime mutation: `false`; credentials/session secrets retained: `false`\n\n'
-              'This is an implementation causal delta, not a login-state transition and not an IN_GAME proof.'
-          )
-          data=json.dumps({'body':body}).encode()
-          req=urllib.request.Request(
-              f'https://api.github.com/repos/{repo}/issues/{pr}/comments', data=data, method='POST',
-              headers={'Authorization':'Bearer '+os.environ['GITHUB_TOKEN'],'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','User-Agent':'otclient-surveyor-readonly'}
-          )
-          with urllib.request.urlopen(req, timeout=30) as response:
-              if response.status not in (200,201): raise SystemExit('REPORT_COMMENT_FAILED='+str(response.status))
-          print('SANITIZED_REPORT_COMMENT=PASS')
-          PY
-
-      - name: Report failed acceptance without runtime details
-        if: ${{ failure() }}
-        shell: bash
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AUTHORITY_RESULT: ${{ needs.authority.result }}
+          ACCEPTANCE_RESULT: ${{ needs.acceptance.result }}
+          ACCEPTANCE_JSON: ${{ needs.acceptance.outputs.acceptance_json }}
         run: |
           set -Eeuo pipefail
           python3 - <<'PY'
           import json, os, urllib.request
-          repo=os.environ['GITHUB_REPOSITORY']; run=os.environ['GITHUB_RUN_ID']; pr=os.environ['REPORT_PR']
-          sha=os.environ['GITHUB_SHA']
-          body=(
-              '## Trusted-main auth/session read-only acceptance\n\n'
-              f'Run: `{run}`  \nTrusted-main SHA: `{sha}`\n\n'
-              '**Result: FAIL — no physical acceptance recorded**\n\n'
-              'The one-shot failed before a complete PASS verdict. No runtime details are published by this failure path. '
-              'The run ID is retained solely so the bounded failure can be diagnosed without treating absence of a comment as success.'
-          )
+          repo=os.environ['GITHUB_REPOSITORY']; run=os.environ['GITHUB_RUN_ID']; pr=os.environ['REPORT_PR']; sha=os.environ['GITHUB_SHA']
+          authority=os.environ.get('AUTHORITY_RESULT',''); acceptance=os.environ.get('ACCEPTANCE_RESULT',''); raw=os.environ.get('ACCEPTANCE_JSON','')
+          if authority=='success' and acceptance=='success' and raw:
+              result=json.loads(raw)
+              body=(
+                  '## Trusted-main auth/session read-only acceptance\n\n'
+                  f"Run: `{run}`  \nTrusted-main SHA: `{result['acceptance_trusted_main_sha']}`  \n"
+                  f"Implementation merge: `{result['implementation_merge_sha']}`\n\n"
+                  '**Result: PASS**\n\n'
+                  f"- exact target PID/start: `{result['pid']}` / `{result['process_start_ticks']}`\n"
+                  f"- client size/SHA: `{result['client_size']}` / `{result['client_sha256']}`\n"
+                  f"- target uniqueness: `{result['target_uniqueness']}`; runtime owner: `{result['runtime_owner_task']}`\n"
+                  f"- canonical registration present/generation/state: `{result['canonical_registration_present']}` / `{result['canonical_registration_generation']}` / `{result['canonical_registration_state']}`\n"
+                  f"- lease status/generation: `{result['canonical_lease_status']}` / `{result['canonical_lease_generation']}`\n"
+                  f"- canonical rows / aliases: `{result['canonical_rows']}` / `{result['aliases']}`\n"
+                  f"- auth typed reader: `{result['reader_before']} -> {result['reader_after']}`\n"
+                  f"- missing typed readers: `{result['missing_readers_before']} -> {result['missing_readers_after']}`\n"
+                  f"- privacy: `{result['privacy_before']} -> {result['privacy_after']}`\n"
+                  f"- auth state-machine running: `{str(result['authentication_state_machine_running']).lower()}`\n"
+                  f"- semantic state: `{result['semantic_state']}`; IN_GAME claimed: `false`\n"
+                  '- process memory: `read_only`; runtime mutation: `false`; credentials/session secrets retained: `false`\n\n'
+                  'This is an implementation causal delta, not a login-state transition and not an IN_GAME proof.'
+              )
+          else:
+              body=(
+                  '## Trusted-main auth/session read-only acceptance\n\n'
+                  f'Run: `{run}`  \nTrusted-main SHA: `{sha}`\n\n'
+                  '**Result: FAIL — no physical acceptance recorded**\n\n'
+                  f'- authority job: `{authority or "unknown"}`\n'
+                  f'- physical acceptance job: `{acceptance or "unknown"}`\n\n'
+                  'No runtime details are published by this failure path. The run ID is retained solely for bounded diagnosis.'
+              )
           data=json.dumps({'body':body}).encode()
           req=urllib.request.Request(
               f'https://api.github.com/repos/{repo}/issues/{pr}/comments', data=data, method='POST',
               headers={'Authorization':'Bearer '+os.environ['GITHUB_TOKEN'],'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','User-Agent':'otclient-surveyor-readonly'}
           )
           with urllib.request.urlopen(req, timeout=30) as response:
-              if response.status not in (200,201): raise SystemExit('FAIL_REPORT_COMMENT_FAILED='+str(response.status))
-          print('SANITIZED_FAILURE_REPORT_COMMENT=PASS')
+              if response.status not in (200,201): raise SystemExit('FINAL_REPORT_COMMENT_FAILED='+str(response.status))
+          print('SANITIZED_FINAL_REPORT_COMMENT=PASS')
           PY

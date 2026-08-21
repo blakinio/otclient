@@ -1,0 +1,218 @@
+name: Package A isolation-3 one-shot repair v2
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.head_ref == 'feat/OTC-20260820-tibia-re-control-center-package-a'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Apply bounded isolation-three repairs and validate
+        shell: bash
+        env:
+          BRANCH: ${{ github.head_ref }}
+        run: |
+          set -Eeuo pipefail
+          git pull --ff-only origin "$BRANCH"
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path('tools/tibia_re_control_center/execution.py')
+          text = p.read_text(encoding='utf-8')
+          if 'def _freeze_semantic_value(' not in text:
+              text = text.replace(
+                  'from collections.abc import Callable\nfrom dataclasses import dataclass, replace\n',
+                  'from collections.abc import Callable, Mapping\nfrom dataclasses import dataclass, replace\nfrom types import MappingProxyType\nfrom typing import Any\n',
+                  1,
+              )
+              text = text.replace(
+                  '_MISSING = object()\n\n\n@dataclass\nclass CancellationToken:',
+                  '''_MISSING = object()\n\n\ndef _freeze_semantic_value(value: Any) -> Any:\n    if isinstance(value, Mapping):\n        return MappingProxyType({key: _freeze_semantic_value(child) for key, child in value.items()})\n    if isinstance(value, (list, tuple)):\n        return tuple(_freeze_semantic_value(child) for child in value)\n    return value\n\n\n@dataclass\nclass CancellationToken:''',
+                  1,
+              )
+          old = '''        final_commit_check: Callable[[], str | None] | None,\n        final_commit_refusal_reason: list[str | None],\n    ) -> bool:\n'''
+          new = '''        final_commit_check: Callable[[], str | None] | None,\n        final_commit_refusal_reason: list[str | None],\n        action_deadline_ns: int,\n    ) -> bool:\n'''
+          if 'action_deadline_ns: int' not in text:
+              if old not in text:
+                  raise SystemExit('final commit signature anchor missing')
+              text = text.replace(old, new, 1)
+          deadline_anchor = '''            if self._deadline_expired(run):\n                return False\n'''
+          deadline_replacement = '''            if self.clock.now_ns() >= action_deadline_ns:\n                final_commit_refusal_reason[0] = "ACTION_TIMEOUT_EXPIRED"\n                return False\n            if self._deadline_expired(run):\n                return False\n'''
+          current_count = text.count('self.clock.now_ns() >= action_deadline_ns')
+          while current_count < 2:
+              if deadline_anchor not in text:
+                  raise SystemExit('deadline anchor missing')
+              text = text.replace(deadline_anchor, deadline_replacement, 1)
+              current_count += 1
+          start_old = '''        request = replace(request, parameters=copy.deepcopy(dict(request.parameters)))\n        run = self._run(request.run_id)\n'''
+          start_new = '''        parameters_snapshot = copy.deepcopy(dict(request.parameters))\n        request = replace(request, parameters=_freeze_semantic_value(parameters_snapshot))\n        action_started_ns = self.clock.now_ns()\n        action_timeout_ns = checked_mul(\n            request.timeout_ms,\n            1_000_000,\n            maximum=MAX_U64,\n            field_name="action_timeout_ns",\n        )\n        action_deadline_ns = checked_add(\n            action_started_ns,\n            action_timeout_ns,\n            maximum=MAX_U64,\n            field_name="action_deadline_ns",\n        )\n        run = self._run(request.run_id)\n'''
+          if 'parameters_snapshot = copy.deepcopy' not in text:
+              if start_old not in text:
+                  raise SystemExit('request snapshot anchor missing')
+              text = text.replace(start_old, start_new, 1)
+          lambda_old = '''                    run, request, token, final_commit_check, final_commit_refusal_reason\n                )\n'''
+          lambda_new = '''                    run,\n                    request,\n                    token,\n                    final_commit_check,\n                    final_commit_refusal_reason,\n                    action_deadline_ns,\n                )\n'''
+          if '                    action_deadline_ns,\n                )' not in text:
+              if lambda_old not in text:
+                  raise SystemExit('one-shot deadline anchor missing')
+              text = text.replace(lambda_old, lambda_new, 1)
+          not_committed_old = '''                return self._terminalize_pre_dispatch(\n                    run, request, LifecycleState.REFUSED,\n                    ActionStatus.REFUSED, final_commit_refusal_reason[0] or "FINAL_COMMIT_REFUSED",\n                )\n'''
+          not_committed_new = '''                refusal_reason = final_commit_refusal_reason[0] or "FINAL_COMMIT_REFUSED"\n                if refusal_reason == "ACTION_TIMEOUT_EXPIRED":\n                    return self._terminalize_pre_dispatch(\n                        run, request, LifecycleState.TIMED_OUT_BEFORE_DISPATCH,\n                        ActionStatus.TIMEOUT, refusal_reason,\n                    )\n                return self._terminalize_pre_dispatch(\n                    run, request, LifecycleState.REFUSED,\n                    ActionStatus.REFUSED, refusal_reason,\n                )\n'''
+          if 'refusal_reason == "ACTION_TIMEOUT_EXPIRED"' not in text:
+              if not_committed_old not in text:
+                  raise SystemExit('not-committed timeout anchor missing')
+              text = text.replace(not_committed_old, not_committed_new, 1)
+          terminal_old = '''            if token is not None and token.cancelled:\n                terminal_state = LifecycleState.CANCELLED_AFTER_DISPATCH\n'''
+          terminal_new = '''            if run.cancelled or (token is not None and token.cancelled):\n                terminal_state = LifecycleState.CANCELLED_AFTER_DISPATCH\n'''
+          if 'if run.cancelled or (token is not None and token.cancelled):' not in text:
+              if terminal_old not in text:
+                  raise SystemExit('post-commit cancellation anchor missing')
+              text = text.replace(terminal_old, terminal_new, 1)
+          p.write_text(text, encoding='utf-8')
+
+          p = Path('tools/tibia_re_control_center/artifact.py')
+          text = p.read_text(encoding='utf-8')
+          if 'import json\n' not in text:
+              text = text.replace('import copy\n', 'import copy\nimport json\n', 1)
+          if 'def _admit_public_artifact_bytes(' not in text:
+              insert_at = '\n\n@dataclass\nclass RunArtifact:'
+              helper = '''\n\ndef _admit_public_artifact_bytes(logical: str, data: bytes, *, key_path: str) -> bytes:\n    payload = bytes(data)\n    try:\n        decoded = payload.decode("utf-8", "strict")\n    except UnicodeDecodeError as exc:\n        raise ValidationError(\n            "ARTIFACT_PRIVACY_UNCLASSIFIED",\n            "binary artifact requires a typed privacy-approved path",\n        ) from exc\n    if logical.endswith(".json"):\n        try:\n            structured = json.loads(decoded)\n        except json.JSONDecodeError as exc:\n            raise ValidationError(\n                "ARTIFACT_STRUCTURED_INVALID",\n                "JSON artifact must parse before privacy admission",\n            ) from exc\n        ensure_no_secret_material(structured, key_path=key_path)\n    elif logical.endswith(".jsonl"):\n        for line_number, line in enumerate(decoded.splitlines(), start=1):\n            if not line.strip():\n                continue\n            try:\n                structured = json.loads(line)\n            except json.JSONDecodeError as exc:\n                raise ValidationError(\n                    "ARTIFACT_STRUCTURED_INVALID",\n                    f"JSONL artifact line {line_number} must parse before privacy admission",\n                ) from exc\n            ensure_no_secret_material(structured, key_path=f"{key_path}.{line_number}")\n    else:\n        ensure_no_secret_material(decoded, key_path=key_path)\n    return payload\n'''
+              if insert_at not in text:
+                  raise SystemExit('artifact helper insertion anchor missing')
+              text = text.replace(insert_at, helper + insert_at, 1)
+          old_stage = '''        if not privacy_approved:\n            try:\n                staged_text = bytes(data).decode("utf-8", "strict")\n            except UnicodeDecodeError as exc:\n                raise ValidationError(\n                    "ARTIFACT_PRIVACY_UNCLASSIFIED",\n                    "binary staged artifact requires a typed privacy-approved path",\n                ) from exc\n            ensure_no_secret_material(staged_text, key_path=f"artifact_stage.{logical}")\n'''
+          new_stage = '''        if not privacy_approved:\n            data = _admit_public_artifact_bytes(\n                logical, data, key_path=f"artifact_stage.{logical}"\n            )\n'''
+          if 'key_path=f"artifact_stage.{logical}"' not in text:
+              if old_stage not in text:
+                  raise SystemExit('stage privacy anchor missing')
+              text = text.replace(old_stage, new_stage, 1)
+          old_supp = '''        safe_files = {_safe_relative_path(path): bytes(data) for path, data in files.items()}\n'''
+          new_supp = '''        safe_files: dict[str, bytes] = {}\n        for path, data in files.items():\n            logical = _safe_relative_path(path)\n            safe_files[logical] = _admit_public_artifact_bytes(\n                logical,\n                data,\n                key_path=f"artifact_supplement.{supplement_id}.{logical}",\n            )\n'''
+          if 'artifact_supplement.{supplement_id}.{logical}' not in text:
+              if old_supp not in text:
+                  raise SystemExit('supplement privacy anchor missing')
+              text = text.replace(old_supp, new_supp, 1)
+          p.write_text(text, encoding='utf-8')
+          PY
+
+          cat > tests/tools/tibia_re_control_center/test_isolation3_repairs.py <<'PY'
+          from __future__ import annotations
+
+          import unittest
+
+          from test_codex_review_repairs import abort_scenario_json, make_request, make_stack
+          from tools.tibia_re_control_center.artifact import ArtifactStore
+          from tools.tibia_re_control_center.model import ActionStatus, PrivacyError
+          from tools.tibia_re_control_center.scenario import parse_and_validate
+
+
+          class IsolationThreeRegressionTests(unittest.TestCase):
+              def test_action_local_timeout_refuses_before_dispatch(self) -> None:
+                  clock, adapter, _, coordinator = make_stack(epoch="action-timeout")
+                  request = make_request(coordinator, adapter, "timeout-action")
+                  adapter.authority_wait_hook = lambda: clock.advance_ms(request.timeout_ms + 1)
+                  result = coordinator.execute_action(request)
+                  self.assertEqual(ActionStatus.TIMEOUT, result.status)
+                  self.assertEqual("ACTION_TIMEOUT_EXPIRED", result.reason_code)
+                  self.assertEqual([], adapter.physical_effects)
+
+              def test_preflight_cannot_mutate_frozen_action_parameters(self) -> None:
+                  _, adapter, _, coordinator = make_stack(epoch="deep-freeze")
+                  request = make_request(coordinator, adapter, "frozen-action")
+                  original_preflight = adapter.preflight
+                  mutation_blocked: list[bool] = []
+
+                  def mutating_preflight(candidate):
+                      try:
+                          candidate.parameters["direction"] = "SOUTH"
+                      except TypeError:
+                          mutation_blocked.append(True)
+                      return original_preflight(candidate)
+
+                  adapter.preflight = mutating_preflight
+                  result = coordinator.execute_action(request)
+                  self.assertEqual(ActionStatus.PASS, result.status)
+                  self.assertEqual([True], mutation_blocked)
+                  self.assertEqual("NORTH", adapter.physical_effects[0]["parameters"]["direction"])
+
+              def test_stop_after_dispatch_commit_is_cancelled_after_dispatch(self) -> None:
+                  _, adapter, _, coordinator = make_stack(epoch="post-commit-stop")
+                  request = make_request(coordinator, adapter, "stop-after-commit")
+                  adapter.after_commit_hook = lambda: coordinator.stop_all()
+                  result = coordinator.execute_action(request)
+                  self.assertEqual(ActionStatus.CANCELLED, result.status)
+                  self.assertEqual("CANCELLED_AFTER_DISPATCH", result.reason_code)
+                  self.assertEqual(1, len(adapter.physical_effects))
+
+              def test_structured_stage_json_secret_key_is_rejected(self) -> None:
+                  scenario = parse_and_validate(abort_scenario_json())
+                  artifacts = ArtifactStore()
+                  artifacts.create_run(
+                      run_id="structured-stage",
+                      scenario_id=scenario.scenario_id,
+                      scenario_hash=scenario.scenario_hash,
+                      scenario_ast=scenario.ast,
+                      adapter_identity={"adapter_id": "fake"},
+                      backend_epoch="b",
+                      initial_control_generation=0,
+                      started_monotonic_ns=0,
+                      privacy_policy=scenario.ast["privacy_policy"],
+                  )
+                  with self.assertRaises(PrivacyError):
+                      artifacts.write_stage(
+                          "structured-stage", "metadata.json", b'{"password":"hunter2"}'
+                      )
+
+              def test_supplement_secret_is_rejected_by_privacy_admission(self) -> None:
+                  scenario = parse_and_validate(abort_scenario_json())
+                  artifacts = ArtifactStore()
+                  run = artifacts.create_run(
+                      run_id="supplement-privacy",
+                      scenario_id=scenario.scenario_id,
+                      scenario_hash=scenario.scenario_hash,
+                      scenario_ast=scenario.ast,
+                      adapter_identity={"adapter_id": "fake"},
+                      backend_epoch="b",
+                      initial_control_generation=0,
+                      started_monotonic_ns=0,
+                      privacy_policy=scenario.ast["privacy_policy"],
+                  )
+                  run.final_result = {"status": "PASS"}
+                  with self.assertRaises(PrivacyError):
+                      artifacts.add_supplement(
+                          "supplement-privacy",
+                          "late-secret",
+                          {"trace.txt": b"PASSWORD=hunter2"},
+                      )
+
+
+          if __name__ == "__main__":
+              unittest.main()
+          PY
+
+          rm -rf tools/tibia_re_control_center/__pycache__ tests/tools/tibia_re_control_center/__pycache__
+          python3 -m compileall -q tools/tibia_re_control_center tests/tools/tibia_re_control_center
+          PYTHONPATH=. python3 -m unittest discover -s tests/tools/tibia_re_control_center -p 'test_*.py'
+          PYTHONPATH=. python3 tests/tools/tibia_re_control_center/audit_package_a.py
+          PYTHONPATH=. python3 tests/tools/tibia_re_control_center/audit_package_a_p1.py
+          python3 -m pip install --disable-pip-version-check --no-input ruff==0.16.1 >/dev/null
+          ruff check tools/tibia_re_control_center tests/tools/tibia_re_control_center/test_isolation3_repairs.py
+          git diff --check
+          rm -rf tools/tibia_re_control_center/__pycache__ tests/tools/tibia_re_control_center/__pycache__
+          git rm .github/workflows/tibia-re-control-center-isolation3-repair-v2.yml
+          git config user.name 'blakinio'
+          git config user.email '75369544+blakinio@users.noreply.github.com'
+          git add -A
+          git commit -m 'fix(control-center): close isolation-three P1 findings'
+          git push origin "HEAD:$BRANCH"

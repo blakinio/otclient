@@ -5,6 +5,7 @@ from tools.tibia_re_surveyor.action_protocol_presence import (
     DIAGNOSTIC_READ_ONLY_PRESENCE_PROBE,
     read_action_protocol_presence,
 )
+from tools.tibia_re_surveyor.typed_presence import READ_ONLY_PRESENCE_PROBE
 
 READER_ID = "action_protocol_typed_reader"
 TYPE_NAME = "tibia::game::TPlayerProtocolMessageHandler"
@@ -24,11 +25,15 @@ class ActionProtocolPresenceTests(unittest.TestCase):
             }
         )
 
-    def test_diagnostic_probe_stays_read_only_and_count_only(self):
+    def test_diagnostic_probe_stays_read_only_count_only_and_action_bounded(self):
         self.assertIn("os.O_RDONLY", DIAGNOSTIC_READ_ONLY_PRESENCE_PROBE)
         self.assertNotIn("os.O_RDWR", DIAGNOSTIC_READ_ONLY_PRESENCE_PROBE)
         self.assertIn("raw_hits.append(obj)", DIAGNOSTIC_READ_ONLY_PRESENCE_PROBE)
         self.assertIn("RAW_VPTR_COUNT=", DIAGNOSTIC_READ_ONLY_PRESENCE_PROBE)
+        self.assertIn("> 2*1024*1024*1024", DIAGNOSTIC_READ_ONLY_PRESENCE_PROBE)
+        self.assertNotIn("> 1536*1024*1024", DIAGNOSTIC_READ_ONLY_PRESENCE_PROBE)
+        self.assertIn("> 1536*1024*1024", READ_ONLY_PRESENCE_PROBE)
+        self.assertNotIn("> 2*1024*1024*1024", READ_ONLY_PRESENCE_PROBE)
 
     def test_live_count_failure_preserves_only_safe_counts(self):
         calls = []

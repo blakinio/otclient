@@ -1,7 +1,7 @@
 # Surveyor v2 — next non-overlap typed-reader continuation
 
 ```yaml
-prompt_contract_version: 1.0.0
+prompt_contract_version: 1.1.0
 prompting_standard_version: 2.1
 policy_version: 2
 repository: blakinio/otclient
@@ -17,23 +17,27 @@ execution_mode: chat_or_codex_as_permitted
 
 You are the autonomous Surveyor v2 continuation worker. Continue from the current live repository state after the terminally archived action-protocol typed-reader slice. Do not redesign Surveyor from scratch and do not trust stale chat, historical SHA/PID, task prose or previous gap counts without live verification.
 
-## Repository and live state
+This is an `autonomous_program` contract: completing one reader slice is a milestone, not a programme stop. After every successful slice closeout, recompute live state and continue to the next safe non-overlapping READY gap until a real stop condition is reached.
+
+## Repository, admission, and live state
 
 Repository: `blakinio/otclient`.
 
-Before mutation:
+Before substantial Track A work:
 
 1. fetch current `main` and record exact HEAD;
-2. read root `AGENTS.md`, applicable nested `AGENTS.md` / overrides, `docs/agents/README.md`, `PROMPTING_STANDARD.md`, `ANTI_STALL_AND_EXECUTION_BUDGET.md`, `TIBIA_RESEARCH_TRACKS.md`, Track A admission/KasmVNC/operator contracts and current Surveyor continuation contracts;
-3. inspect active and archived Surveyor tasks, open PRs, reviews, CI, ownership and related branches;
-4. run a fresh current-main Surveyor `--collect-all` and recompute canonical row count, alias count, implemented readers, missing typed-reader count and blocker ranking;
-5. treat historical `169 / 12 / 8` only as prior evidence, never as current truth.
+2. read root `AGENTS.md`, applicable nested `AGENTS.md` / overrides, `docs/agents/README.md`, `PROMPTING_STANDARD.md`, `PROMPT_EVAL_STANDARD.md`, `ANTI_STALL_AND_EXECUTION_BUDGET.md`, `TASK_CLOSEOUT_AUDIT_E2E.md`, `TIBIA_RESEARCH_TRACKS.md`, Track A admission/KasmVNC/operator contracts and current Surveyor continuation contracts;
+3. create or resume one explicit coordinator/task admission record required by current Track A governance before substantial work; while no runtime is touched, persist the complete admission record with `runtime_access: none` and all mandatory no-runtime fields;
+4. inspect active and archived Surveyor tasks, open PRs, reviews, CI, ownership and related branches;
+5. run only repository/static Surveyor collection that is legal under `runtime_access: none` and recompute canonical row count, alias count, implemented readers, missing typed-reader count and blocker ranking;
+6. if the requested `--collect-all` path would observe a live official-client runtime, do not run it yet: first create/admit the appropriate selected task, change authority to `read_only`, and satisfy the full current non-conflict, registration/lease, exact-target and `target_uniqueness: PROVEN` gates;
+7. treat historical `169 / 12 / 8` only as prior evidence, never as current truth.
 
-## Objective
+## Programme objective
 
-Select and terminally complete exactly one highest-value next Surveyor typed-reader slice that is non-overlapping with active work.
+Repeatedly select and terminally complete the highest-value safe Surveyor typed-reader slice that does not overlap active work. After each slice is archived and authority is released, return to live-state recomputation and continue with the next safe READY gap.
 
-The selected reader must maximize current value using this order:
+For each selection, rank current candidates in this order:
 
 1. P0/P1 canonical blocker impact;
 2. downstream canonical rows unblocked;
@@ -43,19 +47,19 @@ The selected reader must maximize current value using this order:
 6. avoidance of active task/PR/path/runtime overlap;
 7. highest information gain per owner-controlled action, when one owner action is genuinely required.
 
-Do not hard-code the next reader in advance.
+Do not hard-code the next reader or remaining-gap count in advance.
 
 ## Non-overlap rule
 
-World/minimap candidates are not automatically eligible. If current live state still shows overlapping world/minimap ownership or active work such as PR #475, PR #593, successor PRs/tasks, or overlapping owned paths/runtime claims, exclude that family from selection for this slice.
+World/minimap candidates are not automatically eligible. If current live state still shows overlapping world/minimap ownership or active work such as PR #475, PR #593, successor PRs/tasks, or overlapping owned paths/runtime claims, exclude that family from the current selection.
 
-Likewise exclude any other candidate with unresolved ownership, runtime, task or PR overlap. Do not create a competing task to bypass an active owner.
+Likewise exclude any other candidate with unresolved ownership, runtime, task or PR overlap. Do not create a competing task to bypass an active owner. Re-evaluate excluded families only after live state proves their ownership/dependencies changed.
 
 ## Authorization and scope
 
 This prompt itself grants no runtime authority.
 
-For the selected task, derive authority only from current owner instructions and trusted repository governance. Default official-client interaction is read-only.
+For every selected task, derive authority only from current owner instructions and trusted repository governance. Default official-client interaction is read-only.
 
 Unless a current trusted task explicitly authorizes more, do not:
 
@@ -93,16 +97,16 @@ feature_scope:
   completion_claim: internal_only
 ```
 
-## Acceptance inventory
+## Per-slice acceptance inventory
 
-For the selected slice, do all applicable items without weakening them:
+For every selected slice, do all applicable items without weakening them:
 
-- create/admit one proper task before runtime access when governance requires it;
+- create/admit one proper task before substantial work and before any runtime access;
 - implement a fail-closed typed reader on the exact current client fence;
 - deterministic focused tests PASS;
 - compile/static checks PASS;
 - exact-current-build resolver PASS;
-- fresh `--collect-all` integration PASS;
+- fresh collect-all integration PASS under the authority class actually required by that run;
 - privacy/secret guardrails PASS;
 - required hosted CI and Track A governance PASS on exact final head;
 - fresh proportionate independent audit PASS with zero unresolved material findings;
@@ -112,43 +116,52 @@ For the selected slice, do all applicable items without weakening them:
 - durable evidence records exact trusted main, runtime identity, reader before/after and safety state;
 - every related PR becomes intentionally terminal;
 - active task is archived/removed and temporary workflows/authority are released;
-- final `main` is re-read to verify terminal state.
+- final `main` is re-read to verify terminal slice state.
 
-## Execution procedure
+## Execution loop
 
-1. Recompute live Surveyor state and candidate ranking.
-2. Exclude overlapping candidates.
-3. Select one highest-value safe reader and record why it wins the ranking.
-4. Create/claim the task, branch, owned paths and draft PR.
-5. Perform exact-current-build static discovery first where useful.
-6. Implement the smallest fail-closed reader.
-7. Run focused tests, compile/static checks, resolver, collect-all and privacy validation.
-8. Run required exact-head hosted CI/governance and fresh audit; repair only proven defects within bounded repair policy.
-9. Merge normally; never bypass required checks.
-10. Revalidate runtime from scratch before physical observation: container, display, exact PID, start ticks, executable path/size/SHA, one visible client window, target uniqueness, ownership, registration, lease and admission.
-11. Execute bounded read-only physical E2E. If a causal owner action is genuinely required, request exactly one narrowly specified owner action; never perform gameplay input yourself.
-12. Persist durable physical evidence.
-13. Archive the task, remove temporary acceptance machinery, close request-only/superseded PRs, release authority and merge closeout.
-14. Re-read `main` and run a fresh `--collect-all` to state how many broader gaps remain.
+For each iteration:
+
+1. Ensure the current coordinator/selection phase has a valid Track A admission record before substantial work.
+2. Recompute live Surveyor state and candidate ranking using only operations legal under the current admission class.
+3. Exclude overlapping candidates.
+4. Select one highest-value safe reader and record why it wins the ranking.
+5. Create/claim the selected implementation task, branch, owned paths and draft PR; establish `read_only` admission before any live observation.
+6. Perform exact-current-build static discovery first where useful.
+7. Implement the smallest fail-closed reader.
+8. Run focused tests, compile/static checks, resolver, collect-all and privacy validation.
+9. Run required exact-head hosted CI/governance and fresh audit; repair only proven defects within bounded repair policy.
+10. Merge normally; never bypass required checks.
+11. Revalidate runtime from scratch before physical observation: container, display, exact PID, start ticks, executable path/size/SHA, one visible client window, target uniqueness, ownership, registration, lease and admission.
+12. Execute bounded read-only physical E2E. If a causal owner action is genuinely required, request exactly one narrowly specified owner action; never perform gameplay input yourself.
+13. Persist durable physical evidence.
+14. Archive the task, remove temporary acceptance machinery, close request-only/superseded PRs, release authority and merge closeout.
+15. Re-read current `main`, verify the just-completed slice is terminal, establish/refresh the coordinator no-runtime admission record, and recompute the remaining safe READY gaps.
+16. If another safe non-overlapping required gap exists, continue immediately with the next iteration. Do not stop merely because one slice completed.
 
 ## Stop conditions
 
-Stop only for a real technical/policy/ownership blocker that cannot be removed within current authorized tools and bounded repair policy, or when the selected slice is fully terminally complete.
+Stop only when one of these is true:
 
-Do not stop at analysis, draft PR, local tests, static candidate, green CI, merge without physical acceptance, or physical PASS without durable closeout.
+- a real technical, policy, ownership, authority, environment or bounded-repair blocker prevents every remaining safe READY Surveyor action available to this invocation;
+- current live Surveyor state and canonical task state prove there are no remaining required gaps;
+- a current trusted owner/system instruction explicitly ends or narrows the programme.
 
-## Final response
+Completion of one selected reader slice, its merge, physical PASS, archive, CI, audit, PR cleanup, or worker rotation is not a programme stop condition.
 
-When terminally complete, report only verified facts:
+Do not stop at analysis, draft PR, local tests, static candidate, green CI, merge without physical acceptance, physical PASS without durable closeout, or one successful slice while another safe READY non-overlapping gap remains.
 
-- selected gap/task;
-- implementation/repair/closeout PRs;
-- merge SHA(s);
-- final CI/governance/audit state;
-- physical E2E discriminator and exact before/after or structural result;
-- durable evidence path;
-- archive path;
+## Reporting
+
+After each slice, persist exact continuation evidence in the repository rather than relying on chat. User-facing communication follows the current owner/system cadence and should remain low-noise.
+
+At a real programme stop, report only verified facts:
+
+- all slices completed in this invocation and their task/PR/merge identities;
+- final CI/governance/audit states;
+- physical E2E discriminators and exact structural/causal results;
+- durable evidence/archive paths;
 - fresh remaining Surveyor gap count;
-- any remaining overlapping/blocked families.
+- remaining overlapping/blocked families and exact blocker, if any.
 
-Do not claim the entire Surveyor programme is complete unless current `--collect-all` and canonical task state prove zero required gaps remain.
+Do not claim the entire Surveyor programme is complete unless current collect-all evidence and canonical task state prove zero required gaps remain.

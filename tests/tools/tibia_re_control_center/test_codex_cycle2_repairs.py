@@ -18,7 +18,11 @@ from tools.tibia_re_control_center.artifact import ArtifactStore
 from tools.tibia_re_control_center.engine import ScenarioEngine
 from tools.tibia_re_control_center.execution import MutationCoordinator
 from tools.tibia_re_control_center.fake import FakeAdapter, ManualClock
-from tools.tibia_re_control_center.model import ActionStatus, PrivacyError, ValidationError
+from tools.tibia_re_control_center.model import (
+    ActionStatus,
+    PrivacyError,
+    ValidationError,
+)
 from tools.tibia_re_control_center.recorder import Recorder
 from tools.tibia_re_control_center.scenario import parse_and_validate
 from tools.tibia_re_control_center.store import DeterministicDurableStore

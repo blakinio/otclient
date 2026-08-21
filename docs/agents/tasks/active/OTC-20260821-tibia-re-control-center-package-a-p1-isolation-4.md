@@ -11,13 +11,23 @@ risk: medium
 branch: feat/OTC-20260820-tibia-re-control-center-package-a
 base_branch: main
 created: 2026-08-21T11:45:00+02:00
-updated: 2026-08-21T11:45:00+02:00
+updated: 2026-08-21T11:52:00+02:00
 initial_base_sha: 5707af6c413cd9949f6c33b17744801cedef6eaf
 related_pr: 628
 parent_task: OTC-20260820-tibia-re-control-center-package-a
 predecessor_repair_task: OTC-20260821-tibia-re-control-center-package-a-p1-isolation-3
 fresh_isolation_authorized_by_owner: true
 runtime_access: none
+runtime_owner_task: NOT_APPLICABLE
+runtime_namespace: NOT_APPLICABLE
+canonical_registration: NOT_APPLICABLE
+canonical_lease_generation: NOT_APPLICABLE
+registration_lease_generation: NOT_APPLICABLE
+gate_a: NOT_APPLICABLE
+generation_rebind: NOT_APPLICABLE
+gate_b: NOT_APPLICABLE
+bootstrap: NOT_APPLICABLE
+target_uniqueness: NOT_APPLICABLE
 mutation_authorized: false
 credentials_allowed: false
 login_allowed: false
@@ -32,7 +42,7 @@ continuation_policy: continue_until_real_stop
 task_completion_policy: full_closeout
 execution_mode: github_connector_plus_actions
 execution_budget_minutes: 120
-repair_cycles_for_current_gate: 0
+repair_cycles_for_current_gate: 1
 validation_level: full
 complete_user_facing_feature: false
 owned_paths:
@@ -59,6 +69,10 @@ Fresh bounded repair task opened after independent exact-head review of PR #628 
 ## Authority
 
 `runtime_access:none` permanently. No official-client process access, credentials, login, GUI/gameplay input, network listener, Track A mutation, transaction or unrelated refactor.
+
+## Validation checkpoint
+
+Isolation-4 implementation was published only after the corrected one-shot driver completed the full Package A suite, both audits, Ruff and diff-check. The remaining transient gate failure was governance-only: this task record initially omitted the explicit NOT_APPLICABLE runtime-none admission fields. Those fields are now present.
 
 ## Required gates
 

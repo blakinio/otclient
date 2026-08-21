@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import json
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
@@ -32,6 +33,41 @@ def _safe_relative_path(path: str) -> str:
     if any(part in {"", ".", ".."} for part in parts):
         raise ValidationError("ARTIFACT_PATH_INVALID", "artifact path traversal is forbidden")
     return "/".join(parts)
+
+
+def _admit_public_artifact_bytes(logical: str, data: bytes, *, key_path: str) -> bytes:
+    payload = bytes(data)
+    try:
+        decoded = payload.decode("utf-8", "strict")
+    except UnicodeDecodeError as exc:
+        raise ValidationError(
+            "ARTIFACT_PRIVACY_UNCLASSIFIED",
+            "binary artifact requires a typed privacy-approved path",
+        ) from exc
+    if logical.endswith(".json"):
+        try:
+            structured = json.loads(decoded)
+        except json.JSONDecodeError as exc:
+            raise ValidationError(
+                "ARTIFACT_STRUCTURED_INVALID",
+                "JSON artifact must parse before privacy admission",
+            ) from exc
+        ensure_no_secret_material(structured, key_path=key_path)
+    elif logical.endswith(".jsonl"):
+        for line_number, line in enumerate(decoded.splitlines(), start=1):
+            if not line.strip():
+                continue
+            try:
+                structured = json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise ValidationError(
+                    "ARTIFACT_STRUCTURED_INVALID",
+                    f"JSONL artifact line {line_number} must parse before privacy admission",
+                ) from exc
+            ensure_no_secret_material(structured, key_path=f"{key_path}.{line_number}")
+    else:
+        ensure_no_secret_material(decoded, key_path=key_path)
+    return payload
 
 
 @dataclass
@@ -141,14 +177,9 @@ class ArtifactStore:
             raise ValidationError("FINALIZED_IMMUTABLE", "finalized run artifacts are immutable")
         logical = _safe_relative_path(path)
         if not privacy_approved:
-            try:
-                staged_text = bytes(data).decode("utf-8", "strict")
-            except UnicodeDecodeError as exc:
-                raise ValidationError(
-                    "ARTIFACT_PRIVACY_UNCLASSIFIED",
-                    "binary staged artifact requires a typed privacy-approved path",
-                ) from exc
-            ensure_no_secret_material(staged_text, key_path=f"artifact_stage.{logical}")
+            data = _admit_public_artifact_bytes(
+                logical, data, key_path=f"artifact_stage.{logical}"
+            )
         if self.fail_next_presentation_write:
             self.fail_next_presentation_write = False
             run.state = RunArtifactState.INCOMPLETE
@@ -365,7 +396,14 @@ class ArtifactStore:
             )
         if supplement_id in run.supplements:
             raise ValidationError("SUPPLEMENT_EXISTS", "supplement ID already exists")
-        safe_files = {_safe_relative_path(path): bytes(data) for path, data in files.items()}
+        safe_files: dict[str, bytes] = {}
+        for path, data in files.items():
+            logical = _safe_relative_path(path)
+            safe_files[logical] = _admit_public_artifact_bytes(
+                logical,
+                data,
+                key_path=f"artifact_supplement.{supplement_id}.{logical}",
+            )
         if "result.json" in safe_files or "manifest.json" in safe_files:
             raise ValidationError(
                 "SUPPLEMENT_REWRITE_FORBIDDEN",

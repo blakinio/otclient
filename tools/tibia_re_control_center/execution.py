@@ -3,8 +3,10 @@ from __future__ import annotations
 import copy
 import threading
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
+from types import MappingProxyType
+from typing import Any
 
 from .fake import FakeAdapter, ManualClock
 from .model import (
@@ -33,6 +35,14 @@ from .scenario import action_request_hash
 from .store import DeterministicDurableStore
 
 _MISSING = object()
+
+
+def _freeze_semantic_value(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return MappingProxyType({key: _freeze_semantic_value(child) for key, child in value.items()})
+    if isinstance(value, (list, tuple)):
+        return tuple(_freeze_semantic_value(child) for child in value)
+    return value
 
 
 @dataclass
@@ -445,6 +455,7 @@ class MutationCoordinator:
         token: CancellationToken | None,
         final_commit_check: Callable[[], str | None] | None,
         final_commit_refusal_reason: list[str | None],
+        action_deadline_ns: int,
     ) -> bool:
         with self.control_transition_lock, self.dispatch_gate:
             record = self.store.load_action(request.action_id)
@@ -469,6 +480,12 @@ class MutationCoordinator:
             if identity.runtime_instance_id != fence.expected_runtime_instance_id:
                 return False
             if identity.session_epoch != fence.expected_session_epoch:
+                return False
+            if self.clock.now_ns() >= action_deadline_ns:
+                final_commit_refusal_reason[0] = "ACTION_TIMEOUT_EXPIRED"
+                return False
+            if self.clock.now_ns() >= action_deadline_ns:
+                final_commit_refusal_reason[0] = "ACTION_TIMEOUT_EXPIRED"
                 return False
             if self._deadline_expired(run):
                 return False
@@ -552,7 +569,21 @@ class MutationCoordinator:
         token: CancellationToken | None = None,
         final_commit_check: Callable[[], str | None] | None = None,
     ) -> ActionResult:
-        request = replace(request, parameters=copy.deepcopy(dict(request.parameters)))
+        parameters_snapshot = copy.deepcopy(dict(request.parameters))
+        request = replace(request, parameters=_freeze_semantic_value(parameters_snapshot))
+        action_started_ns = self.clock.now_ns()
+        action_timeout_ns = checked_mul(
+            request.timeout_ms,
+            1_000_000,
+            maximum=MAX_U64,
+            field_name="action_timeout_ns",
+        )
+        action_deadline_ns = checked_add(
+            action_started_ns,
+            action_timeout_ns,
+            maximum=MAX_U64,
+            field_name="action_deadline_ns",
+        )
         run = self._run(request.run_id)
         canonical_request_hash = action_request_hash(
             schema_version=request.schema_version,
@@ -689,7 +720,12 @@ class MutationCoordinator:
             final_commit_refusal_reason: list[str | None] = [None]
             one_shot = _OneShotCommit(
                 lambda: self._final_commit(
-                    run, request, token, final_commit_check, final_commit_refusal_reason
+                    run,
+                    request,
+                    token,
+                    final_commit_check,
+                    final_commit_refusal_reason,
+                    action_deadline_ns,
                 )
             )
             try:
@@ -731,9 +767,15 @@ class MutationCoordinator:
                         DispatchState.POSSIBLY_DISPATCHED,
                         reason_code="COMMIT_RESULT_CONTRADICTION",
                     )
+                refusal_reason = final_commit_refusal_reason[0] or "FINAL_COMMIT_REFUSED"
+                if refusal_reason == "ACTION_TIMEOUT_EXPIRED":
+                    return self._terminalize_pre_dispatch(
+                        run, request, LifecycleState.TIMED_OUT_BEFORE_DISPATCH,
+                        ActionStatus.TIMEOUT, refusal_reason,
+                    )
                 return self._terminalize_pre_dispatch(
                     run, request, LifecycleState.REFUSED,
-                    ActionStatus.REFUSED, final_commit_refusal_reason[0] or "FINAL_COMMIT_REFUSED",
+                    ActionStatus.REFUSED, refusal_reason,
                 )
             durable = self.store.load_action(request.action_id)
             if durable is None or durable.dispatch_state == DispatchState.NOT_DISPATCHED:
@@ -746,7 +788,7 @@ class MutationCoordinator:
                     reason_code="DURABLE_DISPATCH_STATE_MISSING",
                 )
             next_budget = self._reconcile_budget(run, request, outcome="confirmed")
-            if token is not None and token.cancelled:
+            if run.cancelled or (token is not None and token.cancelled):
                 terminal_state = LifecycleState.CANCELLED_AFTER_DISPATCH
                 terminal_status = ActionStatus.CANCELLED
                 reason = "CANCELLED_AFTER_DISPATCH"

@@ -487,7 +487,8 @@ class PackageAMandatoryTests(unittest.TestCase):
         self.assertIsNotNone(durable)
         self.assertNotEqual(DispatchState.NOT_DISPATCHED, durable.dispatch_state)
         self.assertTrue(coordinator.control_state.stop_latched)
-        self.assertEqual(ActionStatus.PASS, result.status)
+        self.assertEqual(ActionStatus.CANCELLED, result.status)
+        self.assertEqual("CANCELLED_AFTER_DISPATCH", result.reason_code)
 
     def test_26_stop_linearizes_while_action_waits_for_authority(self):
         _, adapter, _, coordinator = stack()

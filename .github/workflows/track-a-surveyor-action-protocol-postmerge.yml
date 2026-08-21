@@ -40,13 +40,15 @@ jobs:
       - name: Validate exact owner-controlled trigger
         id: authority
         shell: bash
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -Eeuo pipefail
           test "$GITHUB_REPOSITORY" = 'blakinio/otclient'
-          test "${{ github.event.pull_request.head.ref }}" = "$TRIGGER_BRANCH"
-          trusted="${{ github.event.pull_request.base.sha }}"
-          [[ "$trusted" =~ ^[0-9a-f]{40}$ ]]
-          echo "trusted_main_sha=$trusted" >> "$GITHUB_OUTPUT"
+          test "$HEAD_REF" = "$TRIGGER_BRANCH"
+          [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          echo "trusted_main_sha=$BASE_SHA" >> "$GITHUB_OUTPUT"
           echo AUTHORIZATION_GATE=PASS
           echo PR_HEAD_CODE_EXECUTED=false
           echo RUNTIME_MUTATION=false
@@ -179,7 +181,6 @@ jobs:
           echo WINDOW_TITLE_VALUE_RETAINED=false
 
       - name: Run passive collect-all and assert action-protocol reader
-        id: assert
         shell: bash
         env:
           TARGET_PID: ${{ steps.target.outputs.pid }}

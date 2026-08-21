@@ -1,0 +1,147 @@
+name: TIBIA RE Control Center Package A
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - tools/tibia_re_control_center/**
+      - tests/tools/tibia_re_control_center/**
+      - docs/agents/tasks/active/OTC-20260820-tibia-re-control-center-package-a.md
+      - docs/agents/tasks/active/OTC-20260820-tibia-re-control-center-package-a-p1-isolation.md
+      - docs/agents/tasks/active/OTC-20260821-tibia-re-control-center-package-a-p1-isolation-2.md
+      - docs/agents/tasks/active/OTC-20260821-tibia-re-control-center-package-a-p1-isolation-3.md
+      - docs/agents/tasks/active/OTC-20260821-tibia-re-control-center-package-a-p1-isolation-4.md
+      - docs/agents/tasks/active/OTC-20260821-tibia-re-control-center-package-a-p1-isolation-5.md
+      - docs/agents/tasks/active/OTC-20260821-tibia-re-control-center-package-a-p1-isolation-6.md
+      - docs/agents/tasks/active/OTC-20260821-tibia-re-control-center-package-a-p1-isolation-7.md
+      - docs/agents/MODULE_CATALOG.md
+      - docs/agents/CHANGELOG.md
+      - .github/workflows/tibia-re-control-center-core.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  control-core:
+    name: Package A deterministic core
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact head with base history
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Compile and run focused suite
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 -m compileall -q tools/tibia_re_control_center tests/tools/tibia_re_control_center
+          PYTHONPATH=. python3 -m unittest discover -s tests/tools/tibia_re_control_center -v
+
+      - name: Verify all 65 mandatory cases are explicit
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          import ast
+          from pathlib import Path
+
+          path = Path('tests/tools/tibia_re_control_center/test_package_a.py')
+          tree = ast.parse(path.read_text(encoding='utf-8'))
+          names = {
+              node.name
+              for node in ast.walk(tree)
+              if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+          }
+          missing = [
+              index
+              for index in range(1, 66)
+              if not any(name.startswith(f'test_{index:02d}_') for name in names)
+          ]
+          if missing:
+              raise SystemExit(f'missing mandatory Package A tests: {missing}')
+          print('PACKAGE_A_MANDATORY_TESTS=65/65')
+          PY
+
+      - name: Enforce runtime-access-none implementation boundary
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          PYTHONPATH=. python3 tests/tools/tibia_re_control_center/audit_package_a.py >/tmp/package-a-audit.txt
+          grep -F 'RUNTIME_ACCESS_NONE=PASS' /tmp/package-a-audit.txt
+
+      - name: Ruff and whitespace validation
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -Eeuo pipefail
+          python3 -m pip install --disable-pip-version-check --no-input ruff==0.16.1
+          ruff check tools/tibia_re_control_center
+          if [[ -n "${BASE_SHA:-}" ]]; then
+            git diff --check "$BASE_SHA"...HEAD
+          else
+            git diff --check HEAD~1..HEAD
+          fi
+
+  fresh-audit:
+    name: Fresh Package A falsification audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact head with base history
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Verify declared Package A path boundary
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -Eeuo pipefail
+          python3 - "$BASE_SHA" <<'PY'
+          import subprocess
+          import sys
+
+          base = sys.argv[1]
+          changed = subprocess.check_output(
+              ['git', 'diff', '--name-only', f'{base}...HEAD'],
+              text=True,
+          ).splitlines()
+          allowed_exact = {
+              '.github/workflows/tibia-re-control-center-core.yml',
+              'docs/agents/CHANGELOG.md',
+              'docs/agents/MODULE_CATALOG.md',
+              'docs/agents/tasks/active/OTC-20260820-tibia-re-control-center-package-a.md',
+              'docs/agents/tasks/active/OTC-20260820-tibia-re-control-center-package-a-p1-isolation.md',
+              'docs/agents/tasks/active/OTC-20260821-tibia-re-control-center-package-a-p1-isolation-2.md',
+              'docs/agents/tasks/active/OTC-20260821-tibia-re-control-center-package-a-p1-isolation-3.md',
+              'docs/agents/tasks/active/OTC-20260821-tibia-re-control-center-package-a-p1-isolation-4.md',
+              'docs/agents/tasks/active/OTC-20260821-tibia-re-control-center-package-a-p1-isolation-5.md',
+              'docs/agents/tasks/active/OTC-20260821-tibia-re-control-center-package-a-p1-isolation-6.md',
+              'docs/agents/tasks/active/OTC-20260821-tibia-re-control-center-package-a-p1-isolation-7.md',
+          }
+          allowed_prefixes = (
+              'tools/tibia_re_control_center/',
+              'tests/tools/tibia_re_control_center/',
+          )
+          unexpected = [
+              path for path in changed
+              if path not in allowed_exact and not path.startswith(allowed_prefixes)
+          ]
+          if unexpected:
+              raise SystemExit(f'Package A changed unexpected paths: {unexpected}')
+          print(f'PACKAGE_A_CHANGED_PATHS={len(changed)}_DECLARED_ONLY')
+          PY
+
+      - name: Independently falsify safety and E2E invariants
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          PYTHONPATH=. python3 tests/tools/tibia_re_control_center/audit_package_a.py
+          PYTHONPATH=. python3 tests/tools/tibia_re_control_center/audit_package_a_p1.py

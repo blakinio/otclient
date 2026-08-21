@@ -6,12 +6,12 @@ project_lane: otclient
 lane: P1-CONTROL-CORE
 track_id: official-client-re
 task_kind: repair
-phase: implement
+phase: validate
 risk: medium
 branch: feat/OTC-20260820-tibia-re-control-center-package-a
 base_branch: main
 created: 2026-08-21T13:34:00+02:00
-updated: 2026-08-21T13:34:00+02:00
+updated: 2026-08-21T16:35:00+02:00
 initial_base_sha: 5707af6c413cd9949f6c33b17744801cedef6eaf
 related_pr: 628
 parent_task: OTC-20260820-tibia-re-control-center-package-a
@@ -42,7 +42,7 @@ continuation_policy: continue_until_real_stop
 task_completion_policy: full_closeout
 execution_mode: github_connector_plus_actions
 execution_budget_minutes: 120
-repair_cycles_for_current_gate: 0
+repair_cycles_for_current_gate: 1
 validation_level: full
 complete_user_facing_feature: false
 owned_paths:
@@ -72,6 +72,10 @@ Fresh bounded repair task opened after independent exact-head review of PR #628 
 ## Authority
 
 `runtime_access:none` permanently. No official-client process access, credentials, login, GUI/gameplay input, network listener, Track A mutation, transaction or unrelated refactor.
+
+## Current action
+
+One-shot isolation-seven repair driver is staged on the Package A branch. It will apply only the five bounded repairs, add focused deterministic regressions, run the full Package A suite plus both audits, Ruff and diff-check, remove itself, and push only after full PASS.
 
 ## Required gates
 

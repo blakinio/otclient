@@ -27,20 +27,32 @@ credentials_allowed: false
 login_allowed: false
 gameplay_allowed: false
 transaction_authorized: false
-base_main: f80dd43f741c39ce5ee4296396cb07891d04c324
-branch: runtime/OTC-20260821-surveyor-action-protocol-acceptance
+base_main: 13b3f02a07a176662d766352d9af39619775a73d
+branch: fix/OTC-20260821-surveyor-action-protocol-elf-resolver
 implementation_pr: 645
 implementation_merge_sha: f80dd43f741c39ce5ee4296396cb07891d04c324
+acceptance_pr: 646
+acceptance_merge_sha: b7fa88ef2d772c70ca7250b587e7f584327ee37b
+repair_pr: 648
 selected_gap: action_protocol_typed_reader
 physical_e2e_required: true
-physical_e2e_result: NOT_RUN
+physical_e2e_result: FAIL_REPAIR_IN_PROGRESS
+last_physical_run: 32494958152
 ---
 
 # Surveyor v2 — action protocol typed reader acceptance
 
+## Current checkpoint
+
+Implementation PR #645 merged as `f80dd43f741c39ce5ee4296396cb07891d04c324`. Read-only acceptance authority PR #646 merged as `b7fa88ef2d772c70ca7250b587e7f584327ee37b`.
+
+Physical run `32494958152` proved the runtime/control preflight but failed the reader acceptance. Verified preflight facts from that run were: one exact client in the declared namespace, one matching visible window, exact size/SHA, stable PID/start identity, `target_uniqueness=PROVEN`, and matching canonical registration. The passive Surveyor collect still returned 169 rows / 12 aliases / 8 repository-known missing readers / privacy PASS, but `action_protocol_typed_reader` was `UNAVAILABLE` with `READ_FAILED:RuntimeError`.
+
+The failure was localized to the reader's static current-build discovery path: it depended on external `strings` and `readelf` commands in the target container before opening process memory. Repair PR #648 replaces that dependency with a bounded pure-Python ELF64 parser over the exact-fenced `/proc/PID/exe`. It resolves the unique mangled RTTI string, `R_X86_64_RELATIVE` typeinfo relation and unique primary vptr, then runs the existing bounded `/proc/PID/mem` `O_RDONLY` typed-presence probe. Failures are separated into `STATIC_LAYOUT_FAILED:*` and `LIVE_TYPED_PROBE_FAILED:*` without weakening acceptance.
+
 ## Read-only admission checkpoint
 
-The latest completed physical Surveyor run proved one exact client and one matching visible window in the declared canonical runtime namespace. This checkpoint authorizes only a bounded read-only acceptance revalidation. Historical PID/start/registration/lease values are **not** admitted as current truth: the physical workflow must freshly re-read all of them and fail before process-memory access unless the current exact target is unique, exact-fenced, display-owned and non-conflicting.
+Historical PID/start/registration/lease values are not admitted as current truth. Every physical retry must freshly re-read all of them and fail before process-memory access unless the current exact target is unique, exact-fenced, display-owned and non-conflicting.
 
 The workflow must revalidate from scratch:
 
@@ -52,7 +64,7 @@ The workflow must revalidate from scratch:
 - exactly one visible Tibia window owned by that PID;
 - no fresh active canonical lease owned by another task;
 - canonical registration identity consistency when registration exists;
-- implementation ancestry from trusted `main`.
+- implementation/repair ancestry from trusted `main`.
 
 Only after those checks may Surveyor open `/proc/PID/mem` with `O_RDONLY` and execute passive `--collect-all`.
 

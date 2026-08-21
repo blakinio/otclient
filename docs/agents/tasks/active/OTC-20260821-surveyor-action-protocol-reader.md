@@ -1,7 +1,7 @@
 ---
 task_id: OTC-20260821-surveyor-action-protocol-reader
 status: implementing
-phase: implement
+phase: validate
 agent: ChatGPT
 project_lane: otclient
 lane: P0-ACTION
@@ -9,17 +9,17 @@ track_id: official-client-re
 task_kind: implementation
 risk: medium
 policy_version: 2
-runtime_access: none
+runtime_access: read_only
 runtime_owner_task: NOT_APPLICABLE
-runtime_namespace: NOT_APPLICABLE
-canonical_registration: NOT_APPLICABLE
-canonical_lease_generation: NOT_APPLICABLE
-registration_lease_generation: NOT_APPLICABLE
+runtime_namespace: canonical-live-runtime
+canonical_registration: UNKNOWN
+canonical_lease_generation: UNKNOWN
+registration_lease_generation: UNKNOWN
 gate_a: NOT_APPLICABLE
 generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
-target_uniqueness: NOT_APPLICABLE
+target_uniqueness: PROVEN
 mutation_authorized: false
 gui_input_authorized: false
 process_control_authorized: false
@@ -27,36 +27,55 @@ credentials_allowed: false
 login_allowed: false
 gameplay_allowed: false
 transaction_authorized: false
-base_main: 079d6b814a13b1984a0c0ed36def66919238d8f4
-branch: feat/OTC-20260821-surveyor-action-protocol-reader
+base_main: f80dd43f741c39ce5ee4296396cb07891d04c324
+branch: runtime/OTC-20260821-surveyor-action-protocol-acceptance
+implementation_pr: 645
+implementation_merge_sha: f80dd43f741c39ce5ee4296396cb07891d04c324
 selected_gap: action_protocol_typed_reader
-selection_reason: current physical collect-all after auth-session closeout reports 9 gaps; world_minimap rank 1 overlaps active PRs 475/593, so action_protocol rank 2 is the highest-value non-overlapping gap
 physical_e2e_required: true
 physical_e2e_result: NOT_RUN
 ---
 
-# Surveyor v2 — action protocol typed reader
+# Surveyor v2 — action protocol typed reader acceptance
 
-## Objective
+## Read-only admission checkpoint
 
-Implement the next fail-closed Surveyor typed reader for `TIBIA-RE-ACTION-PROTOCOL` on the exact current official Linux client while preserving Track A read-only boundaries.
+The latest completed physical Surveyor run proved one exact client and one matching visible window in the declared canonical runtime namespace. This checkpoint authorizes only a bounded read-only acceptance revalidation. Historical PID/start/registration/lease values are **not** admitted as current truth: the physical workflow must freshly re-read all of them and fail before process-memory access unless the current exact target is unique, exact-fenced, display-owned and non-conflicting.
 
-## Current authority
+The workflow must revalidate from scratch:
 
-This implementation phase is repository-only (`runtime_access: none`). No new runtime observation is authorized by this task record yet. A separate explicit read-only admission checkpoint is required before physical acceptance, with target identity and uniqueness freshly revalidated by the physical workflow before process memory is opened.
+- target container running;
+- exactly one `client` process in the declared target namespace;
+- current PID and process start ticks;
+- executable path, size and SHA-256;
+- display `:1` availability;
+- exactly one visible Tibia window owned by that PID;
+- no fresh active canonical lease owned by another task;
+- canonical registration identity consistency when registration exists;
+- implementation ancestry from trusted `main`.
 
-## Safety boundary
+Only after those checks may Surveyor open `/proc/PID/mem` with `O_RDONLY` and execute passive `--collect-all`.
 
-No login/logout/relogin, credentials, GUI/gameplay input, process control, attach/debug/injection, process-memory writes, client/container restart, target-network mutation, item/economy action or local-model use is authorized. Runtime observation may occur only after a current Track A read-only admission checkpoint and must fail closed on identity/fence ambiguity.
+## Acceptance contract
 
-## Semantic boundary
+PASS requires:
 
-The reader may expose only exact typed runtime structure proven by exact-current-build RTTI/vtable evidence and live read-only object identity. It must not claim packet serialization, protocol opcode semantics, action execution, or `IN_GAME` state from structural presence alone. `semantic_promotion_allowed=false` is mandatory.
+- 169 canonical rows;
+- 12 aliases;
+- privacy PASS;
+- `action_protocol_typed_reader` `AVAILABLE`;
+- exact `tibia::game::TPlayerProtocolMessageHandler` typed object count = 1;
+- `typed_object_identity=PROVEN`;
+- `process_memory_access=read_only`;
+- semantic state `TYPED_ACTION_PROTOCOL_OBJECT_IDENTITY_ONLY`;
+- `action_to_protocol_connection_claimed=false`;
+- `serialized_message_semantics_claimed=false`;
+- `protocol_opcodes_claimed=false`;
+- `packet_payloads_retained=false`;
+- `in_game_claimed=false`;
+- missing typed readers `9 -> 8`;
+- no runtime mutation.
 
-## Baseline
+## Hard safety boundary
 
-The latest completed physical Surveyor artifact from run `32478932597` reports 169 canonical rows, 12 aliases, 9 missing typed readers and privacy PASS. This is selection evidence only, not current runtime admission. `action_protocol_typed_reader` is rank 2 with canonical priority 65 and 16 affected unresolved rows. `world_minimap_typed_reader` is rank 1 but overlaps active #475/#593 and is therefore deferred under the selection rule.
-
-## Existing structural evidence
-
-Merged static S9 evidence (`OTC-20260818-track-a-s9-action-control-static-census`) proves the action-control catalogue and the concrete type `tibia::game::TPlayerProtocolMessageHandler` for its exact historical build, while leaving action-layer-to-protocol connection and per-action serialized messages UNKNOWN. The new implementation resolves current-build RTTI/vptr dynamically and must preserve that semantic boundary.
+No login/logout/relogin, credentials, GUI/gameplay input, process control, attach/debug/injection, process-memory writes, client/container restart, target-network mutation, item/economy action or local-model use is authorized. Structural presence is not packet/action semantics and is not `IN_GAME` proof.

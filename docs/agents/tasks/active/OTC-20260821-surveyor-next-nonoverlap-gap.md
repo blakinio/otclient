@@ -63,17 +63,17 @@ estimate_confidence: medium
 decomposition_decision: phased
 decomposition_reason: discovery selected one non-overlapping reader; the same task now owns implementation through validation, physical acceptance and closeout
 invocation_started_at: 2026-08-21T22:05:00+02:00
-last_progress_at: 2026-08-21T22:36:00+02:00
+last_progress_at: 2026-08-21T23:24:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: repair_exact_head
+ci_check_generation: descriptor_binding_remediation_head_pending
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 1
+repair_cycles_for_current_gate: 2
 context_reconstruction_attempts: 1
 stall_warnings: 0
-next_action: obtain fresh independent exact-head audit plus CI/governance PASS for repair #659, merge if clean, then rerun trusted-main read-only physical acceptance
+next_action: validate the descriptor-bound exact-executable repair, obtain fresh exact-head independent audit plus CI/governance PASS, merge #659 if clean, then rerun trusted-main read-only physical acceptance
 ---
 
 # Surveyor v2 next non-overlap typed-reader slice
@@ -116,24 +116,27 @@ No official-client runtime may be observed under this checkpoint. Before any lat
 ## Terminal acceptance
 
 The selected slice is complete only after focused/static validation, exact-current-build resolver, collect-all/privacy PASS, fresh independent audit, required exact-head CI/governance, implementation merge, trusted-main read-only physical E2E, durable evidence, intentional terminal state for all related PRs, archival/removal of the active task record and released ownership.
+
 ## Independent audit remediation
 
 Fresh validator review `PRR_kwDOTVmdjs8AAAABKddk8A` on head `e91504bb8dcfcb7d582baf122710981e76c957e0` opened two findings: `AUD-658-001` P1 (unexpected probe fields could escape the telemetry allowlist) and `AUD-658-002` P2 (pre-open `resolve()` weakened fixed-path symlink protection).
 
-Both are repaired in the current working candidate. Accepted static/live probe payloads now require exact key sets and are rebuilt from allowlisted scalar values. The settings file is opened by no-follow directory descriptors from passwd home through the fixed path, then validated as a regular file owned by the target uid. Post-repair focused tests are 8/8 PASS; all Surveyor tests 59/59 PASS; compileall, collect-all 169/12/7, privacy, Track A governance and `git diff --check` are PASS.
+Both were repaired before implementation merge. Accepted static/live probe payloads require exact key sets and are rebuilt from allowlisted scalar values. The settings file uses no-follow directory descriptors and is validated as a regular file owned by the target uid. Post-repair focused tests were 8/8 PASS; all Surveyor tests 59/59 PASS; compileall, collect-all 169/12/7, privacy, Track A governance and `git diff --check` were PASS.
 
-The original review is not reused as a passing audit because code changed. Fresh exact-head re-audit is mandatory before merge.
-
-## First trusted-main physical acceptance ? repair required
+## First trusted-main physical acceptance — repair required
 
 Implementation PR #658 merged as `1cb56f652784ca1baeaf59a777e4c0b5b8ab312e`. Trusted-main workflow run `32523208150`, job `96899728966`, re-proved one exact client PID `19590`, start ticks `76611792`, exact size/SHA, one matching X11 window, canonical registration generation `2`, lease generation `19`, `runtime_access=read_only`, target uniqueness `PROVEN`, and `mutation_authorized=false`.
 
 The workflow itself completed successfully and the sanitized artifact `9461336737` (digest `sha256:e10a836244c454056e09202f5f179c16852b743db9016e30c004b1fa3d19690f`) passed privacy with 169 rows / 12 aliases / 7 missing reader implementations. However, task-level E2E is **not PASS**: `ui_settings_typed_reader` returned `UNAVAILABLE / LIVE_SETTINGS_READ_FAILED:CLIENTOPTIONS_PARENT_OPEN_FAILED`. Static `TClientOptions` evidence remained AVAILABLE. No gameplay input, relogin, restart, process control, process-memory write, credential access, network mutation or economy action occurred.
 
-This is physical repair cycle 1. The current read-only admission is persisted only to inspect the fixed-path filesystem metadata needed to explain that fail-closed result; mutation remains forbidden.
+This is physical repair cycle 1. A temporary read-only admission was persisted only for the bounded filesystem-metadata diagnosis and was released before the current pre-merge checkpoint; current `runtime_access` is `none`. Mutation remained forbidden throughout.
 
 ## Physical repair diagnosis
 
 Read-only metadata isolated the failure without reading config contents. The persistent Kasm runtime does not store current settings under the prior isolated-HOME path. A bounded filename census found four historical package roots, so home scanning is intentionally rejected as ambiguous. The exact live executable is `/home/kasm-user/otclient-track-a/Tibia-32177065988-1/bin/client`; its own package-root sibling `conf/clientoptions.json` exists, is regular, non-symlink and owned by the target UID.
 
-Repair #659 therefore anchors the file only to the already exact-fenced executable's package root (`exe.parent.parent`), requires `.../bin/client`, and opens package root -> `conf` -> `clientoptions.json` with mandatory `O_DIRECTORY/O_NOFOLLOW`, regular-file and UID checks. It performs no HOME scan and preserves the exact output allowlists from `AUD-658-001`. Durable diagnosis: `docs/agents/evidence/OTC-20260821-surveyor-next-nonoverlap-gap/20260821-physical-read-path-repair.md`.
+Repair #659 therefore derives the candidate package root only from the exact-fenced executable path and never scans HOME. After audit finding `AUD-659-001`, the live probe now holds an open `/proc/<pid>/exe` descriptor, verifies its exact size/SHA and identity, opens `root/bin/client` through the held package-root descriptor, and requires its `(st_dev, st_ino)` to equal the held live-executable descriptor before opening `conf/clientoptions.json` through that same root descriptor. This closes the package-root rename/replacement TOCTOU while preserving mandatory `O_DIRECTORY/O_NOFOLLOW`, regular-file/UID checks and the exact output allowlists from `AUD-658-001`.
+
+Fresh Codex review `4997251226` on superseded head `c75232e835c5ac187d32f2aa984b43f2ed2aa21e` also opened `AUD-659-002` P2 because the durable text still described the diagnosis admission as current. The text above now records that admission as historical and released. Both #659 findings require a fresh exact-head audit after this remediation.
+
+Durable diagnosis: `docs/agents/evidence/OTC-20260821-surveyor-next-nonoverlap-gap/20260821-physical-read-path-repair.md`.

@@ -543,6 +543,9 @@ class MutationCoordinator:
                 return False
             if not self.adapter.current_authority(request.required_authority):
                 return False
+            capability = self.adapter.capability(request.required_capability)
+            if capability is None or not capability.action_supported:
+                return False
             if request.action_id not in run.budget.reservations:
                 return False
             if self.clock.now_ns() >= action_deadline_ns:

@@ -4,6 +4,7 @@ import copy
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Any
 
 from .fake import ManualClock
@@ -54,23 +55,9 @@ def ensure_no_secret_material(value: Any, *, key_path: str = "payload") -> None:
                 raise PrivacyError("SECRET_VALUE", "secret-shaped text rejected before event construction")
 
 
-class _FrozenEventDict(dict):
-    def _immutable(self, *args: Any, **kwargs: Any) -> None:
-        del args, kwargs
-        raise TypeError("event payload is immutable")
-
-    __setitem__ = _immutable
-    __delitem__ = _immutable
-    clear = _immutable
-    pop = _immutable
-    popitem = _immutable
-    setdefault = _immutable
-    update = _immutable
-
-
 def _freeze_event_value(value: Any) -> Any:
     if isinstance(value, Mapping):
-        return _FrozenEventDict({key: _freeze_event_value(child) for key, child in value.items()})
+        return MappingProxyType({key: _freeze_event_value(child) for key, child in value.items()})
     if isinstance(value, list):
         return tuple(_freeze_event_value(child) for child in value)
     if isinstance(value, tuple):

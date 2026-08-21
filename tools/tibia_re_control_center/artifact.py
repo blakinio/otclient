@@ -287,6 +287,7 @@ class ArtifactStore:
             status = requested_status
         if status == "PASS" and (ambiguous or not privacy_ok or not cleanup_ok):
             status = "INCOMPLETE"
+        status_snapshot = copy.deepcopy(status)
         reason_codes_snapshot = copy.deepcopy(list(reason_codes or ()))
         assertions_snapshot = copy.deepcopy(dict(assertions or {}))
         budget_summary_snapshot = copy.deepcopy(dict(budget_summary))
@@ -301,6 +302,7 @@ class ArtifactStore:
         }
         ensure_no_secret_material(
             {
+                "status": status_snapshot,
                 "reason_codes": reason_codes_snapshot,
                 "assertions": assertions_snapshot,
                 "budget_summary": budget_summary_snapshot,
@@ -320,7 +322,7 @@ class ArtifactStore:
             result = {
                 "schema_version": 1,
                 "run_id": run_id,
-                "status": status,
+                "status": status_snapshot,
                 "first_failure_step_id": None,
                 "reason_codes": [] if status == "PASS" else (reason_codes_snapshot or [status]),
                 "assertions": assertions_snapshot,

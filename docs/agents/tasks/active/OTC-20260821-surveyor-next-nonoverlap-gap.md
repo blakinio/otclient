@@ -1,7 +1,7 @@
 ---
 task_id: OTC-20260821-surveyor-next-nonoverlap-gap
-status: implementing
-phase: auditing
+status: validating
+phase: validating
 agent: ChatGPT
 project_lane: otclient
 lane: P0-SURVEYOR
@@ -62,18 +62,18 @@ context_score: 8
 estimate_confidence: medium
 decomposition_decision: phased
 decomposition_reason: discovery selected one non-overlapping reader; the same task now owns implementation through validation, physical acceptance and closeout
-invocation_started_at: 2026-08-21T21:27:00+02:00
-last_progress_at: 2026-08-21T21:54:41+02:00
+invocation_started_at: 2026-08-21T22:05:00+02:00
+last_progress_at: 2026-08-21T22:12:47+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: final_audit_head_pending
+ci_check_generation: remediation_head_pending
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 0
-context_reconstruction_attempts: 0
+repair_cycles_for_current_gate: 1
+context_reconstruction_attempts: 1
 stall_warnings: 0
-next_action: obtain fresh independent exact-head audit, verify exact-head CI/governance and zero review threads, then merge PR #658
+next_action: commit and push AUD-658-001/AUD-658-002 remediation, resolve addressed threads, then obtain a fresh independent exact-head re-audit and CI/governance PASS
 ---
 
 # Surveyor v2 next non-overlap typed-reader slice
@@ -116,3 +116,10 @@ No official-client runtime may be observed under this checkpoint. Before any lat
 ## Terminal acceptance
 
 The selected slice is complete only after focused/static validation, exact-current-build resolver, collect-all/privacy PASS, fresh independent audit, required exact-head CI/governance, implementation merge, trusted-main read-only physical E2E, durable evidence, intentional terminal state for all related PRs, archival/removal of the active task record and released ownership.
+## Independent audit remediation
+
+Fresh validator review `PRR_kwDOTVmdjs8AAAABKddk8A` on head `e91504bb8dcfcb7d582baf122710981e76c957e0` opened two findings: `AUD-658-001` P1 (unexpected probe fields could escape the telemetry allowlist) and `AUD-658-002` P2 (pre-open `resolve()` weakened fixed-path symlink protection).
+
+Both are repaired in the current working candidate. Accepted static/live probe payloads now require exact key sets and are rebuilt from allowlisted scalar values. The settings file is opened by no-follow directory descriptors from passwd home through the fixed path, then validated as a regular file owned by the target uid. Post-repair focused tests are 8/8 PASS; all Surveyor tests 59/59 PASS; compileall, collect-all 169/12/7, privacy, Track A governance and `git diff --check` are PASS.
+
+The original review is not reused as a passing audit because code changed. Fresh exact-head re-audit is mandatory before merge.

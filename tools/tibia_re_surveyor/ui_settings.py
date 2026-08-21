@@ -32,7 +32,7 @@ print(json.dumps({"state":"AVAILABLE","type_name":"tibia::config::TClientOptions
 """
 
 READ_ONLY_SETTINGS_PROBE = r"""
-import hashlib,json,os,pathlib,pwd,sys
+import hashlib,json,os,pathlib,pwd,stat,sys
 pid=int(sys.argv[1]); start=int(sys.argv[2]); size=int(sys.argv[3]); sha=sys.argv[4]
 def ticks():
  raw=pathlib.Path(f"/proc/{pid}/stat").read_text(encoding="ascii")
@@ -46,16 +46,26 @@ if ticks()!=start: raise SystemExit("START_TICKS_MISMATCH")
 exe=pathlib.Path(os.path.realpath(f"/proc/{pid}/exe"))
 if exe.stat().st_size!=size or digest(exe)!=sha: raise SystemExit("EXACT_FENCE_MISMATCH")
 uid=os.stat(f"/proc/{pid}").st_uid
-home=pathlib.Path(pwd.getpwuid(uid).pw_dir).resolve()
-path=(home/".local/share/CipSoft GmbH/Tibia/packages/Tibia/conf/clientoptions.json").resolve()
-try: path.relative_to(home)
-except ValueError: raise SystemExit("SETTINGS_PATH_ESCAPES_HOME")
-flags=os.O_RDONLY|os.O_CLOEXEC
-if hasattr(os,"O_NOFOLLOW"): flags|=os.O_NOFOLLOW
-try: fd=os.open(path,flags)
-except OSError: raise SystemExit("CLIENTOPTIONS_OPEN_FAILED")
+home=pwd.getpwuid(uid).pw_dir
+dir_flags=os.O_RDONLY|os.O_CLOEXEC
+if hasattr(os,"O_DIRECTORY"): dir_flags|=os.O_DIRECTORY
+if hasattr(os,"O_NOFOLLOW"): dir_flags|=os.O_NOFOLLOW
+file_flags=os.O_RDONLY|os.O_CLOEXEC
+if hasattr(os,"O_NOFOLLOW"): file_flags|=os.O_NOFOLLOW
+try: current_fd=os.open(home,dir_flags)
+except OSError: raise SystemExit("CLIENTOPTIONS_HOME_OPEN_FAILED")
+try:
+ for component in (".local","share","CipSoft GmbH","Tibia","packages","Tibia","conf"):
+  try: next_fd=os.open(component,dir_flags,dir_fd=current_fd)
+  except OSError: raise SystemExit("CLIENTOPTIONS_PARENT_OPEN_FAILED")
+  os.close(current_fd); current_fd=next_fd
+ try: fd=os.open("clientoptions.json",file_flags,dir_fd=current_fd)
+ except OSError: raise SystemExit("CLIENTOPTIONS_OPEN_FAILED")
+finally:
+ os.close(current_fd)
 try:
  st=os.fstat(fd)
+ if not stat.S_ISREG(st.st_mode) or st.st_uid!=uid: raise SystemExit("CLIENTOPTIONS_IDENTITY_INVALID")
  if st.st_size<=0 or st.st_size>2*1024*1024: raise SystemExit("CLIENTOPTIONS_SIZE_INVALID")
  raw=b""
  while len(raw)<st.st_size:
@@ -81,8 +91,10 @@ print(json.dumps({"state":"AVAILABLE","reader_id":"ui_settings_typed_reader","ma
 _SAFE_RUNTIME_CODES = (
     "START_TICKS_MISMATCH",
     "EXACT_FENCE_MISMATCH",
-    "SETTINGS_PATH_ESCAPES_HOME",
+    "CLIENTOPTIONS_HOME_OPEN_FAILED",
+    "CLIENTOPTIONS_PARENT_OPEN_FAILED",
     "CLIENTOPTIONS_OPEN_FAILED",
+    "CLIENTOPTIONS_IDENTITY_INVALID",
     "CLIENTOPTIONS_SIZE_INVALID",
     "CLIENTOPTIONS_SHORT_READ",
     "CLIENTOPTIONS_JSON_INVALID",
@@ -98,6 +110,13 @@ def _safe_runtime_failure(exc: Exception) -> str:
         if code in text:
             return code
     return type(exc).__name__
+
+
+_STATIC_RESULT_KEYS = frozenset({"state", "type_name", "type_string_count", "clientoptions_literal_count"})
+_LIVE_RESULT_KEYS = frozenset({
+    "state", "reader_id", "master_volume", "master_volume_old",
+    "persistence_relative_path", "filesystem_access", "process_memory_access",
+})
 
 
 def read_ui_settings(
@@ -117,14 +136,22 @@ def read_ui_settings(
         static = json.loads(raw_static)
         if (
             not isinstance(static, dict)
+            or set(static) != _STATIC_RESULT_KEYS
             or static.get("state") != "AVAILABLE"
             or static.get("type_name") != TYPE_NAME
             or isinstance(static.get("type_string_count"), bool)
             or not isinstance(static.get("type_string_count"), int)
             or static["type_string_count"] < 1
+            or isinstance(static.get("clientoptions_literal_count"), bool)
             or static.get("clientoptions_literal_count") != 1
         ):
             raise RuntimeError("static settings model unavailable")
+        static = {
+            "state": "AVAILABLE",
+            "type_name": TYPE_NAME,
+            "type_string_count": static["type_string_count"],
+            "clientoptions_literal_count": 1,
+        }
     except Exception as exc:
         return {
             "state": "UNAVAILABLE",
@@ -145,6 +172,7 @@ def read_ui_settings(
         master_old = doc.get("master_volume_old") if isinstance(doc, dict) else None
         if (
             not isinstance(doc, dict)
+            or set(doc) != _LIVE_RESULT_KEYS
             or doc.get("state") != "AVAILABLE"
             or doc.get("reader_id") != READER_ID
             or isinstance(master, bool)
@@ -158,6 +186,15 @@ def read_ui_settings(
             or doc.get("process_memory_access") != "not_used"
         ):
             raise RuntimeError("settings snapshot unavailable")
+        doc = {
+            "state": "AVAILABLE",
+            "reader_id": READER_ID,
+            "master_volume": master,
+            "master_volume_old": master_old,
+            "persistence_relative_path": "packages/Tibia/conf/clientoptions.json",
+            "filesystem_access": "read_only",
+            "process_memory_access": "not_used",
+        }
     except Exception as exc:
         return {
             "state": "UNAVAILABLE",

@@ -85,6 +85,34 @@ class UiSettingsReaderTests(unittest.TestCase):
         self.assertEqual("UNAVAILABLE", doc["state"])
         self.assertEqual("STATIC_SETTINGS_MODEL_FAILED:RuntimeError", doc["reason"])
 
+    def test_static_payload_with_extra_field_fails_closed(self):
+        payload = json.loads(self._static())
+        payload["credential"] = "must-not-survive"
+
+        def runner(command):
+            return json.dumps(payload)
+
+        doc = read_ui_settings(pid=123, start_ticks=456, runner=runner)
+        self.assertEqual("UNAVAILABLE", doc["state"])
+        self.assertNotIn("credential", json.dumps(doc))
+        self.assertNotIn("must-not-survive", json.dumps(doc))
+
+    def test_live_payload_with_extra_field_fails_closed(self):
+        calls = []
+
+        def runner(command):
+            calls.append(command)
+            if len(calls) == 1:
+                return self._static()
+            payload = json.loads(self._live())
+            payload["token"] = "must-not-survive"
+            return json.dumps(payload)
+
+        doc = read_ui_settings(pid=123, start_ticks=456, runner=runner)
+        self.assertEqual("UNAVAILABLE", doc["state"])
+        self.assertNotIn("token", json.dumps(doc))
+        self.assertNotIn("must-not-survive", json.dumps(doc))
+
     def test_malformed_live_payload_fails_closed(self):
         calls = []
 
@@ -118,6 +146,10 @@ class UiSettingsReaderTests(unittest.TestCase):
 
     def test_probe_sources_are_read_only_allowlisted_and_do_not_read_process_memory(self):
         self.assertIn("os.O_RDONLY", READ_ONLY_SETTINGS_PROBE)
+        self.assertIn("os.O_NOFOLLOW", READ_ONLY_SETTINGS_PROBE)
+        self.assertIn("dir_fd=current_fd", READ_ONLY_SETTINGS_PROBE)
+        self.assertIn("stat.S_ISREG", READ_ONLY_SETTINGS_PROBE)
+        self.assertNotIn(".resolve()", READ_ONLY_SETTINGS_PROBE)
         self.assertNotIn("os.O_RDWR", READ_ONLY_SETTINGS_PROBE)
         self.assertNotIn("os.O_WRONLY", READ_ONLY_SETTINGS_PROBE)
         self.assertNotIn(f"/proc/{{pid}}/mem", READ_ONLY_SETTINGS_PROBE)

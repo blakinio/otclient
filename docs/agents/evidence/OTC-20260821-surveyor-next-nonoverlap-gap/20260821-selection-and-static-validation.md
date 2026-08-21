@@ -86,3 +86,27 @@ world_minimap_typed_reader remains rank 1 and intentionally untouched
 ```
 
 No official-client runtime was observed during this implementation/static-validation phase; task admission remains `runtime_access:none` until the separately gated trusted-main physical acceptance phase.
+
+## Independent audit findings and remediation
+
+Fresh Codex validator review `PRR_kwDOTVmdjs8AAAABKddk8A` inspected exact head `e91504bb8dcfcb7d582baf122710981e76c957e0` and opened two findings.
+
+`AUD-658-001` — P1, high confidence: accepted probe dictionaries were later embedded as full `static_evidence` / live output. An unexpected future probe field could therefore escape the intended telemetry allowlist. Remediation rejects any static/live key set other than the exact expected contract and rebuilds both accepted dictionaries from explicit scalar fields before publication.
+
+`AUD-658-002` — P2, high confidence: the fixed settings path used `Path.resolve()` before `O_NOFOLLOW`, allowing symlink traversal to be normalized away. Remediation opens the passwd home and every fixed path component with directory descriptors plus `O_NOFOLLOW`, opens only `clientoptions.json` relative to the final directory descriptor, and requires the opened object to be a regular file owned by the target process uid.
+
+No authority or semantic scope was broadened by either repair. The reader still performs no process-memory access, no file write, no GUI input, no process control, no login/relogin and no gameplay action.
+
+Post-remediation deterministic validation:
+
+```text
+UI/settings focused tests: 8/8 PASS
+all Surveyor tests:         59/59 PASS
+Python compileall:           PASS
+repository-only collect-all: 169 rows / 12 aliases / 7 gaps
+privacy scan:                PASS
+Track A runtime governance:  PASS
+git diff --check:            PASS
+```
+
+A fresh exact-head independent re-audit is required after the remediation commit; the original review is not treated as PASS after code changed.

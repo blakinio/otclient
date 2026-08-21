@@ -1,0 +1,77 @@
+name: Package A final current-main reconcile
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  reconcile:
+    if: github.head_ref == 'feat/OTC-20260820-tibia-re-control-center-package-a'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Merge current main, clean generated files, validate, push
+        shell: bash
+        env:
+          BRANCH: ${{ github.head_ref }}
+        run: |
+          set -Eeuo pipefail
+          git fetch origin main "$BRANCH"
+          git pull --ff-only origin "$BRANCH"
+          set +e
+          git merge --no-ff --no-commit origin/main
+          merge_rc=$?
+          set -e
+          if [ "$merge_rc" -ne 0 ]; then
+            git checkout --ours docs/agents/CHANGELOG.md docs/agents/MODULE_CATALOG.md
+            python3 - <<'PY'
+          from pathlib import Path
+
+          changelog = Path('docs/agents/CHANGELOG.md')
+          text = changelog.read_text(encoding='utf-8')
+          auth_line = '- 2026-08-21: Surveyor v2 PR #636 adds an exact-current-build `TIBIA-RE-AUTH-SESSION` lifecycle typed reader and dedicated hosted Surveyor validation. It exact-fences both the official client and deployed Qt StateMachine library, validates the live `TGameClient + 0x8d0 -> TAuthenticationProcessController` relationship, exposes only the exact `QStateMachine::isRunning()`-equivalent boolean, reads `/proc/PID/mem` read-only, retains no credential/play-session payload, never claims `IN_GAME`, and changes repository-only missing-reader accounting from 10 to 9 with privacy PASS expected on the exact head.\n'
+          if auth_line not in text:
+              marker = '## Unreleased\n'
+              if marker not in text:
+                  raise SystemExit('CHANGELOG Unreleased marker missing')
+              text = text.replace(marker, marker + auth_line, 1)
+          changelog.write_text(text, encoding='utf-8')
+
+          catalog = Path('docs/agents/MODULE_CATALOG.md')
+          text = catalog.read_text(encoding='utf-8')
+          text = text.replace('Last reviewed: 2026-08-20', 'Last reviewed: 2026-08-21', 1)
+          old = '| TIBIA-RE Surveyor v2 collect-all | PR #616; namespace hardening #623; player-state reader PR #634 | Deterministic 169-row coverage/evidence index plus allowlisted runtime identity, twelve subsystem alias views, ranked missing-reader report, privacy scan, output manifest and exact-current-build player-state typed-reader candidate | `tools/tibia_re_surveyor/**`, `tests/tools/tibia_re_surveyor/**` | Collect-all is passive/read-only and cannot promote canonical status. The player-state reader is exact-fenced, opens `/proc/PID/mem` read-only, requires one uniquely resolved `TPlayerData` object, and remains `CANDIDATE_PENDING_CAUSAL_E2E` until owner-controlled movement proves semantics. Other missing typed readers remain `UNKNOWN`/`UNAVAILABLE`; bridge structural presence remains non-gameplay authority. |'
+          new = '| TIBIA-RE Surveyor v2 collect-all | PR #616; namespace hardening #623; player-state reader PR #634; auth-session reader PR #636 | Deterministic 169-row coverage/evidence index plus allowlisted runtime identity, twelve subsystem alias views, ranked missing-reader report, privacy scan, output manifest, exact-current-build player-state reader and secret-free auth/session lifecycle reader | `tools/tibia_re_surveyor/**`, `tests/tools/tibia_re_surveyor/**`, `.github/workflows/track-a-surveyor-tests.yml` | Collect-all is passive/read-only and cannot promote canonical status. The player-state reader remains exact-fenced and read-only. PR #636 exact-fences both the official client and deployed Qt StateMachine library, validates `TGameClient -> TAuthenticationProcessController`, and exposes only the exact `QStateMachine::isRunning()`-equivalent lifecycle boolean with `in_game_claimed=false`; it reads no credential/play-session payload. With both readers implemented, repository-only gap accounting is 9; bridge structural presence remains non-gameplay authority. |'
+          if old not in text and new not in text:
+              raise SystemExit('MODULE_CATALOG Surveyor row anchor missing')
+          text = text.replace(old, new, 1)
+          catalog.write_text(text, encoding='utf-8')
+          PY
+            git add docs/agents/CHANGELOG.md docs/agents/MODULE_CATALOG.md
+            git diff --name-only --diff-filter=U | grep . && { echo 'unresolved merge conflicts'; exit 1; } || true
+          fi
+          find tools/tibia_re_control_center tests/tools/tibia_re_control_center -type d -name __pycache__ -prune -exec rm -rf {} +
+          rm -f _tmp_do_not_merge tests/tools/tibia_re_control_center/test_cycle2_isolation.py
+          git rm -f --ignore-unmatch .github/workflows/tibia-re-control-center-final-reconcile.yml
+          python3 -m compileall -q tools/tibia_re_control_center tests/tools/tibia_re_control_center
+          find tools/tibia_re_control_center tests/tools/tibia_re_control_center -type d -name __pycache__ -prune -exec rm -rf {} +
+          PYTHONPATH=. python3 -m unittest discover -s tests/tools/tibia_re_control_center -p 'test_*.py'
+          PYTHONPATH=. python3 tests/tools/tibia_re_control_center/audit_package_a.py
+          PYTHONPATH=. python3 tests/tools/tibia_re_control_center/audit_package_a_p1.py
+          python3 -m pip install --disable-pip-version-check --no-input ruff==0.16.1 >/dev/null
+          ruff check tools/tibia_re_control_center tests/tools/tibia_re_control_center/test_codex_cycle2_repairs.py
+          git diff --check
+          git add -A
+          git status --short
+          git config user.name blakinio
+          git config user.email 75369544+blakinio@users.noreply.github.com
+          git commit -m 'merge(track-a): reconcile Package A with current main'
+          git push origin "HEAD:$BRANCH"

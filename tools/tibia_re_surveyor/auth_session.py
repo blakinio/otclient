@@ -23,7 +23,7 @@ _GAME_AUTH_LOAD = re.compile(
 )
 _QSTATE_PRIVATE_LOAD = re.compile(r"\bmov\s+0x([0-9a-fA-F]+)\(%rdi\),%rax\b")
 _QSTATE_RUNNING_CMP = re.compile(
-    r"\bcmpl?\s+\$0x([0-9a-fA-F]+),0x([0-9a-fA-F]+)\(%rax\)\b"
+    r"\bcmpl?\s+\$0x([0-9a-fA-F]+),0x([0-9a-fA-F]+)\(%rax\)"
 )
 _QSTATE_BOOL = re.compile(r"\bsete\s+%al\b")
 
@@ -171,7 +171,7 @@ CURRENT_LAYOUT = AuthSessionLayout(
 )
 
 
-READ_ONLY_PROBE = r'''\
+READ_ONLY_PROBE = r'''
 import hashlib,json,os,pathlib,struct,sys
 pid=int(sys.argv[1]); start=int(sys.argv[2]); size=int(sys.argv[3]); sha=sys.argv[4]
 game_vptr_off=int(sys.argv[5],16); auth_vptr_off=int(sys.argv[6],16)

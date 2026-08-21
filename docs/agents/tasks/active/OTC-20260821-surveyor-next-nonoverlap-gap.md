@@ -1,7 +1,7 @@
 ---
 task_id: OTC-20260821-surveyor-next-nonoverlap-gap
 status: implementing
-phase: implementing
+phase: auditing
 agent: ChatGPT
 project_lane: otclient
 lane: P0-SURVEYOR
@@ -63,9 +63,9 @@ estimate_confidence: medium
 decomposition_decision: phased
 decomposition_reason: discovery selected one non-overlapping reader; the same task now owns implementation through validation, physical acceptance and closeout
 invocation_started_at: 2026-08-21T21:27:00+02:00
-last_progress_at: 2026-08-21T21:41:00+02:00
+last_progress_at: 2026-08-21T21:52:51+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: draft
+ci_check_generation: audit_metadata_head_pending
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -73,7 +73,7 @@ identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 0
 stall_warnings: 0
-next_action: finish ui_settings_typed_reader implementation evidence, push PR #658, run exact-head CI/governance/audit, merge, then run trusted-main read-only physical acceptance
+next_action: obtain a fresh independent exact-diff validator audit, verify exact metadata-head CI/governance, merge PR #658, then run trusted-main read-only physical acceptance
 ---
 
 # Surveyor v2 next non-overlap typed-reader slice
@@ -100,6 +100,10 @@ The current owner request authorizes the bounded Surveyor continuation and read-
 Fresh repository-only collect-all on exact starting `main@dce8bbd0e78ceea3681a1fe1dab40d3c19ed7458` produced 169 rows, 12 aliases, 8 missing typed readers and privacy `PASS`. `world_minimap_typed_reader` ranked first at score 125 but is excluded by still-open overlapping PRs #475 and #593. `ui_settings_typed_reader` ranked second at score 65 and is the highest-ranked non-overlapping gap. Its prior exact-build UI/settings discovery task `OTC-20260819-track-a-ui-settings-static-model` is terminally archived with ownership released and no open UI/settings PR exists.
 
 The implementation is deliberately bounded to the exact-build `tibia::config::TClientOptions` compiled model plus the two previously causally proven Master Volume persistence fields in `packages/Tibia/conf/clientoptions.json`. The reader does not claim complete settings semantics, live UI application state, `TClientOptions -> clientoptions.json` linkage, or QSettings linkage. It uses no process-memory access.
+
+## Pre-audit exact code-head validation
+
+Code candidate 15398146d7fd46cf047aba1f3aa7317990092b84 passed all applicable GitHub gates before this metadata-only audit checkpoint: repository CI run 32520242535, Track A Surveyor tests run 32520242610, and Track A agent runtime governance run 32520242396, all success. No reader/source/test/workflow content changes follow this checkpoint unless a material audit finding requires remediation.
 
 ## Runtime boundary
 

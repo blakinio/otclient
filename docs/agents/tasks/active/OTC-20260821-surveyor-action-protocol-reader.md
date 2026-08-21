@@ -34,6 +34,8 @@ implementation_merge_sha: f80dd43f741c39ce5ee4296396cb07891d04c324
 acceptance_pr: 646
 acceptance_merge_sha: b7fa88ef2d772c70ca7250b587e7f584327ee37b
 repair_pr: 648
+repair_hosted_validation_sha: 3c843a51eca276151bb89301c52887f2514b3168
+repair_hosted_validation: PASS_BEFORE_READY_REFRESH
 selected_gap: action_protocol_typed_reader
 physical_e2e_required: true
 physical_e2e_result: FAIL_REPAIR_IN_PROGRESS
@@ -49,6 +51,8 @@ Implementation PR #645 merged as `f80dd43f741c39ce5ee4296396cb07891d04c324`. Rea
 Physical run `32494958152` proved the runtime/control preflight but failed the reader acceptance. Verified preflight facts from that run were: one exact client in the declared namespace, one matching visible window, exact size/SHA, stable PID/start identity, `target_uniqueness=PROVEN`, and matching canonical registration. The passive Surveyor collect still returned 169 rows / 12 aliases / 8 repository-known missing readers / privacy PASS, but `action_protocol_typed_reader` was `UNAVAILABLE` with `READ_FAILED:RuntimeError`.
 
 The failure was localized to the reader's static current-build discovery path: it depended on external `strings` and `readelf` commands in the target container before opening process memory. Repair PR #648 replaces that dependency with a bounded pure-Python ELF64 parser over the exact-fenced `/proc/PID/exe`. It resolves the unique mangled RTTI string, `R_X86_64_RELATIVE` typeinfo relation and unique primary vptr, then runs the existing bounded `/proc/PID/mem` `O_RDONLY` typed-presence probe. Failures are separated into `STATIC_LAYOUT_FAILED:*` and `LIVE_TYPED_PROBE_FAILED:*` without weakening acceptance.
+
+Hosted validation on repair head `3c843a51eca276151bb89301c52887f2514b3168` passed full CI, focused Surveyor tests and Track A governance while the PR was still Draft. After transition to Ready, GitHub branch rules continued to report required context `CI / Required` as expected despite the completed success job, so this task checkpoint intentionally refreshes the exact head and reruns the required check suite in Ready state rather than bypassing branch protection.
 
 ## Read-only admission checkpoint
 

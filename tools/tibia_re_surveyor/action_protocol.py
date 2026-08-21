@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Callable
 
+from .action_protocol_presence import read_action_protocol_presence
 from .runtime import EXPECTED_TARGET_CONTAINER
-from .typed_presence import read_typed_presence
 
 READER_ID = "action_protocol_typed_reader"
 TYPE_NAME = "tibia::game::TPlayerProtocolMessageHandler"
@@ -17,7 +17,7 @@ def read_action_protocol(
     runner: Callable[[list[str]], str],
     container: str = EXPECTED_TARGET_CONTAINER,
 ) -> dict[str, object]:
-    doc = read_typed_presence(
+    doc = read_action_protocol_presence(
         reader_id=READER_ID,
         type_name=TYPE_NAME,
         mangled_name=MANGLED_TYPE_NAME,

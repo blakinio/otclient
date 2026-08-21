@@ -96,6 +96,7 @@ class MutationCoordinator:
         self.control_transition_lock = threading.RLock()
         self.run_admission_lock = threading.RLock()
         self.mutation_execution_lock = threading.Lock()
+        self.stop_operation_lock = threading.RLock()
         self.runs: dict[str, RunState] = {}
         self.results: dict[str, ActionResult] = {}
         self.active_mutation_run_id: str | None = None
@@ -544,6 +545,9 @@ class MutationCoordinator:
                 return False
             if request.action_id not in run.budget.reservations:
                 return False
+            if self.clock.now_ns() >= action_deadline_ns:
+                final_commit_refusal_reason[0] = "ACTION_TIMEOUT_EXPIRED"
+                return False
             next_budget = self._move_reserved_to_at_risk(run.budget, request.action_id)
             committed = record.with_state(
                 LifecycleState.DISPATCH_COMMITTED,
@@ -647,7 +651,15 @@ class MutationCoordinator:
                     )
                     self.results[request.action_id] = result
                     return result
-            if request.required_authority == Authority.MUTATION and not self.adapter.allow_mutation:
+            if request.required_authority != Authority.MUTATION:
+                return self._make_result(
+                    request,
+                    LifecycleState.REFUSED,
+                    ActionStatus.REFUSED,
+                    DispatchState.NOT_DISPATCHED,
+                    reason_code="MUTATION_AUTHORITY_REQUIRED",
+                )
+            if not self.adapter.allow_mutation:
                 return self._make_result(
                     request,
                     LifecycleState.REFUSED,
@@ -829,44 +841,44 @@ class MutationCoordinator:
             return result
 
     def stop_all(self, *, transition_id: str | None = None, reason_code: str = "STOP_ALL") -> bool:
-        persisted = False
-        with self.run_admission_lock, self.control_transition_lock, self.dispatch_gate:
-            self.in_memory_stop = True
-            self.mutation_disabled = True
-            self.stop_cleanup_in_progress = True
-            try:
-                next_generation = checked_add(
-                    self.control_generation, 1, maximum=MAX_U64, field_name="control_generation"
-                )
-            except ValidationError:
-                self.stop_durability_unresolved = True
-            else:
-                next_state = self._new_control_state(
-                    stop_latched=True,
-                    recovery_required=self.control_state.recovery_required,
-                    generation=next_generation,
-                    transition_id=transition_id or f"stop:{self.backend_epoch}:{next_generation}",
-                    reason_code=reason_code,
-                    active_backend_epoch=self.backend_epoch,
-                )
+        with self.stop_operation_lock:
+            persisted = False
+            with self.run_admission_lock, self.control_transition_lock, self.dispatch_gate:
+                self.in_memory_stop = True
+                self.mutation_disabled = True
+                self.stop_cleanup_in_progress = True
                 try:
-                    self.store.write_control_state(next_state, operation="stop")
-                except (DurabilityError, DurabilityTimeout):
+                    next_generation = checked_add(
+                        self.control_generation, 1, maximum=MAX_U64, field_name="control_generation"
+                    )
+                except ValidationError:
                     self.stop_durability_unresolved = True
                 else:
-                    self.control_state = next_state
-                    self.stop_durability_unresolved = False
-                    persisted = True
-            for run in self.runs.values():
-                run.cancelled = True
-        try:
-            self.adapter.emergency_stop(reason_code)
-        except Exception:  # noqa: BLE001 -- failed cleanup must keep STOP fail-closed
-            return False
-        with self.control_transition_lock:
-            self.stop_cleanup_in_progress = False
-        return persisted
-
+                    next_state = self._new_control_state(
+                        stop_latched=True,
+                        recovery_required=self.control_state.recovery_required,
+                        generation=next_generation,
+                        transition_id=transition_id or f"stop:{self.backend_epoch}:{next_generation}",
+                        reason_code=reason_code,
+                        active_backend_epoch=self.backend_epoch,
+                    )
+                    try:
+                        self.store.write_control_state(next_state, operation="stop")
+                    except (DurabilityError, DurabilityTimeout):
+                        self.stop_durability_unresolved = True
+                    else:
+                        self.control_state = next_state
+                        self.stop_durability_unresolved = False
+                        persisted = True
+                for run in self.runs.values():
+                    run.cancelled = True
+            try:
+                self.adapter.emergency_stop(reason_code)
+            except Exception:  # noqa: BLE001 -- failed cleanup must keep STOP fail-closed
+                return False
+            with self.control_transition_lock:
+                self.stop_cleanup_in_progress = False
+            return persisted
     def reset_stop(self, *, transition_id: str | None = None, reason_code: str = "EXPLICIT_RESET") -> bool:
         with self.control_transition_lock, self.dispatch_gate:
                 if self.stop_cleanup_in_progress or self.stop_durability_unresolved:

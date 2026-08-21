@@ -287,17 +287,29 @@ class ArtifactStore:
             status = requested_status
         if status == "PASS" and (ambiguous or not privacy_ok or not cleanup_ok):
             status = "INCOMPLETE"
+        reason_codes_snapshot = copy.deepcopy(list(reason_codes or ()))
+        assertions_snapshot = copy.deepcopy(dict(assertions or {}))
+        budget_summary_snapshot = copy.deepcopy(dict(budget_summary))
+        action_projection = {
+            action_id: {
+                "lifecycle_state": result.lifecycle_state.value,
+                "status": result.status.value,
+                "dispatch_state": result.dispatch_state.value,
+                "reason_code": result.reason_code,
+            }
+            for action_id, result in action_results.items()
+        }
+        ensure_no_secret_material(
+            {
+                "reason_codes": reason_codes_snapshot,
+                "assertions": assertions_snapshot,
+                "budget_summary": budget_summary_snapshot,
+                "action_outcomes": action_projection,
+            },
+            key_path="artifact.finalize",
+        )
         try:
             run.stage["events.jsonl"] = self._events_jsonl(recorder)
-            action_projection = {
-                action_id: {
-                    "lifecycle_state": result.lifecycle_state.value,
-                    "status": result.status.value,
-                    "dispatch_state": result.dispatch_state.value,
-                    "reason_code": result.reason_code,
-                }
-                for action_id, result in action_results.items()
-            }
             action_lines = [
                 jcs_dumps({"action_id": action_id, **projection})
                 for action_id, projection in sorted(action_projection.items())
@@ -310,10 +322,10 @@ class ArtifactStore:
                 "run_id": run_id,
                 "status": status,
                 "first_failure_step_id": None,
-                "reason_codes": [] if status == "PASS" else list(reason_codes or (status,)),
-                "assertions": dict(assertions or {}),
+                "reason_codes": [] if status == "PASS" else (reason_codes_snapshot or [status]),
+                "assertions": assertions_snapshot,
                 "action_outcomes": action_projection,
-                "budget_outcome": dict(budget_summary),
+                "budget_outcome": budget_summary_snapshot,
                 "recorder_outcome": {
                     "events": len(recorder.events),
                     "late_supplements": len(recorder.supplemental_events),
@@ -344,7 +356,7 @@ class ArtifactStore:
                 "finished_monotonic_ns": recorder.clock.now_ns(),
                 "privacy_policy": dict(run.privacy_policy),
                 "action_summary": action_projection,
-                "budget_summary": dict(budget_summary),
+                "budget_summary": budget_summary_snapshot,
                 "event_summary": {"count": len(recorder.events)},
                 "artifact_hashes": hashes,
                 "supplements": sorted(run.supplements),

@@ -54,6 +54,30 @@ def ensure_no_secret_material(value: Any, *, key_path: str = "payload") -> None:
                 raise PrivacyError("SECRET_VALUE", "secret-shaped text rejected before event construction")
 
 
+class _FrozenEventDict(dict):
+    def _immutable(self, *args: Any, **kwargs: Any) -> None:
+        del args, kwargs
+        raise TypeError("event payload is immutable")
+
+    __setitem__ = _immutable
+    __delitem__ = _immutable
+    clear = _immutable
+    pop = _immutable
+    popitem = _immutable
+    setdefault = _immutable
+    update = _immutable
+
+
+def _freeze_event_value(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return _FrozenEventDict({key: _freeze_event_value(child) for key, child in value.items()})
+    if isinstance(value, list):
+        return tuple(_freeze_event_value(child) for child in value)
+    if isinstance(value, tuple):
+        return tuple(_freeze_event_value(child) for child in value)
+    return value
+
+
 def safe_error(code: str, *, safe_message: str, exception: BaseException | None = None) -> dict[str, str]:
     del exception
     if not code or not isinstance(code, str):
@@ -168,6 +192,7 @@ class Recorder:
             "payload": payload_snapshot,
         }
         ensure_no_secret_material(metadata_snapshot, key_path="event")
+        payload_snapshot = _freeze_event_value(payload_snapshot)
         self._ingest_seq += 1
         is_late = self.state != "ACTIVE" if late is None else bool(late)
         event = Event(

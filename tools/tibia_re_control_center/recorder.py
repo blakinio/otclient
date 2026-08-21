@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -147,7 +148,25 @@ class Recorder:
             raise ValidationError("INVALID_EVENT_KIND", "event kind is not admitted")
         if sensitivity not in _SENSITIVITIES or sensitivity == "SECRET_REJECTED":
             raise ValidationError("INVALID_EVENT_SENSITIVITY", "ordinary event cannot be constructed as SECRET_REJECTED")
-        ensure_no_secret_material(payload)
+        payload_snapshot = copy.deepcopy(dict(payload))
+        metadata_snapshot = {
+            "source_timestamp": source_timestamp,
+            "source_clock_domain": source_clock_domain,
+            "source_sequence_scope": source_sequence_scope,
+            "backend_epoch": self.backend_epoch,
+            "adapter_id": self.adapter_id,
+            "adapter_generation": self.adapter_generation,
+            "runtime_instance_id": runtime_instance_id,
+            "session_epoch": session_epoch,
+            "run_id": run_id,
+            "experiment_id": experiment_id,
+            "step_id": step_id,
+            "stimulus_id": stimulus_id,
+            "kind": kind,
+            "sensitivity": sensitivity,
+            "payload": payload_snapshot,
+        }
+        ensure_no_secret_material(metadata_snapshot, key_path="event")
         self._ingest_seq += 1
         is_late = self.state != "ACTIVE" if late is None else bool(late)
         event = Event(
@@ -172,7 +191,7 @@ class Recorder:
             stimulus_id=stimulus_id,
             kind=kind,
             sensitivity=sensitivity,
-            payload=dict(payload),
+            payload=payload_snapshot,
         )
         if self.state == "FINALIZED":
             self.supplemental_events.append(event)

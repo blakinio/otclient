@@ -166,24 +166,26 @@ class ScenarioEngine:
             scenario.side_effect_budget,
             mutation_capable=scenario.mutation_capable,
         )
-        identity = self.adapter.identity()
-        self.artifacts.create_run(
-            run_id=run_id,
-            scenario_id=scenario.scenario_id,
-            scenario_hash=scenario.scenario_hash,
-            scenario_ast=scenario.ast,
-            adapter_identity=self._identity_mapping(identity),
-            backend_epoch=self.coordinator.backend_epoch,
-            initial_control_generation=self.coordinator.control_generation,
-            started_monotonic_ns=run.budget.started_monotonic_ns,
-            privacy_policy=scenario.ast["privacy_policy"],
-        )
+        artifact_created = False
         action_results: dict[str, ActionResult] = {}
         assertions: dict[str, bool] = {}
         reason_codes: list[str] = []
         last_snapshot: Mapping[str, Any] | None = None
         status = "PASS"
         try:
+            identity = self.adapter.identity()
+            self.artifacts.create_run(
+                run_id=run_id,
+                scenario_id=scenario.scenario_id,
+                scenario_hash=scenario.scenario_hash,
+                scenario_ast=scenario.ast,
+                adapter_identity=self._identity_mapping(identity),
+                backend_epoch=self.coordinator.backend_epoch,
+                initial_control_generation=self.coordinator.control_generation,
+                started_monotonic_ns=run.budget.started_monotonic_ns,
+                privacy_policy=scenario.ast["privacy_policy"],
+            )
+            artifact_created = True
             current = self._snapshot_mapping(self.adapter.snapshot())
             for raw in scenario.ast["preconditions"]:
                 predicate, _ = validate_predicate(raw, safety_context=True)
@@ -297,6 +299,7 @@ class ScenarioEngine:
                 budget_summary=self._budget_summary(run_id),
                 assertions=assertions,
                 safety_actions=self.coordinator.store.action_ledgers,
+                reason_codes=reason_codes,
             )
             return EngineRunResult(
                 run_id,
@@ -307,7 +310,8 @@ class ScenarioEngine:
                 artifact_result,
             )
         except Exception:
-            self.artifacts.mark_crash(run_id)
+            if artifact_created:
+                self.artifacts.mark_crash(run_id)
             raise
         finally:
             self.coordinator.finish_run(run_id)

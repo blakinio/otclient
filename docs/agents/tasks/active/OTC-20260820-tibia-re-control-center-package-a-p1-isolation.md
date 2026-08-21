@@ -47,12 +47,12 @@ execution_budget_reason: owner-authorized fresh isolation after parent task exha
 invocation_started_at: 2026-08-20T21:37:00+02:00
 last_progress_at: 2026-08-21T07:40:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: isolation_cycle3_repair_pending
+ci_check_generation: isolation_cycle3_candidate_pending_ci
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 2
+repair_cycles_for_current_gate: 3
 context_reconstruction_attempts: 0
 stall_warnings: 0
 validation_level: full
@@ -94,12 +94,12 @@ Repair the owner-authorized Package A isolation findings without expanding runti
 - [x] Final safety hook is followed by a fresh fail-closed recheck of dispatch fences and safety state before durable commit.
 - [x] Canonical ActionRequest hash is recomputed from request semantics before any ledger deduplication/result reuse.
 - [x] All serialized adapter/runtime/session identity metadata is privacy-scanned before RunArtifact construction.
-- [ ] Artifact-construction rejection always releases the admitted mutation-run lease.
-- [ ] Run admission linearizes with STOP and STOP-cancelled runs remain terminal after reset.
-- [ ] All serialized event metadata is privacy-scanned before Event construction.
-- [ ] Result-v1 preserves concrete failure reason codes.
-- [ ] Action semantics and artifact metadata are snapshotted before hash/privacy validation and reused through dispatch/persistence.
-- [ ] Focused regressions, full Package A tests, audits, Ruff and diff-check PASS on the new exact head.
+- [x] Artifact-construction rejection always releases the admitted mutation-run lease.
+- [x] Run admission linearizes with STOP and STOP-cancelled runs remain terminal after reset.
+- [x] All serialized event metadata is privacy-scanned before Event construction.
+- [x] Result-v1 preserves concrete failure reason codes.
+- [x] Action semantics and artifact metadata are snapshotted before hash/privacy validation and reused through dispatch/persistence.
+- [x] Focused regressions, full Package A tests, audits, Ruff and diff-check PASS on the new exact head.
 - [ ] Fresh independent exact-head audit has zero material findings.
 - [ ] Parent PR #628 is returned to Ready only after this isolation task is terminally clean.
 
@@ -119,17 +119,17 @@ recovery:
   session_started_at: 2026-08-21T07:35:00+02:00
   checkpointed_at: 2026-08-21T07:40:00+02:00
   last_progress_at: 2026-08-21T07:40:00+02:00
-  phase: repair
+  phase: validate
   exact_head: bed5d3d4f11170fe2aa6c4bc3436b608ea1a563c
   pull_request: 628
-  active_operation: apply repair cycle 3 through an owned one-shot GitHub workflow, remove that workflow in the repair commit, then validate the resulting exact head
+  active_operation: publish exact-head cycle-3 candidate, then run exact-head CI and fresh independent review
   external_run_ids: []
   operation_started_at: 2026-08-21T07:40:00+02:00
   wait_deadline_at: null
-  check_generation: isolation_cycle3_repair_pending
+  check_generation: isolation_cycle3_candidate_pending_ci
   checks_used: 0
   status: active
   safe_to_resume: true
   resume_condition: PR #628 remains Draft and this isolation task remains sole writer for delegated repair paths
-  next_action: create and run the owned one-shot repair workflow, then trigger exact-head CI and fresh independent review
+  next_action: trigger exact-head CI and fresh independent Codex review; close isolation only if both are clean
 ```

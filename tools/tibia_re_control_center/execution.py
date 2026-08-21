@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import threading
 import uuid
 from collections.abc import Callable
@@ -520,6 +521,7 @@ class MutationCoordinator:
         token: CancellationToken | None = None,
         final_commit_check: Callable[[], str | None] | None = None,
     ) -> ActionResult:
+        request = replace(request, parameters=copy.deepcopy(dict(request.parameters)))
         run = self._run(request.run_id)
         canonical_request_hash = action_request_hash(
             schema_version=request.schema_version,
@@ -755,7 +757,7 @@ class MutationCoordinator:
 
     def stop_all(self, *, transition_id: str | None = None, reason_code: str = "STOP_ALL") -> bool:
         persisted = False
-        with self.control_transition_lock, self.dispatch_gate:
+        with self.run_admission_lock, self.control_transition_lock, self.dispatch_gate:
             self.in_memory_stop = True
             self.mutation_disabled = True
             self.stop_cleanup_in_progress = True
@@ -782,8 +784,8 @@ class MutationCoordinator:
                     self.control_state = next_state
                     self.stop_durability_unresolved = False
                     persisted = True
-        for run in self.runs.values():
-            run.cancelled = True
+            for run in self.runs.values():
+                run.cancelled = True
         try:
             self.adapter.emergency_stop(reason_code)
         except Exception:  # noqa: BLE001 -- failed cleanup must keep STOP fail-closed
@@ -835,8 +837,6 @@ class MutationCoordinator:
                 self.control_state = next_state
                 self.in_memory_stop = False
                 self.mutation_disabled = False
-                for run in self.runs.values():
-                    run.cancelled = False
                 return True
 
     def pause_run(self, run_id: str) -> None:
@@ -844,6 +844,8 @@ class MutationCoordinator:
 
     def resume_run(self, run_id: str) -> bool:
         run = self._run(run_id)
+        if run.cancelled:
+            return False
         if self._deadline_expired(run):
             return False
         identity = self.adapter.identity()

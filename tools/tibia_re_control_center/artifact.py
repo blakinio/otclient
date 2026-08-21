@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
@@ -74,18 +75,21 @@ class ArtifactStore:
         privacy_policy: Mapping[str, Any],
     ) -> RunArtifact:
         validate_opaque_id(run_id, field_name="run_id")
+        scenario_ast_snapshot = copy.deepcopy(dict(scenario_ast))
+        adapter_identity_snapshot = copy.deepcopy(dict(adapter_identity))
+        privacy_policy_snapshot = copy.deepcopy(dict(privacy_policy))
         ensure_no_secret_material(
             {
                 "run_id": run_id,
                 "scenario_id": scenario_id,
-                "adapter_identity": adapter_identity,
+                "adapter_identity": adapter_identity_snapshot,
                 "backend_epoch": backend_epoch,
             },
             key_path="artifact_metadata",
         )
-        privacy_scan_ast = {key: value for key, value in scenario_ast.items() if key != "privacy_policy"}
+        privacy_scan_ast = {key: value for key, value in scenario_ast_snapshot.items() if key != "privacy_policy"}
         ensure_no_secret_material(privacy_scan_ast, key_path="scenario")
-        if scenario_hash != sha256_jcs(scenario_ast):
+        if scenario_hash != sha256_jcs(scenario_ast_snapshot):
             raise ValidationError("SCENARIO_HASH_CONTRADICTION", "scenario hash does not match canonical Scenario-v1 AST")
         if run_id in self.runs:
             existing = self.runs[run_id]
@@ -96,14 +100,14 @@ class ArtifactStore:
             run_id=run_id,
             scenario_id=scenario_id,
             scenario_hash=scenario_hash,
-            scenario_ast=dict(scenario_ast),
-            adapter_identity=dict(adapter_identity),
+            scenario_ast=scenario_ast_snapshot,
+            adapter_identity=adapter_identity_snapshot,
             backend_epoch=backend_epoch,
             initial_control_generation=initial_control_generation,
             started_monotonic_ns=started_monotonic_ns,
-            privacy_policy=dict(privacy_policy),
+            privacy_policy=privacy_policy_snapshot,
         )
-        run.stage["scenario.json"] = jcs_dumps(scenario_ast).encode("utf-8")
+        run.stage["scenario.json"] = jcs_dumps(scenario_ast_snapshot).encode("utf-8")
         self.runs[run_id] = run
         return run
 
@@ -178,6 +182,7 @@ class ArtifactStore:
         privacy_ok: bool = True,
         cleanup_ok: bool = True,
         safety_actions: Mapping[str, ActionLedgerRecord] | None = None,
+        reason_codes: list[str] | tuple[str, ...] | None = None,
     ) -> Mapping[str, Any]:
         run = self.runs[run_id]
         if run.state == RunArtifactState.FINALIZED:
@@ -219,7 +224,7 @@ class ArtifactStore:
                 "run_id": run_id,
                 "status": status,
                 "first_failure_step_id": None,
-                "reason_codes": [] if status == "PASS" else [status],
+                "reason_codes": [] if status == "PASS" else list(reason_codes or (status,)),
                 "assertions": dict(assertions or {}),
                 "action_outcomes": action_projection,
                 "budget_outcome": dict(budget_summary),

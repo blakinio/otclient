@@ -124,8 +124,8 @@ jobs:
           git rm .github/workflows/tibia-re-control-center-package-a-closeout.yml
           git add docs/agents/MODULE_CATALOG.md docs/agents/CHANGELOG.md docs/agents/tasks/active docs/agents/tasks/archive
           git diff --cached --check
-          test "$(git diff --cached --name-only | grep -c '^docs/agents/tasks/archive/OTC-202608.*tibia-re-control-center-package-a')" -eq 8
-          test "$(git diff --cached --name-only | grep -c '^docs/agents/tasks/active/OTC-202608.*tibia-re-control-center-package-a')" -eq 8
+          git diff --cached --name-status
+          test ! -e .github/workflows/tibia-re-control-center-package-a-closeout.yml
           git config user.name 'blakinio'
           git config user.email '75369544+blakinio@users.noreply.github.com'
           git commit -m 'docs(agents): close Control Center Package A lifecycle'

@@ -9,24 +9,22 @@ from tools.tibia_re_surveyor.action_protocol import (
 )
 
 
-STRINGS = f"1000 {TYPE_NAME}\n2000 {MANGLED_TYPE_NAME}\n"
-RELOCS = (
-    "0000000000003008  0000000000000008 R_X86_64_RELATIVE                    2000\n"
-    "0000000000004008  0000000000000008 R_X86_64_RELATIVE                    3000\n"
-    "0000000000004010  0000000000000008 R_X86_64_RELATIVE                    5000\n"
-)
-
-
 class ActionProtocolReaderTests(unittest.TestCase):
     def test_available_reader_keeps_structural_semantic_boundary(self):
         calls = []
 
         def runner(command):
             calls.append(command)
-            if command[3] == "strings":
-                return STRINGS
-            if command[3] == "readelf":
-                return RELOCS
+            if len(calls) == 1:
+                return json.dumps(
+                    {
+                        "state": "AVAILABLE",
+                        "type_name": TYPE_NAME,
+                        "mangled_name": MANGLED_TYPE_NAME,
+                        "vptr_offset": 0x4010,
+                        "typeinfo_offset": 0x3000,
+                    }
+                )
             return json.dumps(
                 {
                     "state": "AVAILABLE",
@@ -48,17 +46,43 @@ class ActionProtocolReaderTests(unittest.TestCase):
         self.assertFalse(doc["packet_payloads_retained"])
         self.assertFalse(doc["in_game_claimed"])
         self.assertFalse(doc["semantic_promotion_allowed"])
-        self.assertEqual(3, len(calls))
+        self.assertEqual("0x4010", doc["layout_evidence"]["vptr_offset"])
+        self.assertEqual("0x3000", doc["layout_evidence"]["typeinfo_offset"])
+        self.assertEqual(2, len(calls))
+        self.assertEqual("python3", calls[0][3])
+        self.assertEqual("python3", calls[1][3])
 
     def test_static_resolution_failure_returns_unavailable(self):
         def runner(command):
-            if command[3] == "strings":
-                return ""
-            return RELOCS
+            raise RuntimeError("static parser failed")
 
         doc = read_action_protocol(pid=123, start_ticks=456, runner=runner)
         self.assertEqual("UNAVAILABLE", doc["state"])
-        self.assertTrue(doc["reason"].startswith("READ_FAILED:"))
+        self.assertEqual("STATIC_LAYOUT_FAILED:RuntimeError", doc["reason"])
+        self.assertFalse(doc["semantic_promotion_allowed"])
+
+    def test_live_probe_failure_preserves_static_layout_evidence(self):
+        calls = []
+
+        def runner(command):
+            calls.append(command)
+            if len(calls) == 1:
+                return json.dumps(
+                    {
+                        "state": "AVAILABLE",
+                        "type_name": TYPE_NAME,
+                        "mangled_name": MANGLED_TYPE_NAME,
+                        "vptr_offset": 0x4010,
+                        "typeinfo_offset": 0x3000,
+                    }
+                )
+            raise RuntimeError("live probe failed")
+
+        doc = read_action_protocol(pid=123, start_ticks=456, runner=runner)
+        self.assertEqual("UNAVAILABLE", doc["state"])
+        self.assertEqual("LIVE_TYPED_PROBE_FAILED:RuntimeError", doc["reason"])
+        self.assertEqual("0x4010", doc["layout_evidence"]["vptr_offset"])
+        self.assertEqual("0x3000", doc["layout_evidence"]["typeinfo_offset"])
         self.assertFalse(doc["semantic_promotion_allowed"])
 
 

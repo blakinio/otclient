@@ -1,7 +1,7 @@
 ---
 task_id: OTC-20260821-surveyor-next-nonoverlap-gap
-status: validating
-phase: validating
+status: implementing
+phase: physical-repair
 agent: ChatGPT
 project_lane: otclient
 lane: P0-SURVEYOR
@@ -9,24 +9,24 @@ track_id: official-client-re
 task_kind: implementation
 risk: medium
 policy_version: 2
-branch: feat/OTC-20260821-surveyor-next-nonoverlap-gap
-base_main: dce8bbd0e78ceea3681a1fe1dab40d3c19ed7458
+branch: fix/OTC-20260821-surveyor-ui-settings-physical
+base_main: 1cb56f652784ca1baeaf59a777e4c0b5b8ab312e
 execution_mode: chat
 execution_reason: live GitHub coordination plus deterministic repository/static discovery; physical evidence is deferred until a selected reader is merged
-execution_class: github_hosted
+execution_class: synology_physical_runtime
 persistent_session_role: consumer_of_runtime_evidence
 physical_e2e_required: true
-runtime_access: none
+runtime_access: read_only
 runtime_owner_task: NOT_APPLICABLE
-runtime_namespace: NOT_APPLICABLE
-canonical_registration: NOT_APPLICABLE
-canonical_lease_generation: NOT_APPLICABLE
-registration_lease_generation: NOT_APPLICABLE
+runtime_namespace: synology:otclient-track-a-kasmvnc:display-1:client-19590
+canonical_registration: PRESENT
+canonical_lease_generation: 19
+registration_lease_generation: 19
 gate_a: NOT_APPLICABLE
 generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
-target_uniqueness: NOT_APPLICABLE
+target_uniqueness: PROVEN
 mutation_authorized: false
 gui_input_authorized: false
 process_control_authorized: false
@@ -63,9 +63,9 @@ estimate_confidence: medium
 decomposition_decision: phased
 decomposition_reason: discovery selected one non-overlapping reader; the same task now owns implementation through validation, physical acceptance and closeout
 invocation_started_at: 2026-08-21T22:05:00+02:00
-last_progress_at: 2026-08-21T22:12:47+02:00
+last_progress_at: 2026-08-21T22:28:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: remediation_head_pending
+ci_check_generation: physical_repair_discovery
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -73,7 +73,7 @@ identical_failure_retries: 0
 repair_cycles_for_current_gate: 1
 context_reconstruction_attempts: 1
 stall_warnings: 0
-next_action: commit and push AUD-658-001/AUD-658-002 remediation, resolve addressed threads, then obtain a fresh independent exact-head re-audit and CI/governance PASS
+next_action: inspect only fixed-path filesystem metadata under the freshly admitted exact runtime, identify the parent-layout cause of CLIENTOPTIONS_PARENT_OPEN_FAILED, then implement the smallest fail-closed repair
 ---
 
 # Surveyor v2 next non-overlap typed-reader slice
@@ -89,7 +89,7 @@ The current owner request authorizes the bounded Surveyor continuation and read-
 ## Discovery acceptance
 
 - Current `main` is the source of truth; historical gap counts and runtime IDs are discovery evidence only.
-- Run repository-only `--collect-all` first under `runtime_access: none`.
+- Run repository-only `--collect-all` first under `runtime_access: read_only`.
 - Inspect live open PRs and active task ownership before selecting a reader.
 - Exclude `world_minimap_typed_reader` while #475/#593 or successor ownership overlaps remain active.
 - Rank by canonical P0/P1 blocker impact, downstream rows, exact-current-build evidence, bounded read-only discrimination feasibility, implementation size and non-overlap.
@@ -123,3 +123,11 @@ Fresh validator review `PRR_kwDOTVmdjs8AAAABKddk8A` on head `e91504bb8dcfcb7d582
 Both are repaired in the current working candidate. Accepted static/live probe payloads now require exact key sets and are rebuilt from allowlisted scalar values. The settings file is opened by no-follow directory descriptors from passwd home through the fixed path, then validated as a regular file owned by the target uid. Post-repair focused tests are 8/8 PASS; all Surveyor tests 59/59 PASS; compileall, collect-all 169/12/7, privacy, Track A governance and `git diff --check` are PASS.
 
 The original review is not reused as a passing audit because code changed. Fresh exact-head re-audit is mandatory before merge.
+
+## First trusted-main physical acceptance ? repair required
+
+Implementation PR #658 merged as `1cb56f652784ca1baeaf59a777e4c0b5b8ab312e`. Trusted-main workflow run `32523208150`, job `96899728966`, re-proved one exact client PID `19590`, start ticks `76611792`, exact size/SHA, one matching X11 window, canonical registration generation `2`, lease generation `19`, `runtime_access=read_only`, target uniqueness `PROVEN`, and `mutation_authorized=false`.
+
+The workflow itself completed successfully and the sanitized artifact `9461336737` (digest `sha256:e10a836244c454056e09202f5f179c16852b743db9016e30c004b1fa3d19690f`) passed privacy with 169 rows / 12 aliases / 7 missing reader implementations. However, task-level E2E is **not PASS**: `ui_settings_typed_reader` returned `UNAVAILABLE / LIVE_SETTINGS_READ_FAILED:CLIENTOPTIONS_PARENT_OPEN_FAILED`. Static `TClientOptions` evidence remained AVAILABLE. No gameplay input, relogin, restart, process control, process-memory write, credential access, network mutation or economy action occurred.
+
+This is physical repair cycle 1. The current read-only admission is persisted only to inspect the fixed-path filesystem metadata needed to explain that fail-closed result; mutation remains forbidden.

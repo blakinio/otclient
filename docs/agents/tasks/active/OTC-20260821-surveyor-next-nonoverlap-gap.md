@@ -1,7 +1,7 @@
 ---
 task_id: OTC-20260821-surveyor-next-nonoverlap-gap
-status: implementing
-phase: physical-repair
+status: validating
+phase: auditing
 agent: ChatGPT
 project_lane: otclient
 lane: P0-SURVEYOR
@@ -12,21 +12,21 @@ policy_version: 2
 branch: fix/OTC-20260821-surveyor-ui-settings-physical
 base_main: 1cb56f652784ca1baeaf59a777e4c0b5b8ab312e
 execution_mode: chat
-execution_reason: live GitHub coordination plus deterministic repository/static discovery; physical evidence is deferred until a selected reader is merged
-execution_class: synology_physical_runtime
+execution_reason: physical failure is isolated and repaired; exact-head deterministic validation/audit is repository-hosted until post-merge trusted-main reacceptance
+execution_class: github_hosted
 persistent_session_role: consumer_of_runtime_evidence
 physical_e2e_required: true
-runtime_access: read_only
+runtime_access: none
 runtime_owner_task: NOT_APPLICABLE
-runtime_namespace: synology:otclient-track-a-kasmvnc:display-1:client-19590
-canonical_registration: PRESENT
-canonical_lease_generation: 19
-registration_lease_generation: 19
+runtime_namespace: NOT_APPLICABLE
+canonical_registration: NOT_APPLICABLE
+canonical_lease_generation: NOT_APPLICABLE
+registration_lease_generation: NOT_APPLICABLE
 gate_a: NOT_APPLICABLE
 generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
-target_uniqueness: PROVEN
+target_uniqueness: NOT_APPLICABLE
 mutation_authorized: false
 gui_input_authorized: false
 process_control_authorized: false
@@ -63,9 +63,9 @@ estimate_confidence: medium
 decomposition_decision: phased
 decomposition_reason: discovery selected one non-overlapping reader; the same task now owns implementation through validation, physical acceptance and closeout
 invocation_started_at: 2026-08-21T22:05:00+02:00
-last_progress_at: 2026-08-21T22:32:00+02:00
+last_progress_at: 2026-08-21T22:36:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: physical_repair_discovery
+ci_check_generation: repair_exact_head
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -73,7 +73,7 @@ identical_failure_retries: 0
 repair_cycles_for_current_gate: 1
 context_reconstruction_attempts: 1
 stall_warnings: 0
-next_action: validate the executable-package-root repair locally, push the exact repair head, obtain fresh exact-head audit/CI, merge, then rerun trusted-main read-only physical acceptance
+next_action: obtain fresh independent exact-head audit plus CI/governance PASS for repair #659, merge if clean, then rerun trusted-main read-only physical acceptance
 ---
 
 # Surveyor v2 next non-overlap typed-reader slice
@@ -89,7 +89,7 @@ The current owner request authorizes the bounded Surveyor continuation and read-
 ## Discovery acceptance
 
 - Current `main` is the source of truth; historical gap counts and runtime IDs are discovery evidence only.
-- Run repository-only `--collect-all` first under `runtime_access: read_only`.
+- Run repository-only `--collect-all` first under `runtime_access: none`.
 - Inspect live open PRs and active task ownership before selecting a reader.
 - Exclude `world_minimap_typed_reader` while #475/#593 or successor ownership overlaps remain active.
 - Rank by canonical P0/P1 blocker impact, downstream rows, exact-current-build evidence, bounded read-only discrimination feasibility, implementation size and non-overlap.

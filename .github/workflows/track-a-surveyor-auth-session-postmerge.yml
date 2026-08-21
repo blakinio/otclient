@@ -1,17 +1,19 @@
-name: Track A Surveyor auth-session physical acceptance
+name: Track A Surveyor auth-session direct physical acceptance
 
 on:
-  issue_comment:
-    types: [created]
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize]
 
 permissions:
   contents: read
 
 concurrency:
-  group: track-a-surveyor-auth-session-physical-acceptance
+  group: track-a-surveyor-auth-session-direct-physical
   cancel-in-progress: false
 
 env:
+  TRUSTED_MAIN_SHA: 301e3f57d4537b9cc1d97a320c0cc8060feb2026
   IMPLEMENTATION_SHA: 16f83cf70548cbbe1eb6cb3838d27fbe6e0430e3
   EXPECTED_SHA: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
   EXPECTED_SIZE: '52109920'
@@ -20,57 +22,28 @@ env:
   DISPLAY_NAME: ':1'
   CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime
   RUNTIME_TASK_ID: OTC-20260820-surveyor-auth-session-reader
-  REPORT_PR: '641'
 
 jobs:
   authority:
     if: >-
+      false &&
       github.actor == 'blakinio' &&
-      github.event.issue.number == 641 &&
-      github.event.issue.pull_request != null &&
-      github.event.comment.body == 'ONE_SHOT_SURVEYOR_AUTH_READ_ONLY'
+      github.event.pull_request.base.ref == 'main' &&
+      github.event.pull_request.base.sha == '301e3f57d4537b9cc1d97a320c0cc8060feb2026' &&
+      github.event.pull_request.head.repo.full_name == 'blakinio/otclient' &&
+      github.event.pull_request.head.ref == 'test/OTC-20260820-surveyor-auth-session-direct-pr-e2e'
     runs-on: ubuntu-24.04
     timeout-minutes: 2
-    permissions:
-      contents: read
-      issues: write
     steps:
-      - name: Validate immutable owner comment trigger
+      - name: Validate exact owner-controlled trigger
         shell: bash
         run: |
           set -Eeuo pipefail
           test "$GITHUB_REPOSITORY" = 'blakinio/otclient'
-          test "$GITHUB_REF" = 'refs/heads/main'
           echo AUTHORIZATION_GATE=PASS
-          echo TRUSTED_BASE_WORKFLOW=true
-          echo PR_CODE_EXECUTED=false
+          echo TRUSTED_MAIN_SHA="$TRUSTED_MAIN_SHA"
+          echo PR_HEAD_CODE_EXECUTED=false
           echo RUNTIME_MUTATION=false
-
-      - name: Publish authorized run id
-        shell: bash
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -Eeuo pipefail
-          python3 - <<'PY'
-          import json, os, urllib.request
-          repo=os.environ['GITHUB_REPOSITORY']; run=os.environ['GITHUB_RUN_ID']; pr=os.environ['REPORT_PR']
-          sha=os.environ['GITHUB_SHA']; implementation=os.environ['IMPLEMENTATION_SHA']
-          body=(
-              '## Auth/session physical acceptance authorized\n\n'
-              f'Run: `{run}`  \nTrusted-base SHA: `{sha}`  \nImplementation merge: `{implementation}`\n\n'
-              '**State: AUTHORIZED — physical read-only job pending/running**\n\n'
-              'This marker is not acceptance evidence. The physical job must still return PASS.'
-          )
-          data=json.dumps({'body':body}).encode()
-          req=urllib.request.Request(
-              f'https://api.github.com/repos/{repo}/issues/{pr}/comments', data=data, method='POST',
-              headers={'Authorization':'Bearer '+os.environ['GITHUB_TOKEN'],'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','User-Agent':'otclient-surveyor-readonly'}
-          )
-          with urllib.request.urlopen(req, timeout=30) as response:
-              if response.status not in (200,201): raise SystemExit('RUN_ID_REPORT_FAILED='+str(response.status))
-          print('AUTHORIZED_RUN_ID_REPORT=PASS')
-          PY
 
   acceptance:
     needs: authority
@@ -79,8 +52,6 @@ jobs:
     timeout-minutes: 8
     permissions:
       contents: read
-    outputs:
-      acceptance_json: ${{ steps.assert.outputs.acceptance_json }}
     steps:
       - name: Declare immutable read-only authority
         shell: bash
@@ -94,23 +65,23 @@ jobs:
           echo PROCESS_MEMORY_WRITE=false
           echo NETWORK_MUTATION=false
           echo RUNTIME_MUTATION=false
-          echo PR_CODE_EXECUTED=false
+          echo PR_HEAD_CODE_EXECUTED=false
 
-      - name: Checkout exact trusted base
+      - name: Checkout exact trusted main
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ env.TRUSTED_MAIN_SHA }}
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Prove implementation ancestry and trusted checkout
+      - name: Prove trusted checkout and implementation ancestry
         shell: bash
         run: |
           set -Eeuo pipefail
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git merge-base --is-ancestor "$IMPLEMENTATION_SHA" "$GITHUB_SHA"
-          echo IMPLEMENTATION_ANCESTRY=PASS
+          test "$(git rev-parse HEAD)" = "$TRUSTED_MAIN_SHA"
+          git merge-base --is-ancestor "$IMPLEMENTATION_SHA" "$TRUSTED_MAIN_SHA"
           echo TRUSTED_CHECKOUT=PASS
+          echo IMPLEMENTATION_ANCESTRY=PASS
 
       - name: Prove safe canonical control state and exact target
         id: target
@@ -194,11 +165,13 @@ jobs:
             echo "start=$start"
             echo "exe=$exe"
           } >> "$GITHUB_OUTPUT"
+          echo TARGET_PID="$pid"
+          echo TARGET_START_TICKS="$start"
+          echo TARGET_EXECUTABLE="$exe"
           echo PROCESS_ENVIRONMENT_READ=false
           echo WINDOW_TITLE_VALUE_RETAINED=false
 
       - name: Run passive collect-all and assert implementation causal delta
-        id: assert
         shell: bash
         env:
           TARGET_PID: ${{ steps.target.outputs.pid }}
@@ -214,10 +187,10 @@ jobs:
             --control-container "$CONTROL_CONTAINER" \
             --display "$DISPLAY_NAME" \
             --output-dir "$out"
-          python3 - "$out" "$RUNNER_TEMP/control.json" "$TARGET_PID" "$TARGET_START" "$TARGET_EXE" "$IMPLEMENTATION_SHA" "$GITHUB_SHA" "$GITHUB_OUTPUT" <<'PY'
+          python3 - "$out" "$RUNNER_TEMP/control.json" "$TARGET_PID" "$TARGET_START" "$TARGET_EXE" "$IMPLEMENTATION_SHA" "$TRUSTED_MAIN_SHA" <<'PY'
           import json,pathlib,sys
           root=pathlib.Path(sys.argv[1]); control=json.loads(pathlib.Path(sys.argv[2]).read_text())
-          pid=int(sys.argv[3]); start=int(sys.argv[4]); exe=sys.argv[5]; implementation_sha=sys.argv[6]; acceptance_sha=sys.argv[7]; output=pathlib.Path(sys.argv[8])
+          pid=int(sys.argv[3]); start=int(sys.argv[4]); exe=sys.argv[5]; implementation_sha=sys.argv[6]; acceptance_sha=sys.argv[7]
           privacy=json.loads((root/'privacy-scan.json').read_text())
           missing=json.loads((root/'missing-readers.json').read_text())
           auth=json.loads((root/'telemetry'/'auth-session.json').read_text())
@@ -258,16 +231,8 @@ jobs:
           }
           (root/'acceptance.json').write_text(json.dumps(result,indent=2,sort_keys=True)+'\n')
           compact=json.dumps(result,separators=(',',':'),sort_keys=True)
-          with output.open('a',encoding='utf-8') as handle: handle.write('acceptance_json='+compact+'\n')
           print('POSTMERGE_AUTH_SESSION_E2E=PASS')
-          print('CANONICAL_ROWS=169')
-          print('ALIASES=12')
-          print('AUTH_TYPED_READER=AVAILABLE')
-          print('MISSING_TYPED_READERS=9')
-          print('PRIVACY_SCAN=PASS')
-          print('AUTH_STATE_MACHINE_RUNNING='+str(result['authentication_state_machine_running']).lower())
-          print('IN_GAME_CLAIMED=false')
-          print('RUNTIME_MUTATION=false')
+          print('ACCEPTANCE_JSON='+compact)
           PY
 
       - name: Upload sanitized acceptance bundle
@@ -277,66 +242,3 @@ jobs:
           path: ${{ runner.temp }}/tibia-re-surveyor-auth-session-postmerge/
           if-no-files-found: error
           retention-days: 3
-
-  report:
-    needs: [authority, acceptance]
-    if: ${{ always() }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 2
-    permissions:
-      contents: read
-      issues: write
-    steps:
-      - name: Publish sanitized final verdict
-        shell: bash
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          AUTHORITY_RESULT: ${{ needs.authority.result }}
-          ACCEPTANCE_RESULT: ${{ needs.acceptance.result }}
-          ACCEPTANCE_JSON: ${{ needs.acceptance.outputs.acceptance_json }}
-        run: |
-          set -Eeuo pipefail
-          python3 - <<'PY'
-          import json,os,urllib.request
-          repo=os.environ['GITHUB_REPOSITORY']; run=os.environ['GITHUB_RUN_ID']; pr=os.environ['REPORT_PR']; sha=os.environ['GITHUB_SHA']
-          authority=os.environ.get('AUTHORITY_RESULT',''); acceptance=os.environ.get('ACCEPTANCE_RESULT',''); raw=os.environ.get('ACCEPTANCE_JSON','')
-          if authority=='success' and acceptance=='success' and raw:
-              r=json.loads(raw)
-              body=(
-                  '## Auth/session physical read-only acceptance\n\n'
-                  f"Run: `{run}`  \nTrusted-base SHA: `{r['acceptance_trusted_main_sha']}`  \nImplementation merge: `{r['implementation_merge_sha']}`\n\n"
-                  '**Result: PASS**\n\n'
-                  f"- exact target PID/start: `{r['pid']}` / `{r['process_start_ticks']}`\n"
-                  f"- executable: `{r['executable_path']}`\n"
-                  f"- client size/SHA: `{r['client_size']}` / `{r['client_sha256']}`\n"
-                  f"- display / matching visible windows: `{r['display']}` / `{r['visible_matching_windows']}`\n"
-                  f"- target uniqueness: `{r['target_uniqueness']}`; runtime owner: `{r['runtime_owner_task']}`\n"
-                  f"- canonical registration present/generation/state: `{r['canonical_registration_present']}` / `{r['canonical_registration_generation']}` / `{r['canonical_registration_state']}`\n"
-                  f"- lease status/generation: `{r['canonical_lease_status']}` / `{r['canonical_lease_generation']}`\n"
-                  f"- canonical rows / aliases: `{r['canonical_rows']}` / `{r['aliases']}`\n"
-                  f"- auth typed reader: `{r['reader_before']} -> {r['reader_after']}`\n"
-                  f"- missing typed readers: `{r['missing_readers_before']} -> {r['missing_readers_after']}`\n"
-                  f"- privacy: `{r['privacy_before']} -> {r['privacy_after']}`\n"
-                  f"- auth state-machine running: `{str(r['authentication_state_machine_running']).lower()}`\n"
-                  f"- semantic state: `{r['semantic_state']}`; IN_GAME claimed: `false`\n"
-                  '- process memory: `read_only`; runtime mutation: `false`; credentials/session secrets retained: `false`\n\n'
-                  'Causal discriminator: implementation availability (`NO_TYPED_READER_IMPLEMENTED -> AVAILABLE`) and gap-count reduction (`10 -> 9`), not a login-state transition.'
-              )
-          else:
-              body=(
-                  '## Auth/session physical read-only acceptance\n\n'
-                  f'Run: `{run}`  \nTrusted-base SHA: `{sha}`\n\n'
-                  '**Result: FAIL — no physical acceptance recorded**\n\n'
-                  f'- authority job: `{authority or "unknown"}`\n'
-                  f'- physical acceptance job: `{acceptance or "unknown"}`\n\n'
-                  'No runtime details are published by this failure path. The run ID is retained for bounded diagnosis.'
-              )
-          data=json.dumps({'body':body}).encode()
-          req=urllib.request.Request(
-              f'https://api.github.com/repos/{repo}/issues/{pr}/comments',data=data,method='POST',
-              headers={'Authorization':'Bearer '+os.environ['GITHUB_TOKEN'],'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','User-Agent':'otclient-surveyor-readonly'}
-          )
-          with urllib.request.urlopen(req,timeout=30) as response:
-              if response.status not in (200,201): raise SystemExit('FINAL_REPORT_COMMENT_FAILED='+str(response.status))
-          print('SANITIZED_FINAL_REPORT_COMMENT=PASS')
-          PY

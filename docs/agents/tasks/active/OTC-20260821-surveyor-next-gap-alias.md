@@ -10,6 +10,16 @@ task_kind: documentation
 risk: low
 policy_version: 2
 runtime_access: none
+runtime_owner_task: NOT_APPLICABLE
+runtime_namespace: NOT_APPLICABLE
+canonical_registration: NOT_APPLICABLE
+canonical_lease_generation: NOT_APPLICABLE
+registration_lease_generation: NOT_APPLICABLE
+gate_a: NOT_APPLICABLE
+generation_rebind: NOT_APPLICABLE
+gate_b: NOT_APPLICABLE
+bootstrap: NOT_APPLICABLE
+target_uniqueness: NOT_APPLICABLE
 mutation_authorized: false
 gui_input_authorized: false
 process_control_authorized: false
@@ -40,7 +50,7 @@ feature_scope:
   e2e_required: false
   completion_claim: internal_only
 invocation_started_at: 2026-08-21T18:55:00Z
-last_progress_at: 2026-08-21T18:55:00Z
+last_progress_at: 2026-08-21T19:01:00Z
 ---
 
 # Surveyor v2 next non-overlap gap alias publication
@@ -66,6 +76,10 @@ The prompt must force live-state recomputation and must not hard-code a next rea
 - action-protocol reader slice is archived and reports 8 remaining typed-reader gaps;
 - active world/minimap work remains represented by Draft PR #475 and Draft PR #593, so a fresh worker must treat that family as overlapping until live state proves otherwise.
 
+## Validation history
+
+Initial governance run `32516182956` failed only because the new Track A task record omitted mandatory no-runtime admission metadata. The fresh admission behavior audit job passed; the deterministic policy audit correctly rejected the incomplete front matter. The prompt and alias content were not implicated.
+
 ## Next action
 
-Create the canonical prompt and alias, review exact diff, run required hosted validation/audit, merge, then archive this documentation task.
+Revalidate the exact new head, run proportionate prompt/content audit, merge after required CI/governance pass, then archive this documentation task.

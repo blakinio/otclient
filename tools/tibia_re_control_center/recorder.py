@@ -152,6 +152,7 @@ class Recorder:
         metadata_snapshot = {
             "source_timestamp": source_timestamp,
             "source_clock_domain": source_clock_domain,
+            "source_sequence": source_sequence,
             "source_sequence_scope": source_sequence_scope,
             "backend_epoch": self.backend_epoch,
             "adapter_id": self.adapter_id,

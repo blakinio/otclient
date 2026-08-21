@@ -35,6 +35,18 @@ def _safe_relative_path(path: str) -> str:
     return "/".join(parts)
 
 
+def _json_object_without_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValidationError(
+                "ARTIFACT_JSON_DUPLICATE_KEY",
+                f"duplicate JSON key is forbidden: {key}",
+            )
+        result[key] = value
+    return result
+
+
 def _admit_public_artifact_bytes(logical: str, data: bytes, *, key_path: str) -> bytes:
     payload = bytes(data)
     try:
@@ -46,7 +58,7 @@ def _admit_public_artifact_bytes(logical: str, data: bytes, *, key_path: str) ->
         ) from exc
     if logical.endswith(".json"):
         try:
-            structured = json.loads(decoded)
+            structured = json.loads(decoded, object_pairs_hook=_json_object_without_duplicate_keys)
         except json.JSONDecodeError as exc:
             raise ValidationError(
                 "ARTIFACT_STRUCTURED_INVALID",
@@ -58,7 +70,7 @@ def _admit_public_artifact_bytes(logical: str, data: bytes, *, key_path: str) ->
             if not line.strip():
                 continue
             try:
-                structured = json.loads(line)
+                structured = json.loads(line, object_pairs_hook=_json_object_without_duplicate_keys)
             except json.JSONDecodeError as exc:
                 raise ValidationError(
                     "ARTIFACT_STRUCTURED_INVALID",

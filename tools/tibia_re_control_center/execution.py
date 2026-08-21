@@ -233,35 +233,35 @@ class MutationCoordinator:
             return run
 
     def recover_run(self, run_id: str, *, mutation_capable: bool = True) -> RunState:
-        activation = self.store.load_run_activation(run_id)
-        ledger = self.store.load_budget(run_id)
-        recovery = self.store.load_recovery(run_id)
-        if activation is None or ledger is None or recovery is None:
-            raise ValidationError("RECOVERY_STATE_MISSING", "run recovery requires original activation, budget, and recovery fences")
-        if (ledger.started_monotonic_ns, ledger.deadline_monotonic_ns) != activation:
-            raise ValidationError("RECOVERY_STATE_CONTRADICTORY", "runtime activation/deadline contradict durable budget state")
-        if bool(recovery.get("mutation_capable")) != mutation_capable:
-            raise ValidationError("RECOVERY_AUTHORITY_CONTRADICTION", "run recovery cannot change mutation capability")
-        identity = self.adapter.identity()
-        origin_matches = (
-            recovery.get("backend_epoch") == self.backend_epoch
-            and recovery.get("control_generation") == self.control_generation
-            and recovery.get("adapter_generation") == identity.adapter_generation
-            and recovery.get("runtime_instance_id") == identity.runtime_instance_id
-            and recovery.get("session_epoch") == identity.session_epoch
-        )
-        run = RunState(
-            run_id,
-            ledger,
-            str(recovery.get("adapter_generation")),
-            recovery.get("runtime_instance_id"),
-            recovery.get("session_epoch"),
-            mutation_capable,
-            cancelled=bool(mutation_capable and (not origin_matches or not self.mutation_admission_allowed())),
-        )
-        self.runs[run_id] = run
-        return run
-
+        with self.run_admission_lock:
+            activation = self.store.load_run_activation(run_id)
+            ledger = self.store.load_budget(run_id)
+            recovery = self.store.load_recovery(run_id)
+            if activation is None or ledger is None or recovery is None:
+                raise ValidationError("RECOVERY_STATE_MISSING", "run recovery requires original activation, budget, and recovery fences")
+            if (ledger.started_monotonic_ns, ledger.deadline_monotonic_ns) != activation:
+                raise ValidationError("RECOVERY_STATE_CONTRADICTORY", "runtime activation/deadline contradict durable budget state")
+            if bool(recovery.get("mutation_capable")) != mutation_capable:
+                raise ValidationError("RECOVERY_AUTHORITY_CONTRADICTION", "run recovery cannot change mutation capability")
+            identity = self.adapter.identity()
+            origin_matches = (
+                recovery.get("backend_epoch") == self.backend_epoch
+                and recovery.get("control_generation") == self.control_generation
+                and recovery.get("adapter_generation") == identity.adapter_generation
+                and recovery.get("runtime_instance_id") == identity.runtime_instance_id
+                and recovery.get("session_epoch") == identity.session_epoch
+            )
+            run = RunState(
+                run_id,
+                ledger,
+                str(recovery.get("adapter_generation")),
+                recovery.get("runtime_instance_id"),
+                recovery.get("session_epoch"),
+                mutation_capable,
+                cancelled=bool(mutation_capable and (not origin_matches or not self.mutation_admission_allowed())),
+            )
+            self.runs[run_id] = run
+            return run
     def finish_run(self, run_id: str) -> None:
         with self.run_admission_lock:
             if self.active_mutation_run_id == run_id:
@@ -484,9 +484,6 @@ class MutationCoordinator:
             if self.clock.now_ns() >= action_deadline_ns:
                 final_commit_refusal_reason[0] = "ACTION_TIMEOUT_EXPIRED"
                 return False
-            if self.clock.now_ns() >= action_deadline_ns:
-                final_commit_refusal_reason[0] = "ACTION_TIMEOUT_EXPIRED"
-                return False
             if self._deadline_expired(run):
                 return False
             capability = self.adapter.capability(request.required_capability)
@@ -509,6 +506,9 @@ class MutationCoordinator:
                 if final_reason is not None:
                     final_commit_refusal_reason[0] = final_reason
                     return False
+            if self.clock.now_ns() >= action_deadline_ns:
+                final_commit_refusal_reason[0] = "ACTION_TIMEOUT_EXPIRED"
+                return False
             record = self.store.load_action(request.action_id)
             if record is None or record.action_request_hash != request.action_request_hash:
                 return False

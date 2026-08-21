@@ -144,6 +144,19 @@ class UiSettingsReaderTests(unittest.TestCase):
         self.assertEqual(TYPE_NAME, doc["static_evidence"]["type_name"])
         self.assertNotIn("secret-noise", json.dumps(doc))
 
+    def test_probe_sources_bind_package_root_to_live_executable_descriptor(self):
+        self.assertIn('exe_fd=os.open(proc_exe,os.O_RDONLY|os.O_CLOEXEC)', READ_ONLY_SETTINGS_PROBE)
+        self.assertIn("exe_st=os.fstat(exe_fd)", READ_ONLY_SETTINGS_PROBE)
+        self.assertIn('bin_fd=os.open("bin",dir_flags,dir_fd=root_fd)', READ_ONLY_SETTINGS_PROBE)
+        self.assertIn('package_exe_fd=os.open("client",file_flags,dir_fd=bin_fd)', READ_ONLY_SETTINGS_PROBE)
+        self.assertIn("package_exe_st=os.fstat(package_exe_fd)", READ_ONLY_SETTINGS_PROBE)
+        self.assertIn(
+            "(package_exe_st.st_dev,package_exe_st.st_ino)!=(exe_st.st_dev,exe_st.st_ino)",
+            READ_ONLY_SETTINGS_PROBE,
+        )
+        self.assertIn("CLIENT_PACKAGE_EXECUTABLE_IDENTITY_MISMATCH", READ_ONLY_SETTINGS_PROBE)
+        self.assertIn("CLIENT_EXE_IDENTITY_CHANGED", READ_ONLY_SETTINGS_PROBE)
+
     def test_probe_sources_are_read_only_allowlisted_and_do_not_read_process_memory(self):
         self.assertIn("os.O_RDONLY", READ_ONLY_SETTINGS_PROBE)
         self.assertIn("os.O_NOFOLLOW", READ_ONLY_SETTINGS_PROBE)

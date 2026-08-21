@@ -1,17 +1,17 @@
 ---
 task_id: OTC-20260821-control-center-parallel-agent-prompts
-status: validating
+status: waiting
 agent: ChatGPT
 project_lane: otclient
 lane: CONTROL-CENTER-PARALLEL-PROMPTS
 track_id: official-client-re
 task_kind: prompting_coordination
-phase: validation
+phase: auditing
 risk: medium
 branch: docs/control-center-parallel-agent-prompts-20260821
 base_branch: main
 created: 2026-08-21T17:45:00+02:00
-updated: 2026-08-21T18:08:00+02:00
+updated: 2026-08-21T18:18:00+02:00
 initial_base_sha: 532b54fa60d11ae10227ab16dc02cd0cadf39b23
 related_pr: 650
 runtime_access: none
@@ -61,7 +61,7 @@ reuses:
 depends_on:
   - main includes terminal Control Center Package A lifecycle closeout at 532b54fa60d11ae10227ab16dc02cd0cadf39b23
 blocks:
-  - direct owner launch of dedicated Package B, Package C and Package D-preparation workers by short alias
+  - direct owner launch of dedicated Package B, Package C and Package D-preparation workers from trusted main by short alias until PR #650 is independently audited and merged
 cross_repository_tasks: []
 ownership_released: false
 prompt_contract:
@@ -116,18 +116,27 @@ complete_user_facing_feature: false
 - [x] Dependency order makes B/C parallel, D-prep parallel-static, and real D runtime gated after dependency/authority revalidation.
 - [x] Prompts preserve Control Center Scenario/Execution/Artifact/Policy safety and forbid adapter/raw-action bypasses.
 - [x] Prompt evaluation includes success, overlap, stale state, injection, unauthorized runtime, missing Surveyor producer, shared-core change and closeout cases with no intended safety regression.
-- [ ] Full changed-file review shows only declared documentation/evidence/task paths.
-- [ ] Exact-head repository checks for this documentation-only publication pass.
-- [ ] Fresh proportionate prompt audit finds no material contradiction or authority expansion.
+- [x] Full changed-file review shows only declared documentation/evidence/task paths.
+- [x] Exact-head repository checks for this documentation-only publication pass.
+- [ ] Fresh independent prompt audit finds no material contradiction or authority expansion.
 - [ ] PR merges, task is archived, and ownership is released.
 
 ## Validation evidence
 
 - Current trusted base at task start: `main@532b54fa60d11ae10227ab16dc02cd0cadf39b23`, Package A lifecycle closeout merged in PR #649.
 - Draft publication PR: #650.
-- Manual deterministic prompt regression matrix: `docs/agents/evidence/OTC-20260821-control-center-parallel-agent-prompts/prompt-eval.md`; E01-E15 static contract comparison PASS. This is explicitly not an automated model-behaviour evaluation; no unauthorized AI invocation was used.
+- Exact reviewed head before this audit-wait checkpoint: `e958379388429c07ba7bace062e1e8f70b756193`.
+- Full PR diff review at that head: 8 changed files, all inside the declared prompt/evidence/task paths; no runtime/source/workflow/module files changed.
+- Manual deterministic prompt regression matrix: `docs/agents/evidence/OTC-20260821-control-center-parallel-agent-prompts/prompt-eval.md`; E01-E15 static contract comparison PASS. This is explicitly not an automated model-behaviour evaluation and not an independent audit.
+- GitHub exact-head checks at `e958379388429c07ba7bace062e1e8f70b756193`: `CI` run `32500710415` SUCCESS; `Track A agent runtime governance` run `32500710184` SUCCESS; unrelated Surveyor physical workflow `32500710174` SKIPPED as expected for this docs-only PR.
 - Current Surveyor source was inspected for discovery values and the C prompt requires revalidation rather than hard authority reuse.
 - Current Track A admission and Control Center adapter contracts were inspected so D-prep remains strictly no-runtime and cannot silently expand into real Package D execution.
+
+## Audit blocker
+
+The remaining gate is a **fresh independent-context documentation/prompt audit** of the exact final prompt content. The implementing session cannot truthfully self-label its own review as independent. Root/closeout policy also says central Spark PR pre-review, if it later runs, is advisory and does not replace a required independent review.
+
+No direct owner-funded AI/Codex invocation was performed by this task. PR #650 therefore remains Draft until a separate fresh validator records a PASS or material findings are remediated.
 
 ## Validation / E2E
 
@@ -135,4 +144,4 @@ Runtime E2E is `NOT_APPLICABLE`: this task publishes documentation/prompting onl
 
 ## Next action
 
-Review the exact PR #650 changed-file list/diff and prompt contents against the baseline contracts, then run/observe documentation CI and obtain a fresh proportionate prompt audit before readiness/merge.
+Run a fresh independent documentation/prompt audit of PR #650 exact prompt head; if PASS, revalidate any task-only delta, mark Ready, verify final exact-head CI, merge, archive this task and release ownership.

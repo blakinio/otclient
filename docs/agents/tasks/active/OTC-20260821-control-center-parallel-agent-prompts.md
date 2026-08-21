@@ -1,19 +1,19 @@
 ---
 task_id: OTC-20260821-control-center-parallel-agent-prompts
-status: implementing
+status: validating
 agent: ChatGPT
 project_lane: otclient
 lane: CONTROL-CENTER-PARALLEL-PROMPTS
 track_id: official-client-re
 task_kind: prompting_coordination
-phase: implementation
+phase: validation
 risk: medium
 branch: docs/control-center-parallel-agent-prompts-20260821
 base_branch: main
 created: 2026-08-21T17:45:00+02:00
-updated: 2026-08-21T17:45:00+02:00
+updated: 2026-08-21T18:08:00+02:00
 initial_base_sha: 532b54fa60d11ae10227ab16dc02cd0cadf39b23
-related_pr: null
+related_pr: 650
 runtime_access: none
 runtime_owner_task: NOT_APPLICABLE
 runtime_namespace: NOT_APPLICABLE
@@ -106,20 +106,28 @@ complete_user_facing_feature: false
 
 ## Acceptance
 
-- [ ] Three canonical worker prompts exist for Package B, Package C and Package D preparation.
-- [ ] Three owner-facing alias prompts resolve to those canonical worker prompts.
-- [ ] Every worker prompt requires current-main/open-PR/active-task/AGENTS revalidation before claiming work.
-- [ ] Package B remains `runtime_access:none`, with real Official Tibia mutation impossible and fake mutation only.
-- [ ] Package C is read-only and consumes an accepted exact Surveyor producer/schema/interface without copying Surveyor internals or promoting evidence.
-- [ ] Package D preparation is `runtime_access:none` and cannot perform official-client process observation, memory access, GUI/gameplay input or mutation.
-- [ ] Ownership boundaries are non-overlapping by default and instruct workers to split shared core changes into an explicitly coordinated producer task rather than editing each other's paths.
-- [ ] Dependency order makes B/C parallel, D-prep parallel-static, and real D runtime gated after dependency/authority revalidation.
-- [ ] Prompts preserve Control Center Scenario/Execution/Artifact/Policy safety and forbid adapter/raw-action bypasses.
-- [ ] Prompt evaluation includes success, overlap, stale state, injection, unauthorized runtime, missing Surveyor producer, shared-core change and closeout cases with no safety regression.
+- [x] Three canonical worker prompts exist for Package B, Package C and Package D preparation.
+- [x] Three owner-facing alias prompts resolve to those canonical worker prompts.
+- [x] Every worker prompt requires current-main/open-PR/active-task/AGENTS revalidation before claiming work.
+- [x] Package B remains `runtime_access:none`, with real Official Tibia mutation impossible and fake mutation only.
+- [x] Package C is read-only and consumes an accepted exact Surveyor producer/schema/interface without copying Surveyor internals or promoting evidence.
+- [x] Package D preparation is `runtime_access:none` and cannot perform official-client process observation, memory access, GUI/gameplay input or mutation.
+- [x] Ownership boundaries are non-overlapping by default and instruct workers to coordinate/serialize shared core changes rather than editing each other's paths.
+- [x] Dependency order makes B/C parallel, D-prep parallel-static, and real D runtime gated after dependency/authority revalidation.
+- [x] Prompts preserve Control Center Scenario/Execution/Artifact/Policy safety and forbid adapter/raw-action bypasses.
+- [x] Prompt evaluation includes success, overlap, stale state, injection, unauthorized runtime, missing Surveyor producer, shared-core change and closeout cases with no intended safety regression.
 - [ ] Full changed-file review shows only declared documentation/evidence/task paths.
 - [ ] Exact-head repository checks for this documentation-only publication pass.
 - [ ] Fresh proportionate prompt audit finds no material contradiction or authority expansion.
 - [ ] PR merges, task is archived, and ownership is released.
+
+## Validation evidence
+
+- Current trusted base at task start: `main@532b54fa60d11ae10227ab16dc02cd0cadf39b23`, Package A lifecycle closeout merged in PR #649.
+- Draft publication PR: #650.
+- Manual deterministic prompt regression matrix: `docs/agents/evidence/OTC-20260821-control-center-parallel-agent-prompts/prompt-eval.md`; E01-E15 static contract comparison PASS. This is explicitly not an automated model-behaviour evaluation; no unauthorized AI invocation was used.
+- Current Surveyor source was inspected for discovery values and the C prompt requires revalidation rather than hard authority reuse.
+- Current Track A admission and Control Center adapter contracts were inspected so D-prep remains strictly no-runtime and cannot silently expand into real Package D execution.
 
 ## Validation / E2E
 
@@ -127,4 +135,4 @@ Runtime E2E is `NOT_APPLICABLE`: this task publishes documentation/prompting onl
 
 ## Next action
 
-Create the three worker prompts, aliases and manual eval matrix; open/update the draft PR; validate exact contents and CI; then terminally close the publication task.
+Review the exact PR #650 changed-file list/diff and prompt contents against the baseline contracts, then run/observe documentation CI and obtain a fresh proportionate prompt audit before readiness/merge.

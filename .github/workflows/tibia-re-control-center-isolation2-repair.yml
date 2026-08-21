@@ -1,0 +1,121 @@
+name: Package A isolation-2 one-shot repair
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.head_ref == 'feat/OTC-20260820-tibia-re-control-center-package-a'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Apply bounded isolation-2 repairs
+        shell: bash
+        env:
+          BRANCH: ${{ github.head_ref }}
+        run: |
+          set -Eeuo pipefail
+          git pull --ff-only origin "$BRANCH"
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def edit(path, old, new, marker):
+              p = Path(path)
+              text = p.read_text(encoding='utf-8')
+              if marker in text:
+                  return
+              if old not in text:
+                  raise SystemExit(f'repair anchor missing: {path}: {marker}')
+              p.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          edit(
+              'tools/tibia_re_control_center/store.py',
+              '    def write_recovery(self, run_id: str, record: dict[str, Any]) -> None:\n        self._before_write("recovery")\n        self.recovery_records[run_id] = copy.deepcopy(record)\n\n',
+              '    def write_recovery(self, run_id: str, record: dict[str, Any]) -> None:\n        self._before_write("recovery")\n        self.recovery_records[run_id] = copy.deepcopy(record)\n\n    def load_recovery(self, run_id: str) -> dict[str, Any] | None:\n        value = self.recovery_records.get(run_id)\n        return None if value is None else copy.deepcopy(value)\n\n',
+              'def load_recovery(',
+          )
+
+          edit(
+              'tools/tibia_re_control_center/execution.py',
+              '            identity = self.adapter.identity()\n            run = RunState(run_id, ledger, identity.adapter_generation, identity.runtime_instance_id, identity.session_epoch, mutation_capable)\n            self.runs[run_id] = run\n',
+              '            identity = self.adapter.identity()\n            self.store.write_recovery(\n                run_id,\n                {\n                    "backend_epoch": self.backend_epoch,\n                    "control_generation": self.control_generation,\n                    "adapter_generation": identity.adapter_generation,\n                    "runtime_instance_id": identity.runtime_instance_id,\n                    "session_epoch": identity.session_epoch,\n                    "mutation_capable": mutation_capable,\n                },\n            )\n            run = RunState(run_id, ledger, identity.adapter_generation, identity.runtime_instance_id, identity.session_epoch, mutation_capable)\n            self.runs[run_id] = run\n',
+              '"mutation_capable": mutation_capable,',
+          )
+
+          p = Path('tools/tibia_re_control_center/execution.py')
+          text = p.read_text(encoding='utf-8')
+          old = '''    def recover_run(self, run_id: str, *, mutation_capable: bool = True) -> RunState:\n        activation = self.store.load_run_activation(run_id)\n        ledger = self.store.load_budget(run_id)\n        if activation is None or ledger is None:\n            raise ValidationError("RECOVERY_STATE_MISSING", "run recovery requires original activation and budget ledger")\n        if (ledger.started_monotonic_ns, ledger.deadline_monotonic_ns) != activation:\n            raise ValidationError("RECOVERY_STATE_CONTRADICTORY", "runtime activation/deadline contradict durable budget state")\n        identity = self.adapter.identity()\n        run = RunState(\n            run_id,\n            ledger,\n            identity.adapter_generation,\n            identity.runtime_instance_id,\n            identity.session_epoch,\n            mutation_capable,\n        )\n        self.runs[run_id] = run\n        return run\n'''
+          new = '''    def recover_run(self, run_id: str, *, mutation_capable: bool = True) -> RunState:\n        activation = self.store.load_run_activation(run_id)\n        ledger = self.store.load_budget(run_id)\n        recovery = self.store.load_recovery(run_id)\n        if activation is None or ledger is None or recovery is None:\n            raise ValidationError("RECOVERY_STATE_MISSING", "run recovery requires original activation, budget, and recovery fences")\n        if (ledger.started_monotonic_ns, ledger.deadline_monotonic_ns) != activation:\n            raise ValidationError("RECOVERY_STATE_CONTRADICTORY", "runtime activation/deadline contradict durable budget state")\n        if bool(recovery.get("mutation_capable")) != mutation_capable:\n            raise ValidationError("RECOVERY_AUTHORITY_CONTRADICTION", "run recovery cannot change mutation capability")\n        identity = self.adapter.identity()\n        origin_matches = (\n            recovery.get("backend_epoch") == self.backend_epoch\n            and recovery.get("control_generation") == self.control_generation\n            and recovery.get("adapter_generation") == identity.adapter_generation\n            and recovery.get("runtime_instance_id") == identity.runtime_instance_id\n            and recovery.get("session_epoch") == identity.session_epoch\n        )\n        run = RunState(\n            run_id,\n            ledger,\n            str(recovery.get("adapter_generation")),\n            recovery.get("runtime_instance_id"),\n            recovery.get("session_epoch"),\n            mutation_capable,\n            cancelled=bool(mutation_capable and (not origin_matches or not self.mutation_admission_allowed())),\n        )\n        self.runs[run_id] = run\n        return run\n'''
+          if 'RECOVERY_AUTHORITY_CONTRADICTION' not in text:
+              if old not in text:
+                  raise SystemExit('recover_run anchor missing')
+              text = text.replace(old, new, 1)
+          old2 = '''            if not run.mutation_capable:\n                raise ValidationError("RUN_READ_ONLY", "read-only run cannot acquire mutation ownership")\n            if not self.mutation_admission_allowed():\n'''
+          new2 = '''            if not run.mutation_capable:\n                raise ValidationError("RUN_READ_ONLY", "read-only run cannot acquire mutation ownership")\n            if run.cancelled:\n                raise ValidationError("RUN_CANCELLED", "cancelled/recovered mutation run cannot reacquire ownership")\n            identity = self.adapter.identity()\n            if (\n                identity.adapter_generation != run.expected_adapter_generation\n                or identity.runtime_instance_id != run.expected_runtime_instance_id\n                or identity.session_epoch != run.expected_session_epoch\n            ):\n                raise ValidationError("RUN_IDENTITY_FENCE_MISMATCH", "run identity fence no longer matches the adapter")\n            if not self.mutation_admission_allowed():\n'''
+          if 'RUN_IDENTITY_FENCE_MISMATCH' not in text:
+              if old2 not in text:
+                  raise SystemExit('acquire_mutation_run anchor missing')
+              text = text.replace(old2, new2, 1)
+          p.write_text(text, encoding='utf-8')
+
+          edit(
+              'tools/tibia_re_control_center/artifact.py',
+              '        privacy_policy_snapshot = copy.deepcopy(dict(privacy_policy))\n        ensure_no_secret_material(\n',
+              '        privacy_policy_snapshot = copy.deepcopy(dict(privacy_policy))\n        if privacy_policy_snapshot != scenario_ast_snapshot.get("privacy_policy"):\n            raise ValidationError("PRIVACY_POLICY_CONTRADICTION", "privacy policy must match the validated scenario AST")\n        ensure_no_secret_material(privacy_policy_snapshot, key_path="privacy_policy")\n        ensure_no_secret_material(\n',
+              'PRIVACY_POLICY_CONTRADICTION',
+          )
+          edit(
+              'tools/tibia_re_control_center/artifact.py',
+              '        logical = _safe_relative_path(path)\n        if self.fail_next_presentation_write:\n',
+              '        logical = _safe_relative_path(path)\n        try:\n            staged_text = bytes(data).decode("utf-8", "strict")\n        except UnicodeDecodeError as exc:\n            raise ValidationError("ARTIFACT_PRIVACY_UNCLASSIFIED", "binary staged artifact requires a typed privacy-approved path") from exc\n        ensure_no_secret_material(staged_text, key_path=f"artifact_stage.{logical}")\n        if self.fail_next_presentation_write:\n',
+              'ARTIFACT_PRIVACY_UNCLASSIFIED',
+          )
+
+          edit(
+              'tools/tibia_re_control_center/engine.py',
+              '                safety_actions=self.coordinator.store.action_ledgers,\n',
+              '                safety_actions={\n                    action_id: record\n                    for action_id, record in self.coordinator.store.action_ledgers.items()\n                    if record.run_id == run_id\n                },\n',
+              'if record.run_id == run_id',
+          )
+
+          edit(
+              'tools/tibia_re_control_center/model.py',
+              '        checked_non_negative(self.attempt_index, maximum=MAX_I32, field_name="attempt_index")\n        if not HEX_SHA256_RE.fullmatch(self.action_request_hash):\n',
+              '        checked_non_negative(self.attempt_index, maximum=MAX_I32, field_name="attempt_index")\n        if not isinstance(self.required_authority, Authority):\n            raise ValidationError("INVALID_ACTION_AUTHORITY", "required_authority must be an Authority enum")\n        if not HEX_SHA256_RE.fullmatch(self.action_request_hash):\n',
+              'INVALID_ACTION_AUTHORITY',
+          )
+
+          test = Path('tests/tools/tibia_re_control_center/test_codex_cycle2_repairs.py')
+          t = test.read_text(encoding='utf-8')
+          if 'test_recovered_mutation_run_cannot_rebase_after_stop_restart' not in t:
+              insert = '''\n    def test_recovered_mutation_run_cannot_rebase_after_stop_restart(self) -> None:\n        clock = ManualClock(); adapter = FakeAdapter(clock); adapter.add_capability("move"); store = DeterministicDurableStore()\n        first = MutationCoordinator(adapter, store, clock, backend_epoch="recover-one"); first.start_run("old-run", hard_budget()); self.assertTrue(first.stop_all())\n        second_adapter = FakeAdapter(clock); second_adapter.add_capability("move"); second = MutationCoordinator(second_adapter, store, clock, backend_epoch="recover-two")\n        recovered = second.recover_run("old-run"); self.assertTrue(recovered.cancelled); self.assertTrue(second.reset_stop())\n        with self.assertRaises(Exception): second.acquire_mutation_run("old-run")\n\n    def test_privacy_policy_snapshot_is_scanned_and_must_match_ast(self) -> None:\n        scenario = parse_and_validate(abort_scenario_json()); artifacts = ArtifactStore()\n        with self.assertRaises(PrivacyError):\n            artifacts.create_run(run_id="privacy-policy", scenario_id=scenario.scenario_id, scenario_hash=scenario.scenario_hash, scenario_ast=scenario.ast, adapter_identity={"adapter_id":"fake"}, backend_epoch="b", initial_control_generation=0, started_monotonic_ns=0, privacy_policy={"password":"hunter2"})\n\n    def test_write_stage_rejects_secret_shaped_bytes(self) -> None:\n        scenario = parse_and_validate(abort_scenario_json()); artifacts = ArtifactStore()\n        artifacts.create_run(run_id="stage-privacy", scenario_id=scenario.scenario_id, scenario_hash=scenario.scenario_hash, scenario_ast=scenario.ast, adapter_identity={"adapter_id":"fake"}, backend_epoch="b", initial_control_generation=0, started_monotonic_ns=0, privacy_policy=scenario.ast["privacy_policy"])\n        with self.assertRaises(PrivacyError): artifacts.write_stage("stage-privacy", "trace.txt", b"PASSWORD=hunter2")\n\n    def test_dynamic_action_request_rejects_non_enum_authority(self) -> None:\n        _, adapter, _, coordinator = make_stack(epoch="authority-enum"); request = make_request(coordinator, adapter, "authority-action")\n        with self.assertRaises(Exception): execution_module.replace(request, required_authority="INVALID")\n'''
+              marker = '\nif __name__ == "__main__": unittest.main()\n'
+              if marker not in t:
+                  raise SystemExit('test insertion marker missing')
+              test.write_text(t.replace(marker, insert + marker, 1), encoding='utf-8')
+          PY
+
+          rm -f _tmp_do_not_merge tests/tools/tibia_re_control_center/test_cycle2_isolation.py
+          python3 -m compileall -q tools/tibia_re_control_center tests/tools/tibia_re_control_center
+          PYTHONPATH=. python3 -m unittest discover -s tests/tools/tibia_re_control_center -p 'test_*.py'
+          PYTHONPATH=. python3 tests/tools/tibia_re_control_center/audit_package_a.py
+          PYTHONPATH=. python3 tests/tools/tibia_re_control_center/audit_package_a_p1.py
+          python3 -m pip install --disable-pip-version-check --no-input ruff==0.16.1 >/dev/null
+          ruff check tools/tibia_re_control_center tests/tools/tibia_re_control_center/test_codex_cycle2_repairs.py
+          git diff --check
+          git rm .github/workflows/tibia-re-control-center-isolation2-repair.yml
+          git config user.name 'blakinio'
+          git config user.email '75369544+blakinio@users.noreply.github.com'
+          git add -A
+          git commit -m 'fix(control-center): close second isolation P1 findings'
+          git push origin "HEAD:$BRANCH"

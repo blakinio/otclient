@@ -67,7 +67,7 @@ The v2 runtime snapshot is allowlisted: raw character-bearing window titles, arb
 
 ## Current typed readers
 
-The registry currently includes exact-fenced readers for player state, auth/session lifecycle, action/protocol object identity, and UI/settings. The UI/settings reader is deliberately narrower than the alias: it verifies the compiled `tibia::config::TClientOptions` model and reads only the two previously causally established Master Volume persistence fields from `packages/Tibia/conf/clientoptions.json`. It performs no process-memory access, retains no arbitrary settings document, and does not claim current UI application state, complete settings semantics, QSettings linkage, or `TClientOptions -> clientoptions.json` ownership.
+The registry currently includes exact-fenced readers for player state, auth/session lifecycle, action/protocol object identity, and UI/settings. The UI/settings reader is deliberately narrower than the alias: it verifies the compiled `tibia::config::TClientOptions` model and reads only the two previously causally established Master Volume fields from `conf/clientoptions.json` anchored to the exact-fenced executable package root. It performs no process-memory access, retains no arbitrary settings document, and does not claim current UI application state, complete settings semantics, QSettings linkage, or `TClientOptions -> clientoptions.json` ownership.
 
 ## Local repository-only collect-all
 

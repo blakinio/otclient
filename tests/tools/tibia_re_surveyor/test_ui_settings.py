@@ -30,7 +30,7 @@ class UiSettingsReaderTests(unittest.TestCase):
                 "reader_id": READER_ID,
                 "master_volume": 100,
                 "master_volume_old": 100,
-                "persistence_relative_path": "packages/Tibia/conf/clientoptions.json",
+                "persistence_relative_path": "conf/clientoptions.json",
                 "filesystem_access": "read_only",
                 "process_memory_access": "not_used",
             }
@@ -147,9 +147,14 @@ class UiSettingsReaderTests(unittest.TestCase):
     def test_probe_sources_are_read_only_allowlisted_and_do_not_read_process_memory(self):
         self.assertIn("os.O_RDONLY", READ_ONLY_SETTINGS_PROBE)
         self.assertIn("os.O_NOFOLLOW", READ_ONLY_SETTINGS_PROBE)
-        self.assertIn("dir_fd=current_fd", READ_ONLY_SETTINGS_PROBE)
+        self.assertIn("package_root=exe.parent.parent", READ_ONLY_SETTINGS_PROBE)
+        self.assertIn("dir_fd=root_fd", READ_ONLY_SETTINGS_PROBE)
+        self.assertIn("dir_fd=conf_fd", READ_ONLY_SETTINGS_PROBE)
+        self.assertIn("CLIENT_PACKAGE_LAYOUT_INVALID", READ_ONLY_SETTINGS_PROBE)
+        self.assertIn("CLIENT_NOFOLLOW_UNAVAILABLE", READ_ONLY_SETTINGS_PROBE)
         self.assertIn("stat.S_ISREG", READ_ONLY_SETTINGS_PROBE)
-        self.assertNotIn(".resolve()", READ_ONLY_SETTINGS_PROBE)
+        self.assertNotIn("pwd.getpwuid", READ_ONLY_SETTINGS_PROBE)
+        self.assertNotIn("os.walk", READ_ONLY_SETTINGS_PROBE)
         self.assertNotIn("os.O_RDWR", READ_ONLY_SETTINGS_PROBE)
         self.assertNotIn("os.O_WRONLY", READ_ONLY_SETTINGS_PROBE)
         self.assertNotIn(f"/proc/{{pid}}/mem", READ_ONLY_SETTINGS_PROBE)

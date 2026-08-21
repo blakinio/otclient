@@ -32,7 +32,7 @@ print(json.dumps({"state":"AVAILABLE","type_name":"tibia::config::TClientOptions
 """
 
 READ_ONLY_SETTINGS_PROBE = r"""
-import hashlib,json,os,pathlib,pwd,stat,sys
+import hashlib,json,os,pathlib,stat,sys
 pid=int(sys.argv[1]); start=int(sys.argv[2]); size=int(sys.argv[3]); sha=sys.argv[4]
 def ticks():
  raw=pathlib.Path(f"/proc/{pid}/stat").read_text(encoding="ascii")
@@ -46,23 +46,22 @@ if ticks()!=start: raise SystemExit("START_TICKS_MISMATCH")
 exe=pathlib.Path(os.path.realpath(f"/proc/{pid}/exe"))
 if exe.stat().st_size!=size or digest(exe)!=sha: raise SystemExit("EXACT_FENCE_MISMATCH")
 uid=os.stat(f"/proc/{pid}").st_uid
-home=pwd.getpwuid(uid).pw_dir
-dir_flags=os.O_RDONLY|os.O_CLOEXEC
-if hasattr(os,"O_DIRECTORY"): dir_flags|=os.O_DIRECTORY
-if hasattr(os,"O_NOFOLLOW"): dir_flags|=os.O_NOFOLLOW
-file_flags=os.O_RDONLY|os.O_CLOEXEC
-if hasattr(os,"O_NOFOLLOW"): file_flags|=os.O_NOFOLLOW
-try: current_fd=os.open(home,dir_flags)
-except OSError: raise SystemExit("CLIENTOPTIONS_HOME_OPEN_FAILED")
+if exe.name!="client" or exe.parent.name!="bin": raise SystemExit("CLIENT_PACKAGE_LAYOUT_INVALID")
+package_root=exe.parent.parent
+if not hasattr(os,"O_DIRECTORY") or not hasattr(os,"O_NOFOLLOW"):
+ raise SystemExit("CLIENT_NOFOLLOW_UNAVAILABLE")
+dir_flags=os.O_RDONLY|os.O_CLOEXEC|os.O_DIRECTORY|os.O_NOFOLLOW
+file_flags=os.O_RDONLY|os.O_CLOEXEC|os.O_NOFOLLOW
+try: root_fd=os.open(package_root,dir_flags)
+except OSError: raise SystemExit("CLIENT_PACKAGE_ROOT_OPEN_FAILED")
 try:
- for component in (".local","share","CipSoft GmbH","Tibia","packages","Tibia","conf"):
-  try: next_fd=os.open(component,dir_flags,dir_fd=current_fd)
-  except OSError: raise SystemExit("CLIENTOPTIONS_PARENT_OPEN_FAILED")
-  os.close(current_fd); current_fd=next_fd
- try: fd=os.open("clientoptions.json",file_flags,dir_fd=current_fd)
- except OSError: raise SystemExit("CLIENTOPTIONS_OPEN_FAILED")
-finally:
- os.close(current_fd)
+ try: conf_fd=os.open("conf",dir_flags,dir_fd=root_fd)
+ except OSError: raise SystemExit("CLIENTOPTIONS_PARENT_OPEN_FAILED")
+ try:
+  try: fd=os.open("clientoptions.json",file_flags,dir_fd=conf_fd)
+  except OSError: raise SystemExit("CLIENTOPTIONS_OPEN_FAILED")
+ finally: os.close(conf_fd)
+finally: os.close(root_fd)
 try:
  st=os.fstat(fd)
  if not stat.S_ISREG(st.st_mode) or st.st_uid!=uid: raise SystemExit("CLIENTOPTIONS_IDENTITY_INVALID")
@@ -85,13 +84,15 @@ for key in ("soundMasterVolume","soundMasterVolumeOld"):
   raise SystemExit("CLIENTOPTIONS_MASTER_VOLUME_INVALID")
  values[key]=value
 if ticks()!=start: raise SystemExit("START_TICKS_CHANGED_DURING_READ")
-print(json.dumps({"state":"AVAILABLE","reader_id":"ui_settings_typed_reader","master_volume":values["soundMasterVolume"],"master_volume_old":values["soundMasterVolumeOld"],"persistence_relative_path":"packages/Tibia/conf/clientoptions.json","filesystem_access":"read_only","process_memory_access":"not_used"},sort_keys=True))
+print(json.dumps({"state":"AVAILABLE","reader_id":"ui_settings_typed_reader","master_volume":values["soundMasterVolume"],"master_volume_old":values["soundMasterVolumeOld"],"persistence_relative_path":"conf/clientoptions.json","filesystem_access":"read_only","process_memory_access":"not_used"},sort_keys=True))
 """
 
 _SAFE_RUNTIME_CODES = (
     "START_TICKS_MISMATCH",
     "EXACT_FENCE_MISMATCH",
-    "CLIENTOPTIONS_HOME_OPEN_FAILED",
+    "CLIENT_PACKAGE_LAYOUT_INVALID",
+    "CLIENT_NOFOLLOW_UNAVAILABLE",
+    "CLIENT_PACKAGE_ROOT_OPEN_FAILED",
     "CLIENTOPTIONS_PARENT_OPEN_FAILED",
     "CLIENTOPTIONS_OPEN_FAILED",
     "CLIENTOPTIONS_IDENTITY_INVALID",
@@ -181,7 +182,7 @@ def read_ui_settings(
             or isinstance(master_old, bool)
             or not isinstance(master_old, int)
             or not 0 <= master_old <= 100
-            or doc.get("persistence_relative_path") != "packages/Tibia/conf/clientoptions.json"
+            or doc.get("persistence_relative_path") != "conf/clientoptions.json"
             or doc.get("filesystem_access") != "read_only"
             or doc.get("process_memory_access") != "not_used"
         ):
@@ -191,7 +192,7 @@ def read_ui_settings(
             "reader_id": READER_ID,
             "master_volume": master,
             "master_volume_old": master_old,
-            "persistence_relative_path": "packages/Tibia/conf/clientoptions.json",
+            "persistence_relative_path": "conf/clientoptions.json",
             "filesystem_access": "read_only",
             "process_memory_access": "not_used",
         }

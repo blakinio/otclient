@@ -63,7 +63,7 @@ estimate_confidence: medium
 decomposition_decision: phased
 decomposition_reason: discovery selected one non-overlapping reader; the same task now owns implementation through validation, physical acceptance and closeout
 invocation_started_at: 2026-08-21T22:05:00+02:00
-last_progress_at: 2026-08-21T22:28:00+02:00
+last_progress_at: 2026-08-21T22:32:00+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: physical_repair_discovery
 terminal_ci_wait_started_at: null
@@ -73,7 +73,7 @@ identical_failure_retries: 0
 repair_cycles_for_current_gate: 1
 context_reconstruction_attempts: 1
 stall_warnings: 0
-next_action: inspect only fixed-path filesystem metadata under the freshly admitted exact runtime, identify the parent-layout cause of CLIENTOPTIONS_PARENT_OPEN_FAILED, then implement the smallest fail-closed repair
+next_action: validate the executable-package-root repair locally, push the exact repair head, obtain fresh exact-head audit/CI, merge, then rerun trusted-main read-only physical acceptance
 ---
 
 # Surveyor v2 next non-overlap typed-reader slice
@@ -99,7 +99,7 @@ The current owner request authorizes the bounded Surveyor continuation and read-
 
 Fresh repository-only collect-all on exact starting `main@dce8bbd0e78ceea3681a1fe1dab40d3c19ed7458` produced 169 rows, 12 aliases, 8 missing typed readers and privacy `PASS`. `world_minimap_typed_reader` ranked first at score 125 but is excluded by still-open overlapping PRs #475 and #593. `ui_settings_typed_reader` ranked second at score 65 and is the highest-ranked non-overlapping gap. Its prior exact-build UI/settings discovery task `OTC-20260819-track-a-ui-settings-static-model` is terminally archived with ownership released and no open UI/settings PR exists.
 
-The implementation is deliberately bounded to the exact-build `tibia::config::TClientOptions` compiled model plus the two previously causally proven Master Volume persistence fields in `packages/Tibia/conf/clientoptions.json`. The reader does not claim complete settings semantics, live UI application state, `TClientOptions -> clientoptions.json` linkage, or QSettings linkage. It uses no process-memory access.
+The implementation is deliberately bounded to the exact-build `tibia::config::TClientOptions` compiled model plus the two previously causally proven Master Volume fields in `clientoptions.json`; the physical repair later binds the current file specifically as `conf/clientoptions.json` under the exact executable package root. The reader does not claim complete settings semantics, live UI application state, `TClientOptions -> clientoptions.json` linkage, or QSettings linkage. It uses no process-memory access.
 
 ## Implementer falsification checkpoint
 
@@ -131,3 +131,9 @@ Implementation PR #658 merged as `1cb56f652784ca1baeaf59a777e4c0b5b8ab312e`. Tru
 The workflow itself completed successfully and the sanitized artifact `9461336737` (digest `sha256:e10a836244c454056e09202f5f179c16852b743db9016e30c004b1fa3d19690f`) passed privacy with 169 rows / 12 aliases / 7 missing reader implementations. However, task-level E2E is **not PASS**: `ui_settings_typed_reader` returned `UNAVAILABLE / LIVE_SETTINGS_READ_FAILED:CLIENTOPTIONS_PARENT_OPEN_FAILED`. Static `TClientOptions` evidence remained AVAILABLE. No gameplay input, relogin, restart, process control, process-memory write, credential access, network mutation or economy action occurred.
 
 This is physical repair cycle 1. The current read-only admission is persisted only to inspect the fixed-path filesystem metadata needed to explain that fail-closed result; mutation remains forbidden.
+
+## Physical repair diagnosis
+
+Read-only metadata isolated the failure without reading config contents. The persistent Kasm runtime does not store current settings under the prior isolated-HOME path. A bounded filename census found four historical package roots, so home scanning is intentionally rejected as ambiguous. The exact live executable is `/home/kasm-user/otclient-track-a/Tibia-32177065988-1/bin/client`; its own package-root sibling `conf/clientoptions.json` exists, is regular, non-symlink and owned by the target UID.
+
+Repair #659 therefore anchors the file only to the already exact-fenced executable's package root (`exe.parent.parent`), requires `.../bin/client`, and opens package root -> `conf` -> `clientoptions.json` with mandatory `O_DIRECTORY/O_NOFOLLOW`, regular-file and UID checks. It performs no HOME scan and preserves the exact output allowlists from `AUD-658-001`. Durable diagnosis: `docs/agents/evidence/OTC-20260821-surveyor-next-nonoverlap-gap/20260821-physical-read-path-repair.md`.

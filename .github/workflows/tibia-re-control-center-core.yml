@@ -13,6 +13,7 @@ on:
       - docs/agents/tasks/active/OTC-20260821-tibia-re-control-center-package-a-p1-isolation-4.md
       - docs/agents/tasks/active/OTC-20260821-tibia-re-control-center-package-a-p1-isolation-5.md
       - docs/agents/tasks/active/OTC-20260821-tibia-re-control-center-package-a-p1-isolation-6.md
+      - docs/agents/tasks/active/OTC-20260821-tibia-re-control-center-package-a-p1-isolation-7.md
       - docs/agents/MODULE_CATALOG.md
       - docs/agents/CHANGELOG.md
       - .github/workflows/tibia-re-control-center-core.yml
@@ -123,6 +124,7 @@ jobs:
               'docs/agents/tasks/active/OTC-20260821-tibia-re-control-center-package-a-p1-isolation-4.md',
               'docs/agents/tasks/active/OTC-20260821-tibia-re-control-center-package-a-p1-isolation-5.md',
               'docs/agents/tasks/active/OTC-20260821-tibia-re-control-center-package-a-p1-isolation-6.md',
+              'docs/agents/tasks/active/OTC-20260821-tibia-re-control-center-package-a-p1-isolation-7.md',
           }
           allowed_prefixes = (
               'tools/tibia_re_control_center/',

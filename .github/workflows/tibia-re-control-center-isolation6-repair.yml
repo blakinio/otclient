@@ -1,0 +1,175 @@
+name: Package A isolation-6 one-shot repair
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.head_ref == 'feat/OTC-20260820-tibia-re-control-center-package-a'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Apply bounded isolation-six repairs and validate
+        shell: bash
+        env:
+          BRANCH: ${{ github.head_ref }}
+        run: |
+          set -Eeuo pipefail
+          git pull --ff-only origin "$BRANCH"
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path('tools/tibia_re_control_center/execution.py')
+          text = p.read_text(encoding='utf-8')
+          anchor = '''            if not self.adapter.current_authority(request.required_authority):\n                return False\n            if request.action_id not in run.budget.reservations:\n                return False\n            if self.clock.now_ns() >= action_deadline_ns:\n'''
+          fixed = '''            if not self.adapter.current_authority(request.required_authority):\n                return False\n            capability = self.adapter.capability(request.required_capability)\n            if capability is None or not capability.action_supported:\n                return False\n            if request.action_id not in run.budget.reservations:\n                return False\n            if self.clock.now_ns() >= action_deadline_ns:\n'''
+          if fixed not in text:
+              if anchor not in text:
+                  raise SystemExit('post-authority capability anchor missing')
+              text = text.replace(anchor, fixed, 1)
+          p.write_text(text, encoding='utf-8')
+
+          p = Path('tools/tibia_re_control_center/recorder.py')
+          text = p.read_text(encoding='utf-8')
+          if 'from types import MappingProxyType\n' not in text:
+              text = text.replace('from dataclasses import dataclass\n', 'from dataclasses import dataclass\nfrom types import MappingProxyType\n', 1)
+          start = text.index('\n\nclass _FrozenEventDict(dict):\n')
+          end = text.index('\n\ndef safe_error(', start)
+          replacement = '''\n\ndef _freeze_event_value(value: Any) -> Any:\n    if isinstance(value, Mapping):\n        return MappingProxyType({key: _freeze_event_value(child) for key, child in value.items()})\n    if isinstance(value, list):\n        return tuple(_freeze_event_value(child) for child in value)\n    if isinstance(value, tuple):\n        return tuple(_freeze_event_value(child) for child in value)\n    return value\n'''
+          text = text[:start] + replacement + text[end:]
+          p.write_text(text, encoding='utf-8')
+
+          p = Path('tools/tibia_re_control_center/artifact.py')
+          text = p.read_text(encoding='utf-8')
+          anchor = '''        reason_codes_snapshot = copy.deepcopy(list(reason_codes or ()))\n        assertions_snapshot = copy.deepcopy(dict(assertions or {}))\n        budget_summary_snapshot = copy.deepcopy(dict(budget_summary))\n        action_projection = {\n'''
+          fixed = '''        status_snapshot = copy.deepcopy(status)\n        reason_codes_snapshot = copy.deepcopy(list(reason_codes or ()))\n        assertions_snapshot = copy.deepcopy(dict(assertions or {}))\n        budget_summary_snapshot = copy.deepcopy(dict(budget_summary))\n        action_projection = {\n'''
+          if fixed not in text:
+              if anchor not in text:
+                  raise SystemExit('status snapshot anchor missing')
+              text = text.replace(anchor, fixed, 1)
+          scan_anchor = '''            {\n                "reason_codes": reason_codes_snapshot,\n                "assertions": assertions_snapshot,\n'''
+          scan_fixed = '''            {\n                "status": status_snapshot,\n                "reason_codes": reason_codes_snapshot,\n                "assertions": assertions_snapshot,\n'''
+          if scan_fixed not in text:
+              if scan_anchor not in text:
+                  raise SystemExit('status privacy scan anchor missing')
+              text = text.replace(scan_anchor, scan_fixed, 1)
+          text = text.replace('"status": status,\n', '"status": status_snapshot,\n', 1)
+          p.write_text(text, encoding='utf-8')
+          PY
+
+          cat > tests/tools/tibia_re_control_center/test_isolation6_repairs.py <<'PY'
+          from __future__ import annotations
+
+          import unittest
+
+          from test_codex_review_repairs import abort_scenario_json, make_request, make_stack
+
+          from tools.tibia_re_control_center.artifact import ArtifactStore
+          from tools.tibia_re_control_center.fake import FakeAdapter, ManualClock
+          from tools.tibia_re_control_center.model import ActionStatus, PrivacyError
+          from tools.tibia_re_control_center.recorder import Recorder
+          from tools.tibia_re_control_center.scenario import parse_and_validate
+
+
+          class IsolationSixRegressionTests(unittest.TestCase):
+              def test_capability_is_rechecked_after_final_authority_callback(self) -> None:
+                  _, adapter, _, coordinator = make_stack(epoch="capability-final-p1")
+                  request = make_request(coordinator, adapter, "capability-final")
+                  original = adapter.current_authority
+                  calls = 0
+
+                  def revoke_after_authority(authority):
+                      nonlocal calls
+                      calls += 1
+                      result = original(authority)
+                      if calls >= 3:
+                          adapter.add_capability(request.required_capability, read=True, action=False)
+                      return result
+
+                  adapter.current_authority = revoke_after_authority
+                  result = coordinator.execute_action(request)
+                  self.assertEqual(ActionStatus.REFUSED, result.status)
+                  self.assertEqual([], adapter.physical_effects)
+
+              def test_event_payload_cannot_be_mutated_via_dict_descriptor(self) -> None:
+                  clock = ManualClock()
+                  adapter = FakeAdapter(clock)
+                  identity = adapter.identity()
+                  recorder = Recorder(
+                      clock,
+                      backend_epoch="event-proxy",
+                      adapter_id=identity.adapter_id,
+                      adapter_generation=identity.adapter_generation,
+                  )
+                  event = recorder.record_event(kind="SNAPSHOT", payload={"nested": {"safe": "value"}})
+                  with self.assertRaises(TypeError):
+                      dict.__setitem__(event.payload, "password", "hunter2")
+                  with self.assertRaises(TypeError):
+                      dict.__setitem__(event.payload["nested"], "password", "hunter2")
+                  self.assertEqual("value", event.payload["nested"]["safe"])
+
+              def test_finalize_privacy_classifies_status(self) -> None:
+                  scenario = parse_and_validate(abort_scenario_json())
+                  clock = ManualClock()
+                  adapter = FakeAdapter(clock)
+                  identity = adapter.identity()
+                  recorder = Recorder(
+                      clock,
+                      backend_epoch="status-privacy",
+                      adapter_id=identity.adapter_id,
+                      adapter_generation=identity.adapter_generation,
+                  )
+                  artifacts = ArtifactStore()
+                  artifacts.create_run(
+                      run_id="status-privacy",
+                      scenario_id=scenario.scenario_id,
+                      scenario_hash=scenario.scenario_hash,
+                      scenario_ast=scenario.ast,
+                      adapter_identity={"adapter_id": "fake"},
+                      backend_epoch="status-privacy",
+                      initial_control_generation=0,
+                      started_monotonic_ns=0,
+                      privacy_policy=scenario.ast["privacy_policy"],
+                  )
+                  with self.assertRaises(PrivacyError):
+                      artifacts.finalize(
+                          "status-privacy",
+                          recorder=recorder,
+                          action_results={},
+                          requested_status="PASSWORD=hunter2",
+                          final_control_generation=0,
+                          budget_summary={"safe": 1},
+                          assertions={"safe": True},
+                      )
+                  self.assertNotIn("result.json", artifacts.runs["status-privacy"].stage)
+
+
+          if __name__ == "__main__":
+              unittest.main()
+          PY
+
+          rm -rf tools/tibia_re_control_center/__pycache__ tests/tools/tibia_re_control_center/__pycache__
+          python3 -m compileall -q tools/tibia_re_control_center tests/tools/tibia_re_control_center
+          PYTHONPATH=. python3 -m unittest discover -s tests/tools/tibia_re_control_center -p 'test_*.py'
+          PYTHONPATH=. python3 tests/tools/tibia_re_control_center/audit_package_a.py
+          PYTHONPATH=. python3 tests/tools/tibia_re_control_center/audit_package_a_p1.py
+          python3 -m pip install --disable-pip-version-check --no-input ruff==0.16.1 >/dev/null
+          ruff check --fix tools/tibia_re_control_center tests/tools/tibia_re_control_center/test_isolation6_repairs.py
+          ruff check tools/tibia_re_control_center tests/tools/tibia_re_control_center/test_isolation6_repairs.py
+          git diff --check
+          rm -rf tools/tibia_re_control_center/__pycache__ tests/tools/tibia_re_control_center/__pycache__
+          git rm .github/workflows/tibia-re-control-center-isolation6-repair.yml
+          git config user.name 'blakinio'
+          git config user.email '75369544+blakinio@users.noreply.github.com'
+          git add -A
+          git commit -m 'fix(control-center): close isolation-six P1 findings'
+          git push origin "HEAD:$BRANCH"

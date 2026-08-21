@@ -46,6 +46,16 @@ def digest_fd(fd):
   h.update(chunk)
  os.lseek(fd,0,os.SEEK_SET)
  return h.hexdigest()
+def descriptor_path(fd,code):
+ try: raw=os.readlink(f"/proc/self/fd/{fd}")
+ except OSError: raise SystemExit(code)
+ if not raw.startswith("/") or raw.endswith(" (deleted)"): raise SystemExit(code)
+ return pathlib.Path(raw)
+def assert_root_binding(exe_fd,root_fd):
+ exe_path=descriptor_path(exe_fd,"CLIENT_EXE_DESCRIPTOR_PATH_INVALID")
+ root_path=descriptor_path(root_fd,"CLIENT_PACKAGE_ROOT_DESCRIPTOR_PATH_INVALID")
+ if exe_path!=root_path/"bin"/"client": raise SystemExit("CLIENT_PACKAGE_ROOT_BINDING_MISMATCH")
+ return exe_path
 if ticks()!=start: raise SystemExit("START_TICKS_MISMATCH")
 proc_exe=f"/proc/{pid}/exe"
 try: exe_fd=os.open(proc_exe,os.O_RDONLY|os.O_CLOEXEC)
@@ -57,7 +67,7 @@ try:
  if (current_exe_st.st_dev,current_exe_st.st_ino)!=(exe_st.st_dev,exe_st.st_ino):
   raise SystemExit("CLIENT_EXE_IDENTITY_CHANGED")
  uid=os.stat(f"/proc/{pid}").st_uid
- exe=pathlib.Path(os.path.realpath(proc_exe))
+ exe=descriptor_path(exe_fd,"CLIENT_EXE_DESCRIPTOR_PATH_INVALID")
  if exe.name!="client" or exe.parent.name!="bin": raise SystemExit("CLIENT_PACKAGE_LAYOUT_INVALID")
  package_root=exe.parent.parent
  if not hasattr(os,"O_DIRECTORY") or not hasattr(os,"O_NOFOLLOW"):
@@ -67,6 +77,7 @@ try:
  try: root_fd=os.open(package_root,dir_flags)
  except OSError: raise SystemExit("CLIENT_PACKAGE_ROOT_OPEN_FAILED")
  try:
+  assert_root_binding(exe_fd,root_fd)
   try: bin_fd=os.open("bin",dir_flags,dir_fd=root_fd)
   except OSError: raise SystemExit("CLIENT_PACKAGE_BIN_OPEN_FAILED")
   try:
@@ -84,33 +95,35 @@ try:
    try: fd=os.open("clientoptions.json",file_flags,dir_fd=conf_fd)
    except OSError: raise SystemExit("CLIENTOPTIONS_OPEN_FAILED")
   finally: os.close(conf_fd)
- finally: os.close(root_fd)
- try:
-  st=os.fstat(fd)
-  if not stat.S_ISREG(st.st_mode) or st.st_uid!=uid: raise SystemExit("CLIENTOPTIONS_IDENTITY_INVALID")
-  if st.st_size<=0 or st.st_size>2*1024*1024: raise SystemExit("CLIENTOPTIONS_SIZE_INVALID")
-  raw=b""
-  while len(raw)<st.st_size:
-   chunk=os.read(fd,min(1024*1024,st.st_size-len(raw)))
-   if not chunk: break
-   raw+=chunk
- finally: os.close(fd)
- if len(raw)!=st.st_size: raise SystemExit("CLIENTOPTIONS_SHORT_READ")
- try: doc=json.loads(raw)
- except Exception: raise SystemExit("CLIENTOPTIONS_JSON_INVALID")
- options=doc.get("options") if isinstance(doc,dict) else None
- if not isinstance(options,dict): raise SystemExit("CLIENTOPTIONS_OPTIONS_MISSING")
- values={}
- for key in ("soundMasterVolume","soundMasterVolumeOld"):
-  value=options.get(key)
-  if isinstance(value,bool) or not isinstance(value,int) or not 0<=value<=100:
-   raise SystemExit("CLIENTOPTIONS_MASTER_VOLUME_INVALID")
-  values[key]=value
- if ticks()!=start: raise SystemExit("START_TICKS_CHANGED_DURING_READ")
- current_exe_st=os.stat(proc_exe)
- if (current_exe_st.st_dev,current_exe_st.st_ino)!=(exe_st.st_dev,exe_st.st_ino):
-  raise SystemExit("CLIENT_EXE_IDENTITY_CHANGED")
- print(json.dumps({"state":"AVAILABLE","reader_id":"ui_settings_typed_reader","master_volume":values["soundMasterVolume"],"master_volume_old":values["soundMasterVolumeOld"],"persistence_relative_path":"conf/clientoptions.json","filesystem_access":"read_only","process_memory_access":"not_used"},sort_keys=True))
+  try:
+   st=os.fstat(fd)
+   if not stat.S_ISREG(st.st_mode) or st.st_uid!=uid: raise SystemExit("CLIENTOPTIONS_IDENTITY_INVALID")
+   if st.st_size<=0 or st.st_size>2*1024*1024: raise SystemExit("CLIENTOPTIONS_SIZE_INVALID")
+   raw=b""
+   while len(raw)<st.st_size:
+    chunk=os.read(fd,min(1024*1024,st.st_size-len(raw)))
+    if not chunk: break
+    raw+=chunk
+  finally: os.close(fd)
+  if len(raw)!=st.st_size: raise SystemExit("CLIENTOPTIONS_SHORT_READ")
+  try: doc=json.loads(raw)
+  except Exception: raise SystemExit("CLIENTOPTIONS_JSON_INVALID")
+  options=doc.get("options") if isinstance(doc,dict) else None
+  if not isinstance(options,dict): raise SystemExit("CLIENTOPTIONS_OPTIONS_MISSING")
+  values={}
+  for key in ("soundMasterVolume","soundMasterVolumeOld"):
+   value=options.get(key)
+   if isinstance(value,bool) or not isinstance(value,int) or not 0<=value<=100:
+    raise SystemExit("CLIENTOPTIONS_MASTER_VOLUME_INVALID")
+   values[key]=value
+  if ticks()!=start: raise SystemExit("START_TICKS_CHANGED_DURING_READ")
+  current_exe_st=os.stat(proc_exe)
+  if (current_exe_st.st_dev,current_exe_st.st_ino)!=(exe_st.st_dev,exe_st.st_ino):
+   raise SystemExit("CLIENT_EXE_IDENTITY_CHANGED")
+  assert_root_binding(exe_fd,root_fd)
+  print(json.dumps({"state":"AVAILABLE","reader_id":"ui_settings_typed_reader","master_volume":values["soundMasterVolume"],"master_volume_old":values["soundMasterVolumeOld"],"persistence_relative_path":"conf/clientoptions.json","filesystem_access":"read_only","process_memory_access":"not_used"},sort_keys=True))
+ finally:
+  os.close(root_fd)
 finally:
  os.close(exe_fd)
 """
@@ -120,9 +133,12 @@ _SAFE_RUNTIME_CODES = (
     "EXACT_FENCE_MISMATCH",
     "CLIENT_EXE_OPEN_FAILED",
     "CLIENT_EXE_IDENTITY_CHANGED",
+    "CLIENT_EXE_DESCRIPTOR_PATH_INVALID",
     "CLIENT_PACKAGE_LAYOUT_INVALID",
     "CLIENT_NOFOLLOW_UNAVAILABLE",
     "CLIENT_PACKAGE_ROOT_OPEN_FAILED",
+    "CLIENT_PACKAGE_ROOT_DESCRIPTOR_PATH_INVALID",
+    "CLIENT_PACKAGE_ROOT_BINDING_MISMATCH",
     "CLIENT_PACKAGE_BIN_OPEN_FAILED",
     "CLIENT_PACKAGE_EXECUTABLE_OPEN_FAILED",
     "CLIENT_PACKAGE_EXECUTABLE_IDENTITY_MISMATCH",

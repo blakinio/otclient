@@ -11,7 +11,7 @@ risk: medium
 branch: feat/OTC-20260820-tibia-re-control-center-package-a
 base_branch: main
 created: 2026-08-21T08:46:00+02:00
-updated: 2026-08-21T08:46:00+02:00
+updated: 2026-08-21T08:52:00+02:00
 initial_base_sha: 5707af6c413cd9949f6c33b17744801cedef6eaf
 related_pr: 628
 parent_task: OTC-20260820-tibia-re-control-center-package-a
@@ -46,14 +46,14 @@ execution_mode: github_connector_plus_codex
 execution_budget_minutes: 120
 execution_budget_reason: owner-authorized fresh isolation after exact-head Codex review b42b5449 opened five new P1 findings
 invocation_started_at: 2026-08-21T08:46:00+02:00
-last_progress_at: 2026-08-21T08:46:00+02:00
+last_progress_at: 2026-08-21T08:52:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: isolation3_implementation_pending
+ci_check_generation: isolation3_repair_driver
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 0
+repair_cycles_for_current_gate: 1
 context_reconstruction_attempts: 0
 stall_warnings: 0
 validation_level: full

@@ -63,17 +63,17 @@ estimate_confidence: medium
 decomposition_decision: phased
 decomposition_reason: discovery selected one non-overlapping reader; the same task now owns implementation through validation, physical acceptance and closeout
 invocation_started_at: 2026-08-21T22:05:00+02:00
-last_progress_at: 2026-08-21T23:24:00+02:00
+last_progress_at: 2026-08-21T23:43:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: descriptor_binding_remediation_head_pending
+ci_check_generation: executable_dentry_binding_remediation_head_pending
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 2
+repair_cycles_for_current_gate: 3
 context_reconstruction_attempts: 1
 stall_warnings: 0
-next_action: validate the descriptor-bound exact-executable repair, obtain fresh exact-head independent audit plus CI/governance PASS, merge #659 if clean, then rerun trusted-main read-only physical acceptance
+next_action: validate the executable-dentry-bound repair on the new exact head, obtain fresh independent audit plus required CI/governance PASS, merge #659 if clean, then rerun trusted-main read-only physical acceptance
 ---
 
 # Surveyor v2 next non-overlap typed-reader slice
@@ -135,8 +135,16 @@ This is physical repair cycle 1. A temporary read-only admission was persisted o
 
 Read-only metadata isolated the failure without reading config contents. The persistent Kasm runtime does not store current settings under the prior isolated-HOME path. A bounded filename census found four historical package roots, so home scanning is intentionally rejected as ambiguous. The exact live executable is `/home/kasm-user/otclient-track-a/Tibia-32177065988-1/bin/client`; its own package-root sibling `conf/clientoptions.json` exists, is regular, non-symlink and owned by the target UID.
 
-Repair #659 therefore derives the candidate package root only from the exact-fenced executable path and never scans HOME. After audit finding `AUD-659-001`, the live probe now holds an open `/proc/<pid>/exe` descriptor, verifies its exact size/SHA and identity, opens `root/bin/client` through the held package-root descriptor, and requires its `(st_dev, st_ino)` to equal the held live-executable descriptor before opening `conf/clientoptions.json` through that same root descriptor. This closes the package-root rename/replacement TOCTOU while preserving mandatory `O_DIRECTORY/O_NOFOLLOW`, regular-file/UID checks and the exact output allowlists from `AUD-658-001`.
+Repair #659 therefore derives the candidate package root only from the exact-fenced executable path and never scans HOME. After audit finding `AUD-659-001`, the live probe held an open `/proc/<pid>/exe` descriptor, verified its exact size/SHA and identity, opened `root/bin/client` through the held package-root descriptor, and required its `(st_dev, st_ino)` to equal the held live-executable descriptor before opening `conf/clientoptions.json` through that same root descriptor. Fresh review later proved inode equality alone was insufficient against a same-filesystem hard-link replacement.
 
-Fresh Codex review `4997251226` on superseded head `c75232e835c5ac187d32f2aa984b43f2ed2aa21e` also opened `AUD-659-002` P2 because the durable text still described the diagnosis admission as current. The text above now records that admission as historical and released. Both #659 findings require a fresh exact-head audit after this remediation.
+Fresh Codex review `4997251226` on superseded head `c75232e835c5ac187d32f2aa984b43f2ed2aa21e` also opened `AUD-659-002` P2 because the durable text still described the diagnosis admission as current. That wording was repaired so the admission is historical and released.
+
+## Second #659 exact-head audit remediation
+
+Fresh Codex review `PRR_kwDOTVmdjs8AAAABKeFMxQ` on exact head `7b9a0bc7eb69a7b904e9ee66b7bcfcb08fe1e06d` opened one new P2 finding, `AUD-659-003`: a replacement package tree could contain a same-filesystem hard link to the held executable, making `(st_dev, st_ino)` equality pass even though `conf/clientoptions.json` came from an unrelated root.
+
+The current repair binds directory ancestry, not only file identity. The live probe derives the executable path from the held `/proc/<pid>/exe` descriptor via `/proc/self/fd/<exe_fd>`, opens the candidate package root read-only/no-follow, and while that root descriptor remains open requires the held executable descriptor path to equal exactly `<root-fd-path>/bin/client`. That descriptor-path relationship is checked before opening `conf/clientoptions.json` and again after the bounded config read immediately before publication. The existing `root/bin/client` inode equality, PID/start fence, exact size/SHA, `O_DIRECTORY/O_NOFOLLOW`, regular-file/UID checks, output allowlists, and no-process-memory boundary remain in force. A deleted/unavailable descriptor path fails closed.
+
+No runtime access was used for this remediation; current `runtime_access` remains `none`. The new exact head must pass focused/all Surveyor validation, required CI/governance and a fresh independent audit before merge.
 
 Durable diagnosis: `docs/agents/evidence/OTC-20260821-surveyor-next-nonoverlap-gap/20260821-physical-read-path-repair.md`.

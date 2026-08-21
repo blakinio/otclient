@@ -9,25 +9,25 @@ track_id: official-client-re
 task_kind: implementation
 risk: medium
 policy_version: 2
-execution_mode: chat_github_and_hosted_ci
-execution_reason: exact-current static resolver and deterministic implementation validation followed by separately re-admitted post-merge physical read-only acceptance
+execution_mode: trusted_main_self_hosted_read_only
+execution_reason: implementation PR #636 is merged; run one separately reviewed trusted-main passive post-merge collect-all and archive only after exact causal implementation acceptance
 context_pressure: medium
 context_growth: stable
 context_score: 7
-estimate_confidence: medium
+estimate_confidence: high
 decomposition_decision: single
-decomposition_reason: one typed reader with one exact-build lifecycle resolver and one bounded read-only implementation-causal acceptance path
-runtime_access: none
+decomposition_reason: post-merge closeout is one bounded read-only acceptance followed by evidence/archive cleanup
+runtime_access: read_only
 runtime_owner_task: NOT_APPLICABLE
-runtime_namespace: NOT_APPLICABLE
-canonical_registration: NOT_APPLICABLE
-canonical_lease_generation: NOT_APPLICABLE
-registration_lease_generation: NOT_APPLICABLE
+runtime_namespace: canonical-live-runtime
+canonical_registration: UNKNOWN
+canonical_lease_generation: UNKNOWN
+registration_lease_generation: UNKNOWN
 gate_a: NOT_APPLICABLE
 generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
-target_uniqueness: NOT_APPLICABLE
+target_uniqueness: PROVEN
 mutation_authorized: false
 gui_input_authorized: false
 process_control_authorized: false
@@ -35,110 +35,111 @@ credentials_allowed: false
 login_allowed: false
 gameplay_allowed: false
 transaction_authorized: false
-base_main: 73487b0746b898365c759dbfc193e914e619acfb
-branch: feat/OTC-20260820-surveyor-auth-session-reader
+base_main: 16f83cf70548cbbe1eb6cb3838d27fbe6e0430e3
+branch: fix/OTC-20260820-surveyor-auth-session-postmerge-e2e
 implementation_pr: 636
+implementation_merge_sha: 16f83cf70548cbbe1eb6cb3838d27fbe6e0430e3
 physical_e2e_required: true
 physical_e2e_result: NOT_RUN
-updated_at: 2026-08-21T07:44:00+02:00
-next_action: validate the exact PR head with the dedicated hosted Surveyor test workflow and normal CI/governance, then perform fresh exact-head audit and merge only if all gates are green
+updated_at: 2026-08-21T08:08:00+02:00
+next_action: validate and merge the one-shot trusted-main read-only acceptance workflow with exact phrase ONE_SHOT_SURVEYOR_AUTH_READ_ONLY; allow the workflow to freshly re-prove runtime identity before any semantic read
 ---
 
 # Surveyor v2 next gap — auth/session typed reader
 
-## Current-main selection evidence
+## Selected gap
 
-Trusted base at task start: `73487b0746b898365c759dbfc193e914e619acfb`.
+Fresh pre-implementation repository-only and admitted physical Surveyor `--collect-all` both produced 169 canonical rows, 12 alias views, 10 missing typed readers and privacy PASS. `auth_session_typed_reader` ranked first at score 125. `world_minimap_typed_reader` tied at 125 but overlapped active #475/#593, so auth/session was selected.
 
-Fresh repository-only and admitted physical current-main Surveyor `--collect-all` runs produced:
+## Implementation result
 
-- canonical rows: 169;
-- alias views: 12;
-- missing typed readers: 10;
-- privacy scan: PASS;
-- implemented typed reader: `player_state_typed_reader`;
-- rank 1: `auth_session_typed_reader`, canonical priority score 125, 14 unresolved affected rows;
-- rank 2: `world_minimap_typed_reader`, canonical priority score 125.
+Implementation PR #636 merged to `main` as:
 
-`world_minimap_typed_reader` was not selected because open #475 owns the physical world-map server-delivery frontier and open #593 owns current world-minimap static G1 evidence. `auth_session_typed_reader` is therefore the highest-value current non-overlapping reader gap.
+`16f83cf70548cbbe1eb6cb3838d27fbe6e0430e3`
 
-## Pre-implementation physical baseline
+The merged reader is exact-current-build, fail-closed and read-only. It validates the exact official client and deployed Qt StateMachine library, resolves the singleton `TGameClient`, verifies `TGameClient + 0x8d0 -> TAuthenticationProcessController`, and exposes only the exact `QStateMachine::isRunning()`-equivalent lifecycle boolean.
 
-The last explicitly admitted pre-implementation observation proved:
+It explicitly emits `TYPED_AUTH_LIFECYCLE_ONLY`, `in_game_claimed=false`, `credentials_retained=false`, `session_secrets_retained=false`, and `semantic_promotion_allowed=false`.
 
-- target container `otclient-track-a-kasmvnc`: running;
-- control container `otclient-synology-runner`: running;
-- display `:1`: connect PASS;
-- exact `client` PID: `19590`;
-- process start ticks: `76611792`;
-- exact client size/SHA: `52109920 / ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8`;
-- exactly one target process and one matching visible Tibia window;
-- canonical lease generation `19`, released, with no active controller;
-- canonical registration generation `2`, lease generation `19`, identity matching PID/start/size/SHA/display, semantic state `UNKNOWN`;
-- process environment read: false;
-- raw window title retained: false.
+## Implementation validation
 
-That admission is retained as historical before-evidence only. Current frontmatter is reset to `runtime_access:none`; any post-merge physical observation requires a fresh admission rather than reuse of stale runtime authority.
+Exact implementation head `18bee436f57915bf61d59f0d068448a5b91e6ab1` passed:
 
-## Exact-current implementation evidence
+- Track A Surveyor tests run `32452573096`: PASS;
+- Python compile: PASS;
+- 40/40 focused Surveyor tests: PASS;
+- repository-only collect-all: 169 rows / 12 aliases / 9 missing readers / privacy PASS;
+- CI run `32452573404`: PASS;
+- Track A agent runtime governance `32452573189`: PASS;
+- Track A canonical live governance `32452573109`: PASS;
+- fresh exact-head validator audit: PASS, material findings 0;
+- open review threads: 0.
 
-The exact current binary resolves:
+## Historical physical before-evidence
+
+The last explicitly admitted pre-implementation observation proved one exact current client in `otclient-track-a-kasmvnc`, display `:1`, PID `19590`, start ticks `76611792`, size `52109920`, SHA-256 `ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8`, one matching visible Tibia window, released lease generation `19`, and matching canonical registration generation `2` / lease generation `19`. Semantic registration state remained `UNKNOWN`.
+
+That exact PID/start/control metadata is historical before-evidence only. The post-merge workflow must re-prove the current target from scratch and fails closed before `/proc/PID/mem` if PID/start/fence/window/registration ownership conditions no longer hold.
+
+The target namespace itself was proven unique for the bounded read-only programme and remains the declared observation namespace. Frontmatter does not promote the historical PID/start values into current authority.
+
+## Exact static/live lifecycle evidence
+
+Durable implementation evidence:
+
+`docs/agents/evidence/OTC-20260820-surveyor-auth-session-reader/current-build-auth-lifecycle.md`
+
+Exact current identities:
 
 - `TGameClient` typeinfo/vptr: `0x30a7778 / 0x30adce8`;
 - `TAuthenticationProcessController` typeinfo/vptr: `0x30b4410 / 0x30b5290`;
-- current `TGameClient::onGameSessionConnected` implementation reads the controller from `TGameClient + 0x8d0`;
-- bounded live type correlation confirmed that member points to the exact auth controller without inspecting credential or play-session payload fields.
+- auth-controller member: `TGameClient + 0x8d0`;
+- Qt StateMachine library size/SHA: `394824 / 26f504ae723fa15c77e0c33a93a964a305c63577f2bed3f136c098b7b06921e8`;
+- Qt `isRunning()` layout: private pointer `+0x8`, private state `+0xf0`, running value `2`.
 
-The exact deployed `libQt6StateMachine.so.6` is fenced at size `394824`, SHA-256 `26f504ae723fa15c77e0c33a93a964a305c63577f2bed3f136c098b7b06921e8`. Its `QStateMachine::isRunning()` reads private pointer offset `0x8`, compares private state offset `0xf0` with value `2`, and returns that boolean. The pre-implementation live controller state was `0`, hence `authentication_state_machine_running=false` under this exact predicate.
+Pre-implementation bounded read-only correlation observed lifecycle state `0`, equivalent to `authentication_state_machine_running=false`. This is not an `IN_GAME` discriminator.
 
-Durable detail: `docs/agents/evidence/OTC-20260820-surveyor-auth-session-reader/current-build-auth-lifecycle.md`.
+## One-shot post-merge acceptance
 
-## Implemented slice
+Owned temporary workflow:
 
-PR #636 now contains:
+`.github/workflows/track-a-surveyor-auth-session-postmerge.yml`
 
-- `tools/tibia_re_surveyor/auth_session.py` with deterministic exact-build layout resolver and bounded read-only runtime probe;
-- exact client and Qt StateMachine fences;
-- singleton heap resolution of the exact `TGameClient` primary vptr;
-- exact `TGameClient + 0x8d0` auth-controller vptr validation;
-- exact Qt `isRunning()`-equivalent lifecycle boolean;
-- explicit `TYPED_AUTH_LIFECYCLE_ONLY`, `in_game_claimed=false`, `semantic_promotion_allowed=false` output;
-- collect-all integration registering both auth/session and player-state readers as implemented;
-- focused auth/session tests plus updated Surveyor gap expectations: repository-only collect-all is expected to report 9 missing readers after this slice;
-- a dedicated GitHub-hosted Surveyor test workflow is authorized in this task so these Python tests and repository-only collect-all assertions run on the exact PR head and future matching changes.
+It is push-to-main only, owner-actor gated and additionally requires the merge commit message marker `ONE_SHOT_SURVEYOR_AUTH_READ_ONLY`. It has `contents: read`, no secrets and no mutation path. Before semantic collection it must freshly prove:
 
-A validation pass found the original Qt lifecycle comparison regex ended with a word-boundary assertion after `(%rax)`, which cannot match a normal line ending. The implementation was repaired before readiness to use the exact objdump-compatible comparison shape without that invalid terminal boundary.
+- no conflicting fresh canonical lease owner;
+- exactly one `client` in the declared target container;
+- exact current size/SHA;
+- process start ticks;
+- display connectivity;
+- exactly one matching visible Tibia window;
+- canonical registration identity consistency when registration is present.
 
-## Scope
+It then runs only the merged passive Surveyor collect-all and requires:
 
-Owned implementation paths are limited to:
+- runtime admission `AVAILABLE`;
+- auth typed reader `AVAILABLE`;
+- `process_memory_access=read_only`;
+- `TYPED_AUTH_LIFECYCLE_ONLY`;
+- `in_game_claimed=false`;
+- credentials/session secrets retained false;
+- aliases `12`;
+- missing readers `9`;
+- privacy PASS.
 
-- `tools/tibia_re_surveyor/**`;
-- `tests/tools/tibia_re_surveyor/**`;
-- `.github/workflows/track-a-surveyor-tests.yml` for non-secret GitHub-hosted deterministic Surveyor validation only;
-- `docs/agents/evidence/OTC-20260820-surveyor-auth-session-reader/**`;
-- this task record and required closeout/catalog/changelog metadata.
+The causal acceptance is an implementation differential, not a login-state transition: pre-implementation auth reader `NO_TYPED_READER_IMPLEMENTED` / gap count `10` becomes post-merge `AVAILABLE` / gap count `9` on a freshly admitted physical snapshot.
 
-Do not modify or take ownership of #475/#593 world-map surfaces, Control Center, Ollama/local models, credentials, login, network mutation, client bytes or process-memory writes.
+## Hard safety boundary
 
-## Runtime boundary
+No login/logout/relogin, user credential access, GUI/gameplay input, process control, attach/debug/injection, memory write, client/container restart, network mutation, item/economic action or local-model execution is authorized. The workflow reads only declared safe control metadata and the exact reader opens process memory with `O_RDONLY|O_CLOEXEC`.
 
-Any future lease/registration/PID/start/fence/display/window identity change requires fresh read-only admission before observation.
+`BRIDGE_3_OF_3` remains structural presence only and is never `IN_GAME` proof.
 
-Read-only observation never authorizes login, logout/relogin, input, process control, attach/debug/injection, memory writes, item/economic actions, network mutation or secret-bearing memory access. `mutation_authorized=false` throughout this slice.
+## Acceptance remaining
 
-`BRIDGE_3_OF_3` remains structural presence only and is never treated as `IN_GAME` proof.
-
-## Acceptance
-
-- exact-current-build static discovery/resolver deterministic and fail-closed;
-- reader returns bounded typed non-secret lifecycle state and distinguishes unavailable/read failure from healthy values;
-- exact client or Qt-library mismatch disables the reader;
-- collect-all integrates the reader without semantic-promotion authority;
-- repository-only collect-all moves missing-reader count from 10 to 9 while privacy remains PASS;
-- focused tests and compile/static checks PASS;
-- required current Track A governance/CI PASS on exact final head;
-- fresh independent audit has no open material finding;
-- implementation PR merges to `main`;
-- post-merge physical read-only causal E2E freshly re-admits the target and proves the implementation delta `auth missing -> AVAILABLE`, `10 -> 9`, privacy PASS without requiring a login-state transition;
-- durable final evidence is recorded, task archived and ownership released.
+- one-shot workflow PR exact-head CI/governance/audit PASS;
+- one-shot workflow merged to trusted `main` with the exact authorization marker;
+- physical read-only acceptance PASS and sanitized artifact/log evidence captured;
+- temporary one-shot workflow removed;
+- durable post-merge evidence recorded;
+- this task archived and runtime access reset to none.

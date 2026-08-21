@@ -1,7 +1,7 @@
 ---
 task_id: OTC-20260821-surveyor-action-protocol-reader
-status: implementing
-phase: live_diagnostic_repair
+status: validating
+phase: diagnostic_exact_head_validation
 agent: ChatGPT
 project_lane: otclient
 lane: P0-ACTION
@@ -41,15 +41,11 @@ owned_paths:
   - tools/tibia_re_surveyor/action_protocol_presence.py
   - tests/tools/tibia_re_surveyor/test_action_protocol_presence.py
   - docs/agents/tasks/active/OTC-20260821-surveyor-action-protocol-reader.md
-modules_touched:
-  - tibia_re_surveyor
+modules_touched: [tibia_re_surveyor]
 reuses:
   - tools/tibia_re_surveyor/typed_presence.py
   - tools/tibia_re_surveyor/runtime.py
-depends_on:
-  - PR-645
-  - PR-646
-  - PR-648
+depends_on: [PR-645, PR-646, PR-648]
 blocks: []
 implementation_pr: 645
 implementation_merge_sha: f80dd43f741c39ce5ee4296396cb07891d04c324
@@ -57,7 +53,9 @@ acceptance_pr: 646
 acceptance_merge_sha: b7fa88ef2d772c70ca7250b587e7f584327ee37b
 repair_pr: 648
 repair_merge_sha: dbc05824fb539a5dfffb0bd8cb48dbfb3a9a01e1
-diagnostic_repair_pr: PENDING
+diagnostic_repair_pr: 652
+diagnostic_validation_run: 32511970231
+diagnostic_validation_result: PASS_51_OF_51
 selected_gap: action_protocol_typed_reader
 physical_e2e_required: true
 physical_e2e_result: FAIL_LIVE_TYPED_PROBE_DIAGNOSTIC_REPAIR
@@ -67,9 +65,9 @@ last_physical_trigger_pr: 651
 physical_static_vptr_offset: 0x30bf620
 physical_static_typeinfo_offset: 0x30bf298
 invocation_started_at: 2026-08-21T17:30:00Z
-last_progress_at: 2026-08-21T18:06:18Z
+last_progress_at: 2026-08-21T18:10:34Z
 ci_checks_for_current_head: 0
-ci_check_generation: diagnostic_repair
+ci_check_generation: diagnostic_repair_final
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -81,48 +79,34 @@ stall_warnings: 0
 
 # Surveyor v2 — action protocol typed reader acceptance
 
-## Current verified checkpoint
+## Verified chain
 
-Implementation PR #645 merged as `f80dd43f741c39ce5ee4296396cb07891d04c324`. Read-only acceptance authority PR #646 merged as `b7fa88ef2d772c70ca7250b587e7f584327ee37b`. Repair PR #648 removed the unavailable `strings`/`readelf` runtime dependency and merged as `dbc05824fb539a5dfffb0bd8cb48dbfb3a9a01e1` after exact-head Surveyor, Track A governance, audit and required CI PASS.
+PR #645 merged the exact-fenced action-protocol typed reader as `f80dd43f741c39ce5ee4296396cb07891d04c324`. PR #646 merged the bounded trusted-main read-only physical acceptance workflow as `b7fa88ef2d772c70ca7250b587e7f584327ee37b`. PR #648 replaced unavailable external `strings`/`readelf` dependencies with a pure-Python exact-current ELF resolver and merged as `dbc05824fb539a5dfffb0bd8cb48dbfb3a9a01e1` after hosted validation, fresh audit and required CI PASS.
 
-Fresh physical request-only trigger PR #651 used exact trusted base `dbc05824fb539a5dfffb0bd8cb48dbfb3a9a01e1`. Workflow run `32511156780`, authority job `96862488233`, proved owner trigger authority; acceptance job `96862518180` executed only trusted-main code and remained read-only.
+Fresh request-only trigger PR #651 used exact trusted base `dbc05824fb539a5dfffb0bd8cb48dbfb3a9a01e1`. Physical run `32511156780` / acceptance job `96862518180` executed only trusted-main code and remained immutable read-only.
 
-Fresh runtime preflight PASS on that run:
-
+Fresh runtime preflight PASS:
 - one exact client in `otclient-track-a-kasmvnc`;
-- PID `19590`, process start ticks `76611792`;
+- PID/start `19590 / 76611792`;
 - executable `/home/kasm-user/otclient-track-a/Tibia-32177065988-1/bin/client`;
 - size `52109920`, SHA-256 `ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8`;
-- display `:1`, exactly one matching visible Tibia window;
-- target uniqueness `PROVEN`;
-- canonical registration present and identity-matching, generation `2`, lease generation `19`;
-- lease generation `19`, status released/expired;
-- no credential access, GUI input, process control, process-memory write, network mutation or runtime mutation.
+- display `:1`, exactly one matching visible Tibia window, target uniqueness `PROVEN`;
+- canonical registration generation `2`, identity-matching, lease generation `19`; lease released/expired;
+- credential access, GUI input, process control, process-memory write, network mutation and runtime mutation all false.
 
-The passive collect produced 169 rows, 12 aliases, 8 repository-known missing readers and `READ_ONLY_ADMITTED`. Exact-current static RTTI resolution succeeded for `tibia::game::TPlayerProtocolMessageHandler` with typeinfo `0x30bf298` and primary vptr `0x30bf620`. Live typed-presence still failed closed as `LIVE_TYPED_PROBE_FAILED:RuntimeError`; no semantic promotion occurred.
+Passive collect produced 169 rows, 12 aliases, 8 repository-known missing readers and `READ_ONLY_ADMITTED`. Exact-current static RTTI resolution succeeded for `tibia::game::TPlayerProtocolMessageHandler`: typeinfo `0x30bf298`, primary vptr `0x30bf620`. Live typed-presence still failed closed as `LIVE_TYPED_PROBE_FAILED:RuntimeError`; no semantic promotion occurred.
 
-## Current repair hypothesis
+## Diagnostic repair #652
 
-The generic presence probe additionally filters an aligned exact-vptr match by assuming the word at `object + 8` is a non-zero pointer into a writable mapping. That discriminator has not been physically proven for `TPlayerProtocolMessageHandler`. The current repair does **not** remove the discriminator or claim object identity. It adds action-protocol-specific bounded diagnostics that expose only two integer counts on failure: exact-vptr matches before the filter and matches after the filter. Arbitrary child stderr, object addresses, memory bytes, packet payloads and gameplay data remain unexposed. The probe remains exact-fenced, bounded and `O_RDONLY`.
+The existing generic presence probe filters each aligned exact-vptr candidate by additionally requiring the word at `object + 8` to be a non-zero pointer into a writable mapping. That discriminator has not been physically proven for `TPlayerProtocolMessageHandler`.
 
-## Read-only admission checkpoint
+PR #652 does **not** remove or weaken this filter and does not claim object identity. It adds an action-protocol-specific wrapper that, only on failure, exposes two bounded integer counts: aligned exact-vptr matches before the filter and matches after it. Whitelisted fence/lifetime error codes may also be retained. Object addresses, memory bytes, arbitrary child stderr, packet payloads, credentials and gameplay data remain unexposed. The underlying probe remains exact-fenced, bounded and opens `/proc/PID/mem` only `O_RDONLY|O_CLOEXEC`.
 
-Every physical retry must freshly re-read target container, one exact client PID/start, executable path/size/SHA, display, one matching window, lease/control state, registration identity and trusted-main ancestry. Only after these checks may Surveyor open `/proc/PID/mem` with `O_RDONLY` and run passive `--collect-all`.
+Hosted Surveyor validation run `32511970231` PASS: Python compile PASS, 51/51 focused tests PASS, repository-only collect-all 169 rows / 12 aliases / 8 missing readers / privacy PASS, `git diff --check` PASS.
 
 ## Acceptance contract
 
-PASS requires all of:
-
-- 169 canonical rows and 12 aliases;
-- privacy PASS;
-- `action_protocol_typed_reader` `AVAILABLE`;
-- exact `tibia::game::TPlayerProtocolMessageHandler` object count = 1;
-- `typed_object_identity=PROVEN`;
-- `process_memory_access=read_only`;
-- semantic state `TYPED_ACTION_PROTOCOL_OBJECT_IDENTITY_ONLY`;
-- action-to-protocol, serialized-message, opcode, packet-payload and `IN_GAME` claims all false;
-- missing typed readers `9 -> 8`;
-- no runtime mutation.
+A physical PASS still requires 169 canonical rows, 12 aliases, privacy PASS, `action_protocol_typed_reader=AVAILABLE`, exactly one `tibia::game::TPlayerProtocolMessageHandler`, `typed_object_identity=PROVEN`, `process_memory_access=read_only`, semantic state `TYPED_ACTION_PROTOCOL_OBJECT_IDENTITY_ONLY`, all action/protocol/opcode/payload/`IN_GAME` promotion claims false, missing typed readers `9 -> 8`, and no runtime mutation.
 
 ## Hard safety boundary
 

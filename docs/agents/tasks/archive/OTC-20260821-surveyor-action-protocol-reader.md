@@ -37,7 +37,7 @@ physical_e2e_job: 96872176204
 physical_e2e_artifact: 9458204826
 physical_e2e_artifact_digest: sha256:1368e91ee2206f050d253775f0a607f3c14c5e741721337f552231ccf8c92e5e
 final_trigger_pr: 653
-closeout_pr: pending
+closeout_pr: 655
 ---
 
 # Surveyor v2 action-protocol typed reader — completed
@@ -54,4 +54,4 @@ Causal implementation delta: action-protocol reader `NO_TYPED_READER_IMPLEMENTED
 
 Canonical evidence: `docs/agents/evidence/OTC-20260821-surveyor-action-protocol-reader/20260821-live-physical-e2e.md`.
 
-Request-only trigger PR #653 was closed without merge after evidence capture. The temporary acceptance workflow is removed by the closeout change. The broader Surveyor program remains open with eight missing typed-reader gaps after this slice.
+Request-only trigger PR #653 was closed without merge after evidence capture. The temporary acceptance workflow is removed by closeout PR #655. The broader Surveyor program remains open with eight missing typed-reader gaps after this slice.

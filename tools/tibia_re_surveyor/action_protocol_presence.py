@@ -17,6 +17,10 @@ def _build_diagnostic_probe() -> str:
     probe = READ_ONLY_PRESENCE_PROBE
     replacements = (
         (
+            'if sum(end-begin for begin,end,*_ in rw) > 1536*1024*1024: raise SystemExit("RW_SCAN_BOUND_EXCEEDED")',
+            'if sum(end-begin for begin,end,*_ in rw) > 2*1024*1024*1024: raise SystemExit("RW_SCAN_BOUND_EXCEEDED")',
+        ),
+        (
             'pat=struct.pack("<Q",expected_vptr); hits=[]',
             'pat=struct.pack("<Q",expected_vptr); raw_hits=[]; hits=[]',
         ),

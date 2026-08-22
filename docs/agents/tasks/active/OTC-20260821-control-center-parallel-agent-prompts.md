@@ -11,7 +11,7 @@ risk: medium
 branch: docs/control-center-parallel-agent-prompts-20260821
 base_branch: main
 created: 2026-08-21T17:45:00+02:00
-updated: 2026-08-22T16:05:00+02:00
+updated: 2026-08-22T16:18:00+02:00
 initial_base_sha: 532b54fa60d11ae10227ab16dc02cd0cadf39b23
 related_pr: 650
 runtime_access: none
@@ -142,6 +142,8 @@ Codex independent review `PRR_kwDOTVmdjs8AAAABKgpUnQ` audited exact head `06a422
 - `PRRT_kwDOTVmdjs6bZDWe`: Package C normalization wording could allow a candidate/pending-causal Surveyor player position into normalized `GameSnapshot`. Repaired so normalized position requires explicit accepted causal semantic promotion; candidate/pending-causal values remain provenance/source-quality only and normalized position stays unknown.
 
 Fresh re-audit `PRR_kwDOTVmdjs8AAAABKgp-nw` on repaired head `442c299dc417962a11c20f395a16512b1eacea45` confirmed those two threads as outdated/closed-by-change but opened two analogous P1 routing findings: `PRRT_kwDOTVmdjs6bZFdt` for Package B and `PRRT_kwDOTVmdjs6bZFdu` for Package C. Both canonical+alias metadata were repaired to `single_task` / `stop_at_task_boundary` / `finalize_archive_and_stop`; E01/E02 encode the task-boundary requirement.
+
+Synchronized exact-head audit on `9fc73d490d66678b84c2e3f58ebda17cf9113c7d` found one additional P1: `finalize_archive_and_stop` was not a Prompting Standard 2.1 enum value. All six worker/alias headers now retain `single_task` / `stop_at_task_boundary` but use supported `finalize_archive_and_continue`; the stop-at-boundary contract prevents follow-on task selection while preserving archive semantics.
 
 Third fresh independent Codex review of exact head `b8ff280ec47036df30cca64059fa0eca81d37a21` returned no major/material issues. All four prior P1 threads are resolved and outdated after the corresponding fixes.
 

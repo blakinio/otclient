@@ -18,7 +18,7 @@ network_listener_allowed: false
 real_package_d_runtime_authorized: false
 run_scope: single_task
 continuation_policy: stop_at_task_boundary
-task_completion_policy: finalize_archive_and_stop
+task_completion_policy: finalize_archive_and_continue
 user_communication: low_noise
 ```
 

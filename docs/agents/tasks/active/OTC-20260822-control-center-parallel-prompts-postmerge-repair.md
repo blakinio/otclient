@@ -8,10 +8,10 @@ track_id: official-client-re
 task_kind: postmerge_remediation
 phase: validation
 risk: medium
-branch: docs/control-center-parallel-agent-prompts-20260821
+branch: fix/control-center-parallel-prompts-postmerge-20260822
 base_branch: main
 created: 2026-08-22T16:20:00+02:00
-updated: 2026-08-22T16:20:00+02:00
+updated: 2026-08-22T16:27:00+02:00
 runtime_access: none
 runtime_owner_task: NOT_APPLICABLE
 runtime_namespace: NOT_APPLICABLE
@@ -48,13 +48,23 @@ depends_on:
 blocks:
   - Package B/C/D-prep launch until this repair is merged
 ownership_released: false
+prompt_contract:
+  version: 1.0.1
+  changed_surfaces:
+    - routing or continuation rule
+    - canonical worker prompt headers
+    - alias prompt headers
+  objective: repair unsupported completion-policy enum while preserving single-task stop-at-boundary semantics
+  baseline_version: control-center-parallel-prompts@1.0.0#9c54c1a4e22db974109298a23be39d9b04305e76
+  eval_suite: docs/agents/evidence/OTC-20260821-control-center-parallel-agent-prompts/prompt-eval.md
+  rollback_version: docs/agents/prompts/TIBIA_RE_CONTROL_CENTER_MVP.md@9dee1f97694a591b1f9a784556f1357f966c2e57
 ---
 
 # Control Center parallel prompt post-merge repair
 
 ## Finding
 
-The synchronized independent audit of PR #650 found P1 `PRRT_kwDOTVmdjs6bZGW9`: all six new worker/alias headers used undeclared Prompting Standard 2.1 value `finalize_archive_and_stop`.
+The synchronized independent audit of PR #650 found P1 `PRRT_kwDOTVmdjs6bZQvw`: all six new worker/alias headers used undeclared Prompting Standard 2.1 value `finalize_archive_and_stop`.
 
 PR #650 auto-merged before that audit result arrived. This task repairs trusted main immediately without expanding authority.
 
@@ -67,8 +77,8 @@ Use supported `task_completion_policy: finalize_archive_and_continue` while reta
 - [x] six worker/alias headers use only declared Prompting Standard 2.1 values
 - [x] `single_task` / `stop_at_task_boundary` remains intact
 - [x] no runtime/credential/login/mutation authority changes
-- [ ] exact-head CI/governance PASS
-- [ ] fresh independent exact-head audit has no P0/P1
+- [x] exact-head CI/governance PASS on pre-version-bump head `f0ceff3ff32273ae1d70e365e28e9bc4b86c7126`; rerun required on successor
+- [ ] fresh independent exact-head audit has no P0/P1 (prior audit found versioning P1, now repaired)
 - [ ] repair PR merged
 - [ ] this task archived and ownership released
 

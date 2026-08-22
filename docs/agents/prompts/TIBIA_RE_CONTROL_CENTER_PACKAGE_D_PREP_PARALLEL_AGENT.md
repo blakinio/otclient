@@ -1,7 +1,7 @@
 # TIBIA RE Control Center — Package D preparation parallel worker
 
 ```yaml
-prompt_contract_version: 1.0.0
+prompt_contract_version: 1.0.1
 prompting_standard_version: 2.1
 alias: OTCLIENT-TIBIA-RE-CONTROL-CENTER-PACKAGE-D-PREP
 repository: blakinio/otclient

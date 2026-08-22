@@ -65,7 +65,7 @@ blocks:
 cross_repository_tasks: []
 ownership_released: false
 prompt_contract:
-  version: 1.0.0
+  version: 1.0.1
   changed_surfaces:
     - worker prompts
     - alias prompts

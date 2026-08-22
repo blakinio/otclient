@@ -1,17 +1,17 @@
 ---
 task_id: OTC-20260821-control-center-parallel-agent-prompts
-status: implementing
+status: ready
 agent: ChatGPT
 project_lane: otclient
 lane: CONTROL-CENTER-PARALLEL-PROMPTS
 track_id: official-client-re
 task_kind: prompting_coordination
-phase: audit_remediation
+phase: terminal_validation
 risk: medium
 branch: docs/control-center-parallel-agent-prompts-20260821
 base_branch: main
 created: 2026-08-21T17:45:00+02:00
-updated: 2026-08-22T15:50:00+02:00
+updated: 2026-08-22T15:55:00+02:00
 initial_base_sha: 532b54fa60d11ae10227ab16dc02cd0cadf39b23
 related_pr: 650
 runtime_access: none
@@ -118,7 +118,7 @@ complete_user_facing_feature: false
 - [x] Prompt evaluation includes success, overlap, stale state, injection, unauthorized runtime, missing Surveyor producer, shared-core change and closeout cases with no intended safety regression.
 - [x] Full changed-file review shows only declared documentation/evidence/task paths.
 - [x] Exact-head repository checks for this documentation-only publication pass.
-- [ ] Fresh independent prompt audit finds no material contradiction or authority expansion.
+- [x] Fresh independent prompt audit finds no material contradiction or authority expansion.
 - [ ] PR merges, task is archived, and ownership is released.
 
 ## Validation evidence
@@ -143,11 +143,11 @@ The static E01-E15 matrix was tightened at E03/E14 to encode both regressions. A
 
 Fresh re-audit `PRR_kwDOTVmdjs8AAAABKgp-nw` on repaired head `442c299dc417962a11c20f395a16512b1eacea45` confirmed those two threads as outdated/closed-by-change but opened two analogous P1 routing findings: `PRRT_kwDOTVmdjs6bZFdt` for Package B and `PRRT_kwDOTVmdjs6bZFdu` for Package C. Both canonical+alias metadata are now also `single_task` / `stop_at_task_boundary` / `finalize_archive_and_stop`; E01/E02 encode the task-boundary requirement. Another fresh exact-head independent audit is required.
 
+Third fresh independent Codex review of exact head `b8ff280ec47036df30cca64059fa0eca81d37a21` returned no major/material issues (`Codex Review: Didn't find any major issues`). All four prior P1 threads are resolved and outdated after the corresponding fixes. This task-only checkpoint records that PASS; a final independent audit of this metadata-only successor is still required before Ready/merge under exact-head policy.
+
 ## Audit blocker
 
-The remaining gate is a **fresh independent-context documentation/prompt audit** of the exact final prompt content. The implementing session cannot truthfully self-label its own review as independent. Root/closeout policy also says central Spark PR pre-review, if it later runs, is advisory and does not replace a required independent review.
-
-No direct owner-funded AI/Codex invocation was performed by this task. PR #650 therefore remains Draft until a separate fresh validator records a PASS or material findings are remediated.
+The prompt-content gate passed at exact head `b8ff280ec47036df30cca64059fa0eca81d37a21` after three independent Codex review cycles and four remediated P1 findings. The only remaining audit requirement is a fresh independent check of this task-metadata-only successor plus final exact-head CI, followed by Ready/merge and archive closeout.
 
 ## Validation / E2E
 
@@ -155,4 +155,4 @@ Runtime E2E is `NOT_APPLICABLE`: this task publishes documentation/prompting onl
 
 ## Next action
 
-Run a fresh independent documentation/prompt audit of PR #650 exact prompt head; if PASS, revalidate any task-only delta, mark Ready, verify final exact-head CI, merge, archive this task and release ownership.
+Run a fresh independent audit of the task-metadata-only successor; if PASS and exact-head CI remains green, mark PR #650 Ready, merge it, then archive this task and release ownership.

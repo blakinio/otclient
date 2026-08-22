@@ -17,7 +17,7 @@ gameplay_allowed: false
 control_api_listener: loopback_only
 run_scope: single_task
 continuation_policy: stop_at_task_boundary
-task_completion_policy: finalize_archive_and_stop
+task_completion_policy: finalize_archive_and_continue
 user_communication: low_noise
 ```
 

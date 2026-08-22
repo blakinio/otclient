@@ -197,7 +197,7 @@ Examples:
 - missing typed reader -> explicit unsupported/unavailable source-quality entry;
 - stale runtime input -> stale/unknown normalized field, never mutation authority;
 - structural presence without semantic proof -> source-quality/provenance only;
-- player-state typed-reader output may populate normalized position only when the producer schema/provenance says that field is supported and current input passes validation;
+- player-state typed-reader output may populate normalized position only after current accepted producer evidence explicitly records completed causal semantic promotion for that exact field and the current input passes schema/provenance validation; candidate or pending-causal values remain provenance/source-quality only and normalized position stays unknown;
 - Surveyor `semantic_promotion_allowed: false` remains authoritative for its own evidence; Control Center must not flip it.
 
 Do not infer causality from bundle generation time or ingestion order.

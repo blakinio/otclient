@@ -1,17 +1,17 @@
 ---
 task_id: OTC-20260821-control-center-parallel-agent-prompts
-status: waiting
+status: implementing
 agent: ChatGPT
 project_lane: otclient
 lane: CONTROL-CENTER-PARALLEL-PROMPTS
 track_id: official-client-re
 task_kind: prompting_coordination
-phase: auditing
+phase: audit_remediation
 risk: medium
 branch: docs/control-center-parallel-agent-prompts-20260821
 base_branch: main
 created: 2026-08-21T17:45:00+02:00
-updated: 2026-08-21T18:18:00+02:00
+updated: 2026-08-22T15:45:00+02:00
 initial_base_sha: 532b54fa60d11ae10227ab16dc02cd0cadf39b23
 related_pr: 650
 runtime_access: none
@@ -131,6 +131,15 @@ complete_user_facing_feature: false
 - GitHub exact-head checks at `e958379388429c07ba7bace062e1e8f70b756193`: `CI` run `32500710415` SUCCESS; `Track A agent runtime governance` run `32500710184` SUCCESS; unrelated Surveyor physical workflow `32500710174` SKIPPED as expected for this docs-only PR.
 - Current Surveyor source was inspected for discovery values and the C prompt requires revalidation rather than hard authority reuse.
 - Current Track A admission and Control Center adapter contracts were inspected so D-prep remains strictly no-runtime and cannot silently expand into real Package D execution.
+
+## Fresh independent audit findings ? 2026-08-22
+
+Codex independent review `PRR_kwDOTVmdjs8AAAABKgpUnQ` audited exact head `06a422162adf5207875ee4c800b372c25d84033a` and opened two material P1 findings:
+
+- `PRRT_kwDOTVmdjs6bZDWd`: D-prep routing used autonomous-program continuation fields that could permit a follow-on real Package D task despite this alias being preparation-only and `runtime_access:none`. Repaired by making both D-prep canonical and alias metadata `single_task` / `stop_at_task_boundary` / `finalize_archive_and_stop`.
+- `PRRT_kwDOTVmdjs6bZDWe`: Package C normalization wording could allow a candidate/pending-causal Surveyor player position into normalized `GameSnapshot`. Repaired so normalized position requires explicit accepted causal semantic promotion; candidate/pending-causal values remain provenance/source-quality only and normalized position stays unknown.
+
+The static E01-E15 matrix was tightened at E03/E14 to encode both regressions. A fresh exact-head independent audit is required after this remediation.
 
 ## Audit blocker
 

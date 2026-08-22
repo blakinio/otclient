@@ -1,17 +1,17 @@
 ---
 task_id: OTC-20260821-control-center-parallel-agent-prompts
-status: ready
+status: completed
 agent: ChatGPT
 project_lane: otclient
 lane: CONTROL-CENTER-PARALLEL-PROMPTS
 track_id: official-client-re
 task_kind: prompting_coordination
-phase: terminal_validation
+phase: closeout
 risk: medium
 branch: docs/control-center-parallel-agent-prompts-20260821
 base_branch: main
 created: 2026-08-21T17:45:00+02:00
-updated: 2026-08-22T16:18:00+02:00
+updated: 2026-08-22T17:56:00+02:00
 initial_base_sha: 532b54fa60d11ae10227ab16dc02cd0cadf39b23
 related_pr: 650
 runtime_access: none
@@ -60,10 +60,9 @@ reuses:
   - docs/agents/PROMPT_EVAL_STANDARD.md
 depends_on:
   - main includes terminal Control Center Package A lifecycle closeout at 532b54fa60d11ae10227ab16dc02cd0cadf39b23
-blocks:
-  - direct owner launch of dedicated Package B, Package C and Package D-preparation workers from trusted main by short alias until PR #650 is independently audited and merged
+blocks: []
 cross_repository_tasks: []
-ownership_released: false
+ownership_released: true
 prompt_contract:
   version: 1.0.1
   changed_surfaces:
@@ -119,7 +118,7 @@ complete_user_facing_feature: false
 - [x] Full changed-file review shows only declared documentation/evidence/task paths.
 - [x] Exact-head repository checks for this documentation-only publication pass.
 - [x] Fresh independent prompt audit finds no material contradiction or authority expansion.
-- [ ] PR merges, task is archived, and ownership is released.
+- [x] PR merges, task is archived, and ownership is released.
 
 ## Validation evidence
 
@@ -155,4 +154,12 @@ Runtime E2E is `NOT_APPLICABLE`: this task publishes documentation/prompting onl
 
 ## Next action
 
-Require the fresh exact-head ready-state CI/governance generation to pass, then merge PR #650 and archive this task with ownership released.
+NONE — terminal.
+## Terminal closeout — 2026-08-22
+
+- Publication PR #650 merged as `9c54c1a4e22db974109298a23be39d9b04305e76`.
+- Post-merge repair PR #661 merged as `2239f787ab9c03b80f399d83c21275d92a008148`.
+- Final repair head `f103b15cab151d605020381ab1cde1b03c8a82ab`: CI run `32583016941` SUCCESS; Track A governance run `32583016806` SUCCESS; fresh Codex exact-head audit reported no major issues.
+- PR #661 final changed-file set: 9 declared prompt/eval/task paths; its only review thread is resolved.
+- Runtime E2E: NOT_APPLICABLE because this lifecycle is documentation/prompt publication only and had `runtime_access:none`.
+- Ownership is released; the Package B/C/D-prep aliases are unblocked on trusted main at prompt contract `1.0.1`.

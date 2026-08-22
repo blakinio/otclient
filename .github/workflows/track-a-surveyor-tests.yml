@@ -56,14 +56,15 @@ jobs:
           gap_aliases = {item["alias"] for item in gaps["reader_gaps"]}
           assert len(rows) == 169, len(rows)
           assert len(aliases) == 12, len(aliases)
-          assert len(gaps["reader_gaps"]) == 8, len(gaps["reader_gaps"])
+          assert len(gaps["reader_gaps"]) == 7, len(gaps["reader_gaps"])
           assert "TIBIA-RE-AUTH-SESSION" not in gap_aliases
           assert "TIBIA-RE-PLAYER-STATE" not in gap_aliases
           assert "TIBIA-RE-ACTION-PROTOCOL" not in gap_aliases
+          assert "TIBIA-RE-UI-SETTINGS" not in gap_aliases
           assert privacy["result"] == "PASS", privacy
           print("SURVEYOR_ROWS=169")
           print("SURVEYOR_ALIASES=12")
-          print("SURVEYOR_MISSING_READERS=8")
+          print("SURVEYOR_MISSING_READERS=7")
           print("SURVEYOR_PRIVACY=PASS")
           PY
 

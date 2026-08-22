@@ -60,9 +60,14 @@ summary.md
 manifest.sha256
 ```
 
-The first v2 layer deliberately does not invent typed client-memory readers. Each subsystem gets the repository evidence index plus the allowlisted common runtime observation when available. A missing typed reader is recorded as `UNAVAILABLE / NO_TYPED_READER_IMPLEMENTED` and ranked by current canonical blocker/dependency priority. That gap report is the input for later small reviewed reader tasks.
+The base v2 collect-all layer does not invent subsystem semantics. Each subsystem gets the repository evidence index plus the allowlisted common runtime observation when available. Reviewed typed readers are registered separately; any subsystem without one is recorded as `UNAVAILABLE / NO_TYPED_READER_IMPLEMENTED` and ranked by current canonical blocker/dependency priority. That gap report is the input for later small reviewed reader tasks.
 
 The v2 runtime snapshot is allowlisted: raw character-bearing window titles, arbitrary environment values, chat contents, packet payloads, credentials and auth/session secret values are not retained. Generated text/JSON is privacy-scanned before `manifest.sha256` is written. Output directories are owner-only where the host filesystem supports POSIX permissions.
+
+
+## Current typed readers
+
+The registry currently includes exact-fenced readers for player state, auth/session lifecycle, action/protocol object identity, and UI/settings. The UI/settings reader is deliberately narrower than the alias: it verifies the compiled `tibia::config::TClientOptions` model and reads only the two previously causally established Master Volume fields from `conf/clientoptions.json` anchored to the exact-fenced executable package root. It performs no process-memory access, retains no arbitrary settings document, and does not claim current UI application state, complete settings semantics, QSettings linkage, or `TClientOptions -> clientoptions.json` ownership.
 
 ## Local repository-only collect-all
 

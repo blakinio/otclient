@@ -1,17 +1,17 @@
 ---
 task_id: OTC-20260822-control-center-parallel-prompts-postmerge-repair
-status: validating
+status: completed
 agent: ChatGPT
 project_lane: otclient
 lane: CONTROL-CENTER-PARALLEL-PROMPTS
 track_id: official-client-re
 task_kind: postmerge_remediation
-phase: validation
+phase: closeout
 risk: medium
 branch: fix/control-center-parallel-prompts-postmerge-20260822
 base_branch: main
 created: 2026-08-22T16:20:00+02:00
-updated: 2026-08-22T16:27:00+02:00
+updated: 2026-08-22T17:56:00+02:00
 runtime_access: none
 runtime_owner_task: NOT_APPLICABLE
 runtime_namespace: NOT_APPLICABLE
@@ -45,9 +45,8 @@ owned_paths:
   - docs/agents/tasks/archive/OTC-20260822-control-center-parallel-prompts-postmerge-repair.md
 depends_on:
   - PR #650 merged as 9c54c1a4e22db974109298a23be39d9b04305e76
-blocks:
-  - Package B/C/D-prep launch until this repair is merged
-ownership_released: false
+blocks: []
+ownership_released: true
 prompt_contract:
   version: 1.0.1
   changed_surfaces:
@@ -77,11 +76,14 @@ Use supported `task_completion_policy: finalize_archive_and_continue` while reta
 - [x] six worker/alias headers use only declared Prompting Standard 2.1 values
 - [x] `single_task` / `stop_at_task_boundary` remains intact
 - [x] no runtime/credential/login/mutation authority changes
-- [x] exact-head CI/governance PASS on pre-version-bump head `f0ceff3ff32273ae1d70e365e28e9bc4b86c7126`; rerun required on successor
-- [ ] fresh independent exact-head audit has no P0/P1 (prior audit found versioning P1, now repaired)
-- [ ] repair PR merged
-- [ ] this task archived and ownership released
+- [x] exact-head CI/governance PASS on final head `f103b15cab151d605020381ab1cde1b03c8a82ab`: CI `32583016941`, governance `32583016806`
+- [x] fresh independent exact-head audit has no P0/P1 on final head `f103b15cab151d605020381ab1cde1b03c8a82ab`
+- [x] repair PR merged as `2239f787ab9c03b80f399d83c21275d92a008148`
+- [x] this task archived and ownership released
 
 ## Next action
 
-Open the narrow repair PR, validate exact head, obtain fresh independent review, merge, then archive both the repair task and the original prompt-publication lifecycle before launching Package C.
+NONE — terminal.
+## Terminal closeout — 2026-08-22
+
+Post-merge remediation is complete. PR #661 squash-merged as `2239f787ab9c03b80f399d83c21275d92a008148` from exact final head `f103b15cab151d605020381ab1cde1b03c8a82ab`. Final CI and governance passed, the fresh independent Codex audit reported no major issues, the versioning P1 thread is resolved, and ownership is released. Runtime E2E is NOT_APPLICABLE because this remediation is prompt-contract documentation only with no runtime authority.

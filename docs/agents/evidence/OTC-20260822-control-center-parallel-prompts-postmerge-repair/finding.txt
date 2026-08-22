@@ -1,4 +1,0 @@
-SEVERITY=P1
-FINDING=Use a declared completion-policy value
-SOURCE_PR=650
-SOURCE_MERGE=9c54c1a4e22db974109298a23be39d9b04305e76

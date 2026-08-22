@@ -30,7 +30,7 @@ class UiSettingsReaderTests(unittest.TestCase):
                 "reader_id": READER_ID,
                 "master_volume": 100,
                 "master_volume_old": 100,
-                "persistence_relative_path": "packages/Tibia/conf/clientoptions.json",
+                "persistence_relative_path": "conf/clientoptions.json",
                 "filesystem_access": "read_only",
                 "process_memory_access": "not_used",
             }
@@ -144,12 +144,50 @@ class UiSettingsReaderTests(unittest.TestCase):
         self.assertEqual(TYPE_NAME, doc["static_evidence"]["type_name"])
         self.assertNotIn("secret-noise", json.dumps(doc))
 
+    def test_root_binding_failure_is_bounded_and_secret_free(self):
+        calls = []
+
+        def runner(command):
+            calls.append(command)
+            if len(calls) == 1:
+                return self._static()
+            raise RuntimeError("CLIENT_PACKAGE_ROOT_BINDING_MISMATCH secret-noise")
+
+        doc = read_ui_settings(pid=123, start_ticks=456, runner=runner)
+        self.assertEqual("UNAVAILABLE", doc["state"])
+        self.assertEqual("LIVE_SETTINGS_READ_FAILED:CLIENT_PACKAGE_ROOT_BINDING_MISMATCH", doc["reason"])
+        self.assertNotIn("secret-noise", json.dumps(doc))
+
+    def test_probe_sources_bind_package_root_to_live_executable_descriptor(self):
+        self.assertIn('exe_fd=os.open(proc_exe,os.O_RDONLY|os.O_CLOEXEC)', READ_ONLY_SETTINGS_PROBE)
+        self.assertIn("exe_st=os.fstat(exe_fd)", READ_ONLY_SETTINGS_PROBE)
+        self.assertIn('os.readlink(f"/proc/self/fd/{fd}")', READ_ONLY_SETTINGS_PROBE)
+        self.assertIn('exe=descriptor_path(exe_fd,"CLIENT_EXE_DESCRIPTOR_PATH_INVALID")', READ_ONLY_SETTINGS_PROBE)
+        self.assertIn('bin_fd=os.open("bin",dir_flags,dir_fd=root_fd)', READ_ONLY_SETTINGS_PROBE)
+        self.assertIn('package_exe_fd=os.open("client",file_flags,dir_fd=bin_fd)', READ_ONLY_SETTINGS_PROBE)
+        self.assertIn("package_exe_st=os.fstat(package_exe_fd)", READ_ONLY_SETTINGS_PROBE)
+        self.assertIn(
+            "(package_exe_st.st_dev,package_exe_st.st_ino)!=(exe_st.st_dev,exe_st.st_ino)",
+            READ_ONLY_SETTINGS_PROBE,
+        )
+        self.assertIn("CLIENT_PACKAGE_EXECUTABLE_IDENTITY_MISMATCH", READ_ONLY_SETTINGS_PROBE)
+        self.assertIn("CLIENT_EXE_IDENTITY_CHANGED", READ_ONLY_SETTINGS_PROBE)
+        self.assertIn("CLIENT_PACKAGE_ROOT_DESCRIPTOR_PATH_INVALID", READ_ONLY_SETTINGS_PROBE)
+        self.assertIn("CLIENT_PACKAGE_ROOT_BINDING_MISMATCH", READ_ONLY_SETTINGS_PROBE)
+        self.assertGreaterEqual(READ_ONLY_SETTINGS_PROBE.count("assert_root_binding(exe_fd,root_fd)"), 2)
+        self.assertNotIn("os.path.realpath(proc_exe)", READ_ONLY_SETTINGS_PROBE)
+
     def test_probe_sources_are_read_only_allowlisted_and_do_not_read_process_memory(self):
         self.assertIn("os.O_RDONLY", READ_ONLY_SETTINGS_PROBE)
         self.assertIn("os.O_NOFOLLOW", READ_ONLY_SETTINGS_PROBE)
-        self.assertIn("dir_fd=current_fd", READ_ONLY_SETTINGS_PROBE)
+        self.assertIn("package_root=exe.parent.parent", READ_ONLY_SETTINGS_PROBE)
+        self.assertIn("dir_fd=root_fd", READ_ONLY_SETTINGS_PROBE)
+        self.assertIn("dir_fd=conf_fd", READ_ONLY_SETTINGS_PROBE)
+        self.assertIn("CLIENT_PACKAGE_LAYOUT_INVALID", READ_ONLY_SETTINGS_PROBE)
+        self.assertIn("CLIENT_NOFOLLOW_UNAVAILABLE", READ_ONLY_SETTINGS_PROBE)
         self.assertIn("stat.S_ISREG", READ_ONLY_SETTINGS_PROBE)
-        self.assertNotIn(".resolve()", READ_ONLY_SETTINGS_PROBE)
+        self.assertNotIn("pwd.getpwuid", READ_ONLY_SETTINGS_PROBE)
+        self.assertNotIn("os.walk", READ_ONLY_SETTINGS_PROBE)
         self.assertNotIn("os.O_RDWR", READ_ONLY_SETTINGS_PROBE)
         self.assertNotIn("os.O_WRONLY", READ_ONLY_SETTINGS_PROBE)
         self.assertNotIn(f"/proc/{{pid}}/mem", READ_ONLY_SETTINGS_PROBE)

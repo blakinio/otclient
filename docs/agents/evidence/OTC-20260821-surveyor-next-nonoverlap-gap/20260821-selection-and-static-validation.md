@@ -46,7 +46,7 @@ Therefore `ui_settings_typed_reader` is the highest-ranked current P0/P1-family 
 
 ## Reader boundary
 
-The implementation exact-fences PID start identity plus client size/SHA before static/runtime reads. It requires compiled `tibia::config::TClientOptions` presence and the unique `clientoptions.json` literal, then reads only the two causally established Master Volume integer fields from the process user's fixed Tibia `conf/clientoptions.json` path.
+The implementation exact-fences PID start identity plus client size/SHA before static/runtime reads. It requires compiled `tibia::config::TClientOptions` presence and the unique `clientoptions.json` literal, then reads only the two causally established Master Volume integer fields. Physical repair evidence later binds the current persistent runtime file specifically as `conf/clientoptions.json` under the exact executable package root.
 
 Both embedded probe outputs are revalidated by the outer reader before acceptance; malformed or inconsistent static/live payloads fail closed without retaining arbitrary exception text.
 

@@ -11,7 +11,7 @@ risk: medium
 branch: docs/control-center-parallel-agent-prompts-20260821
 base_branch: main
 created: 2026-08-21T17:45:00+02:00
-updated: 2026-08-22T15:55:00+02:00
+updated: 2026-08-22T16:05:00+02:00
 initial_base_sha: 532b54fa60d11ae10227ab16dc02cd0cadf39b23
 related_pr: 650
 runtime_access: none
@@ -124,30 +124,28 @@ complete_user_facing_feature: false
 ## Validation evidence
 
 - Current trusted base at task start: `main@532b54fa60d11ae10227ab16dc02cd0cadf39b23`, Package A lifecycle closeout merged in PR #649.
-- Draft publication PR: #650.
-- Exact reviewed head before this audit-wait checkpoint: `e958379388429c07ba7bace062e1e8f70b756193`.
+- Publication PR: #650.
+- Exact reviewed head before audit remediation: `e958379388429c07ba7bace062e1e8f70b756193`.
 - Full PR diff review at that head: 8 changed files, all inside the declared prompt/evidence/task paths; no runtime/source/workflow/module files changed.
 - Manual deterministic prompt regression matrix: `docs/agents/evidence/OTC-20260821-control-center-parallel-agent-prompts/prompt-eval.md`; E01-E15 static contract comparison PASS. This is explicitly not an automated model-behaviour evaluation and not an independent audit.
-- GitHub exact-head checks at `e958379388429c07ba7bace062e1e8f70b756193`: `CI` run `32500710415` SUCCESS; `Track A agent runtime governance` run `32500710184` SUCCESS; unrelated Surveyor physical workflow `32500710174` SKIPPED as expected for this docs-only PR.
+- GitHub checks at `bc45419eb7bc6590f19d4f32add2ded593f39bde`: CI run `32577080151` SUCCESS and Track A agent runtime governance run `32577080122` SUCCESS.
+- Final metadata-only independent Codex audit of `bc45419eb7bc6590f19d4f32add2ded593f39bde` returned `Didn't find any major issues`.
+- After Draft -> Ready transition, branch protection correctly required a fresh `CI / Required` context; a direct merge attempt was rejected with `Required status check "CI / Required" is expected`. This metadata-only successor exists solely to trigger the required ready-state validation generation without weakening protection.
 - Current Surveyor source was inspected for discovery values and the C prompt requires revalidation rather than hard authority reuse.
 - Current Track A admission and Control Center adapter contracts were inspected so D-prep remains strictly no-runtime and cannot silently expand into real Package D execution.
 
-## Fresh independent audit findings ? 2026-08-22
+## Fresh independent audit findings - 2026-08-22
 
 Codex independent review `PRR_kwDOTVmdjs8AAAABKgpUnQ` audited exact head `06a422162adf5207875ee4c800b372c25d84033a` and opened two material P1 findings:
 
 - `PRRT_kwDOTVmdjs6bZDWd`: D-prep routing used autonomous-program continuation fields that could permit a follow-on real Package D task despite this alias being preparation-only and `runtime_access:none`. Repaired by making both D-prep canonical and alias metadata `single_task` / `stop_at_task_boundary` / `finalize_archive_and_stop`.
 - `PRRT_kwDOTVmdjs6bZDWe`: Package C normalization wording could allow a candidate/pending-causal Surveyor player position into normalized `GameSnapshot`. Repaired so normalized position requires explicit accepted causal semantic promotion; candidate/pending-causal values remain provenance/source-quality only and normalized position stays unknown.
 
-The static E01-E15 matrix was tightened at E03/E14 to encode both regressions. A fresh exact-head independent audit is required after this remediation.
+Fresh re-audit `PRR_kwDOTVmdjs8AAAABKgp-nw` on repaired head `442c299dc417962a11c20f395a16512b1eacea45` confirmed those two threads as outdated/closed-by-change but opened two analogous P1 routing findings: `PRRT_kwDOTVmdjs6bZFdt` for Package B and `PRRT_kwDOTVmdjs6bZFdu` for Package C. Both canonical+alias metadata were repaired to `single_task` / `stop_at_task_boundary` / `finalize_archive_and_stop`; E01/E02 encode the task-boundary requirement.
 
-Fresh re-audit `PRR_kwDOTVmdjs8AAAABKgp-nw` on repaired head `442c299dc417962a11c20f395a16512b1eacea45` confirmed those two threads as outdated/closed-by-change but opened two analogous P1 routing findings: `PRRT_kwDOTVmdjs6bZFdt` for Package B and `PRRT_kwDOTVmdjs6bZFdu` for Package C. Both canonical+alias metadata are now also `single_task` / `stop_at_task_boundary` / `finalize_archive_and_stop`; E01/E02 encode the task-boundary requirement. Another fresh exact-head independent audit is required.
+Third fresh independent Codex review of exact head `b8ff280ec47036df30cca64059fa0eca81d37a21` returned no major/material issues. All four prior P1 threads are resolved and outdated after the corresponding fixes.
 
-Third fresh independent Codex review of exact head `b8ff280ec47036df30cca64059fa0eca81d37a21` returned no major/material issues (`Codex Review: Didn't find any major issues`). All four prior P1 threads are resolved and outdated after the corresponding fixes. This task-only checkpoint records that PASS; a final independent audit of this metadata-only successor is still required before Ready/merge under exact-head policy.
-
-## Audit blocker
-
-The prompt-content gate passed at exact head `b8ff280ec47036df30cca64059fa0eca81d37a21` after three independent Codex review cycles and four remediated P1 findings. The only remaining audit requirement is a fresh independent check of this task-metadata-only successor plus final exact-head CI, followed by Ready/merge and archive closeout.
+Final fresh independent Codex review of metadata-only successor `bc45419eb7bc6590f19d4f32add2ded593f39bde` also returned no major/material issues. This successor changes only task validation evidence and creates the pull-request synchronization event required for a fresh ready-state branch-protection check generation.
 
 ## Validation / E2E
 
@@ -155,4 +153,4 @@ Runtime E2E is `NOT_APPLICABLE`: this task publishes documentation/prompting onl
 
 ## Next action
 
-Run a fresh independent audit of the task-metadata-only successor; if PASS and exact-head CI remains green, mark PR #650 Ready, merge it, then archive this task and release ownership.
+Require the fresh exact-head ready-state CI/governance generation to pass, then merge PR #650 and archive this task with ownership released.

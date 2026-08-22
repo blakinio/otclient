@@ -11,7 +11,7 @@ risk: medium
 branch: docs/control-center-parallel-agent-prompts-20260821
 base_branch: main
 created: 2026-08-21T17:45:00+02:00
-updated: 2026-08-22T15:45:00+02:00
+updated: 2026-08-22T15:50:00+02:00
 initial_base_sha: 532b54fa60d11ae10227ab16dc02cd0cadf39b23
 related_pr: 650
 runtime_access: none
@@ -140,6 +140,8 @@ Codex independent review `PRR_kwDOTVmdjs8AAAABKgpUnQ` audited exact head `06a422
 - `PRRT_kwDOTVmdjs6bZDWe`: Package C normalization wording could allow a candidate/pending-causal Surveyor player position into normalized `GameSnapshot`. Repaired so normalized position requires explicit accepted causal semantic promotion; candidate/pending-causal values remain provenance/source-quality only and normalized position stays unknown.
 
 The static E01-E15 matrix was tightened at E03/E14 to encode both regressions. A fresh exact-head independent audit is required after this remediation.
+
+Fresh re-audit `PRR_kwDOTVmdjs8AAAABKgp-nw` on repaired head `442c299dc417962a11c20f395a16512b1eacea45` confirmed those two threads as outdated/closed-by-change but opened two analogous P1 routing findings: `PRRT_kwDOTVmdjs6bZFdt` for Package B and `PRRT_kwDOTVmdjs6bZFdu` for Package C. Both canonical+alias metadata are now also `single_task` / `stop_at_task_boundary` / `finalize_archive_and_stop`; E01/E02 encode the task-boundary requirement. Another fresh exact-head independent audit is required.
 
 ## Audit blocker
 

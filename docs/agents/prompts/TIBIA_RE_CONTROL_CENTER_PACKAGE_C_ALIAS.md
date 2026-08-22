@@ -15,9 +15,9 @@ credentials_allowed: false
 login_allowed: false
 gameplay_allowed: false
 network_listener_allowed: false
-run_scope: autonomous_program
-continuation_policy: continue_until_real_stop
-task_completion_policy: finalize_archive_and_continue
+run_scope: single_task
+continuation_policy: stop_at_task_boundary
+task_completion_policy: finalize_archive_and_stop
 user_communication: low_noise
 ```
 

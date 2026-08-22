@@ -1,0 +1,6 @@
+REPOSITORY=blakinio/otclient
+TRACK=official-client-re
+RUNTIME_ACCESS=none
+CREDENTIALS_ALLOWED=false
+LOGIN_ALLOWED=false
+GAMEPLAY_ALLOWED=false

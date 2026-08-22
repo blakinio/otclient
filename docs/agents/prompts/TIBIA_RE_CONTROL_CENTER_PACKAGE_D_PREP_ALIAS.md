@@ -1,8 +1,8 @@
 # TIBIA RE Control Center Package D preparation alias
 
 ```yaml
-alias_prompt_contract_version: 1.0.0
-canonical_prompt_contract_version: 1.0.0
+alias_prompt_contract_version: 1.0.1
+canonical_prompt_contract_version: 1.0.1
 alias: OTCLIENT-TIBIA-RE-CONTROL-CENTER-PACKAGE-D-PREP
 repository: blakinio/otclient
 track_id: official-client-re
@@ -18,7 +18,7 @@ network_listener_allowed: false
 real_package_d_runtime_authorized: false
 run_scope: single_task
 continuation_policy: stop_at_task_boundary
-task_completion_policy: finalize_archive_and_stop
+task_completion_policy: finalize_archive_and_continue
 user_communication: low_noise
 ```
 

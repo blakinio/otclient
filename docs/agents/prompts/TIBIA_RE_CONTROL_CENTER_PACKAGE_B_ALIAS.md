@@ -1,8 +1,8 @@
 # TIBIA RE Control Center Package B alias
 
 ```yaml
-alias_prompt_contract_version: 1.0.0
-canonical_prompt_contract_version: 1.0.0
+alias_prompt_contract_version: 1.0.1
+canonical_prompt_contract_version: 1.0.1
 alias: OTCLIENT-TIBIA-RE-CONTROL-CENTER-PACKAGE-B
 repository: blakinio/otclient
 track_id: official-client-re
@@ -17,7 +17,7 @@ gameplay_allowed: false
 control_api_listener: loopback_only
 run_scope: single_task
 continuation_policy: stop_at_task_boundary
-task_completion_policy: finalize_archive_and_stop
+task_completion_policy: finalize_archive_and_continue
 user_communication: low_noise
 ```
 

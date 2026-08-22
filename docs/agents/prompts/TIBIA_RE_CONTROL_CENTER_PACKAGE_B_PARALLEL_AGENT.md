@@ -1,7 +1,7 @@
 # TIBIA RE Control Center — Package B parallel worker
 
 ```yaml
-prompt_contract_version: 1.0.0
+prompt_contract_version: 1.0.1
 prompting_standard_version: 2.1
 alias: OTCLIENT-TIBIA-RE-CONTROL-CENTER-PACKAGE-B
 repository: blakinio/otclient
@@ -17,7 +17,7 @@ gameplay_allowed: false
 control_api_listener: loopback_only
 run_scope: single_task
 continuation_policy: stop_at_task_boundary
-task_completion_policy: finalize_archive_and_stop
+task_completion_policy: finalize_archive_and_continue
 user_communication: low_noise
 feature_scope: full_stack_package_slice
 complete_control_center_programme: false

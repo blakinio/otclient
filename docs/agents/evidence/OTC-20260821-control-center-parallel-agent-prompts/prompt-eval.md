@@ -2,7 +2,9 @@
 
 ```yaml
 eval_id: OTC-20260821-control-center-parallel-agent-prompts
-prompt_contract_version: 1.0.0
+prompt_contract_version: 1.0.1
+published_baseline_version: 1.0.0@9c54c1a4e22db974109298a23be39d9b04305e76
+rollback_version: docs/agents/prompts/TIBIA_RE_CONTROL_CENTER_MVP.md@9dee1f97694a591b1f9a784556f1357f966c2e57
 baseline:
   path: docs/agents/prompts/TIBIA_RE_CONTROL_CENTER_MVP.md
   blob_sha: 9dee1f97694a591b1f9a784556f1357f966c2e57

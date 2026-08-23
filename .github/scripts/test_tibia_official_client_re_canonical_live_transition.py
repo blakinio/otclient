@@ -414,10 +414,12 @@ class Tests(unittest.TestCase):
 
 
     def test_parser_accepts_guarded_dispatch_shape(self):
+        request_file = Path(self.temp.name) / 'request.json'
         parsed = self.m.parser().parse_args([
             'guarded-dispatch', '--task-id', 'OTC-TEST', '--session-id', 's',
             '--token-file', str(self.args.token_file), '--probe', str(WORKER),
-            '--worker', str(WORKER), '--worker-timeout', '3',
+            '--worker', str(WORKER), '--request-file', str(request_file),
+            '--worker-timeout', '3',
         ])
         self.assertEqual(parsed.operation, 'guarded-dispatch')
         self.assertEqual(parsed.worker, WORKER)
@@ -456,6 +458,48 @@ class Tests(unittest.TestCase):
             )
         self.assertEqual(result['effect_count'], 0)
         self.assertEqual(events, ['input-lock-enter', 'worker', 'input-lock-exit'])
+
+    def test_guarded_decision_accepts_only_exact_commit_or_abort(self):
+        import io
+        self.assertEqual(self.m._read_guarded_decision(io.StringIO('COMMIT\n')), 'COMMIT')
+        self.assertEqual(self.m._read_guarded_decision(io.StringIO('ABORT\n')), 'ABORT')
+        for raw in ('commit\n', 'COMMIT extra\n', '\n', ''):
+            with self.subTest(raw=raw):
+                with self.assertRaisesRegex(self.m.E, 'guarded_dispatch_decision_invalid'):
+                    self.m._read_guarded_decision(io.StringIO(raw))
+
+    def test_commit_revalidates_gate_b_before_worker(self):
+        events = []
+        registration = self.registration()
+        calls = 0
+
+        class Held:
+            def __enter__(self):
+                events.append('input-lock-enter')
+            def __exit__(self, *_exc):
+                events.append('input-lock-exit')
+
+        def probe(*_args, **_kwargs):
+            nonlocal calls
+            calls += 1
+            events.append(f'gate-b-{calls}')
+            if calls == 3:
+                raise self.m.E('identity_changed_before_commit')
+            return registration, dict(self.manifest)
+
+        self.args.request_file = Path(self.temp.name) / 'request.json'
+        self.args.request_file.write_text('{"schema_version":1,"action_hash":"' + ('a' * 64) + '"}')
+        with mock.patch.object(self.m, '_probe_reg', side_effect=probe), \
+                mock.patch.object(self.m, '_acquire_input_lock', return_value=Held()), \
+                mock.patch.object(self.m, '_read_guarded_decision', return_value='COMMIT'), \
+                mock.patch.object(self.m, '_emit_guarded_ready', side_effect=lambda *_a: events.append('ready')), \
+                mock.patch.object(self.m, '_run_guarded_worker', side_effect=lambda *_a, **_k: events.append('worker')):
+            with self.assertRaisesRegex(self.m.E, 'identity_changed_before_commit'):
+                self.m._guarded_dispatch(
+                    self.args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 1
+                )
+        self.assertNotIn('worker', events)
+        self.assertEqual(events[:5], ['gate-b-1', 'input-lock-enter', 'gate-b-2', 'ready', 'gate-b-3'])
 
 
 if __name__ == '__main__':

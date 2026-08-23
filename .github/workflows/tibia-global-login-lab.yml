@@ -76,6 +76,10 @@ jobs:
         shell: bash
         run: bash tools/tibia-global-login-lab/scripts/prepare-ephemeral-runtime.sh
 
+      - name: Verify public asset catalog direct egress
+        shell: bash
+        run: bash tools/tibia-global-login-lab/scripts/verify-direct-asset-catalog.sh
+
       - name: Verify and bootstrap isolated lab
         shell: bash
         env:

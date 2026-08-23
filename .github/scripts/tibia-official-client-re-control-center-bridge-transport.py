@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import subprocess
 import sys
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any
 
 
 class TransportError(RuntimeError):

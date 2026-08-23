@@ -55,9 +55,9 @@ class Tests(unittest.TestCase):
         ]
 
     def test_invalid_command_is_rejected_before_process_start(self):
-        with mock.patch.object(self.m.subprocess, 'Popen') as popen:
-            with self.assertRaisesRegex(self.m.TransportError, 'track_a_transport_command_invalid'):
-                self.m.start_transition_process(['sh', '-c', 'true'], self.repo)
+        with mock.patch.object(self.m.subprocess, 'Popen') as popen, \
+                self.assertRaisesRegex(self.m.TransportError, 'track_a_transport_command_invalid'):
+            self.m.start_transition_process(['sh', '-c', 'true'], self.repo)
         popen.assert_not_called()
 
     def test_valid_command_uses_exact_no_shell_private_pipe_shape(self):

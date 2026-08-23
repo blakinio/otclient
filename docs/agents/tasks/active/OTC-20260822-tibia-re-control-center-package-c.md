@@ -1,22 +1,22 @@
 ---
 task_id: OTC-20260822-tibia-re-control-center-package-c
-status: implementing
+status: waiting
 agent: ChatGPT
 project_lane: otclient
 lane: P3-SURVEYOR-INTEGRATION
 track_id: official-client-re
 task_kind: implementation
-phase: design
+phase: final_ci
 risk: medium
 branch: feat/OTC-20260822-tibia-re-control-center-package-c
 base_branch: main
 created: 2026-08-22T18:04:00+02:00
-updated: 2026-08-22T18:04:00+02:00
+updated: 2026-08-23T17:05:00+02:00
 execution_mode: remote_desktop+github_connector+github_actions
 execution_budget_minutes: 120
 execution_budget_reason: cohesive Package C provider implementation, repository-only E2E, exact-head audit, merge and mandatory archive closeout
 invocation_started_at: 2026-08-22T17:51:00+02:00
-last_progress_at: 2026-08-22T18:04:00+02:00
+last_progress_at: 2026-08-23T17:05:00+02:00
 policy_version: 2
 context_pressure: medium
 context_growth: stable
@@ -24,10 +24,10 @@ context_score: 7
 estimate_confidence: medium
 decomposition_decision: single
 decomposition_reason: one read-only producer-to-provider normalization slice with one shared schema/provenance boundary
-ci_checks_for_current_head: 0
-ci_check_generation: draft
-terminal_ci_wait_started_at: null
-terminal_ci_checks_for_current_generation: 0
+ci_checks_for_current_head: 2
+ci_check_generation: final_exact_head_7e4c6435c3715b7e97d8b7827ca052cf33743cf8
+terminal_ci_wait_started_at: 2026-08-23T16:15:00+02:00
+terminal_ci_checks_for_current_generation: 2
 unchanged_state_checks: 0
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
@@ -108,7 +108,7 @@ depends_on:
   - Surveyor accepted producer tree present at producer_commit
 blocks: []
 ownership_released: false
-next_action: implement strict Surveyor bundle provider and repository-only E2E
+next_action: verify CI run 32644841268 SUCCESS on head 7e4c6435c3715b7e97d8b7827ca052cf33743cf8, then merge PR #663 and perform terminal archive closeout
 ---
 
 # Control Center Package C — Surveyor read-only integration
@@ -122,29 +122,58 @@ Implement one fail-closed Surveyor provider that validates the accepted output b
 Fresh live state on trusted `main@1affb3a094a06f2a250140e8173501b3a6938164` found no existing Package C task/branch, no active task owning `tools/tests/tibia_re_control_center`, and no open PR touching those paths. Surveyor code/tests/workflow are byte-identical to accepted closeout anchor `815245ab3cac38a96f60f3ee3395b67f81b81c11` across the inspected tree.
 ## Acceptance inventory
 
-- [ ] 01 exact Surveyor producer/schema/interface pin persisted
-- [ ] 02 strict accepted schema/version validation refuses mismatch
-- [ ] 03 bounded path/manifest parsing rejects missing/corrupt/duplicate/unsafe input
-- [ ] 04 no traversal or unbounded bundle ingestion
-- [ ] 05 repository-only bundle yields truthful repository-only status
-- [ ] 06 synthetic live-shaped fixture maps runtime identity without mutation authority
-- [ ] 07 typed-reader fields map only through explicitly accepted schema fields
-- [ ] 08 missing typed readers yield explicit unavailable/unsupported quality
-- [ ] 09 stale/incompatible/missing provenance remains explicit and fail-closed
-- [ ] 10 normalized status separates runtime/client/authority/capability/evidence/freshness/session
-- [ ] 11 GameSnapshot unknown/stale fields stay unknown/stale
-- [ ] 12 capability projection cannot create action capability
-- [ ] 13 Surveyor evidence/canonical statuses remain immutable
-- [ ] 14 no Official Tibia mutation/runtime-control imports or calls
-- [ ] 15 no physical Surveyor collection required
-- [ ] 16 deterministic current-schema fixture regression coverage
-- [ ] 17 schema downgrade/upgrade mismatch fails closed
-- [ ] 18 malformed/partial/privacy-risk bundles fail closed without leakage
-- [ ] 19 Package A regression suite remains green
-- [ ] 20 repository-only producer -> provider -> normalized read-model E2E passes
+- [x] 01 exact Surveyor producer/schema/interface pin persisted
+- [x] 02 strict accepted schema/version validation refuses mismatch
+- [x] 03 bounded path/manifest parsing rejects missing/corrupt/duplicate/unsafe input
+- [x] 04 no traversal or unbounded bundle ingestion
+- [x] 05 repository-only bundle yields truthful repository-only status
+- [x] 06 synthetic live-shaped fixture maps runtime identity without mutation authority
+- [x] 07 typed-reader fields map only through explicitly accepted schema fields
+- [x] 08 missing typed readers yield explicit unavailable/unsupported quality
+- [x] 09 stale/incompatible/missing provenance remains explicit and fail-closed
+- [x] 10 normalized status separates runtime/client/authority/capability/evidence/freshness/session
+- [x] 11 GameSnapshot unknown/stale fields stay unknown/stale
+- [x] 12 capability projection cannot create action capability
+- [x] 13 Surveyor evidence/canonical statuses remain immutable
+- [x] 14 no Official Tibia mutation/runtime-control imports or calls
+- [x] 15 no physical Surveyor collection required
+- [x] 16 deterministic current-schema fixture regression coverage
+- [x] 17 schema downgrade/upgrade mismatch fails closed
+- [x] 18 malformed/partial/privacy-risk bundles fail closed without leakage
+- [x] 19 Package A regression suite remains green
+- [x] 20 repository-only producer -> provider -> normalized read-model E2E passes
 - [ ] 21 exact-head CI and fresh independent Package C audit pass
 - [ ] 22 task/PR terminal and ownership released
 
 ## Validation evidence
 
-Pending implementation. All physical Official Tibia inputs are intentionally unavailable/not requested under `runtime_access:none`.
+Implementation and repository-only E2E are complete on candidate head `7e4c6435c3715b7e97d8b7827ca052cf33743cf8`; independent exact-head audit PASS and zero unresolved review threads are recorded below. Final repository CI run `32644841268` remains in progress. All physical Official Tibia inputs remain intentionally unavailable/not requested under `runtime_access:none`.
+
+
+## Recovery checkpoint — 2026-08-23 17:05 CEST
+
+```yaml
+checkpoint:
+  status: waiting
+  implementation_pr: 663
+  final_candidate_head: 7e4c6435c3715b7e97d8b7827ca052cf33743cf8
+  last_restacked_base: 762436c25433b7bb192e6014cb4e46afc58dfc4b
+  current_main_observed: 56499ec5767093f69f09c581c54957714382e107
+  current_main_overlap_with_package_c_files: false
+  independent_audit: PASS
+  audit_comment: 5386480934
+  unresolved_review_threads: 0
+  local_windows_control_center: 210_passed_2_skipped_125_subtests
+  local_posix_hardening: 4_passed
+  ruff: PASS
+  diff_check: PASS
+  package_a_exact_head_workflow: 32644841117_SUCCESS
+  repository_ci_run: 32644841268_IN_PROGRESS
+  pending_ci_jobs:
+    - linux-tests Run CMake
+    - linux-release Run CMake
+  official_client_access: NONE
+  mutation_authorized: false
+  ownership_released: false
+  next_action: verify CI run 32644841268 SUCCESS on exact head, then merge PR 663 and archive/release ownership
+```

@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import os
 import queue
-import subprocess
 import sys
 import tempfile
 import threading
@@ -233,6 +232,7 @@ class CanonicalTrackAAuthorityBridge:
         client_state_provider: Callable[[], str] | None = None,
         ready_timeout_seconds: float = 10.0,
         result_timeout_seconds: float = 30.0,
+        process_factory: Callable[..., Any] | None = None,
     ) -> None:
         self.repository_root = Path(repository_root).resolve()
         self.task_id = task_id
@@ -246,6 +246,7 @@ class CanonicalTrackAAuthorityBridge:
         self._client_state_provider = client_state_provider or (lambda: "UNKNOWN")
         self._ready_timeout_seconds = ready_timeout_seconds
         self._result_timeout_seconds = result_timeout_seconds
+        self._process_factory = process_factory
         self._active_sessions: set[_GuardedSession] = set()
         self._sessions_lock = threading.Lock()
 
@@ -304,16 +305,12 @@ class CanonicalTrackAAuthorityBridge:
         }
 
     def _start_process(self, request_file: Path) -> Any:
-        return subprocess.Popen(
-            self.command_for_request_file(request_file),
-            cwd=self.repository_root,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1,
-            close_fds=True,
-        )
+        if self._process_factory is None:
+            raise ValidationError(
+                "TRACK_A_BRIDGE_TRANSPORT_UNBOUND",
+                "Track A guarded-dispatch transport is not bound",
+            )
+        return self._process_factory(self.command_for_request_file(request_file), self.repository_root)
 
     @contextmanager
     def guarded_dispatch(self, request: ActionRequest) -> Iterator[_GuardedSession]:

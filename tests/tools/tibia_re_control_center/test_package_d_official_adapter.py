@@ -417,6 +417,7 @@ class PackageDTrackABridgeProtocolTests(unittest.TestCase):
             client_state_provider=lambda: client_state,
             ready_timeout_seconds=0.03,
             result_timeout_seconds=0.03,
+            process_factory=lambda _command, _cwd: process,
         )
         return module, temp, bridge, process
 
@@ -446,8 +447,7 @@ class PackageDTrackABridgeProtocolTests(unittest.TestCase):
             ),
         )
         try:
-            with mock.patch.object(module.subprocess, "Popen", return_value=process):
-                with bridge.guarded_dispatch(request) as session:
+            with bridge.guarded_dispatch(request) as session:
                     view = session.current_view()
                     self.assertEqual(view.client_state, "IN_GAME")
                     self.assertTrue(view.authority_current)
@@ -478,8 +478,7 @@ class PackageDTrackABridgeProtocolTests(unittest.TestCase):
             ),
         )
         try:
-            with mock.patch.object(module.subprocess, "Popen", return_value=process):
-                with bridge.guarded_dispatch(request):
+            with bridge.guarded_dispatch(request):
                     pass
             self.assertEqual(process.stdin.getvalue(), "ABORT\n")
         finally:
@@ -500,8 +499,7 @@ class PackageDTrackABridgeProtocolTests(unittest.TestCase):
             ),
         )
         try:
-            with mock.patch.object(module.subprocess, "Popen", return_value=process):
-                with bridge.guarded_dispatch(request) as session:
+            with bridge.guarded_dispatch(request) as session:
                     outcome = session.cross_once_and_reconcile(request)
             self.assertEqual(outcome.outcome, "ambiguous")
             self.assertEqual(outcome.reason_code, "TRACK_A_RESULT_TIMEOUT")
@@ -576,11 +574,14 @@ class PackageDConcreteBridgeE2ETests(unittest.TestCase):
             adapter_version="1.0", adapter_generation="official-generation-1",
             runtime_instance_id="runtime-1", session_epoch="session-1",
         )
+        transport_holder = {}
         bridge = bridge_module.CanonicalTrackAAuthorityBridge(
             repo, "OTC-TEST", "session-test", token, helper, helper,
             client_state_provider=client_state_provider,
             ready_timeout_seconds=0.03, result_timeout_seconds=0.03,
+            process_factory=lambda _command, _cwd: transport_holder["process"],
         )
+        bridge._test_transport_holder = transport_holder
         promotion = adapter_module.OfficialCapabilityPromotion(
             action_kind="turn", client_sha256=adapter_module.CURRENT_CLIENT_SHA256,
             read_gate="R2", action_gate="A3", semantic_path_id="turn-v1",
@@ -612,8 +613,8 @@ class PackageDConcreteBridgeE2ETests(unittest.TestCase):
         temp, module, coordinator, request = self._stack(lambda: "IN_GAME")
         process = FakeTransitionProcess([self._ready(request.action_request_hash), self._result(request.action_request_hash, "CONFIRMED")])
         try:
-            with mock.patch.object(module.subprocess, "Popen", return_value=process):
-                result = coordinator.execute_action(request)
+            coordinator.adapter._authority_bridge._test_transport_holder["process"] = process
+            result = coordinator.execute_action(request)
             self.assertEqual(result.lifecycle_state, LifecycleState.CONFIRMED)
             self.assertEqual(result.status, ActionStatus.PASS)
             self.assertEqual(result.dispatch_state, DispatchState.DISPATCHED)
@@ -627,8 +628,8 @@ class PackageDConcreteBridgeE2ETests(unittest.TestCase):
         temp, module, coordinator, request = self._stack(lambda: "IN_GAME")
         process = FakeTransitionProcess([self._ready(request.action_request_hash), self._result(request.action_request_hash, "AMBIGUOUS")])
         try:
-            with mock.patch.object(module.subprocess, "Popen", return_value=process):
-                result = coordinator.execute_action(request)
+            coordinator.adapter._authority_bridge._test_transport_holder["process"] = process
+            result = coordinator.execute_action(request)
             self.assertEqual(result.lifecycle_state, LifecycleState.AMBIGUOUS)
             self.assertEqual(result.dispatch_state, DispatchState.POSSIBLY_DISPATCHED)
             self.assertEqual(process.effect_count, 1)
@@ -640,8 +641,8 @@ class PackageDConcreteBridgeE2ETests(unittest.TestCase):
         temp, module, coordinator, request = self._stack(lambda: "IN_GAME")
         process = FakeTransitionProcess([])
         try:
-            with mock.patch.object(module.subprocess, "Popen", return_value=process):
-                result = coordinator.execute_action(request)
+            coordinator.adapter._authority_bridge._test_transport_holder["process"] = process
+            result = coordinator.execute_action(request)
             self.assertEqual(result.dispatch_state, DispatchState.NOT_DISPATCHED)
             self.assertEqual(process.effect_count, 0)
             self.assertEqual(process.decisions.count("COMMIT\n"), 0)
@@ -652,8 +653,8 @@ class PackageDConcreteBridgeE2ETests(unittest.TestCase):
         temp, module, coordinator, request = self._stack(lambda: "IN_GAME")
         process = FakeTransitionProcess([self._ready(request.action_request_hash)])
         try:
-            with mock.patch.object(module.subprocess, "Popen", return_value=process):
-                result = coordinator.execute_action(request)
+            coordinator.adapter._authority_bridge._test_transport_holder["process"] = process
+            result = coordinator.execute_action(request)
             self.assertEqual(result.lifecycle_state, LifecycleState.AMBIGUOUS)
             self.assertEqual(result.dispatch_state, DispatchState.POSSIBLY_DISPATCHED)
             self.assertEqual(process.effect_count, 1)
@@ -673,8 +674,8 @@ class PackageDConcreteBridgeE2ETests(unittest.TestCase):
         holder["coordinator"] = coordinator
         process = FakeTransitionProcess([self._ready(request.action_request_hash)])
         try:
-            with mock.patch.object(module.subprocess, "Popen", return_value=process):
-                result = coordinator.execute_action(request)
+            coordinator.adapter._authority_bridge._test_transport_holder["process"] = process
+            result = coordinator.execute_action(request)
             self.assertEqual(result.dispatch_state, DispatchState.NOT_DISPATCHED)
             self.assertIn(result.lifecycle_state, {LifecycleState.REFUSED, LifecycleState.CANCELLED_BEFORE_DISPATCH})
             self.assertEqual(process.effect_count, 0)
@@ -696,8 +697,8 @@ class PackageDConcreteBridgeE2ETests(unittest.TestCase):
         holder["coordinator"] = coordinator
         process = FakeTransitionProcess([self._ready(request.action_request_hash)])
         try:
-            with mock.patch.object(module.subprocess, "Popen", return_value=process):
-                result = coordinator.execute_action(request)
+            coordinator.adapter._authority_bridge._test_transport_holder["process"] = process
+            result = coordinator.execute_action(request)
             self.assertEqual(result.dispatch_state, DispatchState.NOT_DISPATCHED)
             self.assertEqual(process.effect_count, 0)
             self.assertEqual(process.decisions.count("COMMIT\n"), 0)

@@ -374,10 +374,12 @@ class PackageDTrackABridgeProtocolTests(unittest.TestCase):
         self.assertEqual(module.require_exact_record(result, module.RESULT_KEYS), result)
         assert_sanitized_mapping(self, ready)
         assert_sanitized_mapping(self, result)
-        with self.assertRaisesRegex(Exception, "TRACK_A_BRIDGE_PROTOCOL_INVALID"):
+        with self.assertRaises(Exception) as caught:
             module.require_exact_record(dict(ready, pid=123), module.READY_KEYS)
-        with self.assertRaisesRegex(Exception, "TRACK_A_BRIDGE_PROTOCOL_INVALID"):
+        self.assertEqual(caught.exception.code, "TRACK_A_BRIDGE_PROTOCOL_INVALID")
+        with self.assertRaises(Exception) as caught:
             module.normalize_result(dict(result, outcome="unexpected"))
+        self.assertEqual(caught.exception.code, "TRACK_A_BRIDGE_PROTOCOL_INVALID")
 
     def test_bridge_command_passes_token_path_without_reading_contents(self):
         module = importlib.import_module(

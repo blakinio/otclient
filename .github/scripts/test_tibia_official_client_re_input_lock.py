@@ -64,6 +64,25 @@ class Tests(unittest.TestCase):
                 with second.acquire(timeout_seconds=0.05, cancelled=lambda: False):
                     self.fail('second holder must not acquire concurrently')
 
+    def test_missing_canonical_state_root_is_rejected(self):
+        missing = self.root / 'missing'
+        lock = self.m.InputLock(missing)
+        with self.assertRaisesRegex(self.m.InputLockError, 'input_lock_state_root_unavailable'):
+            with lock.acquire(timeout_seconds=0.2, cancelled=lambda: False):
+                self.fail('input lock must not create canonical state root')
+        self.assertFalse(missing.exists())
+
+    def test_replaced_lock_path_is_rejected_against_open_fd(self):
+        lock = self.m.InputLock(self.root)
+        fd = lock._open_safe()
+        try:
+            lock.path.unlink()
+            lock.path.write_bytes(b'replacement')
+            with self.assertRaisesRegex(self.m.InputLockError, 'input_lock_replaced'):
+                lock._validate_fd_path(fd)
+        finally:
+            os.close(fd)
+
 
 if __name__ == '__main__':
     unittest.main()

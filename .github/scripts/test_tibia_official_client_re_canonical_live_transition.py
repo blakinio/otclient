@@ -476,6 +476,30 @@ class Tests(unittest.TestCase):
                 with self.assertRaisesRegex(self.m.E, 'guarded_dispatch_decision_invalid'):
                     self.m._read_guarded_decision(io.StringIO(raw))
 
+    def test_guarded_request_rejects_nested_raw_runtime_field(self):
+        path = Path(self.temp.name) / 'raw-request.json'
+        path.write_text(json.dumps({
+            'schema_version': 1,
+            'action_hash': 'a' * 64,
+            'parameters': {'pid': 123},
+        }))
+        with self.assertRaisesRegex(self.m.E, 'guarded_dispatch_request_raw_field_forbidden'):
+            self.m._read_guarded_request(path)
+
+    def test_guarded_worker_result_rejects_extra_raw_fields(self):
+        def fake_run(*_args, **_kwargs):
+            (self.m.STATE / '.guarded-dispatch-result.json').write_text(json.dumps({
+                'status': 'CONFIRMED',
+                'effect_count': 1,
+                'action_hash': 'a' * 64,
+                'pid': 123,
+            }))
+            return mock.Mock(returncode=0)
+
+        with mock.patch.object(self.m.subprocess, 'run', side_effect=fake_run):
+            with self.assertRaisesRegex(self.m.E, 'guarded_dispatch_worker_result_invalid'):
+                self.m._run_guarded_worker(self.args, {'action_hash': 'a' * 64})
+
     def test_commit_revalidates_gate_b_before_worker(self):
         events = []
         registration = self.registration()

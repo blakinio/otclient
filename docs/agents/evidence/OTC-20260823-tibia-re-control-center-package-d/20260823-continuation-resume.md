@@ -1,32 +1,25 @@
-# Package D continuation resume ? 2026-08-23 19:06 +02:00
+# Package D continuation resume — 2026-08-23
 
 Task: `OTC-20260823-tibia-re-control-center-package-d`
+Continuation PR: `#684`
+Trusted continuation base: `main@1e9f0245b2c7a249dfd0fdc9c6f8bdda2e9aa5e5`
 
 ## Authoritative repository state
 
-```text
-trusted main = 1e9f0245b2c7a249dfd0fdc9c6f8bdda2e9aa5e5
-continuation branch = ai/OTC-20260823-package-d-continue
-Package D implementation chain through PR #678 = merged
-Package D pre-runtime checkpoint PR #680 = merged
-Package D continuation alias PR #682 = merged
-```
+Package D implementation through PR #678, pre-runtime checkpoint #680 and continuation alias #682 are merged on trusted main. Historical runtime identifiers are evidence only and do not authorize current access.
 
-The repository-only continuation preflight revalidated the Package D task, current trusted-base Track A contracts, and open runtime-adjacent PRs before any Official Tibia target access.
+Fresh ownership reconciliation established:
 
-## Ownership facts
+- PR #475 exact-head task record is released: `runtime_access:none`, no runtime owner and no owned paths;
+- PR #528 is closed/superseded;
+- PR #541 remains isolated to `track-a-kasmvnc-desktop`, with login/gameplay disabled;
+- no inspected current-main task proves a conflicting canonical Official Tibia runtime owner.
 
-- PR #475 is still open Draft, but its exact head task record is released: `session_role: released`, `runtime_access: none`, `runtime_owner_task: null`, `OWNED_PATHS=[]`.
-- PR #528 is closed unmerged as superseded.
-- PR #541 is still open Draft and its exact head task record uses `runtime_access: ephemeral_isolated`, `runtime_owner_task: OTC-20260818-track-a-persistent-viewer-handoff`, `runtime_namespace: track-a-kasmvnc-desktop`, `login_allowed: false`, `gameplay_allowed: false`.
-- No active task on current main inspected in this preflight claims `canonical_reuse_or_mutation` for the canonical Official Tibia runtime.
+Those facts establish repository ownership boundaries only. They do not prove canonical registration, lease generation, Gate B, target uniqueness, active-world state or semantic `turn`.
 
-These facts establish only repository ownership boundaries. They do not prove canonical registration, lease generation, Gate B, target uniqueness, active-world state, or semantic `turn`.
-
-## Fail-closed admission at resume
+## Initial fail-closed admission
 
 ```yaml
-track_id: official-client-re
 runtime_access: none
 runtime_owner_task: NOT_APPLICABLE
 runtime_namespace: NOT_APPLICABLE
@@ -46,33 +39,50 @@ transaction_authorized: false
 official_client_access: false
 ```
 
-Remote Desktop Commander currently reports both `Synology` device registrations offline. That is a transport-availability observation only; it is not canonical-runtime evidence. No Official Tibia process, container, window, display, session, input, credential, login, gameplay, network, or process-memory operation was performed while producing this record.
+No Official Tibia process, container, window, display, session, input, credential, login, gameplay, network or process-memory operation occurred under this admission.
 
-## Next gate
+## Rejected pre-live classification
 
-Before the first live Official Tibia target operation, Package D must reclassify and persist the complete fresh Track A admission record. It must not bootstrap/login/relog/select a character merely to make Package D progress. If current admission cannot prove legal reuse, Package D records one exact `BLOCKED_*` disposition and proceeds to truthful terminal closeout.
+At 19:11 +02:00 the continuation attempted to persist a fail-closed `canonical_reuse_or_mutation` classification with mutation still false and all current runtime gates unproven. That repository checkpoint was **not valid admission authority**.
 
-## Pre-live admission classification ? 19:11 +02:00
+GitHub Track A governance run `32654111394`, deterministic job `97230103884`, rejected it before any client operation with:
 
-Before any Official Tibia target operation, Package D is reclassified fail-closed as:
-
-```yaml
-runtime_access: canonical_reuse_or_mutation
-runtime_owner_task: OTC-20260823-tibia-re-control-center-package-d
-runtime_namespace: track-a-canonical-live
-canonical_registration: UNKNOWN
-canonical_lease_generation: UNKNOWN
-registration_lease_generation: UNKNOWN
-gate_a: REQUIRED_NOT_PROVEN
-generation_rebind: REQUIRED_NOT_PROVEN
-gate_b: REQUIRED_NOT_PROVEN
-bootstrap: NOT_APPLICABLE
-target_uniqueness: UNKNOWN
-mutation_authorized: false
-credentials_allowed: false
-login_allowed: false
-gameplay_allowed: false
-official_client_access: false
+```text
+canonical runtime access must use the authoritative canonical namespace
 ```
 
-This classification grants no mutation. Its first operation is limited to safe canonical controller-plane metadata needed to decide whether reuse is even possible. If registration is absent, Package D must stop physical work with `BLOCKED_NO_CURRENT_REGISTERED_RUNTIME`; it will not enter bootstrap/login merely to make progress.
+The same trusted-base admission policy was then inspected directly. It establishes two additional reasons not to repair that checkpoint optimistically:
+
+- `canonical_reuse_or_mutation` requires authoritative registration `PRESENT`;
+- normative `canonical_bootstrap` is usable only after current authoritative registration absence is proven;
+- `read_only` requires target uniqueness `PROVEN` before live observation.
+
+Current registration and target uniqueness were not proven. No PASS field was fabricated and no mutation/login/bootstrap fallback was attempted.
+
+The rejected classification is therefore superseded by the initial fail-closed `runtime_access:none` boundary for this continuation.
+
+## Bounded access-path check
+
+The only operations after the rejection were host/transport capability checks, not Official Tibia target operations:
+
+- Remote Desktop Commander reported both devices named `Synology` offline;
+- the installed read-only `synology oteryn` connector failed with MCP gateway HTTP 404;
+- `synology.local` resolved to `192.168.1.21` and TCP/22 responded, but the existing `oteryn_synology` SSH identity did not establish a session;
+- the available GitHub connector has no workflow-dispatch action; local `gh` API access was rate-limited with HTTP 403;
+- the only Track A `issue_comment` trigger found is a separately owner-gated native-login workflow and was not invoked because Package D has no login authority.
+
+These observations do not prove any client runtime fact.
+
+## Terminal runtime disposition
+
+```text
+PHYSICAL_SLICE=BLOCKED_WITH_REASON
+BLOCKER=BLOCKED_TARGET_UNIQUENESS_NOT_PROVEN
+OFFICIAL_CLIENT_ACCESS=NONE
+MUTATION_AUTHORIZED=false
+PHYSICAL_ACTION_COUNT=0
+```
+
+The exact durable result is recorded in `package-d-result.md`. No `turn`, `move`, `input.lock`, guarded-dispatch READY/COMMIT, credential, login, gameplay or client/process mutation occurred.
+
+A future separately claimed Track A task may perform a new physical admission attempt only after it can prove the then-current legal target and gates. This continuation owns no future runtime action.

@@ -217,6 +217,8 @@ For `OFFICIAL_TIBIA`:
 6. preserve the existing Track A whole-lifetime supervisor semantics for mutation descendants;
 7. reconcile result/evidence/budgets conservatively.
 
+The current canonical Package D implementation uses the existing Track A canonical transition supervisor's `guarded-dispatch` transaction together with the canonical `input.lock`. Control Center receives only the semantic READY/COMMIT/RESULT bridge. Process execution remains an external Track A transport concern; raw lock paths/file descriptors, process/window/display identifiers and other runtime handles remain adapter-private and never become Scenario/ActionRequest fields or operator-facing Control Center interfaces.
+
 The local `dispatch_gate` is not held while waiting to acquire Track A authority/locks. STOP therefore remains able to linearize while an action is blocked on external authority; the action later fails its stale control-generation commit.
 
 ## 11. Action lifecycle/result

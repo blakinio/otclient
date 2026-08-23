@@ -6,10 +6,12 @@ workflow = (root / '.github/workflows/tibia-global-login-lab.yml').read_text(enc
 prepare = (root / 'tools/tibia-global-login-lab/scripts/prepare-ephemeral-runtime.sh').read_text(encoding='utf-8')
 clear_pid = (root / 'tools/tibia-global-login-lab/scripts/clear-stale-wireproxy-pid.sh').read_text(encoding='utf-8')
 refresh = (root / 'tools/tibia-global-login-lab/scripts/refresh-current-assets.sh').read_text(encoding='utf-8')
+direct_assets = (root / 'tools/tibia-global-login-lab/scripts/verify-direct-asset-catalog.sh').read_text(encoding='utf-8')
 
 probe = workflow.index('  probe:')
 build = workflow.index('      - name: Download exact native Linux binary', probe)
 prep = workflow.index('      - name: Prepare ephemeral GitHub-hosted lab runtime', probe)
+direct = workflow.index('      - name: Verify public asset catalog direct egress', probe)
 bootstrap = workflow.index('      - name: Verify and bootstrap isolated lab', probe)
 clear_before_http = workflow.index('      - name: Clear stale WARP PID before HTTP container recreation', probe)
 http = workflow.index('      - name: Verify redacted HTTP login transport', probe)
@@ -18,7 +20,7 @@ world = workflow.index('      - name: Run controlled login and world-entry probe
 
 assert 'runs-on: ubuntu-24.04' in workflow[probe:build]
 assert "LAB_EPHEMERAL_HOSTED: '1'" in workflow[probe:build]
-assert build < prep < bootstrap < clear_before_http < http < clear_before_world < world
+assert build < prep < direct < bootstrap < clear_before_http < http < clear_before_world < world
 assert workflow.count('bash tools/tibia-global-login-lab/scripts/clear-stale-wireproxy-pid.sh') == 2
 assert 'cancel-in-progress: true' in workflow
 assert 'TIBIA_TEST_EMAIL' not in workflow[prep:bootstrap]
@@ -38,7 +40,13 @@ assert 'rm -f' in clear_pid
 assert 'kill ' not in clear_pid
 assert 'LAB_WIREPROXY_CROSS_CONTAINER_PID_CLEARED=true' in clear_pid
 
-assert "'-A', 'Mozilla/5.0'" in refresh
+assert 'TIBIA_TEST_EMAIL' not in direct_assets
+assert 'TIBIA_TEST_PASSWORD' not in direct_assets
+assert 'assets.json.sha256' in direct_assets
+assert 'sha256sum' in direct_assets
+assert 'LAB_PUBLIC_ASSET_CATALOG_DIRECT_VERIFIED=true' in direct_assets
+
+assert "'curl', '-A', 'Mozilla/5.0', '-fsSL'," in refresh
 assert "get(base + '/assets.json', manifest)" in refresh
 
 print('EPHEMERAL_RUNNER_CONTRACT=PASS')

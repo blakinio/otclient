@@ -136,7 +136,7 @@ first_action_rule: exactly_one_action_may_be_promoted_only_after_full_fresh_proo
 first_action_status: NOT_YET_PHYSICALLY_PROVEN
 ---
 
-# Control Center Package D â€” active task
+# Control Center Package D — active task
 
 The owner approved design option 3 and explicitly approved the written design spec on 2026-08-23. The design and implementation plan were merged by docs-only PR #670 as `371f5a0451e9bf3e3eac29cc12edfecc310c3ea9`.
 

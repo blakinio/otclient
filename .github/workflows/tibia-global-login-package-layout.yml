@@ -117,3 +117,39 @@ jobs:
             echo "PACKAGE_LAYOUT_CANDIDATE_${safe}_HTTP=$code"
           done
           echo PACKAGE_LAYOUT_DISCRIMINATOR_COMPLETE=true
+
+  cdn-egress:
+    name: CDN direct egress (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15, windows-2025]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+    steps:
+      - name: Probe official assets catalog without secrets
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          base=https://static.tibia.com/launcher/assets-current
+          u="$base/assets.json"
+          h="$base/assets.json.sha256"
+          out="$RUNNER_TEMP/tibia-assets.json"
+          hashout="$RUNNER_TEMP/tibia-assets.json.sha256"
+          code=$(curl --compressed -L -sS -o "$out" \
+            -A 'Mozilla/5.0 (X11; Linux x86_64)' -e "$u" -H 'Accept: */*' \
+            --connect-timeout 15 --max-time 60 -w '%{http_code}' "$u" || true)
+          hashcode=$(curl --compressed -L -sS -o "$hashout" \
+            -A 'Mozilla/5.0 (X11; Linux x86_64)' -e "$h" -H 'Accept: */*' \
+            --connect-timeout 15 --max-time 30 -w '%{http_code}' "$h" || true)
+          bytes=0
+          [[ -f "$out" ]] && bytes=$(wc -c < "$out" | tr -d ' ')
+          echo "CDN_EGRESS_RUNNER_OS=$RUNNER_OS"
+          echo "CDN_EGRESS_ASSETS_JSON_HTTP=$code"
+          echo "CDN_EGRESS_ASSETS_JSON_BYTES=$bytes"
+          echo "CDN_EGRESS_ASSETS_HASH_HTTP=$hashcode"
+          if [[ "$code" == 200 ]]; then
+            grep -Eq '^[[:space:]]*[\[{]' "$out"
+            echo CDN_EGRESS_ASSETS_JSON_BODY_PRESENT=true
+          fi
+          echo CDN_EGRESS_PROBE_COMPLETE=true

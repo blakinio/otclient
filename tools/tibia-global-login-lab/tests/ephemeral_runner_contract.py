@@ -43,7 +43,8 @@ assert 'LAB_WIREPROXY_CROSS_CONTAINER_PID_CLEARED=true' in clear_pid
 
 assert 'TIBIA_TEST_EMAIL' not in stage_package
 assert 'TIBIA_TEST_PASSWORD' not in stage_package
-assert 'tibiaclient-linux-current/package.json' in stage_package
+assert 'tibiaclient-linux-current' in stage_package
+assert "url = base + '/package.json'" in stage_package
 assert "'Mozilla/5.0 (X11; Linux x86_64)'" in stage_package
 assert "'Accept: */*'" in stage_package
 assert "startswith('15.32')" in stage_package

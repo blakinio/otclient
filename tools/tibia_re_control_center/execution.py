@@ -794,6 +794,32 @@ class MutationCoordinator:
                     DispatchState.POSSIBLY_DISPATCHED,
                     reason_code="DURABLE_DISPATCH_STATE_MISSING",
                 )
+            if execution.get("outcome") == "ambiguous":
+                reason = str(execution.get("reason_code") or "POST_DISPATCH_AMBIGUOUS")
+                next_budget = self._reconcile_budget(run, request, outcome="ambiguous")
+                terminal = durable.with_state(
+                    LifecycleState.AMBIGUOUS,
+                    self.clock.now_ns(),
+                    dispatch_state=DispatchState.POSSIBLY_DISPATCHED,
+                    authoritative_confirmation=Confirmation.UNKNOWN,
+                    reason_code=reason,
+                )
+                try:
+                    self.store.atomic_reconcile(terminal, next_budget)
+                    run.budget = next_budget
+                except (DurabilityError, DurabilityTimeout):
+                    self.mutation_disabled = True
+                    reason = "RESULT_DURABILITY_FAILED"
+                result = self._make_result(
+                    request,
+                    LifecycleState.AMBIGUOUS,
+                    ActionStatus.AMBIGUOUS,
+                    DispatchState.POSSIBLY_DISPATCHED,
+                    confirmation=Confirmation.UNKNOWN,
+                    reason_code=reason,
+                )
+                self.results[request.action_id] = result
+                return result
             next_budget = self._reconcile_budget(run, request, outcome="confirmed")
             if run.cancelled or (token is not None and token.cancelled):
                 terminal_state = LifecycleState.CANCELLED_AFTER_DISPATCH

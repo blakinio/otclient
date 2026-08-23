@@ -76,3 +76,7 @@ The alias-wide Ruff command reports exactly 10 findings, all in `tests/tools/tib
 PR #666 CI exposed `PB-AUDIT-005`: Package A validation still treated future Package B modules/metadata as part of Package A's original `runtime_access:none` implementation boundary. No active Package A task or open Package A PR owned the two validator paths. The repair scopes `audit_package_a.py` to the explicit Package A core and admits only known Package B metadata in the Package A workflow path-boundary check.
 
 Focused validation: Ruff PASS; `python -m unittest tests.tools.tibia_re_control_center.test_package_a -v` -> 76/76 PASS; `PYTHONPATH=. python tests/tools/tibia_re_control_center/audit_package_a.py` -> fresh audit PASS, zero material findings, runtime-access-none PASS, fake one-step E2E PASS. No Package A execution semantics or authority changed.
+
+## Terminal implementation closeout
+
+Implementation PR #666 merged exact final head `be8e5324cf8df0a62b3f37f43156723b859e7ed6` as squash merge `1e9f0245b2c7a249dfd0fdc9c6f8bdda2e9aa5e5`. Exact-head Package A workflow `32652125288`, Package B workflow `32652125330`, repository CI `32652125421` and required job `97225428316` all passed. Fresh Package A/Package B audits and real Chrome/CDP + CLI + backend E2E passed; PR #666 had no review/comment/thread blocker. `OFFICIAL_CLIENT_ACCESS=NONE` for the full task. The broad local Ruff command's 10 Package D findings are a verified main-baseline issue at identical blob `3b2cdbddc03688f6f698a8b998e38fb6577429e2`, not a Package B change.

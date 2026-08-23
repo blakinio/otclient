@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import importlib
+import io
+import json
 import tempfile
 import unittest
 from contextlib import contextmanager
@@ -380,6 +382,131 @@ class PackageDTrackABridgeProtocolTests(unittest.TestCase):
         with self.assertRaises(Exception) as caught:
             module.normalize_result(dict(result, outcome="unexpected"))
         self.assertEqual(caught.exception.code, "TRACK_A_BRIDGE_PROTOCOL_INVALID")
+
+    def _bridge_and_fake_process(self, lines, *, client_state="IN_GAME"):
+        module = importlib.import_module(
+            "tools.tibia_re_control_center.track_a_authority_bridge"
+        )
+        repo = Path(__file__).resolve().parents[3]
+        temp = tempfile.TemporaryDirectory()
+        root = Path(temp.name)
+        token = root / "lease.token"
+        token.write_text("secret-never-read")
+        probe = repo / ".github/scripts/tibia-official-client-re-canonical-live-session.sh"
+
+        class FakeProcess:
+            def __init__(self):
+                self.stdin = io.StringIO()
+                self.stdout = io.StringIO("".join(lines))
+                self.returncode = None
+
+            def poll(self):
+                return self.returncode
+
+            def wait(self, timeout=None):
+                self.returncode = 0
+                return 0
+
+            def terminate(self):
+                self.returncode = 2
+
+        process = FakeProcess()
+        bridge = module.CanonicalTrackAAuthorityBridge(
+            repo, "OTC-TEST", "session-test", token, probe, probe,
+            client_state_provider=lambda: client_state,
+            ready_timeout_seconds=0.03,
+            result_timeout_seconds=0.03,
+        )
+        return module, temp, bridge, process
+
+    def test_guarded_session_normalizes_ready_and_commits_once(self):
+        action_hash = "a" * 64
+        fence = "b" * 64
+        ready = "TRACK_A_GUARDED_DISPATCH_READY=" + json.dumps({
+            "protocol": "track-a-guarded-dispatch-v1",
+            "status": "READY",
+            "action_hash": action_hash,
+            "fence_digest": fence,
+        }, separators=(",", ":")) + "\n"
+        result = "TRACK_A_GUARDED_DISPATCH_RESULT=" + json.dumps({
+            "status": "CONFIRMED",
+            "effect_count": 1,
+            "action_hash": action_hash,
+        }, separators=(",", ":")) + "\n"
+        module, temp, bridge, process = self._bridge_and_fake_process([ready, result])
+        request = mock.Mock(
+            action_request_hash=action_hash,
+            kind="turn",
+            parameters={"direction": "NORTH"},
+            dispatch_fence=mock.Mock(
+                expected_adapter_generation="g1",
+                expected_runtime_instance_id="r1",
+                expected_session_epoch="s1",
+            ),
+        )
+        try:
+            with mock.patch.object(module.subprocess, "Popen", return_value=process):
+                with bridge.guarded_dispatch(request) as session:
+                    view = session.current_view()
+                    self.assertEqual(view.client_state, "IN_GAME")
+                    self.assertTrue(view.authority_current)
+                    self.assertTrue(view.target_unique)
+                    self.assertTrue(view.input_lock_held)
+                    self.assertEqual(view.fence_digest, fence)
+                    outcome = session.cross_once_and_reconcile(request)
+                    self.assertEqual(outcome.outcome, "confirmed")
+                    self.assertEqual(outcome.reason_code, None)
+                    with self.assertRaises(Exception):
+                        session.cross_once_and_reconcile(request)
+            self.assertEqual(process.stdin.getvalue(), "COMMIT\n")
+        finally:
+            temp.cleanup()
+
+    def test_guarded_context_exit_before_commit_sends_abort(self):
+        action_hash = "a" * 64
+        ready = "TRACK_A_GUARDED_DISPATCH_READY=" + json.dumps({
+            "protocol": "track-a-guarded-dispatch-v1", "status": "READY",
+            "action_hash": action_hash, "fence_digest": "b" * 64,
+        }, separators=(",", ":")) + "\n"
+        module, temp, bridge, process = self._bridge_and_fake_process([ready])
+        request = mock.Mock(
+            action_request_hash=action_hash, kind="turn", parameters={"direction": "NORTH"},
+            dispatch_fence=mock.Mock(
+                expected_adapter_generation="g1", expected_runtime_instance_id="r1",
+                expected_session_epoch="s1",
+            ),
+        )
+        try:
+            with mock.patch.object(module.subprocess, "Popen", return_value=process):
+                with bridge.guarded_dispatch(request):
+                    pass
+            self.assertEqual(process.stdin.getvalue(), "ABORT\n")
+        finally:
+            temp.cleanup()
+
+    def test_timeout_after_commit_is_ambiguous_without_second_commit(self):
+        action_hash = "a" * 64
+        ready = "TRACK_A_GUARDED_DISPATCH_READY=" + json.dumps({
+            "protocol": "track-a-guarded-dispatch-v1", "status": "READY",
+            "action_hash": action_hash, "fence_digest": "b" * 64,
+        }, separators=(",", ":")) + "\n"
+        module, temp, bridge, process = self._bridge_and_fake_process([ready])
+        request = mock.Mock(
+            action_request_hash=action_hash, kind="turn", parameters={"direction": "NORTH"},
+            dispatch_fence=mock.Mock(
+                expected_adapter_generation="g1", expected_runtime_instance_id="r1",
+                expected_session_epoch="s1",
+            ),
+        )
+        try:
+            with mock.patch.object(module.subprocess, "Popen", return_value=process):
+                with bridge.guarded_dispatch(request) as session:
+                    outcome = session.cross_once_and_reconcile(request)
+            self.assertEqual(outcome.outcome, "ambiguous")
+            self.assertEqual(outcome.reason_code, "TRACK_A_RESULT_TIMEOUT")
+            self.assertEqual(process.stdin.getvalue(), "COMMIT\n")
+        finally:
+            temp.cleanup()
 
     def test_bridge_command_passes_token_path_without_reading_contents(self):
         module = importlib.import_module(

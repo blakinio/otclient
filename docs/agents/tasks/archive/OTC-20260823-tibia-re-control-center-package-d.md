@@ -14,7 +14,7 @@ branch: ai/OTC-20260823-package-d-continue
 base_branch: main
 base_main: 1e9f0245b2c7a249dfd0fdc9c6f8bdda2e9aa5e5
 created: 2026-08-23T13:26:00+02:00
-updated: 2026-08-23T19:25:00+02:00
+updated: 2026-08-23T19:31:00+02:00
 execution_mode: archived
 policy_version: 2
 prompting_standard_version: 2.1
@@ -79,7 +79,15 @@ continuation_governance_initial_result: FAIL_REPAIRED_IN_CLOSEOUT
 continuation_governance_failed_job: 97230103884
 continuation_fresh_admission_audit_job: 97230103786
 continuation_fresh_admission_audit: PASS
-closeout_exact_head_ci: REQUIRED_BEFORE_MERGE
+pre_ready_closeout_head: 5df14da3583f6f5b2b7e47fd8b3953cb6c4d05df
+pre_ready_closeout_ci_run: 32654857020
+pre_ready_closeout_required_job: 97231958249
+pre_ready_closeout_ci: PASS
+pre_ready_governance_run: 32654856825
+pre_ready_governance_policy_job: 97231910153
+pre_ready_governance_fresh_audit_job: 97231910274
+pre_ready_governance: PASS
+closeout_exact_head_ci: REQUIRED_AFTER_EVIDENCE_SEAL_COMMIT
 comments_at_closeout_precheck: 0
 reviews_at_closeout_precheck: 0
 review_threads_at_closeout_precheck: 0
@@ -146,7 +154,7 @@ The durable pre-runtime checkpoint on exact trusted main recorded:
 
 The first continuation head also produced general CI run `32654111579` SUCCESS. Track A governance run `32654111394` intentionally caught an invalid pre-live admission record before any client access; deterministic job `97230103884` reported the namespace policy violation. The fresh admission behavior audit job `97230103786` succeeded. The invalid record is corrected in terminal evidence rather than bypassed or retried as runtime authority.
 
-PR #684 must pass its own final exact-head CI/governance after this archive replaces the active task. Merge is forbidden otherwise.
+The complete pre-Ready closeout head `5df14da3583f6f5b2b7e47fd8b3953cb6c4d05df` then passed Track A governance run `32654856825` (policy job `97231910153`, fresh audit job `97231910274`) and general CI run `32654857020` with required job `97231958249`, all SUCCESS. After Draft→Ready, branch protection correctly required a fresh current merge-ref check context. This evidence-seal commit intentionally retriggers `pull_request/synchronize`; its exact head must pass the same required checks before merge.
 
 ## Physical admission and blocker
 
@@ -166,7 +174,7 @@ Package D must not advertise physical action compatibility from this closeout.
 
 Before terminal archive publication, PR #684 had zero comments, zero submitted reviews and zero review threads. No central Spark advisory had been produced. Direct Codex/Spark was not invoked because this task has `direct_codex_authorized:false` and the accepted plan explicitly forbids direct invocation without separate current-task authorization.
 
-The final exact-head CI/governance result is a mandatory merge gate, not pre-claimed by this archive.
+The final exact-head CI/governance result is a mandatory merge gate and is not pre-claimed by this archive.
 
 ## Durable evidence
 

@@ -1,62 +1,72 @@
-# Package C checkpoint — 2026-08-23
+# Package C terminal closeout evidence ? 2026-08-23
 
 ## Scope
 
-This checkpoint preserves the current state of `OTCLIENT-TIBIA-RE-CONTROL-CENTER-PACKAGE-C` without changing the audited implementation PR head.
+This record supersedes the earlier waiting checkpoint for `OTC-20260822-tibia-re-control-center-package-c`.
 
-- implementation PR: `#663`
+Package C remained repository-only throughout the continuation:
+
+- `runtime_access: none`
+- Official Tibia client/runtime/process/container/KasmVNC access: NONE
+- credentials/login/gameplay/UI input: NONE
+- mutation/transaction/network-listener authority: NONE
+
+## Final implementation identity
+
+- implementation PR: #663 ? MERGED
 - implementation branch: `feat/OTC-20260822-tibia-re-control-center-package-c`
-- final candidate head: `7e4c6435c3715b7e97d8b7827ca052cf33743cf8`
-- last restacked base: `762436c25433b7bb192e6014cb4e46afc58dfc4b`
-- current main observed while checkpointing: `56499ec5767093f69f09c581c54957714382e107`
-- current main advances are Package D transport/governance only and do not touch the two Package C implementation files.
-- runtime access remained `none`; Official Tibia runtime/client was not accessed.
+- exact final implementation head: `0c551951b6f40b810f3e69cbd138edb85c70fe3a`
+- implementation base immediately before merge: `main@5ac05b2640e818a1efc3e065e2ed4e501eaed058`
+- squash merge on `main`: `de14f7a3659af51c055ab426fe46ada838f54141`
+- implementation changed files: exactly:
+  - `tools/tibia_re_control_center/surveyor_provider.py`
+  - `tests/tools/tibia_re_control_center/test_package_c_surveyor_provider.py`
 
-## Delivered implementation
+## Producer and schema pins
 
-Package C adds a strict repository-only Surveyor bundle provider and its regression suite. The provider validates the pinned producer/interface, schemas, provenance, privacy, bounded file-set/size rules, typed-reader evidence envelopes, runtime admission evidence and non-promotion semantics before emitting normalized Control Center read models.
+- producer commit: `1affb3a094a06f2a250140e8173501b3a6938164`
+- accepted aggregate schema: `otclient.tibia-re-surveyor.collect-all.v2`
+- alias schema: `otclient.tibia-re-surveyor.alias-view.v2`
+- telemetry schema: `otclient.tibia-re-surveyor.telemetry.v2`
+- missing-reader schema: `otclient.tibia-re-surveyor.missing-readers.v2`
+- producer acceptance anchor: `815245ab3cac38a96f60f3ee3395b67f81b81c11`
+- producer blobs reverified during continuation:
+  - `collect_all.py`: `43494964ed20cbadeb5e27cda6d441cf4c054b50`
+  - `survey.py`: `17d54afa3bce401e6d88c85ea7dcf292e1d31f2c`
+  - `reader_registry.py`: `62a2bc38687f48d6756d5f5eab9d637a110d9f26`
+  - `README.md`: `5f544a6060fbe714ccf9106b929b97897bba2e5f`
 
-The PR continues to change exactly:
+## Material continuation findings closed
 
-- `tools/tibia_re_control_center/surveyor_provider.py`
-- `tests/tools/tibia_re_control_center/test_package_c_surveyor_provider.py`
+Two fresh exact-head Codex audits after the original checkpoint found real P1 producer-boundary defects; both were reproduced, repaired with regressions and re-audited before merge:
 
-## Material hardening completed
+1. a manifest-valid non-admitted runtime with scalar `visible_tibia_windows=1` could reach `len()` and escape as raw `TypeError`; the provider now validates the producer collection shape before projection;
+2. the first fix was too broad for the producer's legitimate target-down shape: `DockerRuntimeProbe.snapshot()` emits `READ_ONLY_UNAVAILABLE` without `visible_tibia_windows` when the target is stopped. The final logic permits omission only for that producer variant and still rejects a malformed value when present.
 
-Independent audits found and the branch repaired all material findings observed during the task, including:
+The final target-down regression was RED before the fix and GREEN after it; the earlier malformed non-admitted regression remained GREEN.
 
-- privacy scanning of decoded and non-JSON producer-scanned text payloads;
-- bounded file reads, directory traversal and JSON structural/integer parsing;
-- strict runtime, lease, registration, executable fence, window and typed-reader provenance;
-- stable POSIX `dir_fd`/`O_NOFOLLOW` traversal plus nonblocking final opens;
-- Windows reparse-point/junction rejection;
-- Windows transient-junction TOCTOU closure using stable directory handles, handle-relative `NtCreateFile`, handle-based bounded directory enumeration, and removal of pathname fallback.
+## Exact-head validation ? `0c551951b6f40b810f3e69cbd138edb85c70fe3a`
 
-The final Windows race regression transiently replaces `telemetry` with a junction only during one `player-state.json` leaf read and restores the original pathname immediately after leaf close. The provider remains bound to the original parent handle and consumes the original manifest-selected payload.
+- Windows full Control Center suite: `214 tests`, PASS, `2` POSIX-only skips
+- Package C focused suite: `60 tests`, PASS, `2` POSIX-only skips
+- WSL/POSIX hardening: `4/4` PASS
+- owned Package C Ruff: PASS
+- `git diff origin/main...HEAD --check`: PASS
+- Package A workflow `32650478511`: SUCCESS
+- repository CI run `32650478885`: SUCCESS
+- required aggregate job `97221314928` (`CI / Required`): SUCCESS
+- independent Codex audit request: comment `5386963167`
+- independent Codex audit result: comment `5386978151` ? "Didn't find any major issues"; reviewed commit `0c551951b6`
+- unresolved implementation review threads at merge gate: `0`
 
-## Fresh validation on `7e4c6435c3715b7e97d8b7827ca052cf33743cf8`
+## Closeout lifecycle
 
-- Windows Control Center suite: `210 passed, 2 skipped, 125 subtests passed`.
-- WSL/POSIX focused hardening: `4 passed, 54 deselected`.
-- Ruff: PASS.
-- `git diff --check`: PASS.
-- Package A workflow `32644841117`: SUCCESS.
-- independent Codex exact-head audit: PASS; comment `5386480934` says no major issues and identifies reviewed commit `7e4c6435c3`.
-- pull request review threads: zero unresolved.
+- task claim PR #664: MERGED
+- implementation PR #663: MERGED
+- closeout PR #679: reused as the mandatory archive/evidence/ownership-release PR
+- active task is moved to `docs/agents/tasks/archive/OTC-20260822-tibia-re-control-center-package-c.md` in #679
+- archive record sets `ownership_released: true` and `owned_paths: []`
+- `docs/agents/MODULE_CATALOG.md` and `docs/agents/CHANGELOG.md` remain deferred because open draft PR #23 still changes both paths
+- Official Tibia access remained NONE
 
-## Remaining terminal gate
-
-Repository CI run `32644841268` is still `in_progress` for the exact final candidate head. All fast checks are green; the only pending jobs are:
-
-- `Build - Linux / Compile (linux-tests)` — `Run CMake` in progress;
-- `Build - Linux / Compile (linux-release)` — `Run CMake` in progress.
-
-This is the only remaining implementation-PR gate recorded by this checkpoint. Do not claim terminal completion until that exact-head run succeeds and PR `#663` reaches a terminal merged state.
-
-## Handoff
-
-Exactly one next action:
-
-`Verify CI run 32644841268 is SUCCESS for 7e4c6435c3715b7e97d8b7827ca052cf33743cf8; then merge PR #663 with expected-head protection and perform the mandatory terminal archive/ownership-release closeout.`
-
-Shared `docs/agents/MODULE_CATALOG.md` and `docs/agents/CHANGELOG.md` remain deferred because open PR `#23` owns those shared files. This checkpoint does not modify them.
+PR #679 must pass its own exact-head lifecycle validation, required GitHub checks and independent documentation/closeout audit before merge. Its merge makes the archive authoritative on `main`; final foreground verification then confirms the active task is absent and Package C ownership is released.

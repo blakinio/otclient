@@ -1,0 +1,119 @@
+name: Track B current package layout discriminator
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/tibia-global-login-package-layout.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Inspect current public Linux package layout without secrets
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          r="$RUNNER_TEMP/track-b-package-layout"
+          mkdir -p "$r/bin" "$r/state"
+          trap 'rm -rf "$r"' EXIT
+
+          curl -fsSL -o "$r/bin/wgcf" https://github.com/ViRb3/wgcf/releases/download/v2.2.32/wgcf_2.2.32_linux_amd64
+          echo '2ff97f2201972ce582a424455d50a3719a380eef0cd1f3144f7779348e122a2c  '"$r"'/bin/wgcf' | sha256sum -c - >/dev/null
+          curl -fsSL -o "$r/bin/wireproxy.tgz" https://github.com/windtf/wireproxy/releases/download/v1.1.3/wireproxy_linux_amd64.tar.gz
+          echo 'e88c1d090740373fc606c1bafd81d9a5eadc642cce5667616e20e9d7a444f51c  '"$r"'/bin/wireproxy.tgz' | sha256sum -c - >/dev/null
+          mkdir "$r/bin/wp"
+          tar -xzf "$r/bin/wireproxy.tgz" -C "$r/bin/wp"
+          cp "$(find "$r/bin/wp" -type f -name wireproxy -print -quit)" "$r/bin/wireproxy"
+          chmod 755 "$r/bin/wgcf" "$r/bin/wireproxy"
+
+          cd "$r/state"
+          "$r/bin/wgcf" register --accept-tos >/dev/null
+          "$r/bin/wgcf" generate >/dev/null
+          printf 'WGConfig = %s\n\n[Socks5]\nBindAddress = 127.0.0.1:25344\n' "$r/state/wgcf-profile.conf" > wireproxy.conf
+          nohup "$r/bin/wireproxy" -c wireproxy.conf >"$r/wireproxy.log" 2>&1 </dev/null &
+          for _ in $(seq 1 30); do
+            curl --socks5-hostname 127.0.0.1:25344 -fsS --max-time 10 https://www.cloudflare.com/cdn-cgi/trace >"$r/trace" 2>/dev/null && break
+            sleep 2
+          done
+          grep -Eq '^warp=(on|plus)$' "$r/trace"
+
+          u=https://static.tibia.com/launcher/tibiaclient-linux-current/package.json
+          curl --socks5-hostname 127.0.0.1:25344 --compressed -fL \
+            -A 'Mozilla/5.0 (X11; Linux x86_64)' -e "$u" -H 'Accept: */*' \
+            "$u" -o "$r/package.json"
+
+          python3 - "$r/package.json" <<'PY'
+          import collections
+          import json
+          import pathlib
+          import sys
+
+          path = pathlib.Path(sys.argv[1])
+          doc = json.loads(path.read_text(encoding='utf-8'))
+          print('PACKAGE_LAYOUT_JSON=true')
+          print('PACKAGE_LAYOUT_TOP_KEYS=' + ','.join(sorted(str(k) for k in doc.keys())))
+          version = str(doc.get('version') or '')
+          print('PACKAGE_LAYOUT_VERSION_FAMILY_15_32=' + str(version.startswith('15.32')).lower())
+          files = doc.get('files')
+          if not isinstance(files, list):
+              raise SystemExit('files is not a list')
+          rows = [x for x in files if isinstance(x, dict)]
+          print('PACKAGE_LAYOUT_FILE_COUNT=' + str(len(rows)))
+
+          local_prefixes = collections.Counter()
+          url_prefixes = collections.Counter()
+          ext_counts = collections.Counter()
+          candidates = []
+          for row in rows:
+              local = str(row.get('localfile') or '')
+              url = str(row.get('url') or '')
+              if local:
+                  local_prefixes[local.split('/', 1)[0]] += 1
+                  suffix = pathlib.PurePosixPath(local).suffix.lower() or '<none>'
+                  ext_counts[suffix] += 1
+              if url:
+                  url_prefixes[url.split('/', 1)[0]] += 1
+              low = (local + ' ' + url).lower()
+              if any(token in low for token in ('asset', 'catalog', 'appear', 'staticdata', 'proficien')):
+                  candidates.append((local, url))
+
+          def emit_counter(label, counter):
+              parts = [f'{k}:{v}' for k, v in sorted(counter.items())]
+              print(label + '=' + ','.join(parts))
+          emit_counter('PACKAGE_LAYOUT_LOCAL_PREFIXES', local_prefixes)
+          emit_counter('PACKAGE_LAYOUT_URL_PREFIXES', url_prefixes)
+          emit_counter('PACKAGE_LAYOUT_EXTENSIONS', ext_counts)
+          print('PACKAGE_LAYOUT_ASSET_LOCAL_COUNT=' + str(sum(v for k,v in local_prefixes.items() if k == 'assets')))
+          print('PACKAGE_LAYOUT_MATCH_COUNT=' + str(len(candidates)))
+          for index, (local, url) in enumerate(candidates[:40]):
+              print(f'PACKAGE_LAYOUT_MATCH_{index}_LOCAL={local}')
+              print(f'PACKAGE_LAYOUT_MATCH_{index}_URL={url}')
+
+          for key, value in sorted(doc.items()):
+              if key in {'files', 'version'}:
+                  continue
+              if isinstance(value, (str, int, float, bool)) or value is None:
+                  print(f'PACKAGE_LAYOUT_META_{key}={value}')
+              elif isinstance(value, list):
+                  print(f'PACKAGE_LAYOUT_META_{key}_TYPE=list')
+                  print(f'PACKAGE_LAYOUT_META_{key}_COUNT={len(value)}')
+              elif isinstance(value, dict):
+                  print(f'PACKAGE_LAYOUT_META_{key}_TYPE=dict')
+                  print(f'PACKAGE_LAYOUT_META_{key}_KEYS=' + ','.join(sorted(str(x) for x in value.keys())))
+          PY
+
+          base=https://static.tibia.com/launcher/tibiaclient-linux-current
+          for rel in assets/package.json assets/catalog-content.json catalog-content.json assets.json assets.json.sha256; do
+            code=$(curl --socks5-hostname 127.0.0.1:25344 --compressed -sS -o /dev/null \
+              -A 'Mozilla/5.0 (X11; Linux x86_64)' -e "$base/$rel" -H 'Accept: */*' \
+              --connect-timeout 15 --max-time 30 -w '%{http_code}' "$base/$rel" || true)
+            safe=$(printf '%s' "$rel" | tr '/.-' '___')
+            echo "PACKAGE_LAYOUT_CANDIDATE_${safe}_HTTP=$code"
+          done
+          echo PACKAGE_LAYOUT_DISCRIMINATOR_COMPLETE=true

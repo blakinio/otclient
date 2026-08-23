@@ -18,7 +18,7 @@ concurrency:
 jobs:
   controller-plane-preflight:
     if: github.repository == 'blakinio/otclient' && github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: [self-hosted, otclient, synology]
+    runs-on: [otclient, synology]
     timeout-minutes: 10
     env:
       STATE_DIR: /home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime
@@ -57,13 +57,9 @@ jobs:
           echo "CURRENT_MAIN_SHA=$current_main"
           echo "TASK_HEAD_SHA=$(git rev-parse HEAD)"
 
-          # Controller-plane lease status is authority metadata only. It does not
-          # discover/attach to/read/mutate any Official Tibia process or window.
           .github/scripts/tibia-official-client-re-canonical-live-lease \
             --state-dir "$STATE_DIR" status
 
-          # Read only durable registration metadata needed to choose the
-          # runtime_access class. Deliberately do not emit PID/start/window IDs.
           python3 - <<'PY'
           import json
           from pathlib import Path

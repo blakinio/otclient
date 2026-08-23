@@ -25,6 +25,27 @@ if text.count(old_stdin) != 1:
     raise SystemExit(f"expected exactly one handoff docker-exec stdin site, found {text.count(old_stdin)}")
 text = text.replace(old_stdin, new_stdin, 1)
 
+# Track B is a login/session experiment, not a full content-install proof. The
+# historical Synology cache happened to contain 5k+ sprite files, but game-login
+# construction only requires the current catalog plus the typed data explicitly
+# loaded below. Replace the historical file-count gate with semantic file gates.
+old_full_asset_gate = '''asset_count=$(docker exec "$CONTAINER" bash -lc 'find /lab/state/things/1532 -maxdepth 1 -type f | wc -l')
+[[ "$asset_count" -ge 5088 ]]
+'''
+new_minimal_asset_gate = '''docker exec "$CONTAINER" bash -lc '
+set -Eeuo pipefail
+root=/lab/state/things/1532
+test -s "$root/catalog-content.json"
+test -s "$root/assets.json.sha256"
+find "$root" -maxdepth 1 -type f -name 'appearances-*.dat' -print -quit | grep -q .
+find "$root" -maxdepth 1 -type f -name 'staticdata-*.dat' -print -quit | grep -q .
+'
+echo LAB_LOGIN_MINIMAL_ASSETS_READY=true
+'''
+if text.count(old_full_asset_gate) != 1:
+    raise SystemExit(f"expected exactly one historical full-asset gate, found {text.count(old_full_asset_gate)}")
+text = text.replace(old_full_asset_gate, new_minimal_asset_gate, 1)
+
 old_asset_marker = "echo LAB_RUNTIME_ASSET_IDENTIFIER_LENGTH=64\n"
 new_asset_marker = old_asset_marker + r'''docker exec -i "$CONTAINER" python3 - <<'PY_STATICDATA'
 from pathlib import Path

@@ -10,11 +10,11 @@ track_id: official-client-re
 task_kind: implementation
 phase: track_a_guarded_transition_repository_only
 risk: high
-branch: staged_prs_under_same_task
+branch: feat/OTC-20260823-package-d-track-a-guarded-dispatch
 base_branch: main
-base_main: 14409a502588b09ba0d30fbaed130df56d173aa0
+base_main: 5d6b4007dbf3b16911ad59204fb7f8beb635cf6c
 created: 2026-08-23T13:26:00+02:00
-updated: 2026-08-23T13:47:00+02:00
+updated: 2026-08-23T15:27:46+02:00
 execution_mode: github_connector_then_track_a_runtime_if_admitted
 execution_reason: owner-approved admission-first Package D design; staged repository PRs preserve independent Control Center and Track A audit boundaries before any separately admitted physical runtime operation
 policy_version: 2
@@ -113,6 +113,17 @@ preferred_first_candidate: turn
 fallback_candidate: move
 first_action_rule: exactly_one_action_may_be_promoted_only_after_full_fresh_proof
 first_action_status: NOT_YET_PHYSICALLY_PROVEN
+track_a_guarded_transition_pr: 674
+track_a_guarded_transition_head: 00cbc3f639560b82e0faa70a6a027ece046af1f7
+track_a_guarded_transition_validation:
+  input_lock_linux: 4_of_4_pass
+  canonical_transition_linux: 26_of_26_pass
+  canonical_lease_linux: 14_of_14_pass
+  canonical_guard_linux: 3_of_3_pass
+  python_compile: pass
+  git_diff_check: pass
+  track_a_canonical_live_governance: pass
+  track_a_agent_runtime_governance: pending_checkpoint_refresh
 ---
 
 # Control Center Package D — active task

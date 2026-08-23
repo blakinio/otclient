@@ -19,6 +19,7 @@ from typing import Any, Sequence
 STATE = Path('/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime')
 REG = STATE / 'runtime-registration.json'
 GUARD_PATH = Path(__file__).with_name('tibia-official-client-re-canonical-live-guard.py')
+INPUT_LOCK_PATH = Path(__file__).with_name('tibia-official-client-re-input-lock.py')
 RID = 'track-a-canonical-live'
 VER = '15.32'
 SIZE = 52109920
@@ -49,6 +50,19 @@ def _guard() -> Any:
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
+    return module
+
+
+def _input_lock_module() -> Any:
+    spec = importlib.util.spec_from_file_location('track_a_input_lock', INPUT_LOCK_PATH)
+    if spec is None or spec.loader is None:
+        raise E('input_lock_unavailable')
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    try:
+        spec.loader.exec_module(module)
+    except OSError as exc:
+        raise E('input_lock_unavailable', str(exc)) from exc
     return module
 
 
@@ -853,6 +867,154 @@ def _gateb(
     _probe_reg(args, guard, lease, manager, identity, generation, False)
 
 
+def _read_guarded_request(path: Path) -> dict[str, Any]:
+    try:
+        st = path.lstat()
+    except OSError as exc:
+        raise E('guarded_dispatch_request_unavailable', str(exc)) from exc
+    owner_ok = not hasattr(os, 'getuid') or st.st_uid == os.getuid()
+    if not path.is_file() or path.is_symlink() or not owner_ok:
+        raise E('guarded_dispatch_request_unsafe')
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        raise E('guarded_dispatch_request_invalid', str(exc)) from exc
+    action_hash = data.get('action_hash') if isinstance(data, dict) else None
+    if data.get('schema_version') != 1 or not isinstance(action_hash, str):
+        raise E('guarded_dispatch_request_invalid')
+    if len(action_hash) != 64 or any(c not in '0123456789abcdef' for c in action_hash.lower()):
+        raise E('guarded_dispatch_request_invalid')
+    forbidden = {'key', 'keys', 'coordinate', 'coordinates', 'opcode', 'address', 'pointer',
+                 'pid', 'window_id', 'display', 'credential', 'password', 'token', 'lease_token'}
+
+    def reject_raw(value: Any) -> None:
+        if isinstance(value, dict):
+            if forbidden.intersection(str(key).lower() for key in value):
+                raise E('guarded_dispatch_request_raw_field_forbidden')
+            for nested in value.values():
+                reject_raw(nested)
+        elif isinstance(value, list):
+            for nested in value:
+                reject_raw(nested)
+
+    reject_raw(data)
+    return data
+
+
+def _guarded_fence_digest(registration: dict[str, Any], manifest: dict[str, Any]) -> str:
+    fields = {
+        'runtime_id': registration.get('runtime_id'),
+        'registration_generation': registration.get('registration_generation'),
+        'lease_generation': registration.get('lease_generation'),
+        'boot_id_sha256': registration.get('boot_id_sha256'),
+        'process_start_ticks': registration.get('process_start_ticks'),
+        'client_sha256': registration.get('client_sha256'),
+        'runtime_locator': registration.get('runtime_locator'),
+        'candidate_fingerprint': registration.get('candidate_fingerprint'),
+        'manifest_state': manifest.get('state'),
+        'manifest_window_identity': manifest.get('window_identity'),
+    }
+    payload = json.dumps(fields, sort_keys=True, separators=(',', ':')).encode()
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _acquire_input_lock(args: argparse.Namespace, guard: Any):
+    module = _input_lock_module()
+    timeout = float(getattr(args, 'input_lock_timeout', 10.0))
+    return module.InputLock(STATE).acquire(
+        timeout_seconds=timeout,
+        cancelled=lambda: guard._supervisor_cancel_signal is not None,
+    )
+
+
+def _emit_guarded_ready(request: dict[str, Any], fence_digest: str) -> None:
+    payload = {
+        'protocol': 'track-a-guarded-dispatch-v1',
+        'status': 'READY',
+        'action_hash': request['action_hash'],
+        'fence_digest': fence_digest,
+    }
+    print('TRACK_A_GUARDED_DISPATCH_READY=' + json.dumps(payload, sort_keys=True, separators=(',', ':')), flush=True)
+
+
+def _read_guarded_decision(stream: Any = None) -> str:
+    source = sys.stdin if stream is None else stream
+    raw = source.readline()
+    if raw not in {'COMMIT\n', 'ABORT\n'}:
+        raise E('guarded_dispatch_decision_invalid')
+    return raw.rstrip('\n')
+
+
+def _run_guarded_worker(args: argparse.Namespace, request: dict[str, Any]) -> dict[str, Any]:
+    result_path = STATE / '.guarded-dispatch-result.json'
+    result_path.unlink(missing_ok=True)
+    try:
+        completed = subprocess.run(
+            [str(args.worker), 'guarded-dispatch', str(args.request_file), str(result_path)],
+            env=_env(), close_fds=True, check=False, timeout=args.worker_timeout,
+        )
+        if completed.returncode:
+            raise E('guarded_dispatch_worker_failed')
+        try:
+            result = json.loads(result_path.read_text())
+        except (OSError, json.JSONDecodeError) as exc:
+            raise E('guarded_dispatch_worker_result_invalid', str(exc)) from exc
+        allowed_keys = {'status', 'effect_count', 'action_hash', 'reason_code'}
+        if not isinstance(result, dict) or not set(result).issubset(allowed_keys):
+            raise E('guarded_dispatch_worker_result_invalid')
+        if result.get('action_hash') != request['action_hash']:
+            raise E('guarded_dispatch_worker_action_hash_mismatch')
+        if result.get('effect_count') not in {0, 1}:
+            raise E('guarded_dispatch_worker_effect_count_invalid')
+        if result.get('status') not in {'CONFIRMED', 'AMBIGUOUS', 'REFUSED'}:
+            raise E('guarded_dispatch_worker_result_invalid')
+        reason = result.get('reason_code')
+        if reason is not None and (not isinstance(reason, str) or not reason or any(c not in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_' for c in reason)):
+            raise E('guarded_dispatch_worker_result_invalid')
+        return result
+    finally:
+        result_path.unlink(missing_ok=True)
+
+
+def _guarded_dispatch(
+    args: argparse.Namespace,
+    guard: Any,
+    lease: Any,
+    manager: Any,
+    identity: Any,
+    generation: int,
+) -> dict[str, Any]:
+    request = _read_guarded_request(args.request_file)
+    first_registration, first_manifest = _probe_reg(
+        args, guard, lease, manager, identity, generation, False
+    )
+    first_fence = _guarded_fence_digest(first_registration, first_manifest)
+    with _acquire_input_lock(args, guard):
+        second_registration, second_manifest = _probe_reg(
+            args, guard, lease, manager, identity, generation, False
+        )
+        second_fence = _guarded_fence_digest(second_registration, second_manifest)
+        if second_fence != first_fence:
+            raise E('guarded_dispatch_fence_changed_before_ready')
+        _emit_guarded_ready(request, second_fence)
+        decision = _read_guarded_decision()
+        if decision == 'ABORT':
+            result = {'status': 'ABORTED', 'effect_count': 0, 'action_hash': request['action_hash']}
+            print('TRACK_A_GUARDED_DISPATCH_RESULT=' + json.dumps(result, sort_keys=True, separators=(',', ':')), flush=True)
+            return result
+        third_registration, third_manifest = _probe_reg(
+            args, guard, lease, manager, identity, generation, False
+        )
+        third_fence = _guarded_fence_digest(third_registration, third_manifest)
+        if third_fence != second_fence:
+            raise E('guarded_dispatch_fence_changed_before_effect')
+        _lease(manager, lease, identity, args.token_file, generation)
+        _cancel(guard)
+        result = _run_guarded_worker(args, request)
+        print('TRACK_A_GUARDED_DISPATCH_RESULT=' + json.dumps(result, sort_keys=True, separators=(',', ':')), flush=True)
+        return result
+
+
 def _child(args: argparse.Namespace, guard: Any, lock_fd: int, previous_mask: set[signal.Signals]) -> None:
     rc = 2
     try:
@@ -864,7 +1026,7 @@ def _child(args: argparse.Namespace, guard: Any, lock_fd: int, previous_mask: se
         identity = lease.LeaseIdentity(args.task_id, args.session_id)
         generation = _lease(manager, lease, identity, args.token_file)
         _cancel(guard)
-        {'bootstrap': _bootstrap, 'adopt-existing': _adopt_existing, 'semantic-downgrade': _semantic_downgrade, 'rebind': _rebind, 'gate-b': _gateb}[args.operation](
+        {'bootstrap': _bootstrap, 'adopt-existing': _adopt_existing, 'semantic-downgrade': _semantic_downgrade, 'rebind': _rebind, 'gate-b': _gateb, 'guarded-dispatch': _guarded_dispatch}[args.operation](
             args, guard, lease, manager, identity, generation
         )
         label = args.operation.upper().replace('-', '_')
@@ -940,7 +1102,7 @@ def _supervise(args: argparse.Namespace) -> int:
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(description=__doc__)
     sub = result.add_subparsers(dest='operation', required=True)
-    for name in ('bootstrap', 'adopt-existing', 'semantic-downgrade', 'rebind', 'gate-b'):
+    for name in ('bootstrap', 'adopt-existing', 'semantic-downgrade', 'rebind', 'gate-b', 'guarded-dispatch'):
         command = sub.add_parser(name)
         command.add_argument('--task-id', required=True)
         command.add_argument('--session-id', required=True)
@@ -948,6 +1110,12 @@ def parser() -> argparse.ArgumentParser:
         if name == 'bootstrap':
             command.add_argument('--worker', required=True, type=Path)
             command.add_argument('--worker-timeout', type=int, default=180)
+        elif name == 'guarded-dispatch':
+            command.add_argument('--probe', required=True, type=Path)
+            command.add_argument('--worker', required=True, type=Path)
+            command.add_argument('--request-file', required=True, type=Path)
+            command.add_argument('--worker-timeout', type=int, default=30)
+            command.add_argument('--input-lock-timeout', type=float, default=10.0)
         else:
             command.add_argument('--probe', required=True, type=Path)
     return result

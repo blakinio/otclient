@@ -76,9 +76,15 @@ class Tests(unittest.TestCase):
         root = Path(self.temp.name)
         self.m.STATE = root
         self.m.REG = root / 'runtime-registration.json'
+        request_file = root / 'guarded-request.json'
+        request_file.write_text(json.dumps({
+            'schema_version': 1,
+            'action_hash': 'a' * 64,
+        }))
         self.args = argparse.Namespace(
             task_id='OTC-TEST', session_id='s', token_file=root / 'tok',
             worker=WORKER, probe=WORKER, worker_timeout=2,
+            request_file=request_file, input_lock_timeout=0.2,
         )
         self.identity = {
             'boot_id_sha256': 'b' * 64,
@@ -411,6 +417,121 @@ class Tests(unittest.TestCase):
             '--token-file', str(Path(self.temp.name) / 'tok'), '--probe', str(WORKER),
         ])
         self.assertEqual(parsed.operation, 'adopt-existing')
+
+
+    def test_parser_accepts_guarded_dispatch_shape(self):
+        request_file = Path(self.temp.name) / 'request.json'
+        parsed = self.m.parser().parse_args([
+            'guarded-dispatch', '--task-id', 'OTC-TEST', '--session-id', 's',
+            '--token-file', str(self.args.token_file), '--probe', str(WORKER),
+            '--worker', str(WORKER), '--request-file', str(request_file),
+            '--worker-timeout', '3',
+        ])
+        self.assertEqual(parsed.operation, 'guarded-dispatch')
+        self.assertEqual(parsed.worker, WORKER)
+        self.assertEqual(parsed.probe, WORKER)
+
+    def test_guarded_dispatch_requires_gate_b_before_input_lock_and_worker(self):
+        events = []
+        with mock.patch.object(self.m, '_probe_reg', side_effect=self.m.E('gate_b_failed')), \
+                mock.patch.object(self.m, '_acquire_input_lock', side_effect=lambda *_a, **_k: events.append('input-lock')), \
+                mock.patch.object(self.m, '_run_guarded_worker', side_effect=lambda *_a, **_k: events.append('worker')):
+            with self.assertRaisesRegex(self.m.E, 'gate_b_failed'):
+                self.m._guarded_dispatch(
+                    self.args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 1
+                )
+        self.assertEqual(events, [])
+
+    def test_guarded_dispatch_holds_input_lock_across_worker_transaction(self):
+        events = []
+        self.write(self.registration())
+
+        class Held:
+            def __enter__(self):
+                events.append('input-lock-enter')
+            def __exit__(self, *_exc):
+                events.append('input-lock-exit')
+
+        def worker(*_args, **_kwargs):
+            events.append('worker')
+            return {'status': 'ABORTED', 'effect_count': 0}
+
+        with mock.patch.object(self.m, '_probe_reg', return_value=(self.registration(), dict(self.manifest))), \
+                mock.patch.object(self.m, '_acquire_input_lock', return_value=Held()), \
+                mock.patch.object(self.m, '_emit_guarded_ready', return_value=None), \
+                mock.patch.object(self.m, '_read_guarded_decision', return_value='COMMIT'), \
+                mock.patch.object(self.m, '_run_guarded_worker', side_effect=worker):
+            result = self.m._guarded_dispatch(
+                self.args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 1
+            )
+        self.assertEqual(result['effect_count'], 0)
+        self.assertEqual(events, ['input-lock-enter', 'worker', 'input-lock-exit'])
+
+    def test_guarded_decision_accepts_only_exact_commit_or_abort(self):
+        import io
+        self.assertEqual(self.m._read_guarded_decision(io.StringIO('COMMIT\n')), 'COMMIT')
+        self.assertEqual(self.m._read_guarded_decision(io.StringIO('ABORT\n')), 'ABORT')
+        for raw in ('commit\n', 'COMMIT extra\n', '\n', ''):
+            with self.subTest(raw=raw):
+                with self.assertRaisesRegex(self.m.E, 'guarded_dispatch_decision_invalid'):
+                    self.m._read_guarded_decision(io.StringIO(raw))
+
+    def test_guarded_request_rejects_nested_raw_runtime_field(self):
+        path = Path(self.temp.name) / 'raw-request.json'
+        path.write_text(json.dumps({
+            'schema_version': 1,
+            'action_hash': 'a' * 64,
+            'parameters': {'pid': 123},
+        }))
+        with self.assertRaisesRegex(self.m.E, 'guarded_dispatch_request_raw_field_forbidden'):
+            self.m._read_guarded_request(path)
+
+    def test_guarded_worker_result_rejects_extra_raw_fields(self):
+        def fake_run(*_args, **_kwargs):
+            (self.m.STATE / '.guarded-dispatch-result.json').write_text(json.dumps({
+                'status': 'CONFIRMED',
+                'effect_count': 1,
+                'action_hash': 'a' * 64,
+                'pid': 123,
+            }))
+            return mock.Mock(returncode=0)
+
+        with mock.patch.object(self.m.subprocess, 'run', side_effect=fake_run):
+            with self.assertRaisesRegex(self.m.E, 'guarded_dispatch_worker_result_invalid'):
+                self.m._run_guarded_worker(self.args, {'action_hash': 'a' * 64})
+
+    def test_commit_revalidates_gate_b_before_worker(self):
+        events = []
+        registration = self.registration()
+        calls = 0
+
+        class Held:
+            def __enter__(self):
+                events.append('input-lock-enter')
+            def __exit__(self, *_exc):
+                events.append('input-lock-exit')
+
+        def probe(*_args, **_kwargs):
+            nonlocal calls
+            calls += 1
+            events.append(f'gate-b-{calls}')
+            if calls == 3:
+                raise self.m.E('identity_changed_before_commit')
+            return registration, dict(self.manifest)
+
+        self.args.request_file = Path(self.temp.name) / 'request.json'
+        self.args.request_file.write_text('{"schema_version":1,"action_hash":"' + ('a' * 64) + '"}')
+        with mock.patch.object(self.m, '_probe_reg', side_effect=probe), \
+                mock.patch.object(self.m, '_acquire_input_lock', return_value=Held()), \
+                mock.patch.object(self.m, '_read_guarded_decision', return_value='COMMIT'), \
+                mock.patch.object(self.m, '_emit_guarded_ready', side_effect=lambda *_a: events.append('ready')), \
+                mock.patch.object(self.m, '_run_guarded_worker', side_effect=lambda *_a, **_k: events.append('worker')):
+            with self.assertRaisesRegex(self.m.E, 'identity_changed_before_commit'):
+                self.m._guarded_dispatch(
+                    self.args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 1
+                )
+        self.assertNotIn('worker', events)
+        self.assertEqual(events[:5], ['gate-b-1', 'input-lock-enter', 'gate-b-2', 'ready', 'gate-b-3'])
 
 
 if __name__ == '__main__':

@@ -1,9 +1,9 @@
 name: Package D physical retry controller preflight
 
 on:
-  push:
-    branches:
-      - runtime/OTC-20260823-control-center-package-d-physical-retry
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
     paths:
       - .github/workflows/otc-20260823-package-d-physical-retry.yml
       - docs/agents/tasks/active/OTC-20260823-control-center-package-d-physical-retry.md
@@ -17,28 +17,32 @@ concurrency:
 
 jobs:
   controller-plane-preflight:
-    if: github.repository == 'blakinio/otclient'
+    if: github.repository == 'blakinio/otclient' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: [self-hosted, otclient, synology]
     timeout-minutes: 10
     env:
       STATE_DIR: /home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime
       TASK_ID: OTC-20260823-control-center-package-d-physical-retry
       TASK_FILE: docs/agents/tasks/active/OTC-20260823-control-center-package-d-physical-retry.md
+      TASK_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
     steps:
-      - name: Checkout control-plane snapshot
+      - name: Checkout exact PR head
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
       - name: Create isolated task worktree
         shell: bash
         run: |
           set -euo pipefail
+          test -n "$TASK_HEAD_SHA"
+          test "$(git rev-parse HEAD)" = "$TASK_HEAD_SHA"
           wt="${RUNNER_TEMP}/otc-20260823-package-d-physical-retry-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           rm -rf "$wt"
-          git worktree add --detach "$wt" "$GITHUB_SHA"
+          git worktree add --detach "$wt" "$TASK_HEAD_SHA"
           printf 'TASK_WORKTREE=%s\n' "$wt" >> "$GITHUB_ENV"
-          test "$(git -C "$wt" rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git -C "$wt" rev-parse HEAD)" = "$TASK_HEAD_SHA"
           test -f "$wt/$TASK_FILE"
           echo "WORKTREE_ISOLATION=PASS"
           echo "WORKTREE_HEAD=$(git -C "$wt" rev-parse HEAD)"
@@ -58,7 +62,7 @@ jobs:
           .github/scripts/tibia-official-client-re-canonical-live-lease \
             --state-dir "$STATE_DIR" status
 
-          # Read only the durable registration metadata needed to choose the
+          # Read only durable registration metadata needed to choose the
           # runtime_access class. Deliberately do not emit PID/start/window IDs.
           python3 - <<'PY'
           import json

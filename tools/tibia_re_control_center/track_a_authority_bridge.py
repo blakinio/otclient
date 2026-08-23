@@ -156,7 +156,7 @@ class _GuardedSession:
     def _client_state(self) -> str:
         try:
             value = self._client_state_provider()
-        except Exception:
+        except Exception:  # noqa: BLE001 -- external state provider must fail closed
             return "UNKNOWN"
         return value if value in {"IN_GAME", "LOGIN_SCREEN", "CHARACTER_SELECTION", "UNKNOWN"} else "UNKNOWN"
 
@@ -365,10 +365,10 @@ class CanonicalTrackAAuthorityBridge:
             if process is not None:
                 try:
                     process.wait(timeout=0.2)
-                except Exception:
+                except TimeoutError:
                     try:
                         process.terminate()
-                    except Exception:
+                    except OSError:
                         pass
 
     def emergency_stop(self, reason: str) -> None:

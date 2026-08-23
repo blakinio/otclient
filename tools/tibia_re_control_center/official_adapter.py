@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import threading
-from contextlib import contextmanager
+from collections.abc import Iterator
+from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass
-from typing import Any, ContextManager, Iterator, Protocol
+from typing import Any, Protocol
 
 from .model import (
     ActionRequest,
@@ -65,7 +66,7 @@ class TrackAAuthorityBridge(Protocol):
     def advisory_available(self, request: ActionRequest) -> bool:
         ...
 
-    def guarded_dispatch(self, request: ActionRequest) -> ContextManager[GuardedDispatchSession]:
+    def guarded_dispatch(self, request: ActionRequest) -> AbstractContextManager[GuardedDispatchSession]:
         ...
 
     def emergency_stop(self, reason: str) -> None:
@@ -294,12 +295,13 @@ class OfficialTibiaAdapter:
             self._active_session.value = None
 
     def emergency_stop(self, reason: str = "STOP") -> dict[str, Any]:
+        cleanup_failed = False
         try:
             self._authority_bridge.emergency_stop(reason)
         except Exception:  # noqa: BLE001 -- STOP cleanup failure grants no authority
-            pass
+            cleanup_failed = True
         return {
-            "status": "HARNESS_CLEANUP_ONLY",
+            "status": "HARNESS_CLEANUP_DEGRADED" if cleanup_failed else "HARNESS_CLEANUP_ONLY",
             "reason": reason,
             "new_external_effects": 0,
         }

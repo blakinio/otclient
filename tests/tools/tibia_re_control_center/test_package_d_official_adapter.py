@@ -8,9 +8,9 @@ from tools.tibia_re_control_center.execution import MutationCoordinator
 from tools.tibia_re_control_center.fake import FakeAdapter, ManualClock
 from tools.tibia_re_control_center.model import (
     ActionRequest,
+    ActionStatus,
     AdapterIdentity,
     AdapterKind,
-    ActionStatus,
     Authority,
     Confirmation,
     DispatchFence,
@@ -199,17 +199,17 @@ class PackageDOfficialAdapterTests(unittest.TestCase):
             runtime_instance_id="runtime-1",
             session_epoch="session-1",
         )
-        base = dict(
-            action_kind="turn",
-            client_sha256=module.CURRENT_CLIENT_SHA256,
-            read_gate="R2",
-            action_gate="A3",
-            semantic_path_id="turn-v1",
-            confirmation_id="facing-direction-v1",
-            requires_input_lock=True,
-            evidence_refs=("evidence:current-turn",),
-            adapter_generation=identity.adapter_generation,
-        )
+        base = {
+            "action_kind": "turn",
+            "client_sha256": module.CURRENT_CLIENT_SHA256,
+            "read_gate": "R2",
+            "action_gate": "A3",
+            "semantic_path_id": "turn-v1",
+            "confirmation_id": "facing-direction-v1",
+            "requires_input_lock": True,
+            "evidence_refs": ("evidence:current-turn",),
+            "adapter_generation": identity.adapter_generation,
+        }
         stale_cases = (
             dict(base, client_sha256="0" * 64),
             dict(base, adapter_generation="old-generation"),
@@ -231,17 +231,17 @@ class PackageDOfficialAdapterTests(unittest.TestCase):
             runtime_instance_id="runtime-1",
             session_epoch="session-1",
         )
-        base = dict(
-            action_kind="turn",
-            client_sha256=module.CURRENT_CLIENT_SHA256,
-            read_gate="R2",
-            action_gate="A3",
-            semantic_path_id="turn-v1",
-            confirmation_id="facing-direction-v1",
-            requires_input_lock=True,
-            evidence_refs=("evidence:current-turn",),
-            adapter_generation=identity.adapter_generation,
-        )
+        base = {
+            "action_kind": "turn",
+            "client_sha256": module.CURRENT_CLIENT_SHA256,
+            "read_gate": "R2",
+            "action_gate": "A3",
+            "semantic_path_id": "turn-v1",
+            "confirmation_id": "facing-direction-v1",
+            "requires_input_lock": True,
+            "evidence_refs": ("evidence:current-turn",),
+            "adapter_generation": identity.adapter_generation,
+        }
         invalid_cases = (
             dict(base, action_kind="not-a-scenario-action"),
             dict(base, read_gate="R0"),

@@ -45,7 +45,7 @@ out = pathlib.Path('/lab/state/things/1532')
 out.mkdir(parents=True, exist_ok=True)
 def get(url, path):
     subprocess.run([
-        'curl', '--socks5-hostname', '127.0.0.1:25344', '-fsSL',
+        'curl', '--socks5-hostname', '127.0.0.1:25344', '-fsSL', '-A', 'Mozilla/5.0',
         '--retry', '3', '--retry-all-errors', '--connect-timeout', '15',
         '--max-time', '180', url, '-o', str(path),
     ], check=True)

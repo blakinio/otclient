@@ -8,13 +8,13 @@ project_lane: otclient
 lane: P4-OFFICIAL-ADAPTER
 track_id: official-client-re
 task_kind: implementation
-phase: control_center_track_a_bridge_repository_only
+phase: governance_and_external_transport_repository_only
 risk: high
-branch: docs/OTC-20260823-package-d-bridge-claim
+branch: docs/OTC-20260823-package-d-governance
 base_branch: main
-base_main: ca7c8eaffd4861e4345cc9eb866a9a4886f93773
+base_main: 762436c25433b7bb192e6014cb4e46afc58dfc4b
 created: 2026-08-23T13:26:00+02:00
-updated: 2026-08-23T15:31:00+02:00
+updated: 2026-08-23T16:05:00+02:00
 execution_mode: github_connector_then_track_a_runtime_if_admitted
 execution_reason: owner-approved admission-first Package D design; staged repository PRs preserve independent Control Center and Track A audit boundaries before any separately admitted physical runtime operation
 policy_version: 2
@@ -56,6 +56,16 @@ control_center_core_merge: 14409a502588b09ba0d30fbaed130df56d173aa0
 track_a_guarded_transition_pr: 674
 track_a_guarded_transition_head: 7f967acd13bb453ca6888e1741932fa657d068c6
 track_a_guarded_transition_merge: ca7c8eaffd4861e4345cc9eb866a9a4886f93773
+control_center_bridge_pr: 676
+control_center_bridge_head: 0857acdf0c9babfdeacbc7e49f73a219f8ba3de7
+control_center_bridge_merge: 762436c25433b7bb192e6014cb4e46afc58dfc4b
+control_center_bridge_validation:
+  control_center_suite: 154_of_154_pass
+  package_a_fresh_audit: pass
+  package_a_p1_audit: pass
+  material_findings_open: 0
+  ruff: pass
+  fake_full_path_cases: 6_of_6_pass
 track_a_guarded_transition_validation:
   input_lock_linux: 6_of_6_pass
   canonical_transition_linux: 28_of_28_pass
@@ -74,9 +84,8 @@ planned_stages:
   - governance_and_runtime_admission
 owned_paths_current_stage:
   - docs/agents/tasks/active/OTC-20260823-tibia-re-control-center-package-d.md
-  - tools/tibia_re_control_center/official_adapter.py
-  - tools/tibia_re_control_center/track_a_authority_bridge.py
-  - tests/tools/tibia_re_control_center/test_package_d_official_adapter.py
+  - docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
+  - docs/agents/contracts/TIBIA_RE_CONTROL_CENTER_ADAPTER_V1.md
 planned_implementation_paths:
   - tools/tibia_re_control_center/execution.py
   - tools/tibia_re_control_center/official_adapter.py
@@ -86,11 +95,9 @@ planned_implementation_paths:
   - .github/scripts/test_tibia_official_client_re_input_lock.py
   - .github/scripts/tibia-official-client-re-canonical-live-transition.py
   - .github/scripts/test_tibia_official_client_re_canonical_live_transition.py
-shared_paths_pending_revalidation:
-  - docs/agents/MODULE_CATALOG.md
-  - docs/agents/CHANGELOG.md
-  - docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
-  - docs/agents/contracts/TIBIA_RE_CONTROL_CENTER_ADAPTER_V1.md
+shared_paths_deferred:
+  - docs/agents/MODULE_CATALOG.md: DEFERRED_EXISTING_OWNER_PR_23
+  - docs/agents/CHANGELOG.md: DEFERRED_EXISTING_OWNER_PR_23
 modules_touched:
   - tibia_re_control_center Official Tibia runtime adapter architecture
   - Track A canonical authority/transition reuse boundary
@@ -115,7 +122,7 @@ depends_on:
   - Package D guarded transition merge ca7c8eaffd4861e4345cc9eb866a9a4886f93773
   - fresh physical runtime admission before any live operation
 blocks:
-  - no physical action may dispatch until canonical input.lock semantics are made normative in current Track A governance or another current trusted-base rule explicitly admits the reviewed implementation
+  - no physical action may dispatch until the external Track A process transport is implemented/reviewed and fresh runtime admission passes
   - no action capability promotion without fresh current semantic action and authoritative confirmation evidence
 runtime_nonclaims:
   display_98_current_canonical_status: UNKNOWN
@@ -129,7 +136,7 @@ first_action_rule: exactly_one_action_may_be_promoted_only_after_full_fresh_proo
 first_action_status: NOT_YET_PHYSICALLY_PROVEN
 ---
 
-# Control Center Package D — active task
+# Control Center Package D â€” active task
 
 The owner approved design option 3 and explicitly approved the written design spec on 2026-08-23. The design and implementation plan were merged by docs-only PR #670 as `371f5a0451e9bf3e3eac29cc12edfecc310c3ea9`.
 

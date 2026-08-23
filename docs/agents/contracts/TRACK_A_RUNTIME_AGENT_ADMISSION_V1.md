@@ -116,11 +116,12 @@ The worker may mutate only its declared task-owned sandbox. It MUST NOT:
 
 Ordinary canonical reuse or mutation is allowed only when all of the following are freshly true:
 
-1. **Gate A PASS** — the current task/session holds the authoritative lease and enters the final cancellation-safe supervisor critical section under `coordination.lock`;
+1. **Gate A PASS** â€” the current task/session holds the authoritative lease and enters the final cancellation-safe supervisor critical section under `coordination.lock`;
 2. the one authoritative registration exists at `/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime/runtime-registration.json`;
 3. if registration `lease_generation` differs from the current validated controller generation, the dedicated reviewed **generation rebind** completes under the same authority boundary;
-4. **Gate B PASS** — boot identity + PID + process start ticks + exact client version/size/SHA + required display/window/state and target uniqueness are freshly revalidated, and registration generation binding matches the current controller;
-5. every state-changing/invasive command stays inside the final PR #321 cancellation-safe whole-lifetime supervisor so the canonical flock survives caller/process-group cancellation and remains held through all guarded mutation descendants.
+4. **Gate B PASS** â€” boot identity + PID + process start ticks + exact client version/size/SHA + required display/window/state and target uniqueness are freshly revalidated, and registration generation binding matches the current controller;
+5. every state-changing/invasive command stays inside the final PR #321 cancellation-safe whole-lifetime supervisor so the canonical flock survives caller/process-group cancellation and remains held through all guarded mutation descendants;
+6. canonical GUI/input mutation additionally holds the reviewed canonical `input.lock` through the existing external Track A supervisor. `input.lock` only serializes GUI/input actors; it grants no lease, registration, Gate B, mutation, login, credential, gameplay or session authority. Failure to acquire or revalidate it refuses mutation. The same lock remains held from before final target validation through Control Center commit, the one physical effect and immediate reconciliation.
 
 If any required condition is not proven now:
 
@@ -214,7 +215,7 @@ A prior PASS is not standing authority after one of these facts changes.
 
 ## Evaluation examples
 
-### PASS — static P2 worker
+### PASS â€” static P2 worker
 
 ```yaml
 runtime_access: none
@@ -223,7 +224,7 @@ mutation_authorized: false
 
 The worker analyzes the exact binary and repository artifacts only after persisting the `none` admission at claim/resume.
 
-### PASS — isolated startup experiment
+### PASS â€” isolated startup experiment
 
 ```yaml
 runtime_access: ephemeral_isolated
@@ -235,7 +236,7 @@ mutation_authorized: true
 
 The worker has proven its own unique sandbox and touches only that sandbox. It does not login merely to mirror canonical state and does not publish canonical registration.
 
-### PASS — bounded read-only live observation
+### PASS â€” bounded read-only live observation
 
 ```yaml
 runtime_access: read_only
@@ -247,19 +248,19 @@ mutation_authorized: false
 
 This is legal only when the target is freshly proven unowned/non-conflicting and the observation is technically non-invasive. It still creates no canonical authority.
 
-### REFUSE — historical display shortcut
+### REFUSE â€” historical display shortcut
 
 A worker sees historical `:98`, reachable `6082`, or an old PID and attempts input/restart/login without current Gate A + required rebind + Gate B. Refuse.
 
-### REFUSE — missing-registration shortcut
+### REFUSE â€” missing-registration shortcut
 
 A worker sees no authoritative `runtime-registration.json` and tries ordinary `guard-run` mutation. Refuse. If no client exists, use reviewed create-bootstrap; if exactly one exact pre-existing client exists, use reviewed metadata-only adoption; ambiguous/mismatched candidates remain fail-closed.
 
-### REFUSE — generation mismatch shortcut
+### REFUSE â€” generation mismatch shortcut
 
 A worker sees the exact old runtime but registration `lease_generation` differs, then manually edits JSON or proceeds with Gate B. Refuse; the dedicated rebind must exist and pass first.
 
-### REFUSE — ambiguous read-only target
+### REFUSE â€” ambiguous read-only target
 
 A worker cannot prove target uniqueness/ownership or the observed namespace, but tries to proceed because it intends no mutation. Refuse; use `none` for static evidence or obtain a proven non-conflicting live target first.
 

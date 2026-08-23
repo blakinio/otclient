@@ -66,7 +66,8 @@ feature_scope:
   completion_claim: complete_feature
 complete_control_center_programme: false
 implementation_pr: 666
-final_implementation_head: be8e5324cf8df0a62b3f37f43156723b859e7ed6
+initial_implementation_head: be8e5324cf8df0a62b3f37f43156723b859e7ed6
+post_merge_repair_code_head: bd907634f3765ee7630cc454235b3a8407c62490
 implementation_merge: 1e9f0245b2c7a249dfd0fdc9c6f8bdda2e9aa5e5
 closeout_pr: 683
 package_b_e2e: PASS
@@ -200,3 +201,9 @@ The mandatory broad local Ruff command still reports 10 pre-existing Package D t
 Ownership is released by this archive record. Package B does not claim Package C, D, E or full Control Center programme completion.
 
 Closeout PR #683 initially made Fresh Package B audit fail closed because its ownership allowlist did not yet admit the two repository-required shared discovery indexes (`docs/agents/CHANGELOG.md`, `docs/agents/MODULE_CATALOG.md`) after their live ownership was revalidated as free. The audit allowlist now admits exactly those two closeout-only paths; product/runtime behavior and Package B authority are unchanged.
+
+## Post-merge concurrency remediation
+
+Closeout PR #683 exposed `PB-AUDIT-006`: Package B test 38 intermittently returned HTTP `500 CONTROL_INTERNAL_ERROR` during concurrent STOP/reset. A direct-domain reproducer surfaced `sqlite3.InterfaceError('bad parameter or other API misuse')`; an HTTP reproducer hit the failure within 24 races and the direct-domain reproducer within 20. The shared SQLite connection used `check_same_thread=False`, but transaction writes alone were serialized; read queries could still execute concurrently with another thread's transaction on the same connection.
+
+Repair `bd907634f3765ee7630cc454235b3a8407c62490` routes SQLite reads through the store's existing re-entrant lock, preserving the existing transactional write ordering. Test 38 now executes 64 STOP/reset races and permits only successful linearized results or `409 CONTROL_RESET_REFUSED`; `500` is forbidden. After the repair, 2,000 direct-domain races and 500 full-HTTP races completed with zero internal SQLite errors. Focused validation passed: Package A 76/76, Package B 39/39, fresh Package A audit, fresh Package B audit, real Chrome/CDP + CLI E2E, Package B Ruff, compileall and diff-check. Exact-head GitHub CI remains the merge gate for PR #683.

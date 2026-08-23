@@ -3,6 +3,8 @@ from __future__ import annotations
 import unittest
 from contextlib import contextmanager
 
+from test_package_d_official_adapter import mutation_budget, request_for_adapter
+
 from tools.tibia_re_control_center.execution import MutationCoordinator
 from tools.tibia_re_control_center.fake import ManualClock
 from tools.tibia_re_control_center.model import (
@@ -21,8 +23,6 @@ from tools.tibia_re_control_center.official_adapter import (
     OfficialTibiaAdapter,
 )
 from tools.tibia_re_control_center.store import DeterministicDurableStore
-
-from .test_package_d_official_adapter import mutation_budget, request_for_adapter
 
 
 def official_identity() -> AdapterIdentity:

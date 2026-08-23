@@ -123,6 +123,9 @@ jobs:
           ).splitlines()
           allowed_exact = {
               '.github/workflows/tibia-re-control-center-core.yml',
+              '.github/workflows/tibia-re-control-center-package-b.yml',
+              'docs/agents/tasks/active/OTC-20260823-tibia-re-control-center-package-b.md',
+              'docs/agents/tasks/archive/OTC-20260823-tibia-re-control-center-package-b.md',
               'docs/agents/CHANGELOG.md',
               'docs/agents/MODULE_CATALOG.md',
               'docs/agents/tasks/active/OTC-20260820-tibia-re-control-center-package-a.md',
@@ -145,6 +148,7 @@ jobs:
           allowed_prefixes = (
               'tools/tibia_re_control_center/',
               'tests/tools/tibia_re_control_center/',
+              'docs/agents/evidence/OTC-20260823-tibia-re-control-center-package-b/',
           )
           unexpected = [
               path for path in changed

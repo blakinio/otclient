@@ -94,7 +94,7 @@ depends_on:
   - Control Center contracts and lifecycle closeout on current main
 blocks: []
 ownership_released: false
-next_action: repair the proven Package A compatibility-audit false positives on the two newly claimed free paths, then rerun Package A + Package B validation
+next_action: commit the validated Package A compatibility repair, then rerun mandatory exact-head Package A + Package B validation and push PR #666
 ---
 
 # Control Center Package B — local Control API, browser, CLI and persistence
@@ -189,5 +189,7 @@ After merging `origin/main@5ac05b2640e818a1efc3e065e2ed4e501eaed058`, code head 
 Criterion 26 is therefore revalidated as green. The full-Ruff baseline failure remains explicitly separated from Package B correctness and must be evaluated against live PR/root CI before terminal closeout.
 
 Live PR #666 CI on exact head `9f73babe821baec12856e0779afc8a084cf1f7ee` proved `PB-AUDIT-005`: Package A validation still scanned future Package B modules and rejected the contract-authorized CLI transport, while its Package A-only path-boundary step rejected Package B workflow/task/evidence metadata. No active Package A task or open Package A PR owns the affected validator/workflow paths. Package B therefore claims only `tests/tools/tibia_re_control_center/audit_package_a.py` and `.github/workflows/tibia-re-control-center-core.yml` for a narrow compatibility repair that preserves the Package A runtime-access-none invariant on its explicit core modules and grants no new authority.
+
+`PB-AUDIT-005` is remediated: the Package A runtime-boundary validator now scans only the explicit Package A core (`__init__.py`, artifact/canonical/comparison/engine/execution/fake/model/recorder/scenario/store), while the Package A PR boundary admits only the known Package B workflow/task/archive/evidence metadata in addition to the already-admitted shared tools/tests tree. Focused validation: Ruff PASS, all 76 Package A tests PASS, and `audit_package_a.py` reports `PACKAGE_A_FRESH_AUDIT=PASS`, `MATERIAL_FINDINGS_OPEN=0`, `RUNTIME_ACCESS_NONE=PASS`, `FAKE_ONE_STEP_E2E=PASS`.
 
 Criterion 30 remains open until exact-head CI is green, PR is terminal, the task is archived and ownership is released.

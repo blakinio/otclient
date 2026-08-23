@@ -120,7 +120,8 @@ Ordinary canonical reuse or mutation is allowed only when all of the following a
 2. the one authoritative registration exists at `/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime/runtime-registration.json`;
 3. if registration `lease_generation` differs from the current validated controller generation, the dedicated reviewed **generation rebind** completes under the same authority boundary;
 4. **Gate B PASS** — boot identity + PID + process start ticks + exact client version/size/SHA + required display/window/state and target uniqueness are freshly revalidated, and registration generation binding matches the current controller;
-5. every state-changing/invasive command stays inside the final PR #321 cancellation-safe whole-lifetime supervisor so the canonical flock survives caller/process-group cancellation and remains held through all guarded mutation descendants.
+5. every state-changing/invasive command stays inside the final PR #321 cancellation-safe whole-lifetime supervisor so the canonical flock survives caller/process-group cancellation and remains held through all guarded mutation descendants;
+6. canonical GUI/input mutation additionally holds the reviewed canonical `input.lock` through the existing external Track A supervisor. `input.lock` only serializes GUI/input actors; it grants no lease, registration, Gate B, mutation, login, credential, gameplay or session authority. Failure to acquire or revalidate it refuses mutation. The same lock remains held from before final target validation through Control Center commit, the one physical effect and immediate reconciliation.
 
 If any required condition is not proven now:
 

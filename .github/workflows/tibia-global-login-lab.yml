@@ -1,0 +1,87 @@
+name: Tibia Global Login Lab
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/tibia-global-login-lab.yml'
+      - 'tools/tibia-global-login-lab/**'
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: tibia-global-login-lab-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-linux:
+    name: Build exact native Linux OTClient
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact branch head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c  # v4.2.0
+
+      - name: Build exact native Linux rootfs
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a  # v7.3.0
+        with:
+          context: .
+          file: Dockerfile
+          push: false
+          outputs: type=local,dest=artifacts/linux-rootfs
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Upload exact Linux binary
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: tibia-global-login-linux-${{ github.event.pull_request.head.sha || github.sha }}
+          path: artifacts/linux-rootfs/otclient/otclient
+          retention-days: 1
+
+  probe:
+    name: Tibia Global login/world-entry probe
+    needs: build-linux
+    runs-on: [otclient, synology]
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact lab source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Download exact native Linux binary
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        with:
+          name: tibia-global-login-linux-${{ github.event.pull_request.head.sha || github.sha }}
+          path: artifacts/exact-linux
+
+      - name: Verify and bootstrap isolated lab
+        shell: bash
+        env:
+          LAB_EXACT_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: bash tools/tibia-global-login-lab/scripts/bootstrap.sh
+
+      - name: Verify redacted HTTP login transport
+        env:
+          TIBIA_TEST_EMAIL: ${{ secrets.TIBIA_TEST_EMAIL }}
+          TIBIA_TEST_PASSWORD: ${{ secrets.TIBIA_TEST_PASSWORD }}
+        shell: bash
+        run: bash tools/tibia-global-login-lab/scripts/http-login-preflight.sh
+
+      - name: Run controlled login and world-entry probe
+        env:
+          TIBIA_TEST_EMAIL: ${{ secrets.TIBIA_TEST_EMAIL }}
+          TIBIA_TEST_PASSWORD: ${{ secrets.TIBIA_TEST_PASSWORD }}
+        shell: bash
+        run: bash tools/tibia-global-login-lab/scripts/world-entry-probe-1532.sh

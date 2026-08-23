@@ -198,3 +198,5 @@ Implementation PR #666 is MERGED from exact head `be8e5324cf8df0a62b3f37f4315672
 The mandatory broad local Ruff command still reports 10 pre-existing Package D test lint findings in `test_package_d_official_adapter.py`; the file is byte-identical to merged `main` at blob `3b2cdbddc03688f6f698a8b998e38fb6577429e2`. Package B-owned/scoped Ruff and all required GitHub checks passed, so this baseline issue is not attributed to Package B.
 
 Ownership is released by this archive record. Package B does not claim Package C, D, E or full Control Center programme completion.
+
+Closeout PR #683 initially made Fresh Package B audit fail closed because its ownership allowlist did not yet admit the two repository-required shared discovery indexes (`docs/agents/CHANGELOG.md`, `docs/agents/MODULE_CATALOG.md`) after their live ownership was revalidated as free. The audit allowlist now admits exactly those two closeout-only paths; product/runtime behavior and Package B authority are unchanged.

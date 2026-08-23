@@ -14,7 +14,7 @@ branch: feat/OTC-20260823-package-d-track-a-transport
 base_branch: main
 base_main: 9c66486a4e1b323d893d33e00a7c2cd87fce1f8e
 created: 2026-08-23T13:26:00+02:00
-updated: 2026-08-23T16:15:00+02:00
+updated: 2026-08-23T16:22:00+02:00
 execution_mode: github_connector_then_track_a_runtime_if_admitted
 execution_reason: owner-approved admission-first Package D design; staged repository PRs preserve independent Control Center and Track A audit boundaries before any separately admitted physical runtime operation
 policy_version: 2
@@ -66,6 +66,17 @@ control_center_bridge_validation:
   material_findings_open: 0
   ruff: pass
   fake_full_path_cases: 6_of_6_pass
+external_transport_pr: 678
+external_transport_head: cda5ad7db
+external_transport_validation:
+  transport_tests: 4_of_4_pass
+  input_lock_linux: 6_of_6_pass
+  canonical_transition_linux: 28_of_28_pass
+  canonical_lease_linux: 14_of_14_pass
+  canonical_guard_linux: 3_of_3_pass
+  ruff: pass
+  python_compile: pass
+  git_diff_check: pass
 track_a_guarded_transition_validation:
   input_lock_linux: 6_of_6_pass
   canonical_transition_linux: 28_of_28_pass

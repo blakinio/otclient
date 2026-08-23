@@ -76,9 +76,15 @@ class Tests(unittest.TestCase):
         root = Path(self.temp.name)
         self.m.STATE = root
         self.m.REG = root / 'runtime-registration.json'
+        request_file = root / 'guarded-request.json'
+        request_file.write_text(json.dumps({
+            'schema_version': 1,
+            'action_hash': 'a' * 64,
+        }))
         self.args = argparse.Namespace(
             task_id='OTC-TEST', session_id='s', token_file=root / 'tok',
             worker=WORKER, probe=WORKER, worker_timeout=2,
+            request_file=request_file, input_lock_timeout=0.2,
         )
         self.identity = {
             'boot_id_sha256': 'b' * 64,

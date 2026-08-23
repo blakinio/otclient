@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib
 import unittest
+from contextlib import contextmanager
 
 from tools.tibia_re_control_center.execution import MutationCoordinator
 from tools.tibia_re_control_center.fake import FakeAdapter, ManualClock
@@ -159,6 +160,187 @@ class PackageDOfficialAdapterTests(unittest.TestCase):
         self.assertIsNotNone(capability)
         self.assertFalse(adapter.allow_mutation)
         self.assertFalse(capability.action_supported)
+
+    def test_current_evidence_promotion_enables_only_that_action_locally(self):
+        module = importlib.import_module("tools.tibia_re_control_center.official_adapter")
+        self.assertTrue(hasattr(module, "OfficialCapabilityPromotion"))
+        identity = AdapterIdentity(
+            adapter_id="official",
+            adapter_kind=AdapterKind.OFFICIAL_TIBIA,
+            adapter_version="1.0",
+            adapter_generation="official-generation-1",
+            runtime_instance_id="runtime-1",
+            session_epoch="session-1",
+        )
+        promotion = module.OfficialCapabilityPromotion(
+            action_kind="turn",
+            client_sha256=module.CURRENT_CLIENT_SHA256,
+            read_gate="R2",
+            action_gate="A3",
+            semantic_path_id="turn-v1",
+            confirmation_id="facing-direction-v1",
+            requires_input_lock=True,
+            evidence_refs=("evidence:current-turn",),
+            adapter_generation=identity.adapter_generation,
+        )
+        adapter = module.OfficialTibiaAdapter(identity, object(), promotions=(promotion,))
+
+        self.assertTrue(adapter.allow_mutation)
+        self.assertTrue(adapter.capability("turn").action_supported)
+        self.assertFalse(adapter.capability("move").action_supported)
+
+    def test_stale_promotion_build_or_generation_is_not_actionable(self):
+        module = importlib.import_module("tools.tibia_re_control_center.official_adapter")
+        identity = AdapterIdentity(
+            adapter_id="official",
+            adapter_kind=AdapterKind.OFFICIAL_TIBIA,
+            adapter_version="1.0",
+            adapter_generation="official-generation-1",
+            runtime_instance_id="runtime-1",
+            session_epoch="session-1",
+        )
+        base = dict(
+            action_kind="turn",
+            client_sha256=module.CURRENT_CLIENT_SHA256,
+            read_gate="R2",
+            action_gate="A3",
+            semantic_path_id="turn-v1",
+            confirmation_id="facing-direction-v1",
+            requires_input_lock=True,
+            evidence_refs=("evidence:current-turn",),
+            adapter_generation=identity.adapter_generation,
+        )
+        stale_cases = (
+            dict(base, client_sha256="0" * 64),
+            dict(base, adapter_generation="old-generation"),
+        )
+        for values in stale_cases:
+            with self.subTest(values=values):
+                promotion = module.OfficialCapabilityPromotion(**values)
+                adapter = module.OfficialTibiaAdapter(identity, object(), promotions=(promotion,))
+                self.assertFalse(adapter.allow_mutation)
+                self.assertFalse(adapter.capability("turn").action_supported)
+
+    def test_incomplete_or_insufficient_promotion_never_enables_mutation(self):
+        module = importlib.import_module("tools.tibia_re_control_center.official_adapter")
+        identity = AdapterIdentity(
+            adapter_id="official",
+            adapter_kind=AdapterKind.OFFICIAL_TIBIA,
+            adapter_version="1.0",
+            adapter_generation="official-generation-1",
+            runtime_instance_id="runtime-1",
+            session_epoch="session-1",
+        )
+        base = dict(
+            action_kind="turn",
+            client_sha256=module.CURRENT_CLIENT_SHA256,
+            read_gate="R2",
+            action_gate="A3",
+            semantic_path_id="turn-v1",
+            confirmation_id="facing-direction-v1",
+            requires_input_lock=True,
+            evidence_refs=("evidence:current-turn",),
+            adapter_generation=identity.adapter_generation,
+        )
+        invalid_cases = (
+            dict(base, action_kind="not-a-scenario-action"),
+            dict(base, read_gate="R0"),
+            dict(base, action_gate="A1"),
+            dict(base, semantic_path_id=""),
+            dict(base, confirmation_id=""),
+            dict(base, requires_input_lock=False),
+            dict(base, evidence_refs=()),
+        )
+        for values in invalid_cases:
+            with self.subTest(values=values):
+                promotion = module.OfficialCapabilityPromotion(**values)
+                adapter = module.OfficialTibiaAdapter(identity, object(), promotions=(promotion,))
+                self.assertFalse(adapter.allow_mutation)
+                self.assertFalse(adapter.capability("turn").action_supported)
+
+    def test_guarded_session_wraps_commit_and_crosses_exactly_once(self):
+        module = importlib.import_module("tools.tibia_re_control_center.official_adapter")
+        self.assertTrue(hasattr(module, "GuardedRuntimeView"))
+        self.assertTrue(hasattr(module, "GuardedExecutionOutcome"))
+        identity = AdapterIdentity(
+            adapter_id="official",
+            adapter_kind=AdapterKind.OFFICIAL_TIBIA,
+            adapter_version="1.0",
+            adapter_generation="official-generation-1",
+            runtime_instance_id="runtime-1",
+            session_epoch="session-1",
+        )
+        promotion = module.OfficialCapabilityPromotion(
+            action_kind="turn",
+            client_sha256=module.CURRENT_CLIENT_SHA256,
+            read_gate="R2",
+            action_gate="A3",
+            semantic_path_id="turn-v1",
+            confirmation_id="facing-direction-v1",
+            requires_input_lock=True,
+            evidence_refs=("evidence:current-turn",),
+            adapter_generation=identity.adapter_generation,
+        )
+
+        class Session:
+            def __init__(self):
+                self.cross_calls = 0
+
+            def current_view(self):
+                return module.GuardedRuntimeView(
+                    adapter_generation=identity.adapter_generation,
+                    runtime_instance_id=identity.runtime_instance_id,
+                    session_epoch=identity.session_epoch,
+                    client_state="IN_GAME",
+                    authority_current=True,
+                    target_unique=True,
+                    input_lock_held=True,
+                    fence_digest="a" * 64,
+                )
+
+            def cross_once_and_reconcile(self, request):
+                self.cross_calls += 1
+                if self.cross_calls != 1:
+                    raise AssertionError("physical boundary crossed more than once")
+                return module.GuardedExecutionOutcome(
+                    outcome="confirmed",
+                    reason_code=None,
+                    evidence_refs=("evidence:turn-after",),
+                )
+
+        class Bridge:
+            def __init__(self, session):
+                self.session = session
+                self.guard_entries = 0
+
+            def advisory_available(self, request):
+                return True
+
+            @contextmanager
+            def guarded_dispatch(self, request):
+                self.guard_entries += 1
+                yield self.session
+
+            def emergency_stop(self, reason):
+                return None
+
+        session = Session()
+        bridge = Bridge(session)
+        adapter = module.OfficialTibiaAdapter(identity, bridge, promotions=(promotion,))
+        clock = ManualClock()
+        store = DeterministicDurableStore()
+        coordinator = MutationCoordinator(adapter, store, clock, backend_epoch="backend-d")
+        coordinator.start_run("run-d", mutation_budget(), mutation_capable=True)
+        request = request_for_adapter(coordinator, adapter)
+
+        result = coordinator.execute_action(request)
+
+        self.assertEqual(result.lifecycle_state, LifecycleState.CONFIRMED)
+        self.assertEqual(result.status, ActionStatus.PASS)
+        self.assertEqual(result.dispatch_state, DispatchState.DISPATCHED)
+        self.assertEqual(result.authoritative_confirmation, Confirmation.PROVEN)
+        self.assertEqual(bridge.guard_entries, 1)
+        self.assertEqual(session.cross_calls, 1)
 
 
 if __name__ == "__main__":

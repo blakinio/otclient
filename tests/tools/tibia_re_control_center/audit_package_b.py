@@ -19,6 +19,8 @@ from tools.tibia_re_control_center.control_cli import (
 
 ALLOWED_EXACT = {
     ".github/workflows/tibia-re-control-center-package-b.yml",
+    ".github/workflows/tibia-re-control-center-core.yml",
+    "tests/tools/tibia_re_control_center/audit_package_a.py",
     "tools/tibia_re_control_center/__init__.py",
     "tests/tools/tibia_re_control_center/test_package_a.py",
     "tools/tibia_re_control_center/persistent_store.py",

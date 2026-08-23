@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import importlib
+import tempfile
 import unittest
 from contextlib import contextmanager
+from pathlib import Path
+from unittest import mock
 
 from tools.tibia_re_control_center.execution import MutationCoordinator
 from tools.tibia_re_control_center.fake import FakeAdapter, ManualClock
@@ -341,6 +344,60 @@ class PackageDOfficialAdapterTests(unittest.TestCase):
         self.assertEqual(result.authoritative_confirmation, Confirmation.PROVEN)
         self.assertEqual(bridge.guard_entries, 1)
         self.assertEqual(session.cross_calls, 1)
+
+
+FORBIDDEN_PUBLIC_KEY_PARTS = {
+    "pid", "xid", "display", "window", "token", "coordinate",
+    "address", "pointer", "opcode", "keycode", "lease_capability",
+}
+
+
+def assert_sanitized_mapping(testcase, value):
+    for key in value:
+        lowered = key.lower()
+        testcase.assertFalse(any(part in lowered for part in FORBIDDEN_PUBLIC_KEY_PARTS))
+
+
+class PackageDTrackABridgeProtocolTests(unittest.TestCase):
+    def test_bridge_strict_normalized_records_reject_extra_keys(self):
+        module = importlib.import_module(
+            "tools.tibia_re_control_center.track_a_authority_bridge"
+        )
+        ready = {"type": "ready", "action_hash": "a" * 64, "fence_digest": "b" * 64}
+        result = {
+            "type": "result",
+            "outcome": "confirmed",
+            "reason_code": None,
+            "evidence_refs": (),
+        }
+        self.assertEqual(module.require_exact_record(ready, module.READY_KEYS), ready)
+        self.assertEqual(module.require_exact_record(result, module.RESULT_KEYS), result)
+        assert_sanitized_mapping(self, ready)
+        assert_sanitized_mapping(self, result)
+        with self.assertRaisesRegex(Exception, "TRACK_A_BRIDGE_PROTOCOL_INVALID"):
+            module.require_exact_record(dict(ready, pid=123), module.READY_KEYS)
+        with self.assertRaisesRegex(Exception, "TRACK_A_BRIDGE_PROTOCOL_INVALID"):
+            module.normalize_result(dict(result, outcome="unexpected"))
+
+    def test_bridge_command_passes_token_path_without_reading_contents(self):
+        module = importlib.import_module(
+            "tools.tibia_re_control_center.track_a_authority_bridge"
+        )
+        repo = Path(__file__).resolve().parents[3]
+        with tempfile.TemporaryDirectory() as td:
+            token = Path(td) / "lease.token"
+            token.write_text("secret-never-read")
+            probe = repo / ".github/scripts/tibia-official-client-re-canonical-live-session.sh"
+            worker = probe
+            bridge = module.CanonicalTrackAAuthorityBridge(
+                repo, "OTC-TEST", "session-test", token, probe, worker
+            )
+            with mock.patch.object(Path, "read_text", side_effect=AssertionError("token read")):
+                command = bridge.command_for_request_file(Path(td) / "request.json")
+            self.assertEqual(command[0], module.sys.executable)
+            self.assertIn("guarded-dispatch", command)
+            self.assertIn(str(token), command)
+            self.assertNotIn("secret-never-read", command)
 
 
 if __name__ == "__main__":

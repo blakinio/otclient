@@ -8,13 +8,13 @@ project_lane: otclient
 lane: P4-OFFICIAL-ADAPTER
 track_id: official-client-re
 task_kind: implementation
-phase: governance_and_external_transport_repository_only
+phase: track_a_external_transport_repository_only
 risk: high
-branch: docs/OTC-20260823-package-d-governance
+branch: feat/OTC-20260823-package-d-track-a-transport
 base_branch: main
-base_main: 762436c25433b7bb192e6014cb4e46afc58dfc4b
+base_main: 9c66486a4e1b323d893d33e00a7c2cd87fce1f8e
 created: 2026-08-23T13:26:00+02:00
-updated: 2026-08-23T16:05:00+02:00
+updated: 2026-08-23T16:22:00+02:00
 execution_mode: github_connector_then_track_a_runtime_if_admitted
 execution_reason: owner-approved admission-first Package D design; staged repository PRs preserve independent Control Center and Track A audit boundaries before any separately admitted physical runtime operation
 policy_version: 2
@@ -66,6 +66,17 @@ control_center_bridge_validation:
   material_findings_open: 0
   ruff: pass
   fake_full_path_cases: 6_of_6_pass
+external_transport_pr: 678
+external_transport_head: cda5ad7db
+external_transport_validation:
+  transport_tests: 4_of_4_pass
+  input_lock_linux: 6_of_6_pass
+  canonical_transition_linux: 28_of_28_pass
+  canonical_lease_linux: 14_of_14_pass
+  canonical_guard_linux: 3_of_3_pass
+  ruff: pass
+  python_compile: pass
+  git_diff_check: pass
 track_a_guarded_transition_validation:
   input_lock_linux: 6_of_6_pass
   canonical_transition_linux: 28_of_28_pass
@@ -84,8 +95,8 @@ planned_stages:
   - governance_and_runtime_admission
 owned_paths_current_stage:
   - docs/agents/tasks/active/OTC-20260823-tibia-re-control-center-package-d.md
-  - docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
-  - docs/agents/contracts/TIBIA_RE_CONTROL_CENTER_ADAPTER_V1.md
+  - .github/scripts/tibia-official-client-re-control-center-bridge-transport.py
+  - .github/scripts/test_tibia_official_client_re_control_center_bridge_transport.py
 planned_implementation_paths:
   - tools/tibia_re_control_center/execution.py
   - tools/tibia_re_control_center/official_adapter.py
@@ -122,7 +133,7 @@ depends_on:
   - Package D guarded transition merge ca7c8eaffd4861e4345cc9eb866a9a4886f93773
   - fresh physical runtime admission before any live operation
 blocks:
-  - no physical action may dispatch until the external Track A process transport is implemented/reviewed and fresh runtime admission passes
+  - no physical action may dispatch until this external Track A process transport is implemented/reviewed and fresh runtime admission passes
   - no action capability promotion without fresh current semantic action and authoritative confirmation evidence
 runtime_nonclaims:
   display_98_current_canonical_status: UNKNOWN

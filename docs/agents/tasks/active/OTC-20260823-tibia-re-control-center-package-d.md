@@ -8,11 +8,11 @@ project_lane: otclient
 lane: P4-OFFICIAL-ADAPTER
 track_id: official-client-re
 task_kind: implementation
-phase: implement_repository_only
+phase: track_a_guarded_transition_repository_only
 risk: high
 branch: staged_prs_under_same_task
 base_branch: main
-base_main: 371f5a0451e9bf3e3eac29cc12edfecc310c3ea9
+base_main: 14409a502588b09ba0d30fbaed130df56d173aa0
 created: 2026-08-23T13:26:00+02:00
 updated: 2026-08-23T13:47:00+02:00
 execution_mode: github_connector_then_track_a_runtime_if_admitted
@@ -51,6 +51,8 @@ design_pr: 670
 design_merge: 371f5a0451e9bf3e3eac29cc12edfecc310c3ea9
 design_spec: docs/superpowers/specs/2026-08-23-control-center-package-d-design.md
 implementation_plan: docs/superpowers/plans/2026-08-23-control-center-package-d.md
+control_center_core_pr: 672
+control_center_core_merge: 14409a502588b09ba0d30fbaed130df56d173aa0
 delivery_strategy: staged_prs_preserve_existing_audit_boundaries
 planned_stages:
   - control_center_outcome_and_semantic_adapter
@@ -59,6 +61,10 @@ planned_stages:
   - governance_and_runtime_admission
 owned_paths_current_stage:
   - docs/agents/tasks/active/OTC-20260823-tibia-re-control-center-package-d.md
+  - .github/scripts/tibia-official-client-re-input-lock.py
+  - .github/scripts/test_tibia_official_client_re_input_lock.py
+  - .github/scripts/tibia-official-client-re-canonical-live-transition.py
+  - .github/scripts/test_tibia_official_client_re_canonical_live_transition.py
 planned_implementation_paths:
   - tools/tibia_re_control_center/execution.py
   - tools/tibia_re_control_center/official_adapter.py

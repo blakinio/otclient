@@ -68,7 +68,7 @@ complete_control_center_programme: false
 implementation_pr: 666
 final_implementation_head: be8e5324cf8df0a62b3f37f43156723b859e7ed6
 implementation_merge: 1e9f0245b2c7a249dfd0fdc9c6f8bdda2e9aa5e5
-closeout_pr: PENDING
+closeout_pr: 683
 package_b_e2e: PASS
 audit: PASS
 ci: PASS

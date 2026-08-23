@@ -8,13 +8,13 @@ project_lane: otclient
 lane: P4-OFFICIAL-ADAPTER
 track_id: official-client-re
 task_kind: implementation
-phase: runtime_admission_preflight_repository_only
+phase: runtime_admission_controller_plane_probe
 risk: high
 branch: ai/OTC-20260823-package-d-continue
 base_branch: main
 base_main: 1e9f0245b2c7a249dfd0fdc9c6f8bdda2e9aa5e5
 created: 2026-08-23T13:26:00+02:00
-updated: 2026-08-23T19:06:47+02:00
+updated: 2026-08-23T19:11:49+02:00
 execution_mode: github_connector_then_track_a_runtime_if_admitted
 execution_reason: autonomous continuation from current main; repository-only ownership/admission preflight must be durable before any live Official Tibia target operation
 policy_version: 2
@@ -22,18 +22,18 @@ prompting_standard_version: 2.1
 validation_level: high
 track_a_runtime_agent_admission_version: 1
 routing_contract: docs/agents/programs/OTCLIENT_TIBIA_RE_HYBRID_EXECUTION_ROUTING.md
-execution_class: github_hosted
-runtime_access: none
-runtime_owner_task: NOT_APPLICABLE
-runtime_namespace: NOT_APPLICABLE
-canonical_registration: NOT_APPLICABLE
-canonical_lease_generation: NOT_APPLICABLE
-registration_lease_generation: NOT_APPLICABLE
-gate_a: NOT_APPLICABLE
-generation_rebind: NOT_APPLICABLE
-gate_b: NOT_APPLICABLE
+execution_class: synology_physical_runtime
+runtime_access: canonical_reuse_or_mutation
+runtime_owner_task: OTC-20260823-tibia-re-control-center-package-d
+runtime_namespace: track-a-canonical-live
+canonical_registration: UNKNOWN
+canonical_lease_generation: UNKNOWN
+registration_lease_generation: UNKNOWN
+gate_a: REQUIRED_NOT_PROVEN
+generation_rebind: REQUIRED_NOT_PROVEN
+gate_b: REQUIRED_NOT_PROVEN
 bootstrap: NOT_APPLICABLE
-target_uniqueness: NOT_APPLICABLE
+target_uniqueness: UNKNOWN
 mutation_authorized: false
 credentials_allowed: false
 login_allowed: false
@@ -174,13 +174,13 @@ No live Official Tibia access has occurred in Package D. `runtime_access:none`, 
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-23T19:06:47+02:00
-head: 1e9f0245b2c7a249dfd0fdc9c6f8bdda2e9aa5e5
-phase: runtime_admission_preflight_repository_only
+updated_at: 2026-08-23T19:11:49+02:00
+head: 7036bdea0f79905a7b800ca3a880c7a66c164278
+phase: runtime_admission_controller_plane_probe
 execution_mode: github_connector_then_track_a_runtime_if_admitted
 status: implementing
 branch: ai/OTC-20260823-package-d-continue
-pr: none
+pr: 684
 context_routes:
   - control-center-package-d
   - track-a-runtime-admission
@@ -190,13 +190,14 @@ owned_paths:
   - docs/agents/evidence/OTC-20260823-tibia-re-control-center-package-d/20260823-continuation-resume.md
 proven:
   - trusted main is 1e9f0245b2c7a249dfd0fdc9c6f8bdda2e9aa5e5 and contains Package D implementation through PR #678 plus checkpoint #680 and continuation alias #682
+  - continuation checkpoint is published on PR #684 head 7036bdea0f79905a7b800ca3a880c7a66c164278
   - PR #475 exact head task record is released with runtime_access none and no owned paths
   - PR #528 is closed unmerged as superseded
   - PR #541 exact head owns only the isolated KasmVNC desktop namespace with login and gameplay disabled
   - no Official Tibia target operation has been performed in this continuation
 derived:
-  - no inspected repository record currently proves another task owns the canonical Official Tibia runtime
-  - repository ownership clearance does not prove canonical registration, Gate B, active-world state, or turn semantics
+  - repository ownership preflight does not reveal a conflicting canonical runtime owner
+  - canonical_reuse_or_mutation is fail-closed until registration, Gate A, conditional rebind, Gate B and target uniqueness are all freshly proven
 unknown:
   - current canonical registration presence
   - current canonical lease generation and registration lease generation
@@ -206,7 +207,7 @@ conflicts:
   - none in repository ownership preflight
 first_failure:
   marker: none
-  evidence: Repository-only continuation preflight has no failed gate; live runtime admission has not started.
+  evidence: No live admission gate has been attempted yet; required runtime gates are deliberately REQUIRED_NOT_PROVEN.
 rejected_hypotheses:
   - an open PR body or historical display/PID/session proves current runtime ownership or mutation authority
   - Package D may bootstrap or login merely to manufacture first-slice evidence
@@ -216,21 +217,25 @@ changed_paths:
 validation:
   - command: python tools/agents/checkpoint.py docs/agents/tasks/active/OTC-20260823-tibia-re-control-center-package-d.md --require-checkpoint
     result: PASS
-    evidence: Checkpoint schema revalidation passes after adding all required portable continuation fields.
+    evidence: Portable continuation checkpoint schema passed before this controller-plane admission classification is published.
 blockers:
-  - fresh Track A admission has not yet established a legally reusable canonical runtime
-last_completed_step: fresh current-main and open-runtime-owner reconciliation; no Official Tibia target was observed or mutated
-runtime_access: none
-runtime_owner_task: NOT_APPLICABLE
-runtime_namespace: NOT_APPLICABLE
-canonical_registration: NOT_APPLICABLE
-canonical_lease_generation: NOT_APPLICABLE
-registration_lease_generation: NOT_APPLICABLE
-gate_a: NOT_APPLICABLE
-generation_rebind: NOT_APPLICABLE
-gate_b: NOT_APPLICABLE
+  - canonical_registration is UNKNOWN
+  - gate_a is REQUIRED_NOT_PROVEN
+  - generation_rebind is REQUIRED_NOT_PROVEN until lease generations are known
+  - gate_b is REQUIRED_NOT_PROVEN
+  - target_uniqueness is UNKNOWN
+last_completed_step: classified Package D for fail-closed canonical reuse admission without granting mutation, login, credentials or gameplay
+runtime_access: canonical_reuse_or_mutation
+runtime_owner_task: OTC-20260823-tibia-re-control-center-package-d
+runtime_namespace: track-a-canonical-live
+canonical_registration: UNKNOWN
+canonical_lease_generation: UNKNOWN
+registration_lease_generation: UNKNOWN
+gate_a: REQUIRED_NOT_PROVEN
+generation_rebind: REQUIRED_NOT_PROVEN
+gate_b: REQUIRED_NOT_PROVEN
 bootstrap: NOT_APPLICABLE
-target_uniqueness: NOT_APPLICABLE
+target_uniqueness: UNKNOWN
 mutation_authorized: false
 credentials_allowed: false
 login_allowed: false
@@ -239,7 +244,7 @@ transaction_authorized: false
 official_client_access: false
 first_action_status: NOT_YET_PHYSICALLY_PROVEN
 invocation_started_at: 2026-08-23T18:52:00+02:00
-last_progress_at: 2026-08-23T19:06:47+02:00
+last_progress_at: 2026-08-23T19:11:49+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: other
 terminal_ci_wait_started_at: null
@@ -249,26 +254,26 @@ identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 0
 stall_warnings: 0
-next_action: Reclassify and persist Track A admission before the first live Official Tibia target operation; do not bootstrap/login merely to create a session.
+next_action: Read only current canonical lease and registration control-plane metadata; if registration is absent, record BLOCKED_NO_CURRENT_REGISTERED_RUNTIME without bootstrap/login.
 ```
 
 The trusted continuation base is current `main@1e9f0245b2c7a249dfd0fdc9c6f8bdda2e9aa5e5`. Package D implementation is already merged. PR #475's own exact head records `session_role: released`, `runtime_access: none`, `runtime_owner_task: null`, and `OWNED_PATHS=[]`; PR #528 is closed superseded; PR #541 remains an isolated `ephemeral_isolated` KasmVNC desktop owner with login/gameplay disabled. None of those facts proves that a reusable canonical Official Tibia runtime exists.
 
-`runtime_access:none` remains binding at this checkpoint. The current Remote Desktop Commander inventory shows the `Synology` device locators offline, which is transport availability evidence only and is not used as a runtime-state claim. No client process/container/window/display/session/input/credential/login/gameplay operation has been performed in this continuation.
+`runtime_access:canonical_reuse_or_mutation` is now declared solely to perform the fail-closed admission sequence. Mutation remains forbidden because registration/lease/rebind/Gate B/uniqueness are unproven. The current Remote Desktop Commander inventory shows the `Synology` device locators offline; that is transport availability evidence only. No client process/container/window/display/session/input/credential/login/gameplay operation has been performed in this continuation.
 
 ## Recovery checkpoint
 
 ```yaml
 recovery:
   policy_version: 1
-  generation: 1
+  generation: 2
   session_id: chatgpt-20260823-package-d-continue-1906
   session_started_at: 2026-08-23T18:52:00+02:00
-  checkpointed_at: 2026-08-23T19:06:47+02:00
-  last_progress_at: 2026-08-23T19:06:47+02:00
-  phase: runtime_admission_preflight_repository_only
-  exact_head: 1e9f0245b2c7a249dfd0fdc9c6f8bdda2e9aa5e5
-  pull_request: none
+  checkpointed_at: 2026-08-23T19:11:49+02:00
+  last_progress_at: 2026-08-23T19:11:49+02:00
+  phase: runtime_admission_controller_plane_probe
+  exact_head: 7036bdea0f79905a7b800ca3a880c7a66c164278
+  pull_request: 684
   active_operation: none
   external_run_ids: []
   operation_started_at: null
@@ -277,6 +282,6 @@ recovery:
   checks_used: 0
   status: ready
   safe_to_resume: true
-  resume_condition: Package D continuation branch remains the sole writer and no conflicting canonical runtime owner appears.
-  next_action: Commit and publish this repository-only admission checkpoint, then reclassify Track A admission before any live Official Tibia target operation.
+  resume_condition: PR #684 remains sole Package D continuation writer and no conflicting canonical runtime owner appears.
+  next_action: Read only canonical lease.json and runtime-registration.json metadata; on absent registration, persist BLOCKED_NO_CURRENT_REGISTERED_RUNTIME and do not bootstrap/login.
 ```

@@ -51,3 +51,28 @@ Remote Desktop Commander currently reports both `Synology` device registrations 
 ## Next gate
 
 Before the first live Official Tibia target operation, Package D must reclassify and persist the complete fresh Track A admission record. It must not bootstrap/login/relog/select a character merely to make Package D progress. If current admission cannot prove legal reuse, Package D records one exact `BLOCKED_*` disposition and proceeds to truthful terminal closeout.
+
+## Pre-live admission classification ? 19:11 +02:00
+
+Before any Official Tibia target operation, Package D is reclassified fail-closed as:
+
+```yaml
+runtime_access: canonical_reuse_or_mutation
+runtime_owner_task: OTC-20260823-tibia-re-control-center-package-d
+runtime_namespace: track-a-canonical-live
+canonical_registration: UNKNOWN
+canonical_lease_generation: UNKNOWN
+registration_lease_generation: UNKNOWN
+gate_a: REQUIRED_NOT_PROVEN
+generation_rebind: REQUIRED_NOT_PROVEN
+gate_b: REQUIRED_NOT_PROVEN
+bootstrap: NOT_APPLICABLE
+target_uniqueness: UNKNOWN
+mutation_authorized: false
+credentials_allowed: false
+login_allowed: false
+gameplay_allowed: false
+official_client_access: false
+```
+
+This classification grants no mutation. Its first operation is limited to safe canonical controller-plane metadata needed to decide whether reuse is even possible. If registration is absent, Package D must stop physical work with `BLOCKED_NO_CURRENT_REGISTERED_RUNTIME`; it will not enter bootstrap/login merely to make progress.

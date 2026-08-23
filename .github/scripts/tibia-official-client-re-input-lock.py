@@ -33,7 +33,10 @@ class InputLock:
         except OSError as exc:
             raise InputLockError("input_lock_unsafe") from exc
         try:
-            os.fchmod(fd, 0o600)
+            if hasattr(os, "fchmod"):
+                os.fchmod(fd, 0o600)
+            else:
+                os.chmod(self.path, 0o600)
             st = os.fstat(fd)
             owner_ok = not hasattr(os, "getuid") or st.st_uid == os.getuid()
             if not stat.S_ISREG(st.st_mode) or stat.S_IMODE(st.st_mode) != 0o600 or not owner_ok:

@@ -12,20 +12,20 @@ branch: feat/OTC-20260823-tibia-re-control-center-package-d-prep
 base_branch: main
 base_main: 63100340f0dbe1aba16a20bc7febc8613291583d
 created: 2026-08-23T12:40:12+02:00
-updated: 2026-08-23T12:40:12+02:00
+updated: 2026-08-23T12:53:00+02:00
 execution_mode: github_connector+github_actions
 execution_reason: runtime-independent static Track A adapter preparation and deterministic repository validation
 execution_budget_minutes: 120
 execution_budget_reason: cohesive D-prep source mapping, hard-disabled adapter skeleton, repository-only E2E, fresh audit, exact-head CI, merge and lifecycle closeout
 invocation_started_at: 2026-08-23T12:35:00+02:00
-last_progress_at: 2026-08-23T12:40:12+02:00
+last_progress_at: 2026-08-23T12:53:00+02:00
 policy_version: 2
 context_pressure: medium
 context_growth: stable
 context_score: 9
 estimate_confidence: medium
-decomposition_decision: single
-decomposition_reason: one static contract-producer slice sharing the Package A semantic adapter and execution boundary
+decomposition_decision: staged_prs
+decomposition_reason: claim is merged first because the shared Package A workflow audits all Control Center source changes but intentionally does not admit unrelated task/evidence paths; implementation then uses a fresh branch and closeout evidence remains docs-only
 validation_level: focused
 session_id: chatgpt-20260823-package-d-prep
 session_role: implementer
@@ -34,7 +34,7 @@ heavy_validation_runs: 0
 stale_takeover_count: 0
 human_interruptions: 0
 ci_checks_for_current_head: 0
-ci_check_generation: draft
+ci_check_generation: claim
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -86,6 +86,12 @@ owned_paths:
   - docs/agents/evidence/OTC-20260823-tibia-re-control-center-package-d-prep/**
   - tools/tibia_re_control_center/official_adapter_contract.py
   - tests/tools/tibia_re_control_center/test_package_d_prep.py
+  - docs/agents/MODULE_CATALOG.md
+  - docs/agents/CHANGELOG.md
+modules_touched:
+  - tibia_re_control_center Official Tibia adapter preparation contract
+  - Track A canonical authority/admission mechanisms (reuse by source reference only)
+  - Control Center Scenario/Adapter semantic contracts (reuse only)
 read_only_paths:
   - tools/tibia_runtime_bridge/**
   - tools/tibia_re_surveyor/**
@@ -95,6 +101,7 @@ read_only_paths:
   - .github/scripts/tibia-official-client-re-canonical-live-lease
 reuses:
   - tools/tibia_re_control_center/model.py semantic ActionRequest/EffectBound/Capability/AdapterIdentity types
+  - tools/tibia_re_control_center/scenario.py supported action families and finite default EffectBound definitions
   - tools/tibia_re_control_center/execution.py coordinator one-shot dispatch commit semantics
   - existing Track A canonical lease/registration/supervisor/input-lock/evidence mechanisms by source reference only
 depends_on:
@@ -102,7 +109,7 @@ depends_on:
   - trusted-base Track A admission and canonical-runtime contracts at base_main
 blocks: []
 ownership_released: false
-next_action: implement source-backed Track A reuse/action-readiness evidence plus a hard-disabled Official adapter contract and deterministic no-dispatch tests
+next_action: merge this task claim, branch from the resulting main, then implement the hard-disabled contract/tests plus same-PR catalogue/changelog updates
 ---
 
 # Control Center Package D PREP — Official Tibia static adapter preparation
@@ -117,10 +124,11 @@ This task is `runtime_access: none`. It must not inspect or mutate any Official 
 
 ## Preflight facts
 
-- trusted `main`: `63100340f0dbe1aba16a20bc7febc8613291583d`
+- trusted `main` at claim start: `63100340f0dbe1aba16a20bc7febc8613291583d`
 - Package A is merged at `13b3f02a07a176662d766352d9af39619775a73d`
 - Package C is active on separate branch/PR and owns only its Surveyor provider/test/evidence/task paths; this D-PREP claim uses separate new paths
 - no Package D branch existed at claim time
+- the shared Package A workflow triggers on Control Center source/tests and its independent path audit intentionally rejects unrelated task/evidence paths; therefore task claim and final evidence/lifecycle closeout are docs-only PR stages around the implementation PR rather than weakening that audit
 
 ## Acceptance inventory
 

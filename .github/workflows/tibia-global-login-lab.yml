@@ -76,9 +76,9 @@ jobs:
         shell: bash
         run: bash tools/tibia-global-login-lab/scripts/prepare-ephemeral-runtime.sh
 
-      - name: Verify public asset catalog direct egress
+      - name: Stage current official package manifest
         shell: bash
-        run: bash tools/tibia-global-login-lab/scripts/verify-direct-asset-catalog.sh
+        run: bash tools/tibia-global-login-lab/scripts/stage-current-package-manifest.sh
 
       - name: Verify and bootstrap isolated lab
         shell: bash

@@ -200,8 +200,16 @@ class SQLitePersistentStore:
                 self._db.execute("ROLLBACK")
                 raise
 
+    def _fetchone(self, query: str, parameters: tuple[Any, ...] = ()) -> Any:
+        with self._lock:
+            return self._db.execute(query, parameters).fetchone()
+
+    def _fetchall(self, query: str, parameters: tuple[Any, ...] = ()) -> list[Any]:
+        with self._lock:
+            return self._db.execute(query, parameters).fetchall()
+
     def _meta(self, key: str) -> str | None:
-        row = self._db.execute("SELECT value FROM meta WHERE key=?", (key,)).fetchone()
+        row = self._fetchone("SELECT value FROM meta WHERE key=?", (key,))
         return None if row is None else str(row[0])
 
     def inject_fault(self, operation: str, kind: str = "error", *, count: int = 1) -> None:
@@ -224,7 +232,7 @@ class SQLitePersistentStore:
         raise DurabilityError(f"durability failure during {operation}")
 
     def _load_control_state_unchecked(self) -> ControlState | None:
-        row = self._db.execute("SELECT body FROM control_state WHERE singleton=1").fetchone()
+        row = self._fetchone("SELECT body FROM control_state WHERE singleton=1")
         return None if row is None else ControlState(**_load(row[0]))
 
     def load_control_state(self) -> ControlState | None:
@@ -244,14 +252,14 @@ class SQLitePersistentStore:
         self.control_state = copy.deepcopy(state)
 
     def load_control_transition(self, transition_id: str) -> ControlState | None:
-        row = self._db.execute("SELECT body FROM control_history WHERE transition_id=?", (transition_id,)).fetchone()
+        row = self._fetchone("SELECT body FROM control_history WHERE transition_id=?", (transition_id,))
         return None if row is None else ControlState(**_load(row[0]))
 
     def _load_actions(self) -> dict[str, ActionLedgerRecord]:
-        return {row[0]: _action_from(_load(row[1])) for row in self._db.execute("SELECT action_id,body FROM actions")}
+        return {row[0]: _action_from(_load(row[1])) for row in self._fetchall("SELECT action_id,body FROM actions")}
 
     def load_action(self, action_id: str) -> ActionLedgerRecord | None:
-        row = self._db.execute("SELECT body FROM actions WHERE action_id=?", (action_id,)).fetchone()
+        row = self._fetchone("SELECT body FROM actions WHERE action_id=?", (action_id,))
         return None if row is None else _action_from(_load(row[0]))
 
     def write_action(self, record: ActionLedgerRecord, *, operation: str = "action") -> None:
@@ -264,10 +272,10 @@ class SQLitePersistentStore:
         self.action_ledgers[record.action_id] = copy.deepcopy(record)
 
     def _load_budgets(self) -> dict[str, BudgetLedger]:
-        return {row[0]: _budget_from(_load(row[1])) for row in self._db.execute("SELECT run_id,body FROM budgets")}
+        return {row[0]: _budget_from(_load(row[1])) for row in self._fetchall("SELECT run_id,body FROM budgets")}
 
     def load_budget(self, run_id: str) -> BudgetLedger | None:
-        row = self._db.execute("SELECT body FROM budgets WHERE run_id=?", (run_id,)).fetchone()
+        row = self._fetchone("SELECT body FROM budgets WHERE run_id=?", (run_id,))
         return None if row is None else _budget_from(_load(row[0]))
 
     def write_budget(self, ledger: BudgetLedger, *, operation: str = "budget") -> None:
@@ -278,7 +286,7 @@ class SQLitePersistentStore:
 
     def _load_run_activations(self) -> dict[str, tuple[int, int]]:
         result: dict[str, tuple[int, int]] = {}
-        for run_id, body in self._db.execute("SELECT run_id,body FROM run_activation"):
+        for run_id, body in self._fetchall("SELECT run_id,body FROM run_activation"):
             value = _load(body)
             result[run_id] = (int(value["started_ns"]), int(value["deadline_ns"]))
         return result
@@ -293,14 +301,14 @@ class SQLitePersistentStore:
         self.run_activation[run_id] = (started_ns, deadline_ns)
 
     def load_run_activation(self, run_id: str) -> tuple[int, int] | None:
-        row = self._db.execute("SELECT body FROM run_activation WHERE run_id=?", (run_id,)).fetchone()
+        row = self._fetchone("SELECT body FROM run_activation WHERE run_id=?", (run_id,))
         if row is None:
             return None
         value = _load(row[0])
         return int(value["started_ns"]), int(value["deadline_ns"])
 
     def _load_recoveries(self) -> dict[str, dict[str, Any]]:
-        return {row[0]: _load(row[1]) for row in self._db.execute("SELECT run_id,body FROM recovery")}
+        return {row[0]: _load(row[1]) for row in self._fetchall("SELECT run_id,body FROM recovery")}
 
     def write_recovery(self, run_id: str, record: dict[str, Any]) -> None:
         body = _dump(record)
@@ -309,7 +317,7 @@ class SQLitePersistentStore:
         self.recovery_records[run_id] = copy.deepcopy(record)
 
     def load_recovery(self, run_id: str) -> dict[str, Any] | None:
-        row = self._db.execute("SELECT body FROM recovery WHERE run_id=?", (run_id,)).fetchone()
+        row = self._fetchone("SELECT body FROM recovery WHERE run_id=?", (run_id,))
         return None if row is None else _load(row[0])
 
     def atomic_dispatch_commit(self, record: ActionLedgerRecord, ledger: BudgetLedger) -> None:
@@ -339,7 +347,7 @@ class SQLitePersistentStore:
         self.safety_flush_count += 1
 
     def load_request(self, request_id: str) -> RequestLedgerRecord | None:
-        row = self._db.execute("SELECT body FROM requests WHERE request_id=?", (request_id,)).fetchone()
+        row = self._fetchone("SELECT body FROM requests WHERE request_id=?", (request_id,))
         return None if row is None else RequestLedgerRecord(**_load(row[0]))
 
     def accept_request(self, record: RequestLedgerRecord) -> RequestLedgerRecord:
@@ -378,7 +386,7 @@ class SQLitePersistentStore:
         return self.get_resource(resource_id) or {}
 
     def get_resource(self, resource_id: str) -> dict[str, Any] | None:
-        row = self._db.execute("SELECT request_id,operation,state,body,result FROM resources WHERE resource_id=?", (resource_id,)).fetchone()
+        row = self._fetchone("SELECT request_id,operation,state,body,result FROM resources WHERE resource_id=?", (resource_id,))
         if row is None:
             return None
         return {"resource_id": resource_id, "request_id": row[0], "operation": row[1], "state": row[2], "body": _load(row[3]), "result": None if row[4] is None else _load(row[4])}
@@ -391,7 +399,7 @@ class SQLitePersistentStore:
                 raise ValidationError("RESOURCE_MISSING", "cannot finish an unknown resource")
 
     def list_run_resources(self, *, offset: int = 0, limit: int = 100) -> list[dict[str, Any]]:
-        rows = self._db.execute("SELECT resource_id FROM resources WHERE operation IN ('CREATE_RUN','ONE_STEP_EXPERIMENT') ORDER BY rowid DESC LIMIT ? OFFSET ?", (limit, offset)).fetchall()
+        rows = self._fetchall("SELECT resource_id FROM resources WHERE operation IN ('CREATE_RUN','ONE_STEP_EXPERIMENT') ORDER BY rowid DESC LIMIT ? OFFSET ?", (limit, offset))
         return [self.get_resource(row[0]) or {} for row in rows]
 
     def append_events(self, run_id: str, events: list[dict[str, Any]]) -> None:
@@ -406,12 +414,12 @@ class SQLitePersistentStore:
                 self._db.execute("DELETE FROM events WHERE seq<=?", (cutoff,))
 
     def list_events(self, *, cursor: int = 0, limit: int = 100) -> tuple[list[dict[str, Any]], int]:
-        row = self._db.execute("SELECT MIN(seq),MAX(seq) FROM events").fetchone()
+        row = self._fetchone("SELECT MIN(seq),MAX(seq) FROM events")
         minimum = 0 if row is None or row[0] is None else int(row[0])
         maximum = 0 if row is None or row[1] is None else int(row[1])
         if cursor and minimum and cursor < minimum - 1:
             raise ValidationError("CONTROL_EVENT_BACKPRESSURE", "event cursor fell behind bounded retention; resynchronization is required")
-        rows = self._db.execute("SELECT seq,body FROM events WHERE seq>? ORDER BY seq LIMIT ?", (cursor, limit)).fetchall()
+        rows = self._fetchall("SELECT seq,body FROM events WHERE seq>? ORDER BY seq LIMIT ?", (cursor, limit))
         return [{"cursor": int(seq), **_load(body)} for seq, body in rows], maximum
 
     def persist_artifacts(self, run_id: str, files: dict[str, bytes], hashes: dict[str, str]) -> None:
@@ -423,7 +431,7 @@ class SQLitePersistentStore:
                 self._db.execute("INSERT INTO artifacts(run_id,path,sha256,body) VALUES(?,?,?,?) ON CONFLICT(run_id,path) DO UPDATE SET sha256=excluded.sha256,body=excluded.body", (run_id, path, digest, sqlite3.Binary(body)))
 
     def list_artifacts(self, run_id: str) -> list[dict[str, Any]]:
-        return [{"path": path, "sha256": digest, "size": len(body)} for path, digest, body in self._db.execute("SELECT path,sha256,body FROM artifacts WHERE run_id=? ORDER BY path", (run_id,))]
+        return [{"path": path, "sha256": digest, "size": len(body)} for path, digest, body in self._fetchall("SELECT path,sha256,body FROM artifacts WHERE run_id=? ORDER BY path", (run_id,))]
 
     def snapshot(self) -> dict[str, Any]:
         return {"initialized": self.initialized, "control_state": self.load_control_state(), "actions": copy.deepcopy(self.action_ledgers), "budgets": {key: value.clone() for key, value in self.budget_ledgers.items()}, "run_activation": dict(self.run_activation), "recovery": copy.deepcopy(self.recovery_records)}

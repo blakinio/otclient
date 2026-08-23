@@ -487,32 +487,40 @@ class PackageBTests(unittest.TestCase):
         self.assertTrue(all(action["dispatch_state"] == "NOT_DISPATCHED" for action in mutation_result["actions"].values()))
 
     def test_38_concurrent_stop_reset_linearizes_to_highest_generation(self):
-        barrier = threading.Barrier(2)
+        for iteration in range(64):
+            barrier = threading.Barrier(2)
 
-        def transition(path: str, request_id: str) -> tuple[str, dict | int]:
-            barrier.wait(timeout=5)
-            try:
-                return "ok", self.client.post(path, {}, request_id=request_id)
-            except ControlClientError as exc:
-                return "error", exc.status
+            def transition(
+                path: str, request_id: str, sync_barrier: threading.Barrier = barrier
+            ) -> tuple[str, dict]:
+                sync_barrier.wait(timeout=5)
+                try:
+                    return "ok", self.client.post(path, {}, request_id=request_id)
+                except ControlClientError as exc:
+                    return "error", {"status": exc.status, "code": exc.payload.get("code")}
 
-        with ThreadPoolExecutor(max_workers=2) as pool:
-            outcomes = [
-                future.result(timeout=10)
-                for future in (
-                    pool.submit(transition, "/v1/stop-all", "concurrent-stop"),
-                    pool.submit(transition, "/v1/reset-stop", "concurrent-reset"),
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                outcomes = [
+                    future.result(timeout=10)
+                    for future in (
+                        pool.submit(transition, "/v1/stop-all", f"concurrent-stop-{iteration}"),
+                        pool.submit(transition, "/v1/reset-stop", f"concurrent-reset-{iteration}"),
+                    )
+                ]
+            successful = [payload for kind, payload in outcomes if kind == "ok"]
+            self.assertTrue(successful)
+            highest = max(successful, key=lambda payload: payload["control_generation"])
+            current = self.client.get("/v1/status")["control"]
+            self.assertEqual(highest["control_generation"], current["control_generation"])
+            self.assertEqual(highest["stop_latched"], current["stop_latched"])
+            for kind, payload in outcomes:
+                if kind == "error":
+                    self.assertEqual({"status": 409, "code": "CONTROL_RESET_REFUSED"}, payload)
+            if current["stop_latched"]:
+                cleanup = self.client.post(
+                    "/v1/reset-stop", {}, request_id=f"concurrent-cleanup-{iteration}"
                 )
-            ]
-        successful = [payload for kind, payload in outcomes if kind == "ok"]
-        self.assertTrue(successful)
-        highest = max(successful, key=lambda payload: payload["control_generation"])
-        current = self.client.get("/v1/status")["control"]
-        self.assertEqual(highest["control_generation"], current["control_generation"])
-        self.assertEqual(highest["stop_latched"], current["stop_latched"])
-        for kind, payload in outcomes:
-            if kind == "error":
-                self.assertEqual(409, payload)
+                self.assertFalse(cleanup["stop_latched"])
 
     def test_39_runtime_monotonic_clock_survives_backend_object_restart(self):
         first = self.server.domain.clock.now_ns()

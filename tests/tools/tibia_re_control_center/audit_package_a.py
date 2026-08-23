@@ -98,7 +98,16 @@ def audit_runtime_boundary() -> None:
     }
     forbidden_calls = {"system", "popen", "Popen", "exec", "eval"}
     violations: list[str] = []
-    for path in sorted(Path("tools/tibia_re_control_center").glob("*.py")):
+    package_a_core = (
+        "__init__.py", "artifact.py", "canonical.py", "comparison.py", "engine.py",
+        "execution.py", "fake.py", "model.py", "recorder.py", "scenario.py", "store.py",
+    )
+    root = Path("tools/tibia_re_control_center")
+    for name in package_a_core:
+        path = root / name
+        if not path.is_file():
+            violations.append(f"{path}:missing Package A core module")
+            continue
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):

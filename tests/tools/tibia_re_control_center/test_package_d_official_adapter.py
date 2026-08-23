@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import importlib
 import unittest
 
 from tools.tibia_re_control_center.execution import MutationCoordinator
 from tools.tibia_re_control_center.fake import FakeAdapter, ManualClock
 from tools.tibia_re_control_center.model import (
     ActionRequest,
+    AdapterIdentity,
+    AdapterKind,
     ActionStatus,
     Authority,
     Confirmation,
@@ -133,6 +136,29 @@ class PackageDExecutionResultTests(unittest.TestCase):
         assert ledger is not None
         self.assertEqual(ledger.dimensions["max_actions"].at_risk, 0)
         self.assertEqual(ledger.dimensions["max_actions"].uncertain, 1)
+
+
+class PackageDOfficialAdapterTests(unittest.TestCase):
+    def test_official_adapter_is_non_actionable_without_promotion(self):
+        try:
+            module = importlib.import_module("tools.tibia_re_control_center.official_adapter")
+        except ModuleNotFoundError:
+            self.fail("OfficialTibiaAdapter production module is missing")
+        identity = AdapterIdentity(
+            adapter_id="official",
+            adapter_kind=AdapterKind.OFFICIAL_TIBIA,
+            adapter_version="1.0",
+            adapter_generation="official-generation-1",
+            runtime_instance_id="runtime-1",
+            session_epoch="session-1",
+        )
+        adapter = module.OfficialTibiaAdapter(identity, object(), promotions=())
+
+        capability = adapter.capability("turn")
+
+        self.assertIsNotNone(capability)
+        self.assertFalse(adapter.allow_mutation)
+        self.assertFalse(capability.action_supported)
 
 
 if __name__ == "__main__":

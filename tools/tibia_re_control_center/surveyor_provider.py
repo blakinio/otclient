@@ -1154,8 +1154,14 @@ def _validate_provenance(docs: Mapping[str, Any]) -> None:
         _fail("SURVEYOR_PROVENANCE_MISMATCH", "Surveyor runtime artifact disagrees with agent bundle")
     if isinstance(agent_runtime, dict) and agent_runtime.get("runtime_access") not in _ALLOWED_RUNTIME_ACCESS:
         _fail("SURVEYOR_PROVENANCE_MISMATCH", "Surveyor runtime access state is outside the pinned producer contract")
-    if isinstance(agent_runtime, dict) and not isinstance(agent_runtime.get("visible_tibia_windows"), list):
-        _fail("SURVEYOR_PROVENANCE_MISMATCH", "Surveyor visible-window collection is outside the pinned producer contract")
+    if isinstance(agent_runtime, dict):
+        runtime_access = agent_runtime.get("runtime_access")
+        windows_present = "visible_tibia_windows" in agent_runtime
+        if (
+            (runtime_access != "READ_ONLY_UNAVAILABLE" or windows_present)
+            and not isinstance(agent_runtime.get("visible_tibia_windows"), list)
+        ):
+            _fail("SURVEYOR_PROVENANCE_MISMATCH", "Surveyor visible-window collection is outside the pinned producer contract")
     _validate_admitted_runtime_contract(agent_runtime)
     if isinstance(agent_runtime, dict):
         control = agent_runtime.get("canonical_control") if isinstance(agent_runtime.get("canonical_control"), dict) else {}

@@ -504,6 +504,42 @@ class PackageCSurveyorProviderTests(unittest.TestCase):
             self.assertEqual("UNKNOWN", model.provenance["runtime_identity"]["evidence_level"])
             self.assertIsNone(model.provenance["runtime_identity"]["value"] )
 
+    def test_target_down_runtime_allows_absent_visible_windows(self):
+        module = self.provider()
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw) / "survey"
+            build_repo_bundle(root)
+            agent = load_json(root, "surveyor/agent_bundle.json")
+            runtime = {
+                "observed_at_epoch": 1,
+                "target_container": "otclient-track-a-kasmvnc",
+                "display": ":1",
+                "target_running": False,
+                "target_uniqueness": "NOT_PROVEN",
+                "runtime_access": "READ_ONLY_UNAVAILABLE",
+            }
+            agent["runtime"] = runtime
+            agent["typed_readers"] = {}
+            write_json(root, "surveyor/agent_bundle.json", agent)
+            write_json(root, "surveyor/runtime.json", runtime)
+            collect_all = build_collect_all(
+                agent, load_json(root, "surveyor/coverage.json")["rows"]
+            )
+            write_collect_all(root, collect_all)
+            model = module.load_surveyor_bundle(root, producer_commit=PRODUCER_COMMIT)
+            self.assertEqual("UNKNOWN", model.runtime_status.runtime_state)
+            self.assertEqual("UNAVAILABLE", model.readiness["runtime_identity"])
+
+            runtime["visible_tibia_windows"] = 1
+            agent["runtime"] = runtime
+            write_json(root, "surveyor/agent_bundle.json", agent)
+            write_json(root, "surveyor/runtime.json", runtime)
+            rewrite_manifest(root)
+            assert_validation_code(
+                self, "SURVEYOR_PROVENANCE_MISMATCH",
+                lambda: module.load_surveyor_bundle(root, producer_commit=PRODUCER_COMMIT),
+            )
+
     def test_non_admitted_runtime_rejects_non_collection_visible_windows(self):
         module = self.provider()
         with tempfile.TemporaryDirectory() as raw:

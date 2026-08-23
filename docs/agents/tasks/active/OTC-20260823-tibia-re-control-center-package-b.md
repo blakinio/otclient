@@ -1,23 +1,23 @@
 ---
 task_id: OTC-20260823-tibia-re-control-center-package-b
-status: validating
+status: final_ci
 agent: ChatGPT
 project_lane: otclient
 lane: P2-CONTROL-API
 track_id: official-client-re
 task_kind: implementation
-phase: validating
+phase: final_ci
 risk: medium
 branch: feat/OTC-20260823-tibia-re-control-center-package-b
 base_branch: main
 base_sha: 63100340f0dbe1aba16a20bc7febc8613291583d
 created: 2026-08-23T12:42:22+02:00
-updated: 2026-08-23T17:45:16.7018903+02:00
+updated: 2026-08-23T17:52:16.6769555+02:00
 execution_mode: remote_desktop+github_connector+github_actions
 execution_budget_minutes: 120
 execution_budget_reason: cohesive Package B full-stack slice requires persistent safety/request storage, secured loopback HTTP transport, browser+CLI integration, restart E2E, fresh audit, exact-head CI, merge and mandatory archive closeout
 invocation_started_at: 2026-08-23T12:34:00+02:00
-last_progress_at: 2026-08-23T17:45:16.7018903+02:00
+last_progress_at: 2026-08-23T17:52:16.6769555+02:00
 policy_version: 2
 context_pressure: medium
 context_growth: stable
@@ -92,7 +92,7 @@ depends_on:
   - Control Center contracts and lifecycle closeout on current main
 blocks: []
 ownership_released: false
-next_action: commit continuation remediation checkpoint, then run full exact-head local validation against the current main integration state
+next_action: commit current validation evidence, rerun mandatory commands on that exact head, push PR #666 and evaluate live exact-head CI
 ---
 
 # Control Center Package B — local Control API, browser, CLI and persistence
@@ -132,7 +132,7 @@ Fresh fetch on `main@63100340f0dbe1aba16a20bc7febc8613291583d` verified Package 
 - [x] 23 MUTATION_ALLOWED cannot be granted locally
 - [x] 24 mutation-capable controls execute only against explicit FAKE_TEST adapter
 - [x] 25 no official-client/raw/debug/concrete-adapter bypass exists
-- [ ] 26 Package A/full Control Center regression remains green on the current integrated head
+- [x] 26 Package A/full Control Center regression remains green on the current integrated head
 - [x] 27 persisted artifacts/store and generated evidence contain no nonce/secret
 - [x] 28 actual backend + CLI + browser Package B E2E passes on final head
 - [x] 29 fresh independent Package B falsification audit passes
@@ -171,6 +171,19 @@ Post-remediation focused evidence on the integrated working tree:
 - `python tests/tools/tibia_re_control_center/e2e_package_b.py`: real local Chrome/CDP + CLI + backend + restart replay, `PACKAGE_B_E2E=PASS`;
 - `OFFICIAL_CLIENT_ACCESS=NONE` throughout.
 
-The earlier 160-test full-regression result predates the current-main integration and this remediation. Criterion 26 is therefore deliberately reopened until the full required discovery command is rerun on the committed exact head.
+The earlier 160-test full-regression result predates the current-main integration and this remediation. It was superseded by the current integrated full-regression run below.
+
+### Integrated mandatory gate run before final evidence commit
+
+After merging `origin/main@5ac05b2640e818a1efc3e065e2ed4e501eaed058`, code head `1c0814f931aff7a6ba5e12e6c2ecc6229be82a31` produced:
+
+- `python -m compileall -q tools/tibia_re_control_center tests/tools/tibia_re_control_center`: PASS;
+- `python -m unittest discover -s tests/tools/tibia_re_control_center -v`: PASS, `Ran 193 tests`, `OK`;
+- `python tests/tools/tibia_re_control_center/audit_package_b.py`: PASS;
+- `python tests/tools/tibia_re_control_center/e2e_package_b.py`: PASS with real Chrome/CDP + CLI + backend;
+- `git diff origin/main...HEAD --check`: PASS;
+- full `ruff check tools/tibia_re_control_center tests/tools/tibia_re_control_center`: FAIL only on 10 pre-existing Package D lint findings in `tests/tools/tibia_re_control_center/test_package_d_official_adapter.py`. The file is byte-identical in this branch and current `origin/main` at Git blob `3b2cdbddc03688f6f698a8b998e38fb6577429e2`; Package B owns no repair authority for that path.
+
+Criterion 26 is therefore revalidated as green. The full-Ruff baseline failure remains explicitly separated from Package B correctness and must be evaluated against live PR/root CI before terminal closeout.
 
 Criterion 30 remains open until exact-head CI is green, PR is terminal, the task is archived and ownership is released.

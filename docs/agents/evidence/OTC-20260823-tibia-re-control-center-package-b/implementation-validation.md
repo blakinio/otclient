@@ -64,3 +64,9 @@ Verified after remediation:
 - official client access remained `NONE`.
 
 The historical `Ran 160 tests` line above is preserved as pre-resync evidence only. It is not treated as final-head evidence after the new main merge/remediation; full regression and final exact-head CI must be rerun before closeout.
+
+## Integrated mandatory gate run - 2026-08-23 17:52 +02:00
+
+After merging current `origin/main@5ac05b2640e818a1efc3e065e2ed4e501eaed058`, code head `1c0814f931aff7a6ba5e12e6c2ecc6229be82a31` was validated with the continuation alias commands. Compileall PASS; full unittest discovery PASS with `Ran 193 tests`, `OK`; Package B audit PASS; real Chrome/CDP + CLI E2E PASS; and `git diff origin/main...HEAD --check` PASS.
+
+The alias-wide Ruff command reports exactly 10 findings, all in `tests/tools/tibia_re_control_center/test_package_d_official_adapter.py` (nine `RUF059`, one `B017`). This is verified as a current-main baseline rather than a Package B change: `git diff --exit-code origin/main -- tests/tools/tibia_re_control_center/test_package_d_official_adapter.py` returns 0 and both HEAD/current-main resolve that path to Git blob `3b2cdbddc03688f6f698a8b998e38fb6577429e2`. Package D paths are read-only for this task, so no cross-owner edit was made. Live PR CI/root merge-gate behavior must determine whether that baseline blocks Package B terminal closeout.

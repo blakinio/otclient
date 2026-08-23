@@ -80,6 +80,8 @@ owned_paths:
   - tools/tibia_re_control_center/__init__.py
   - tests/tools/tibia_re_control_center/test_package_a.py
   - .github/workflows/tibia-re-control-center-package-b.yml
+  - tests/tools/tibia_re_control_center/audit_package_a.py
+  - .github/workflows/tibia-re-control-center-core.yml
 read_only_paths:
   - tools/tibia_re_surveyor/**
   - tests/tools/tibia_re_surveyor/**
@@ -92,7 +94,7 @@ depends_on:
   - Control Center contracts and lifecycle closeout on current main
 blocks: []
 ownership_released: false
-next_action: commit current validation evidence, rerun mandatory commands on that exact head, push PR #666 and evaluate live exact-head CI
+next_action: repair the proven Package A compatibility-audit false positives on the two newly claimed free paths, then rerun Package A + Package B validation
 ---
 
 # Control Center Package B — local Control API, browser, CLI and persistence
@@ -185,5 +187,7 @@ After merging `origin/main@5ac05b2640e818a1efc3e065e2ed4e501eaed058`, code head 
 - full `ruff check tools/tibia_re_control_center tests/tools/tibia_re_control_center`: FAIL only on 10 pre-existing Package D lint findings in `tests/tools/tibia_re_control_center/test_package_d_official_adapter.py`. The file is byte-identical in this branch and current `origin/main` at Git blob `3b2cdbddc03688f6f698a8b998e38fb6577429e2`; Package B owns no repair authority for that path.
 
 Criterion 26 is therefore revalidated as green. The full-Ruff baseline failure remains explicitly separated from Package B correctness and must be evaluated against live PR/root CI before terminal closeout.
+
+Live PR #666 CI on exact head `9f73babe821baec12856e0779afc8a084cf1f7ee` proved `PB-AUDIT-005`: Package A validation still scanned future Package B modules and rejected the contract-authorized CLI transport, while its Package A-only path-boundary step rejected Package B workflow/task/evidence metadata. No active Package A task or open Package A PR owns the affected validator/workflow paths. Package B therefore claims only `tests/tools/tibia_re_control_center/audit_package_a.py` and `.github/workflows/tibia-re-control-center-core.yml` for a narrow compatibility repair that preserves the Package A runtime-access-none invariant on its explicit core modules and grants no new authority.
 
 Criterion 30 remains open until exact-head CI is green, PR is terminal, the task is archived and ownership is released.

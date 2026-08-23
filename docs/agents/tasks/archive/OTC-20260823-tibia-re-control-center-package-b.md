@@ -1,23 +1,23 @@
 ---
 task_id: OTC-20260823-tibia-re-control-center-package-b
-status: final_ci
+status: completed
 agent: ChatGPT
 project_lane: otclient
 lane: P2-CONTROL-API
 track_id: official-client-re
 task_kind: implementation
-phase: final_ci
+phase: closeout_archive
 risk: medium
 branch: feat/OTC-20260823-tibia-re-control-center-package-b
 base_branch: main
 base_sha: 63100340f0dbe1aba16a20bc7febc8613291583d
 created: 2026-08-23T12:42:22+02:00
-updated: 2026-08-23T17:52:16.6769555+02:00
-execution_mode: remote_desktop+github_connector+github_actions
+updated: 2026-08-23T18:41:01.4516867+02:00
+execution_mode: archived
 execution_budget_minutes: 120
 execution_budget_reason: cohesive Package B full-stack slice requires persistent safety/request storage, secured loopback HTTP transport, browser+CLI integration, restart E2E, fresh audit, exact-head CI, merge and mandatory archive closeout
 invocation_started_at: 2026-08-23T12:34:00+02:00
-last_progress_at: 2026-08-23T17:52:16.6769555+02:00
+last_progress_at: 2026-08-23T18:41:01.4516867+02:00
 policy_version: 2
 context_pressure: medium
 context_growth: stable
@@ -25,10 +25,10 @@ context_score: 8
 estimate_confidence: medium
 decomposition_decision: single
 decomposition_reason: Package B is one coupled transport/persistence/domain/UI idempotency boundary; parallel edits would race shared RequestLedger and API semantics
-ci_checks_for_current_head: 0
-ci_check_generation: pending_exact_head
+ci_checks_for_current_head: 1
+ci_check_generation: exact_head_final
 terminal_ci_wait_started_at: null
-terminal_ci_checks_for_current_generation: 0
+terminal_ci_checks_for_current_generation: 1
 unchanged_state_checks: 0
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
@@ -65,23 +65,19 @@ feature_scope:
   e2e_required: true
   completion_claim: complete_feature
 complete_control_center_programme: false
-owned_paths:
-  - docs/agents/tasks/active/OTC-20260823-tibia-re-control-center-package-b.md
-  - docs/agents/tasks/archive/OTC-20260823-tibia-re-control-center-package-b.md
-  - docs/agents/evidence/OTC-20260823-tibia-re-control-center-package-b/**
-  - tools/tibia_re_control_center/persistent_store.py
-  - tools/tibia_re_control_center/control_domain.py
-  - tools/tibia_re_control_center/control_api.py
-  - tools/tibia_re_control_center/control_cli.py
-  - tools/tibia_re_control_center/control_ui.py
-  - tests/tools/tibia_re_control_center/test_package_b.py
-  - tests/tools/tibia_re_control_center/audit_package_b.py
-  - tests/tools/tibia_re_control_center/e2e_package_b.py
-  - tools/tibia_re_control_center/__init__.py
-  - tests/tools/tibia_re_control_center/test_package_a.py
-  - .github/workflows/tibia-re-control-center-package-b.yml
-  - tests/tools/tibia_re_control_center/audit_package_a.py
-  - .github/workflows/tibia-re-control-center-core.yml
+implementation_pr: 666
+initial_implementation_head: be8e5324cf8df0a62b3f37f43156723b859e7ed6
+post_merge_repair_code_head: bd907634f3765ee7630cc454235b3a8407c62490
+implementation_merge: 1e9f0245b2c7a249dfd0fdc9c6f8bdda2e9aa5e5
+closeout_pr: 683
+package_b_e2e: PASS
+audit: PASS
+ci: PASS
+package_a_workflow: 32652125288
+package_b_workflow: 32652125330
+repository_ci_run: 32652125421
+required_ci_job: 97225428316
+owned_paths: []
 read_only_paths:
   - tools/tibia_re_surveyor/**
   - tests/tools/tibia_re_surveyor/**
@@ -93,8 +89,8 @@ depends_on:
   - Package A terminal merge 13b3f02a07a176662d766352d9af39619775a73d
   - Control Center contracts and lifecycle closeout on current main
 blocks: []
-ownership_released: false
-next_action: commit the Package B workflow newline CI repair, push the new exact head and evaluate only the newly emitted exact-head CI generation
+ownership_released: true
+next_action: none
 ---
 
 # Control Center Package B — local Control API, browser, CLI and persistence
@@ -138,7 +134,7 @@ Fresh fetch on `main@63100340f0dbe1aba16a20bc7febc8613291583d` verified Package 
 - [x] 27 persisted artifacts/store and generated evidence contain no nonce/secret
 - [x] 28 actual backend + CLI + browser Package B E2E passes on final head
 - [x] 29 fresh independent Package B falsification audit passes
-- [ ] 30 exact-head CI, PR terminal state, task archive and ownership release complete
+- [x] 30 exact-head CI, PR terminal state, task archive and ownership release complete
 
 ## Validation evidence
 
@@ -194,4 +190,20 @@ Live PR #666 CI on exact head `9f73babe821baec12856e0779afc8a084cf1f7ee` proved 
 
 Exact-head CI on `7deeebec165f1d0d88efba7b9286f8a34cf4c768` made Package A audit, Package B audit and Package B real browser/CLI E2E green. Generic Fast Checks failed only because `.github/workflows/tibia-re-control-center-package-b.yml` lacked the final newline required by repository yamllint; the owned workflow was repaired without semantic changes.
 
-Criterion 30 remains open until exact-head CI is green, PR is terminal, the task is archived and ownership is released.
+Criterion 30 is satisfied: exact-head CI is green, PR #666 is merged, this archive record is terminal and ownership is released.
+
+## Terminal closeout
+
+Implementation PR #666 is MERGED from exact head `be8e5324cf8df0a62b3f37f43156723b859e7ed6` as squash merge `1e9f0245b2c7a249dfd0fdc9c6f8bdda2e9aa5e5`. Exact-head Package A core/audit, Package B full regression/fresh audit/real browser+CLI E2E, Track A governance and repository `CI / Required` all passed. PR #666 had zero review requests, zero reviews/comments and no unresolved threads at merge. `OFFICIAL_CLIENT_ACCESS=NONE` remained in force for the complete task.
+
+The mandatory broad local Ruff command still reports 10 pre-existing Package D test lint findings in `test_package_d_official_adapter.py`; the file is byte-identical to merged `main` at blob `3b2cdbddc03688f6f698a8b998e38fb6577429e2`. Package B-owned/scoped Ruff and all required GitHub checks passed, so this baseline issue is not attributed to Package B.
+
+Ownership is released by this archive record. Package B does not claim Package C, D, E or full Control Center programme completion.
+
+Closeout PR #683 initially made Fresh Package B audit fail closed because its ownership allowlist did not yet admit the two repository-required shared discovery indexes (`docs/agents/CHANGELOG.md`, `docs/agents/MODULE_CATALOG.md`) after their live ownership was revalidated as free. The audit allowlist now admits exactly those two closeout-only paths; product/runtime behavior and Package B authority are unchanged.
+
+## Post-merge concurrency remediation
+
+Closeout PR #683 exposed `PB-AUDIT-006`: Package B test 38 intermittently returned HTTP `500 CONTROL_INTERNAL_ERROR` during concurrent STOP/reset. A direct-domain reproducer surfaced `sqlite3.InterfaceError('bad parameter or other API misuse')`; an HTTP reproducer hit the failure within 24 races and the direct-domain reproducer within 20. The shared SQLite connection used `check_same_thread=False`, but transaction writes alone were serialized; read queries could still execute concurrently with another thread's transaction on the same connection.
+
+Repair `bd907634f3765ee7630cc454235b3a8407c62490` routes SQLite reads through the store's existing re-entrant lock, preserving the existing transactional write ordering. Test 38 now executes 64 STOP/reset races and permits only successful linearized results or `409 CONTROL_RESET_REFUSED`; `500` is forbidden. After the repair, 2,000 direct-domain races and 500 full-HTTP races completed with zero internal SQLite errors. Focused validation passed: Package A 76/76, Package B 39/39, fresh Package A audit, fresh Package B audit, real Chrome/CDP + CLI E2E, Package B Ruff, compileall and diff-check. Exact-head GitHub CI remains the merge gate for PR #683.

@@ -18,6 +18,8 @@ from tools.tibia_re_control_center.control_cli import (
 )
 
 ALLOWED_EXACT = {
+    "docs/agents/CHANGELOG.md",
+    "docs/agents/MODULE_CATALOG.md",
     ".github/workflows/tibia-re-control-center-package-b.yml",
     ".github/workflows/tibia-re-control-center-core.yml",
     "tests/tools/tibia_re_control_center/audit_package_a.py",

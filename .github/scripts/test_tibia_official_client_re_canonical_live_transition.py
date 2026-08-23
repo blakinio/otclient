@@ -413,5 +413,50 @@ class Tests(unittest.TestCase):
         self.assertEqual(parsed.operation, 'adopt-existing')
 
 
+    def test_parser_accepts_guarded_dispatch_shape(self):
+        parsed = self.m.parser().parse_args([
+            'guarded-dispatch', '--task-id', 'OTC-TEST', '--session-id', 's',
+            '--token-file', str(self.args.token_file), '--probe', str(WORKER),
+            '--worker', str(WORKER), '--worker-timeout', '3',
+        ])
+        self.assertEqual(parsed.operation, 'guarded-dispatch')
+        self.assertEqual(parsed.worker, WORKER)
+        self.assertEqual(parsed.probe, WORKER)
+
+    def test_guarded_dispatch_requires_gate_b_before_input_lock_and_worker(self):
+        events = []
+        with mock.patch.object(self.m, '_probe_reg', side_effect=self.m.E('gate_b_failed')), \
+                mock.patch.object(self.m, '_acquire_input_lock', side_effect=lambda *_a, **_k: events.append('input-lock')), \
+                mock.patch.object(self.m, '_run_guarded_worker', side_effect=lambda *_a, **_k: events.append('worker')):
+            with self.assertRaisesRegex(self.m.E, 'gate_b_failed'):
+                self.m._guarded_dispatch(
+                    self.args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 1
+                )
+        self.assertEqual(events, [])
+
+    def test_guarded_dispatch_holds_input_lock_across_worker_transaction(self):
+        events = []
+        self.write(self.registration())
+
+        class Held:
+            def __enter__(self):
+                events.append('input-lock-enter')
+            def __exit__(self, *_exc):
+                events.append('input-lock-exit')
+
+        def worker(*_args, **_kwargs):
+            events.append('worker')
+            return {'status': 'ABORTED', 'effect_count': 0}
+
+        with mock.patch.object(self.m, '_probe_reg', return_value=(self.registration(), dict(self.manifest))), \
+                mock.patch.object(self.m, '_acquire_input_lock', return_value=Held()), \
+                mock.patch.object(self.m, '_run_guarded_worker', side_effect=worker):
+            result = self.m._guarded_dispatch(
+                self.args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 1
+            )
+        self.assertEqual(result['effect_count'], 0)
+        self.assertEqual(events, ['input-lock-enter', 'worker', 'input-lock-exit'])
+
+
 if __name__ == '__main__':
     unittest.main()

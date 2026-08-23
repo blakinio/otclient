@@ -452,6 +452,8 @@ class Tests(unittest.TestCase):
 
         with mock.patch.object(self.m, '_probe_reg', return_value=(self.registration(), dict(self.manifest))), \
                 mock.patch.object(self.m, '_acquire_input_lock', return_value=Held()), \
+                mock.patch.object(self.m, '_emit_guarded_ready', return_value=None), \
+                mock.patch.object(self.m, '_read_guarded_decision', return_value='COMMIT'), \
                 mock.patch.object(self.m, '_run_guarded_worker', side_effect=worker):
             result = self.m._guarded_dispatch(
                 self.args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 1

@@ -886,8 +886,18 @@ def _read_guarded_request(path: Path) -> dict[str, Any]:
         raise E('guarded_dispatch_request_invalid')
     forbidden = {'key', 'keys', 'coordinate', 'coordinates', 'opcode', 'address', 'pointer',
                  'pid', 'window_id', 'display', 'credential', 'password', 'token', 'lease_token'}
-    if forbidden.intersection(str(key).lower() for key in data):
-        raise E('guarded_dispatch_request_raw_field_forbidden')
+
+    def reject_raw(value: Any) -> None:
+        if isinstance(value, dict):
+            if forbidden.intersection(str(key).lower() for key in value):
+                raise E('guarded_dispatch_request_raw_field_forbidden')
+            for nested in value.values():
+                reject_raw(nested)
+        elif isinstance(value, list):
+            for nested in value:
+                reject_raw(nested)
+
+    reject_raw(data)
     return data
 
 
@@ -949,13 +959,17 @@ def _run_guarded_worker(args: argparse.Namespace, request: dict[str, Any]) -> di
             result = json.loads(result_path.read_text())
         except (OSError, json.JSONDecodeError) as exc:
             raise E('guarded_dispatch_worker_result_invalid', str(exc)) from exc
-        if not isinstance(result, dict):
+        allowed_keys = {'status', 'effect_count', 'action_hash', 'reason_code'}
+        if not isinstance(result, dict) or not set(result).issubset(allowed_keys):
             raise E('guarded_dispatch_worker_result_invalid')
         if result.get('action_hash') != request['action_hash']:
             raise E('guarded_dispatch_worker_action_hash_mismatch')
         if result.get('effect_count') not in {0, 1}:
             raise E('guarded_dispatch_worker_effect_count_invalid')
         if result.get('status') not in {'CONFIRMED', 'AMBIGUOUS', 'REFUSED'}:
+            raise E('guarded_dispatch_worker_result_invalid')
+        reason = result.get('reason_code')
+        if reason is not None and (not isinstance(reason, str) or not reason or any(c not in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_' for c in reason)):
             raise E('guarded_dispatch_worker_result_invalid')
         return result
     finally:

@@ -23,8 +23,31 @@ class InputLock:
         self.state_root = Path(state_root)
         self.path = self.state_root / "input.lock"
 
+    def _validate_state_root(self) -> None:
+        try:
+            st = self.state_root.lstat()
+        except OSError as exc:
+            raise InputLockError("input_lock_state_root_unavailable") from exc
+        owner_ok = not hasattr(os, "getuid") or st.st_uid == os.getuid()
+        if not self.state_root.is_dir() or self.state_root.is_symlink() or not owner_ok:
+            raise InputLockError("input_lock_state_root_unsafe")
+
+    def _validate_fd_path(self, fd: int) -> None:
+        st = os.fstat(fd)
+        try:
+            path_st = self.path.lstat()
+        except OSError as exc:
+            raise InputLockError("input_lock_replaced") from exc
+        owner_ok = not hasattr(os, "getuid") or st.st_uid == os.getuid()
+        mode_ok = sys.platform.startswith("win") or stat.S_IMODE(st.st_mode) == 0o600
+        if not stat.S_ISREG(st.st_mode) or not mode_ok or not owner_ok or stat.S_ISLNK(path_st.st_mode):
+            raise InputLockError("input_lock_unsafe")
+        if hasattr(st, "st_ino") and hasattr(path_st, "st_ino"):
+            if (st.st_dev, st.st_ino) != (path_st.st_dev, path_st.st_ino):
+                raise InputLockError("input_lock_replaced")
+
     def _open_safe(self) -> int:
-        self.state_root.mkdir(parents=True, exist_ok=True, mode=0o700)
+        self._validate_state_root()
         flags = os.O_RDWR | os.O_CREAT
         if hasattr(os, "O_NOFOLLOW"):
             flags |= os.O_NOFOLLOW
@@ -37,20 +60,7 @@ class InputLock:
                 os.fchmod(fd, 0o600)
             else:
                 os.chmod(self.path, 0o600)
-            st = os.fstat(fd)
-            owner_ok = not hasattr(os, "getuid") or st.st_uid == os.getuid()
-            mode_ok = sys.platform.startswith("win") or stat.S_IMODE(st.st_mode) == 0o600
-            if not stat.S_ISREG(st.st_mode) or not mode_ok or not owner_ok:
-                raise InputLockError("input_lock_unsafe")
-            try:
-                path_st = self.path.lstat()
-            except OSError as exc:
-                raise InputLockError("input_lock_unsafe") from exc
-            if stat.S_ISLNK(path_st.st_mode):
-                raise InputLockError("input_lock_unsafe")
-            if hasattr(st, "st_ino") and hasattr(path_st, "st_ino"):
-                if (st.st_dev, st.st_ino) != (path_st.st_dev, path_st.st_ino):
-                    raise InputLockError("input_lock_unsafe")
+            self._validate_fd_path(fd)
             return fd
         except BaseException:
             os.close(fd)
@@ -113,6 +123,7 @@ class InputLock:
                     raise InputLockError("input_lock_cancelled")
                 if self._try_lock(fd):
                     locked = True
+                    self._validate_fd_path(fd)
                     break
                 if time.monotonic() >= deadline:
                     raise InputLockError("input_lock_timeout")

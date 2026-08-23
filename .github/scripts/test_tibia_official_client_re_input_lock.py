@@ -30,12 +30,13 @@ class Tests(unittest.TestCase):
     def tearDown(self):
         self.temp.cleanup()
 
-    def test_acquire_creates_mode_0600_regular_file(self):
+    def test_acquire_creates_safe_regular_file(self):
         lock = self.m.InputLock(self.root)
         with lock.acquire(timeout_seconds=0.2, cancelled=lambda: False):
             st = lock.path.lstat()
             self.assertTrue(stat.S_ISREG(st.st_mode))
-            self.assertEqual(stat.S_IMODE(st.st_mode), 0o600)
+            if not sys.platform.startswith('win'):
+                self.assertEqual(stat.S_IMODE(st.st_mode), 0o600)
             if hasattr(os, 'getuid'):
                 self.assertEqual(st.st_uid, os.getuid())
 

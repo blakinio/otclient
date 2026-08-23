@@ -794,8 +794,13 @@ class MutationCoordinator:
                     DispatchState.POSSIBLY_DISPATCHED,
                     reason_code="DURABLE_DISPATCH_STATE_MISSING",
                 )
-            if execution.get("outcome") == "ambiguous":
-                reason = str(execution.get("reason_code") or "POST_DISPATCH_AMBIGUOUS")
+            execution_outcome = str(execution.get("outcome", "confirmed"))
+            if execution_outcome != "confirmed":
+                reason = (
+                    str(execution.get("reason_code") or "POST_DISPATCH_AMBIGUOUS")
+                    if execution_outcome == "ambiguous"
+                    else "POST_DISPATCH_OUTCOME_INVALID"
+                )
                 next_budget = self._reconcile_budget(run, request, outcome="ambiguous")
                 terminal = durable.with_state(
                     LifecycleState.AMBIGUOUS,

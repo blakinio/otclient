@@ -79,6 +79,16 @@ class CommittedAmbiguousAdapter(FakeAdapter):
         }
 
 
+class InvalidOutcomeAdapter(FakeAdapter):
+    def execute_committed(self, request, commit_dispatch):
+        committed = commit_dispatch()
+        return {
+            "committed": committed,
+            "effect": None,
+            "outcome": "unexpected" if committed else None,
+        }
+
+
 class PackageDExecutionResultTests(unittest.TestCase):
     def test_committed_ambiguous_execution_never_becomes_pass(self):
         clock = ManualClock()
@@ -96,6 +106,28 @@ class PackageDExecutionResultTests(unittest.TestCase):
         self.assertEqual(result.dispatch_state, DispatchState.POSSIBLY_DISPATCHED)
         self.assertEqual(result.authoritative_confirmation, Confirmation.UNKNOWN)
         self.assertEqual(result.reason_code, "OFFICIAL_CONFIRMATION_UNAVAILABLE")
+        ledger = store.load_budget("run-d")
+        self.assertIsNotNone(ledger)
+        assert ledger is not None
+        self.assertEqual(ledger.dimensions["max_actions"].at_risk, 0)
+        self.assertEqual(ledger.dimensions["max_actions"].uncertain, 1)
+
+    def test_invalid_committed_outcome_is_conservatively_ambiguous(self):
+        clock = ManualClock()
+        adapter = InvalidOutcomeAdapter(clock)
+        adapter.add_capability("turn")
+        store = DeterministicDurableStore()
+        coordinator = MutationCoordinator(adapter, store, clock, backend_epoch="backend-d")
+        coordinator.start_run("run-d", mutation_budget(), mutation_capable=True)
+        request = request_for_adapter(coordinator, adapter)
+
+        result = coordinator.execute_action(request)
+
+        self.assertEqual(result.lifecycle_state, LifecycleState.AMBIGUOUS)
+        self.assertEqual(result.status, ActionStatus.AMBIGUOUS)
+        self.assertEqual(result.dispatch_state, DispatchState.POSSIBLY_DISPATCHED)
+        self.assertEqual(result.authoritative_confirmation, Confirmation.UNKNOWN)
+        self.assertEqual(result.reason_code, "POST_DISPATCH_OUTCOME_INVALID")
         ledger = store.load_budget("run-d")
         self.assertIsNotNone(ledger)
         assert ledger is not None

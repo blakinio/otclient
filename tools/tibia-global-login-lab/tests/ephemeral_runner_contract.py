@@ -5,6 +5,7 @@ root = Path(__file__).resolve().parents[3]
 workflow = (root / '.github/workflows/tibia-global-login-lab.yml').read_text(encoding='utf-8')
 prepare = (root / 'tools/tibia-global-login-lab/scripts/prepare-ephemeral-runtime.sh').read_text(encoding='utf-8')
 clear_pid = (root / 'tools/tibia-global-login-lab/scripts/clear-stale-wireproxy-pid.sh').read_text(encoding='utf-8')
+refresh = (root / 'tools/tibia-global-login-lab/scripts/refresh-current-assets.sh').read_text(encoding='utf-8')
 
 probe = workflow.index('  probe:')
 build = workflow.index('      - name: Download exact native Linux binary', probe)
@@ -36,5 +37,8 @@ assert 'wireproxy.pid' in clear_pid
 assert 'rm -f' in clear_pid
 assert 'kill ' not in clear_pid
 assert 'LAB_WIREPROXY_CROSS_CONTAINER_PID_CLEARED=true' in clear_pid
+
+assert "'-A', 'Mozilla/5.0'" in refresh
+assert "get(base + '/assets.json', manifest)" in refresh
 
 print('EPHEMERAL_RUNNER_CONTRACT=PASS')

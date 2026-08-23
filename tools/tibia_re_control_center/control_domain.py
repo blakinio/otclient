@@ -211,7 +211,7 @@ class ControlDomainService:
         if existing is not None:
             if existing.request_hash != request_hash:
                 raise ControlDomainError(
-                    "CONTROL_REQUEST_ID_CONFLICT",
+                    "CONTROL_IDEMPOTENCY_CONFLICT",
                     "request id is already bound to a different normalized request",
                     http_status=409,
                 )
@@ -241,7 +241,7 @@ class ControlDomainService:
             )
             existing = self.store.accept_request(accepted)
             if existing.request_hash != request_hash:
-                raise ControlDomainError("CONTROL_REQUEST_ID_CONFLICT", "request id conflict", http_status=409)
+                raise ControlDomainError("CONTROL_IDEMPOTENCY_CONFLICT", "request id conflict", http_status=409)
             resource_id = existing.resource_id
         self._maybe_crash("after_accept")
         try:

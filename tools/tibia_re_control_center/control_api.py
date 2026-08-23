@@ -33,6 +33,28 @@ _RUN_RE = re.compile(r"^/v1/runs/([^/]+)$")
 _ACTION_RE = re.compile(r"^/v1/actions/([^/]+)$")
 
 
+def _allowed_methods(path: str) -> frozenset[str]:
+    methods: set[str] = set()
+    if path == "/":
+        methods.add("GET")
+    if path in {
+        "/v1/status",
+        "/v1/capabilities",
+        "/v1/scenarios",
+        "/v1/runs",
+        "/v1/events",
+    } or _RUN_ARTIFACT_RE.fullmatch(path) or _RUN_RE.fullmatch(path) or _ACTION_RE.fullmatch(path):
+        methods.add("GET")
+    if path in {
+        "/v1/runs",
+        "/v1/experiments/one-step",
+        "/v1/stop-all",
+        "/v1/reset-stop",
+    } or _RUN_CONTROL_RE.fullmatch(path):
+        methods.add("POST")
+    return frozenset(methods)
+
+
 class _DuplicateKey(ValueError):
     pass
 
@@ -163,14 +185,15 @@ class ControlRequestHandler(BaseHTTPRequestHandler):
             return False
         split = urlsplit(self.path)
         query = parse_qs(split.query, keep_blank_values=True)
-        if any(key.lower() in {"nonce", "control_nonce", "control-nonce"} for key in query):
+        decoded_target = unquote(self.path)
+        if self.control.nonce in decoded_target or any(key.lower() in {"nonce", "control_nonce", "control-nonce"} for key in query):
             self._error(HTTPStatus.BAD_REQUEST, "CONTROL_NONCE_IN_URL", "control nonce is forbidden in URL data")
             return False
         if not api:
             return True
         nonce = self._single_header(NONCE_HEADER)
         if nonce is None or not hmac.compare_digest(nonce, self.control.nonce):
-            self._error(HTTPStatus.UNAUTHORIZED, "CONTROL_NONCE_REQUIRED", "valid Control API nonce is required")
+            self._error(HTTPStatus.UNAUTHORIZED, "CONTROL_AUTH_REQUIRED", "valid Control API nonce is required")
             return False
         origin_values = self.headers.get_all("Origin") or []
         if len(origin_values) > 1:
@@ -244,16 +267,29 @@ class ControlRequestHandler(BaseHTTPRequestHandler):
         except json.JSONDecodeError as exc:
             raise ControlDomainError("CONTROL_BODY_JSON_INVALID", "request body must be valid JSON") from exc
 
+    def _validate_method(self, method: str, path: str) -> bool:
+        allowed = _allowed_methods(path)
+        if not allowed:
+            self._error(HTTPStatus.NOT_FOUND, "CONTROL_ROUTE_NOT_FOUND", "resource was not found")
+            return False
+        if method not in allowed:
+            self._error(HTTPStatus.METHOD_NOT_ALLOWED, "CONTROL_METHOD_NOT_ALLOWED", "HTTP method is not admitted")
+            return False
+        return True
+
     def do_OPTIONS(self) -> None:
-        if not self._validate_transport(api=self.path.startswith("/v1/")):
+        path, _ = self._parsed_path()
+        if not self._validate_transport(api=path.startswith("/v1/")):
             return
-        self._error(HTTPStatus.METHOD_NOT_ALLOWED, "CONTROL_METHOD_NOT_ALLOWED", "OPTIONS is not an admitted Control API method")
+        self._validate_method("OPTIONS", path)
 
     def do_GET(self) -> None:
         path, query = self._parsed_path()
+        if not self._validate_transport(api=path.startswith("/v1/")):
+            return
+        if not self._validate_method("GET", path):
+            return
         if path == "/":
-            if not self._validate_transport(api=False):
-                return
             if query:
                 self._error(HTTPStatus.BAD_REQUEST, "CONTROL_QUERY_INVALID", "browser bootstrap URL does not accept query parameters")
                 return
@@ -270,11 +306,6 @@ class ControlRequestHandler(BaseHTTPRequestHandler):
             self.send_header("Referrer-Policy", "no-referrer")
             self.end_headers()
             self.wfile.write(raw)
-            return
-        if not path.startswith("/v1/"):
-            self._error(HTTPStatus.NOT_FOUND, "CONTROL_NOT_FOUND", "resource was not found")
-            return
-        if not self._validate_transport(api=True):
             return
         try:
             if path == "/v1/status":
@@ -308,7 +339,7 @@ class ControlRequestHandler(BaseHTTPRequestHandler):
                     raise ControlDomainError("CONTROL_QUERY_INVALID", "action view does not accept query parameters")
                 payload = self.control.domain.action_detail(unquote(match.group(1)))
             else:
-                raise ControlDomainError("CONTROL_NOT_FOUND", "resource was not found", http_status=404)
+                raise ControlDomainError("CONTROL_ROUTE_NOT_FOUND", "resource was not found", http_status=404)
             self._send_json(HTTPStatus.OK, payload)
         except ControlDomainError as exc:
             self._error(exc.http_status, exc.code, exc.safe_message, retryable=exc.retryable)
@@ -320,10 +351,9 @@ class ControlRequestHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         path, query = self._parsed_path()
-        if not path.startswith("/v1/"):
-            self._error(HTTPStatus.NOT_FOUND, "CONTROL_NOT_FOUND", "resource was not found")
+        if not self._validate_transport(api=path.startswith("/v1/")):
             return
-        if not self._validate_transport(api=True):
+        if not self._validate_method("POST", path):
             return
         if query:
             self._error(HTTPStatus.BAD_REQUEST, "CONTROL_QUERY_INVALID", "POST routes do not accept query parameters")
@@ -350,7 +380,7 @@ class ControlRequestHandler(BaseHTTPRequestHandler):
                 operation = {"pause": "PAUSE_RUN", "resume": "RESUME_RUN", "abort": "ABORT_RUN"}[verb]
                 handler = lambda resource_id, rid, normalized, op=operation, target=run_id: self.control.domain.run_control(resource_id, rid, normalized, operation=op, run_id=target)
             else:
-                self._error(HTTPStatus.NOT_FOUND, "CONTROL_NOT_FOUND", "resource was not found", request_id=request_id)
+                self._error(HTTPStatus.NOT_FOUND, "CONTROL_ROUTE_NOT_FOUND", "resource was not found", request_id=request_id)
                 return
             reply: DomainReply = self.control.domain.process_post(
                 canonical_path=path,
@@ -380,9 +410,10 @@ class ControlRequestHandler(BaseHTTPRequestHandler):
         self._method_not_allowed()
 
     def _method_not_allowed(self) -> None:
-        if not self._validate_transport(api=self.path.startswith("/v1/")):
+        path, _ = self._parsed_path()
+        if not self._validate_transport(api=path.startswith("/v1/")):
             return
-        self._error(HTTPStatus.METHOD_NOT_ALLOWED, "CONTROL_METHOD_NOT_ALLOWED", "HTTP method is not admitted")
+        self._validate_method(self.command, path)
 
 
 class ControlApiServer:

@@ -1,23 +1,23 @@
-﻿---
+---
 task_id: OTC-20260823-tibia-re-control-center-package-b
-status: final_ci
+status: validating
 agent: ChatGPT
 project_lane: otclient
 lane: P2-CONTROL-API
 track_id: official-client-re
 task_kind: implementation
-phase: final_ci
+phase: validating
 risk: medium
 branch: feat/OTC-20260823-tibia-re-control-center-package-b
 base_branch: main
 base_sha: 63100340f0dbe1aba16a20bc7febc8613291583d
 created: 2026-08-23T12:42:22+02:00
-updated: 2026-08-23T13:32:38.9687957+02:00
+updated: 2026-08-23T17:45:16.7018903+02:00
 execution_mode: remote_desktop+github_connector+github_actions
 execution_budget_minutes: 120
 execution_budget_reason: cohesive Package B full-stack slice requires persistent safety/request storage, secured loopback HTTP transport, browser+CLI integration, restart E2E, fresh audit, exact-head CI, merge and mandatory archive closeout
 invocation_started_at: 2026-08-23T12:34:00+02:00
-last_progress_at: 2026-08-23T13:32:38.9687957+02:00
+last_progress_at: 2026-08-23T17:45:16.7018903+02:00
 policy_version: 2
 context_pressure: medium
 context_growth: stable
@@ -92,7 +92,7 @@ depends_on:
   - Control Center contracts and lifecycle closeout on current main
 blocks: []
 ownership_released: false
-next_action: commit implementation candidate, rerun audit/E2E/regression on exact branch head, then wait for exact-head CI
+next_action: commit continuation remediation checkpoint, then run full exact-head local validation against the current main integration state
 ---
 
 # Control Center Package B — local Control API, browser, CLI and persistence
@@ -132,7 +132,7 @@ Fresh fetch on `main@63100340f0dbe1aba16a20bc7febc8613291583d` verified Package 
 - [x] 23 MUTATION_ALLOWED cannot be granted locally
 - [x] 24 mutation-capable controls execute only against explicit FAKE_TEST adapter
 - [x] 25 no official-client/raw/debug/concrete-adapter bypass exists
-- [x] 26 Package A full regression suite remains green
+- [ ] 26 Package A/full Control Center regression remains green on the current integrated head
 - [x] 27 persisted artifacts/store and generated evidence contain no nonce/secret
 - [x] 28 actual backend + CLI + browser Package B E2E passes on final head
 - [x] 29 fresh independent Package B falsification audit passes
@@ -152,5 +152,25 @@ Local implementation candidate validated before final commit:
 - Narrow compatibility edits are limited to Package A test 52 scoping its no-listener check to Package A core files, plus the package docstring; Package A exported API remains unchanged.
 - Package C PR #663 path ownership was checked and remains non-overlapping.
 - `OFFICIAL_CLIENT_ACCESS=NONE` for the full task lifetime.
+
+## Continuation audit and remediation - 2026-08-23 17:45 +02:00
+
+The continuation run merged current `origin/main@36e277a0b7a33b862c838993e0ee2ff95d7516e0` into this task branch without conflicts and then re-audited Package B against the normative Control API v1 contract instead of trusting the earlier green test narrative. The following material contract drifts were found and repaired in owned Package B paths:
+
+- `PB-AUDIT-001`: missing/stale nonce returned `CONTROL_NONCE_REQUIRED`; v1 requires `401 CONTROL_AUTH_REQUIRED`.
+- `PB-AUDIT-002`: unknown routes/method classification used `CONTROL_NOT_FOUND` or unconditional `405`; v1 requires `404 CONTROL_ROUTE_NOT_FOUND` for unknown routes and `405 CONTROL_METHOD_NOT_ALLOWED` only for known routes with unsupported methods.
+- `PB-AUDIT-003`: request-id/hash conflict returned `CONTROL_REQUEST_ID_CONFLICT`; v1 requires `409 CONTROL_IDEMPOTENCY_CONFLICT`.
+- `PB-AUDIT-004`: the URL nonce rejection only recognized nonce-like query key names; it now also rejects the actual current nonce literal wherever it appears in the request target.
+- Direct audit/E2E script invocation was made self-contained so the alias-required `python tests/.../*.py` commands no longer depend on an implicit `PYTHONPATH=.` environment.
+
+Post-remediation focused evidence on the integrated working tree:
+
+- focused `ruff 0.16.1`: PASS for the changed Package B production/test/audit/E2E files;
+- `python -m unittest tests.tools.tibia_re_control_center.test_package_b -v`: PASS, `Ran 39 tests`, `OK`;
+- `python tests/tools/tibia_re_control_center/audit_package_b.py`: `PACKAGE_B_AUDIT=PASS`;
+- `python tests/tools/tibia_re_control_center/e2e_package_b.py`: real local Chrome/CDP + CLI + backend + restart replay, `PACKAGE_B_E2E=PASS`;
+- `OFFICIAL_CLIENT_ACCESS=NONE` throughout.
+
+The earlier 160-test full-regression result predates the current-main integration and this remediation. Criterion 26 is therefore deliberately reopened until the full required discovery command is rerun on the committed exact head.
 
 Criterion 30 remains open until exact-head CI is green, PR is terminal, the task is archived and ownership is released.

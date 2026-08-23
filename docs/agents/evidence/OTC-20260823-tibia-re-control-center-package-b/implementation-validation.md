@@ -48,3 +48,19 @@ Package A mandatory test 52 originally scanned every future Python file in the p
 ## Exact-head gate
 
 This document records the pre-commit candidate validation. Exact-head validation is intentionally performed again after commit and by `.github/workflows/tibia-re-control-center-package-b.yml`; task criterion 30 remains open until PR merge, archive and ownership release.
+
+## Continuation resync, fresh audit and remediation - 2026-08-23 17:45 +02:00
+
+Current-main integration base for this continuation: `origin/main@36e277a0b7a33b862c838993e0ee2ff95d7516e0`; local merge commit before remediation: `eea357685b9561891a5a221cd9edefa44b035b21`. No Package C/D-owned path was edited by the Package B repair.
+
+Fresh contract falsification found four defects that the original tests encoded rather than caught: `PB-AUDIT-001` (`CONTROL_AUTH_REQUIRED`), `PB-AUDIT-002` (unknown-route 404 versus known-route method 405), `PB-AUDIT-003` (`CONTROL_IDEMPOTENCY_CONFLICT`), and `PB-AUDIT-004` (literal nonce in arbitrary URL data). All four were remediated in Package B-owned code and the tests/audit were changed to assert the normative v1 behavior. The audit/E2E scripts were also made directly executable without relying on `PYTHONPATH=.` because the canonical continuation alias requires direct script invocation.
+
+Verified after remediation:
+
+- focused Ruff across changed Package B code/tests/audit/E2E -> PASS;
+- `python -m unittest tests.tools.tibia_re_control_center.test_package_b -v` -> `Ran 39 tests`, `OK`;
+- `python tests/tools/tibia_re_control_center/audit_package_b.py` -> `PACKAGE_B_AUDIT=PASS`;
+- `python tests/tools/tibia_re_control_center/e2e_package_b.py` -> `PACKAGE_B_BROWSER=PASS`, `PACKAGE_B_CLI=PASS`, `PACKAGE_B_IDEMPOTENCY_RESTART=PASS`, `PACKAGE_B_E2E=PASS`;
+- official client access remained `NONE`.
+
+The historical `Ran 160 tests` line above is preserved as pre-resync evidence only. It is not treated as final-head evidence after the new main merge/remediation; full regression and final exact-head CI must be rerun before closeout.

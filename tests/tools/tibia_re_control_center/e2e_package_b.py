@@ -8,6 +8,10 @@ import tempfile
 import time
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parents[3]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 from tools.tibia_re_control_center.control_api import ControlApiServer
 from tools.tibia_re_control_center.control_cli import ControlApiClient
 

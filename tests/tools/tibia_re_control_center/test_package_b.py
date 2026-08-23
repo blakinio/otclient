@@ -125,14 +125,14 @@ class PackageBTests(unittest.TestCase):
         for path in ("/v1/status", "/v1/capabilities", "/v1/scenarios", "/v1/runs", "/v1/events", "/v1/not-real"):
             status, _, raw = http_call(self.server, "GET", path, nonce=None)
             self.assertEqual(401, status, path)
-            self.assertEqual("CONTROL_NONCE_REQUIRED", decode(raw)["code"])
+            self.assertEqual("CONTROL_AUTH_REQUIRED", decode(raw)["code"])
 
     def test_04_stale_nonce_rejected_after_restart(self):
         stale = self.server.nonce
         self.restart(clean=True)
         status, _, raw = http_call(self.server, "GET", "/v1/status", nonce=stale)
         self.assertEqual(401, status)
-        self.assertEqual("CONTROL_NONCE_REQUIRED", decode(raw)["code"])
+        self.assertEqual("CONTROL_AUTH_REQUIRED", decode(raw)["code"])
 
     def test_05_nonce_not_in_runtime_metadata_or_persistent_database(self):
         nonce = self.server.nonce
@@ -205,7 +205,7 @@ class PackageBTests(unittest.TestCase):
         with self.assertRaises(ControlClientError) as ctx:
             self.experiment("idem-conflict", changed)
         self.assertEqual(409, ctx.exception.status)
-        self.assertEqual("CONTROL_REQUEST_ID_CONFLICT", ctx.exception.payload["code"])
+        self.assertEqual("CONTROL_IDEMPOTENCY_CONFLICT", ctx.exception.payload["code"])
         self.assertEqual(1, len(self.server.domain.adapter.physical_effects))
 
     def test_15_failed_logical_request_replays_same_failure(self):
@@ -337,10 +337,22 @@ class PackageBTests(unittest.TestCase):
         for path in ("/v1/raw", "/v1/debug", "/v1/raw-actions", "/v1/debug-actions", "/v1/adapters/official"):
             status, _, raw = http_call(self.server, "GET", path)
             self.assertEqual(404, status, path)
-            self.assertEqual("CONTROL_NOT_FOUND", decode(raw)["code"])
+            self.assertEqual("CONTROL_ROUTE_NOT_FOUND", decode(raw)["code"])
         status, _, raw = http_call(self.server, "DELETE", "/v1/status")
         self.assertEqual(405, status)
         self.assertEqual("CONTROL_METHOD_NOT_ALLOWED", decode(raw)["code"])
+        status, _, raw = http_call(self.server, "DELETE", "/v1/not-real")
+        self.assertEqual(404, status)
+        self.assertEqual("CONTROL_ROUTE_NOT_FOUND", decode(raw)["code"])
+        status, _, raw = http_call(self.server, "GET", "/v1/stop-all")
+        self.assertEqual(405, status)
+        self.assertEqual("CONTROL_METHOD_NOT_ALLOWED", decode(raw)["code"])
+        status, _, raw = http_call(self.server, "POST", "/v1/status")
+        self.assertEqual(405, status)
+        self.assertEqual("CONTROL_METHOD_NOT_ALLOWED", decode(raw)["code"])
+        status, _, raw = http_call(self.server, "OPTIONS", "/v1/not-real")
+        self.assertEqual(404, status)
+        self.assertEqual("CONTROL_ROUTE_NOT_FOUND", decode(raw)["code"])
 
     def test_28_browser_bootstrap_is_no_store_csp_self_contained_and_truthful(self):
         status, headers, raw = http_call(self.server, "GET", "/", nonce=None)
@@ -395,9 +407,14 @@ class PackageBTests(unittest.TestCase):
         self.assertEqual("BOUNDED_POLLING", events["delivery"])
 
     def test_33_nonce_is_not_admitted_to_control_api_url(self):
-        status, _, raw = http_call(self.server, "GET", f"/v1/status?control_nonce={self.server.nonce}")
-        self.assertEqual(400, status)
-        self.assertEqual("CONTROL_NONCE_IN_URL", decode(raw)["code"])
+        for path in (
+            f"/v1/status?control_nonce={self.server.nonce}",
+            f"/v1/status?opaque={self.server.nonce}",
+        ):
+            with self.subTest(path=path.split("=", 1)[0]):
+                status, _, raw = http_call(self.server, "GET", path)
+                self.assertEqual(400, status)
+                self.assertEqual("CONTROL_NONCE_IN_URL", decode(raw)["code"])
 
     def test_34_package_b_domain_has_no_official_adapter_or_runtime_bridge(self):
         source = (Path("tools/tibia_re_control_center/control_domain.py").read_text(encoding="utf-8") + Path("tools/tibia_re_control_center/control_api.py").read_text(encoding="utf-8"))

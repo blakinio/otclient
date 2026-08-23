@@ -94,7 +94,7 @@ depends_on:
   - Control Center contracts and lifecycle closeout on current main
 blocks: []
 ownership_released: false
-next_action: commit the validated Package A compatibility repair, then rerun mandatory exact-head Package A + Package B validation and push PR #666
+next_action: commit the Package B workflow newline CI repair, push the new exact head and evaluate only the newly emitted exact-head CI generation
 ---
 
 # Control Center Package B — local Control API, browser, CLI and persistence
@@ -191,5 +191,7 @@ Criterion 26 is therefore revalidated as green. The full-Ruff baseline failure r
 Live PR #666 CI on exact head `9f73babe821baec12856e0779afc8a084cf1f7ee` proved `PB-AUDIT-005`: Package A validation still scanned future Package B modules and rejected the contract-authorized CLI transport, while its Package A-only path-boundary step rejected Package B workflow/task/evidence metadata. No active Package A task or open Package A PR owns the affected validator/workflow paths. Package B therefore claims only `tests/tools/tibia_re_control_center/audit_package_a.py` and `.github/workflows/tibia-re-control-center-core.yml` for a narrow compatibility repair that preserves the Package A runtime-access-none invariant on its explicit core modules and grants no new authority.
 
 `PB-AUDIT-005` is remediated: the Package A runtime-boundary validator now scans only the explicit Package A core (`__init__.py`, artifact/canonical/comparison/engine/execution/fake/model/recorder/scenario/store), while the Package A PR boundary admits only the known Package B workflow/task/archive/evidence metadata in addition to the already-admitted shared tools/tests tree. Focused validation: Ruff PASS, all 76 Package A tests PASS, and `audit_package_a.py` reports `PACKAGE_A_FRESH_AUDIT=PASS`, `MATERIAL_FINDINGS_OPEN=0`, `RUNTIME_ACCESS_NONE=PASS`, `FAKE_ONE_STEP_E2E=PASS`.
+
+Exact-head CI on `7deeebec165f1d0d88efba7b9286f8a34cf4c768` made Package A audit, Package B audit and Package B real browser/CLI E2E green. Generic Fast Checks failed only because `.github/workflows/tibia-re-control-center-package-b.yml` lacked the final newline required by repository yamllint; the owned workflow was repaired without semantic changes.
 
 Criterion 30 remains open until exact-head CI is green, PR is terminal, the task is archived and ownership is released.

@@ -44,8 +44,10 @@ base = os.environ['ASSET_BASE'].rstrip('/')
 out = pathlib.Path('/lab/state/things/1532')
 out.mkdir(parents=True, exist_ok=True)
 def get(url, path):
+    # Asset bytes are public CDN content. WARP remains mandatory for auth/game,
+    # but the full launcher catalog is rejected when fetched through WARP.
     subprocess.run([
-        'curl', '--socks5-hostname', '127.0.0.1:25344', '-fsSL', '-A', 'Mozilla/5.0',
+        'curl', '-A', 'Mozilla/5.0', '-fsSL',
         '--retry', '3', '--retry-all-errors', '--connect-timeout', '15',
         '--max-time', '180', url, '-o', str(path),
     ], check=True)

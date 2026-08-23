@@ -729,7 +729,11 @@ class PackageAMandatoryTests(unittest.TestCase):
         self.assertFalse(any("official" in name.lower() for name in exported))
         root = Path("tools/tibia_re_control_center")
         forbidden = ("subprocess", "socket", "requests", "urllib.request", "os.system", "Popen")
-        text = "\n".join(path.read_text(encoding="utf-8") for path in root.glob("*.py"))
+        package_a_core = (
+            "artifact.py", "canonical.py", "comparison.py", "engine.py", "execution.py",
+            "fake.py", "model.py", "recorder.py", "scenario.py", "store.py",
+        )
+        text = "\n".join((root / name).read_text(encoding="utf-8") for name in package_a_core)
         self.assertFalse(any(token in text for token in forbidden))
 
     def test_53_typed_budget_abort_fieldpath_destination_reject_free_form(self):

@@ -1,7 +1,8 @@
-"""TIBIA RE Control Center Package A deterministic control core.
+"""TIBIA RE Control Center deterministic core and local Package B control plane.
 
-Package A is permanently runtime_access:none. Concrete official/Oteryn adapters,
-network listeners and operator bypass surfaces are intentionally absent.
+Package A remains runtime_access:none and exposes no adapter bypass. Package B adds
+non-exported loopback HTTP/CLI/UI modules backed only by the explicit FAKE_TEST adapter;
+Official Tibia runtime/client access remains absent.
 """
 
 from .artifact import ArtifactStore

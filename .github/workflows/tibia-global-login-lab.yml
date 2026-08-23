@@ -82,12 +82,20 @@ jobs:
           LAB_EXACT_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
         run: bash tools/tibia-global-login-lab/scripts/bootstrap.sh
 
+      - name: Clear stale WARP PID before HTTP container recreation
+        shell: bash
+        run: bash tools/tibia-global-login-lab/scripts/clear-stale-wireproxy-pid.sh
+
       - name: Verify redacted HTTP login transport
         env:
           TIBIA_TEST_EMAIL: ${{ secrets.TIBIA_TEST_EMAIL }}
           TIBIA_TEST_PASSWORD: ${{ secrets.TIBIA_TEST_PASSWORD }}
         shell: bash
         run: bash tools/tibia-global-login-lab/scripts/http-login-preflight.sh
+
+      - name: Clear stale WARP PID before world-entry container recreation
+        shell: bash
+        run: bash tools/tibia-global-login-lab/scripts/clear-stale-wireproxy-pid.sh
 
       - name: Run controlled login and world-entry probe
         env:

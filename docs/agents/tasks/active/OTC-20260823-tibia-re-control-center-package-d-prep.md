@@ -8,17 +8,17 @@ track_id: official-client-re
 task_kind: implementation
 phase: design
 risk: medium
-branch: feat/OTC-20260823-tibia-re-control-center-package-d-prep
+branch: feat/OTC-20260823-tibia-re-control-center-package-d-prep-impl
 base_branch: main
-base_main: 63100340f0dbe1aba16a20bc7febc8613291583d
+base_main: cc9d5f5b9cb0b2a9d1b55fe86a129551f3eaee63
 created: 2026-08-23T12:40:12+02:00
-updated: 2026-08-23T12:53:00+02:00
+updated: 2026-08-23T13:02:00+02:00
 execution_mode: github_connector+github_actions
 execution_reason: runtime-independent static Track A adapter preparation and deterministic repository validation
 execution_budget_minutes: 120
 execution_budget_reason: cohesive D-prep source mapping, hard-disabled adapter skeleton, repository-only E2E, fresh audit, exact-head CI, merge and lifecycle closeout
 invocation_started_at: 2026-08-23T12:35:00+02:00
-last_progress_at: 2026-08-23T12:53:00+02:00
+last_progress_at: 2026-08-23T13:02:00+02:00
 policy_version: 2
 context_pressure: medium
 context_growth: stable
@@ -33,10 +33,10 @@ session_rotation_count: 0
 heavy_validation_runs: 0
 stale_takeover_count: 0
 human_interruptions: 0
-ci_checks_for_current_head: 0
-ci_check_generation: claim
+ci_checks_for_current_head: 2
+ci_check_generation: claim_merged
 terminal_ci_wait_started_at: null
-terminal_ci_checks_for_current_generation: 0
+terminal_ci_checks_for_current_generation: 2
 unchanged_state_checks: 0
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
@@ -86,6 +86,7 @@ owned_paths:
   - docs/agents/evidence/OTC-20260823-tibia-re-control-center-package-d-prep/**
   - tools/tibia_re_control_center/official_adapter_contract.py
   - tests/tools/tibia_re_control_center/test_package_d_prep.py
+shared_paths_pending_revalidation:
   - docs/agents/MODULE_CATALOG.md
   - docs/agents/CHANGELOG.md
 modules_touched:
@@ -109,7 +110,7 @@ depends_on:
   - trusted-base Track A admission and canonical-runtime contracts at base_main
 blocks: []
 ownership_released: false
-next_action: merge this task claim, branch from the resulting main, then implement the hard-disabled contract/tests plus same-PR catalogue/changelog updates
+next_action: merge this metadata correction, fast-forward the empty implementation branch to corrected main, then add tests before implementation
 ---
 
 # Control Center Package D PREP — Official Tibia static adapter preparation
@@ -125,10 +126,11 @@ This task is `runtime_access: none`. It must not inspect or mutate any Official 
 ## Preflight facts
 
 - trusted `main` at claim start: `63100340f0dbe1aba16a20bc7febc8613291583d`
+- claim PR #665 merged as `cc9d5f5b9cb0b2a9d1b55fe86a129551f3eaee63` after exact-head `CI` and `Track A agent runtime governance` success
 - Package A is merged at `13b3f02a07a176662d766352d9af39619775a73d`
-- Package C is active on separate branch/PR and owns only its Surveyor provider/test/evidence/task paths; this D-PREP claim uses separate new paths
-- no Package D branch existed at claim time
+- Package C is active on separate branch/PR and owns only its Surveyor provider/test paths; this D-PREP claim uses separate new implementation paths
 - the shared Package A workflow triggers on Control Center source/tests and its independent path audit intentionally rejects unrelated task/evidence paths; therefore task claim and final evidence/lifecycle closeout are docs-only PR stages around the implementation PR rather than weakening that audit
+- `MODULE_CATALOG.md` and `CHANGELOG.md` are deliberately not pre-claimed; ownership will be revalidated immediately before any required same-PR implementation update, per the canonical D-PREP prompt
 
 ## Acceptance inventory
 

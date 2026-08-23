@@ -8,7 +8,7 @@ import sys
 import tempfile
 import threading
 import time
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
@@ -287,12 +287,20 @@ class CanonicalTrackAAuthorityBridge:
             return False
 
     @staticmethod
+    def _json_semantic(value: Any) -> Any:
+        if isinstance(value, Mapping):
+            return {str(key): CanonicalTrackAAuthorityBridge._json_semantic(child) for key, child in value.items()}
+        if isinstance(value, (tuple, list)):
+            return [CanonicalTrackAAuthorityBridge._json_semantic(child) for child in value]
+        return value
+
+    @staticmethod
     def _request_payload(request: ActionRequest) -> dict[str, Any]:
         return {
             "schema_version": 1,
             "action_hash": request.action_request_hash,
             "kind": request.kind,
-            "parameters": request.parameters,
+            "parameters": CanonicalTrackAAuthorityBridge._json_semantic(request.parameters),
         }
 
     def _start_process(self, request_file: Path) -> Any:

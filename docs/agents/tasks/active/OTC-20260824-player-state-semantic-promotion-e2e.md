@@ -7,12 +7,12 @@ project_lane: otclient
 lane: P0-STATE
 track_id: official-client-re
 task_kind: runtime_semantic_validation
-phase: runtime_infra_repair
+phase: code_repair
 branch: runtime/OTC-20260824-player-state-semantic-promotion-e2e
 base_branch: main
 base_main: 5d02cf9885ffb00b8a786ba02568cec1919f9cd6
 risk: high
-updated: 2026-08-24T15:42:00+02:00
+updated: 2026-08-24T15:50:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260824-player-state-semantic-promotion-e2e.md
   - docs/agents/tasks/archive/OTC-20260824-player-state-semantic-promotion-e2e.md
@@ -20,10 +20,13 @@ owned_paths:
   - .github/workflows/otc-20260824-player-state-semantic-promotion-e2e.yml
   - .github/scripts/tibia-official-client-re-player-state-semantic-worker.py
   - .github/scripts/test_tibia_official_client_re_player_state_semantic_worker.py
+  - .github/scripts/tibia-official-client-re-canonical-live-transition.py
+  - .github/scripts/test_tibia_official_client_re_canonical_live_transition.py
   - tools/tibia_re_surveyor/player_state.py
   - tests/tools/tibia_re_surveyor/test_player_state.py
 modules_touched:
   - tibia_re_surveyor_player_state
+  - track_a_canonical_live_transition
 reuses:
   - docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
   - docs/agents/contracts/TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md
@@ -48,20 +51,20 @@ continuation_policy: continue_until_real_stop
 task_completion_policy: finalize_archive_and_stop_at_task_boundary
 user_communication: low_noise
 track_a_runtime_agent_admission_version: 1
-runtime_access: canonical_reuse_or_mutation
-runtime_owner_task: OTC-20260824-player-state-semantic-promotion-e2e
+runtime_access: none_during_code_repair
+runtime_owner_task: none
 runtime_namespace: track-a-canonical-live
-canonical_registration: PRESENT
-canonical_lease_status: active
+canonical_registration: PRESENT_STALE_LEASE_BINDING
+canonical_lease_status: released
 canonical_lease_generation: 22
 registration_lease_generation: 19
-gate_a: PASS
-generation_rebind: BLOCKED_STALE_BRIDGE_SOCKET
+gate_a: RELEASED_AFTER_BLOCKER
+generation_rebind: BLOCKED_CODE_REPAIR
 gate_b: REQUIRED_NOT_PROVEN
 bootstrap: NOT_APPLICABLE
-target_uniqueness: PROVEN_BY_CURRENT_PROBE_DIAGNOSTIC
+target_uniqueness: PROVEN_BY_GENERATION_22_DIAGNOSTIC
 mutation_authorized: false
-runtime_helper_cleanup: ORPHAN_BRIDGE_SOCKET_ONLY
+runtime_helper_cleanup: COMPLETED_ORPHAN_BRIDGE_SOCKET_ONLY
 credentials_allowed: false
 login_allowed: false
 character_selection_allowed: false
@@ -80,40 +83,21 @@ Promote or reject the current exact-build `player_state_typed_reader` as a seman
 
 This task is not Package D retry 4. It must not execute the Package D `turn` action. A future fresh Package D task may consume only durable promoted evidence from this task.
 
-## Current owner authorization
+## Owner authorization
 
-On 2026-08-24 in the current conversation the owner explicitly stated:
+On 2026-08-24 the owner explicitly stated:
 
 `Zgadzam się na 1 kontrolowany ruch postaci.`
 
 This authorizes exactly one controlled one-tile movement for this semantic causal E2E, and nothing else. It does not authorize login, relogin, credentials, character selection, combat, item use, chat, trade, economy, spells, repeated movement, direct Codex/OpenAI use, or a Package D `turn`.
 
-## Fresh controller-plane checkpoint
+## Generation-22 admission and infrastructure diagnosis
 
-The first persisted discovery, before any live-client observation by this task, found a released generation-19 lease and a generation-19 exact-build registration. Two temporary workflow-triggered controller generations later returned to `released`; they are not accepted as this task's admission evidence because this task requires a durable persist barrier after acquisition and before rebind.
+A direct controller-plane acquisition using the reviewed repository lease implementation produced an active generation-22 lease owned by this task. The generation was persisted before any current-client rebind attempt.
 
-A new direct controller-plane acquisition using the reviewed repository lease implementation then produced:
-
-```yaml
-lease_status: active
-lease_generation: 22
-lease_owner_matches_task: true
-canonical_registration: PRESENT
-registration_lease_generation: 19
-gate_a: PASS
-generation_rebind_required: true
-physical_action_count: 0
-```
-
-Generation 22 is the authoritative admission generation. The raw capability token remains mode-0600 in the task-local state path and was neither printed nor read by the agent.
-
-## Rebind blocker and bounded infrastructure repair
-
-The reviewed Kasm probe was executed only after generation 22 had been persisted. The rebind failed closed before changing the registration:
+The reviewed Kasm probe then proved:
 
 ```yaml
-rebind: FAIL
-transition_error: probe_worker_failed
 official_client_exact_candidate_count: 1
 exact_client_fence: PASS
 window_proof: PASS
@@ -127,41 +111,61 @@ auth_socket_path_present: false
 physical_action_count: 0
 ```
 
-This proves the `bridge.sock` pathname is an orphaned helper artifact rather than a live peer endpoint for the current client. The only infrastructure mutation admitted before rebind is therefore a guarded removal of exactly that orphaned `bridge.sock` path, after revalidating immediately inside the guarded command that the current client has no bridge library loaded and that the socket has no listener. This cleanup does not authorize or perform client input, process control, login, restart, injection, helper activation, credential access, or gameplay mutation. `character.sock` is not removed by this repair because it is not required to restore the Kasm adoption probe.
+The first rebind therefore failed closed with `probe_worker_failed` and did not update the registration.
 
-If either no-listener or no-loaded-helper proof changes, cleanup is refused.
+## Completed bounded helper cleanup
 
-## Required before live mutation
+After the no-listener and no-loaded-helper facts were durably recorded, generation 22 remained current. Under the canonical lease `guard-run` supervisor the task revalidated exact client size/SHA, singleton client identity, absence of the bridge library in the current process, and absence of a bridge listener, then removed only the orphaned `bridge.sock` pathname. The guarded command returned zero and revalidated that the pathname no longer existed.
 
-1. current Gate A PASS under the authoritative lease and canonical supervisor;
-2. authoritative registration PRESENT and exact current client fence PASS;
-3. reviewed generation rebind after the bounded orphan-socket repair;
-4. current Gate B PASS including boot/PID/start/exact-SHA/display/window/target uniqueness;
-5. canonical `input.lock` held continuously through final validation, the single movement, and immediate reconciliation;
-6. a read-only `player_state_typed_reader` sample immediately before movement with a unique object, mirrored position consistency, plausible XYZ and exact-process fence;
-7. exactly one semantic movement primitive whose effect bound is one tile and whose target remains the same canonical client;
-8. final revalidation immediately before dispatch.
+This was helper-infrastructure cleanup only. It performed no keyboard/mouse input, process control, restart, injection, login, credential access, character selection or gameplay action. `physical_action_count` remained 0. `character.sock` was deliberately left untouched because it was not required for Kasm adoption recovery.
+
+The generation-22 lease was then released and its private task-local token removed before code repair began.
+
+## Newly proven code blocker
+
+With the dead bridge socket absent, the Kasm probe would correctly report fail-closed `UNKNOWN / NO_STRUCTURAL_BRIDGE`. The current canonical rebind implementation cannot consume that legitimate transition from the existing `UNKNOWN / BRIDGE_3_OF_3_SEMANTICS_UNPROVEN` registration because `_probe_reg(..., old=True)` calls the full `_match()` before rebind and requires `state_evidence` to be byte-for-byte unchanged. `_rebind()` also does not copy refreshed adoption `state_evidence` into the new registration.
+
+This is a direct task blocker, not a reason to bypass the registration. No other active task in the current checkout declares ownership of `tibia-official-client-re-canonical-live-transition.py`, so this task now owns the transition implementation and focused tests for the narrow repair.
+
+## Repair invariant
+
+The repair may allow an adoption rebind to refresh only fail-closed adoption evidence while preserving exact stable identity:
+
+- old and new semantic state must both remain `UNKNOWN`;
+- old/new evidence must be one of `BRIDGE_3_OF_3_SEMANTICS_UNPROVEN` or `NO_STRUCTURAL_BRIDGE`;
+- `proof_kind` remains the adoption proof kind;
+- boot identity, PID, start ticks, exact client version/size/SHA, display, runtime locator, complete-inventory proof, candidate count/fingerprint and stable window identity base must remain identical;
+- any stable identity drift still refuses rebind;
+- final post-write probe must exactly match the refreshed registration;
+- rollback behavior on post-write failure remains unchanged.
+
+TDD status before implementation:
+
+```yaml
+new_test_adoption_rebind_refreshes_fail_closed_state_evidence: RED_expected
+observed_error: registered_identity_state_evidence_mismatch
+new_test_adoption_rebind_rejects_stable_identity_drift: RED_expected
+```
+
+After the local implementation, both focused tests pass. Full existing transition/lease/guard validation and repository CI remain required before the repaired rebind can be used on the physical runtime.
+
+## Required before the authorized movement
+
+1. merge or otherwise place the reviewed rebind repair on trusted `main` before using it as runtime authority;
+2. fresh task admission from then-current controller state;
+3. Gate A PASS;
+4. reviewed generation rebind PASS if required;
+5. Gate B PASS with exact singleton target;
+6. pre-movement read-only player-state sample AVAILABLE with unique mirrored position;
+7. canonical `input.lock` held continuously through final validation, exactly one movement dispatch and immediate reconciliation;
+8. exactly one one-tile movement, never retried after COMMIT;
+9. post-sample from the same exact process/object with same Z and Manhattan delta exactly 1.
 
 Any UNKNOWN or REQUIRED_NOT_PROVEN required gate refuses the movement.
 
-## Causal acceptance criteria
-
-The movement may be promoted as semantic evidence only when all of the following are observed in the same admitted runtime generation:
-
-- pre-sample `P0=(x0,y0,z0)` is available from the exact current reader;
-- exactly one authorized one-tile movement is dispatched once;
-- post-sample `P1=(x1,y1,z1)` is available from the same unique typed object and exact process identity;
-- `z1 == z0`;
-- Manhattan delta is exactly one: `abs(x1-x0)+abs(y1-y0) == 1`;
-- mirrored copies remain equal before and after;
-- target identity, Gate B and input-lock authority remain valid through reconciliation;
-- no second physical action is attempted regardless of ambiguity or failure.
-
-If COMMIT occurs and outcome becomes uncertain, record `AMBIGUOUS_NO_RETRY`; never retry the movement.
-
 ## Promotion boundary
 
-Only after causal PASS may this task change `tools/tibia_re_surveyor/player_state.py` / focused tests to represent the exact reviewed semantic promotion. The promotion must stay exact-client-fenced and fail closed on uniqueness, mirror, plausibility, identity or runtime-state failure. Structural bridge 3-of-3 remains insufficient by itself.
+Only after causal PASS may this task change `tools/tibia_re_surveyor/player_state.py` / focused tests to represent the exact reviewed semantic promotion. Structural bridge 3-of-3 remains insufficient by itself.
 
 If causal proof fails or cannot legally run, keep `semantic_promotion_allowed: false` and close with the exact blocker.
 
@@ -178,4 +182,4 @@ If causal proof fails or cannot legally run, keep `semantic_promotion_allowed: f
 
 ## Next action
 
-Under the still-current generation-22 lease, use the reviewed lease `guard-run` supervisor to revalidate and remove only the proven orphan `bridge.sock`. Re-run the Kasm probe afterward; if it reports the socket absent and current target remains unique/exact, retry the reviewed rebind once. No movement is permitted in this repair/rebind step.
+Commit the tested canonical rebind repair and focused regression tests to PR #688, run exact-head repository/Track A governance checks, and do not reacquire physical runtime until the repair is trusted by repository policy.

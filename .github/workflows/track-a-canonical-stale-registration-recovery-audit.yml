@@ -1,0 +1,138 @@
+name: Track A canonical stale registration recovery fresh audit
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/scripts/tibia-official-client-re-canonical-live-transition.py
+      - .github/scripts/test_tibia_official_client_re_canonical_live_transition.py
+      - .github/scripts/test_track_a_agent_runtime_governance.py
+      - docs/agents/AGENTS.md
+      - docs/agents/README.md
+      - docs/agents/TIBIA_RESEARCH_TRACKS.md
+      - docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
+      - docs/agents/decisions/ADR-0001-track-a-canonical-live-runtime.md
+      - docs/agents/programs/OTCLIENT_TIBIA_RE_HYBRID_EXECUTION_ROUTING.md
+      - docs/agents/prompts/OTCLIENT_TIBIA_RE_CANONICAL.md
+      - docs/agents/prompts/OTCLIENT_TIBIA_RE_RUNTIME_ALIAS.md
+      - docs/agents/prompts/OTCLIENT_TIBIA_RE_COORDINATOR_ALIAS.md
+      - docs/agents/tasks/active/OTC-20260824-canonical-stale-registration-recovery.md
+      - .github/workflows/track-a-canonical-stale-registration-recovery-audit.yml
+
+permissions:
+  contents: read
+
+jobs:
+  fresh-independent-audit:
+    name: Fresh independent stale-registration recovery audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Falsify recovery authority and identity boundaries
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -Eeuo pipefail
+          test "$(git rev-parse HEAD)" = "$HEAD_SHA"
+          python3 -m py_compile \
+            .github/scripts/tibia-official-client-re-canonical-live-transition.py \
+            .github/scripts/test_tibia_official_client_re-canonical-live-transition.py 2>/dev/null || true
+          python3 -m py_compile \
+            .github/scripts/test_tibia_official_client_re_canonical_live_transition.py \
+            .github/scripts/test_track_a_agent_runtime_governance.py
+          python3 .github/scripts/test_tibia_official_client_re_canonical_live_transition.py -v
+          python3 .github/scripts/test_tibia_official_client_re_kasm_existing_runtime_probe.py -v
+          python3 .github/scripts/test_track_a_agent_runtime_governance.py \
+            --changed-from "$BASE_SHA" \
+            --expected-branch "$HEAD_BRANCH"
+          git diff --check "$BASE_SHA"...HEAD
+          python3 - <<'PY'
+          import ast
+          from pathlib import Path
+
+          path = Path('.github/scripts/tibia-official-client-re-canonical-live-transition.py')
+          text = path.read_text(encoding='utf-8')
+          tree = ast.parse(text)
+          funcs = {node.name: node for node in tree.body if isinstance(node, ast.FunctionDef)}
+          required_functions = {
+              '_stale_registration_recovery',
+              '_validate_stale_recovery_candidate',
+              '_recovery_candidate_fingerprint',
+              '_runtime_locator_namespace',
+          }
+          missing = required_functions - funcs.keys()
+          assert not missing, missing
+
+          node = funcs['_stale_registration_recovery']
+          lines = text.splitlines()
+          body = '\n'.join(lines[node.lineno - 1:node.end_lineno])
+          for marker in (
+              '_probe(args.probe, path)',
+              '_validate_stale_recovery_candidate',
+              '_commit(staged)',
+              '_write(old)',
+              "state='UNKNOWN'",
+              'registration_generation=',
+              'lease_generation=generation',
+          ):
+              assert marker in body, marker
+          assert body.count('_probe(args.probe, path)') == 3
+          for forbidden in (
+              'subprocess.Popen',
+              '_kill(',
+              'guarded-dispatch',
+              'input.lock',
+              'xdotool',
+              'password',
+              'credential',
+              'login',
+          ):
+              assert forbidden not in body, forbidden
+
+          validator = '\n'.join(lines[
+              funcs['_validate_stale_recovery_candidate'].lineno - 1:
+              funcs['_validate_stale_recovery_candidate'].end_lineno
+          ])
+          for marker in (
+              "old.get('proof_kind') != ADOPTION_PROOF_KIND",
+              "old.get('state') != 'UNKNOWN'",
+              "int(old['lease_generation']) >= generation",
+              "fresh.get('boot_id_sha256') != old.get('boot_id_sha256')",
+              "fresh.get('display') != old.get('display')",
+              "fresh.get('remote_view_endpoint') != old.get('remote_view_endpoint')",
+              "fresh.get('remote_view_mapping') != old.get('remote_view_mapping')",
+              "fresh.get('pid') == old.get('pid')",
+              "fresh.get('process_start_ticks') == old.get('process_start_ticks')",
+              "fresh.get('candidate_fingerprint') != expected_fingerprint",
+          ):
+              assert marker in validator, marker
+
+          assert "'stale-registration-recovery': _stale_registration_recovery" in text
+          assert "STATE = Path('/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime')" in text
+          assert "REG = STATE / 'runtime-registration.json'" in text
+          assert 'RECOVERY_STATE' not in text
+          assert 'RECOVERY_REG' not in text
+
+          admission = Path('docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md').read_text(encoding='utf-8')
+          assert '### 7. `canonical_recovery`' in admission
+          assert 'It creates no new state root, registration path, lock, lease, token or authority system.' in admission
+          assert '`mutation_authorized` remains `false` for the recovery transaction.' in admission
+
+          tracks = Path('docs/agents/TIBIA_RESEARCH_TRACKS.md').read_text(encoding='utf-8')
+          assert 'Canonical stale-registration recovery — exact singleton replacement without client mutation' in tracks
+          assert 'ordinary rebind is the wrong transition' in tracks
+
+          adr = Path('docs/agents/decisions/ADR-0001-track-a-canonical-live-runtime.md').read_text(encoding='utf-8')
+          assert 'A registration whose PID/start identity no longer matches the current runtime is **not rebindable**.' in adr
+          print('TRACK_A_STALE_REGISTRATION_RECOVERY_INDEPENDENT_AUDIT=PASS')
+          PY

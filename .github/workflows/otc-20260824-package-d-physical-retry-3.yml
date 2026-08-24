@@ -1,0 +1,51 @@
+name: Package D retry 3 repository closeout validation
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+    paths:
+      - .github/workflows/otc-20260824-package-d-physical-retry-3.yml
+      - docs/agents/tasks/active/OTC-20260824-control-center-package-d-physical-retry-3.md
+      - docs/agents/evidence/OTC-20260824-control-center-package-d-physical-retry-3/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: otc-20260824-package-d-physical-retry-3-closeout
+  cancel-in-progress: false
+
+jobs:
+  package-d-closeout-validation:
+    if: github.repository == 'blakinio/otclient' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Install ruff
+        run: python -m pip install --disable-pip-version-check ruff
+
+      - name: Required Package D repository validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          ruff check tools/tibia_re_control_center tests/tools/tibia_re_control_center .github/scripts
+          python -m compileall -q tools/tibia_re_control_center tests/tools/tibia_re_control_center .github/scripts
+          python -m unittest discover -s tests/tools/tibia_re_control_center -v
+          python tests/tools/tibia_re_control_center/audit_package_a.py
+          python tests/tools/tibia_re_control_center/audit_package_a_p1.py
+          python .github/scripts/test_tibia_official_client_re_control_center_bridge_transport.py
+          python .github/scripts/test_tibia_official_client_re_input_lock.py
+          python .github/scripts/test_tibia_official_client_re_canonical_live_transition.py
+          python .github/scripts/test_tibia_official_client_re_canonical_live_lease.py
+          python .github/scripts/test_tibia_official_client_re_canonical_live_guard.py
+          python .github/scripts/test_track_a_agent_runtime_governance.py
+          git diff origin/main...HEAD --check
+          echo PACKAGE_D_CLOSEOUT_VALIDATION=PASS

@@ -1,10 +1,10 @@
 # Player-state semantic-promotion E2E retry — terminal runtime evidence
 
-Task: `OTC-20260824-player-state-semantic-promotion-e2e-retry`  
-PR: `#692`  
-Trusted main at runtime transaction: `e98545313a606d6bf4edfb43768e042d2242392c`  
-Runtime workflow: `32770840660`  
-Physical job: `97570588590` (`synology-otclient-01`)  
+Task: `OTC-20260824-player-state-semantic-promotion-e2e-retry`
+PR: `#692`
+Trusted main at runtime transaction: `e98545313a606d6bf4edfb43768e042d2242392c`
+Runtime workflow: `32770840660`
+Physical job: `97570588590` (`synology-otclient-01`)
 Exact workflow head: `f0393251ff711e58448fa682144a4cb9bd3ae041`
 
 ## Source-of-truth preflight

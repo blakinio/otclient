@@ -7,12 +7,12 @@ project_lane: otclient
 lane: P0-STATE
 track_id: official-client-re
 task_kind: runtime_semantic_validation
-phase: generation_rebind
+phase: runtime_infra_repair
 branch: runtime/OTC-20260824-player-state-semantic-promotion-e2e
 base_branch: main
 base_main: 5d02cf9885ffb00b8a786ba02568cec1919f9cd6
 risk: high
-updated: 2026-08-24T15:36:00+02:00
+updated: 2026-08-24T15:42:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260824-player-state-semantic-promotion-e2e.md
   - docs/agents/tasks/archive/OTC-20260824-player-state-semantic-promotion-e2e.md
@@ -56,11 +56,12 @@ canonical_lease_status: active
 canonical_lease_generation: 22
 registration_lease_generation: 19
 gate_a: PASS
-generation_rebind: REQUIRED_NOT_PROVEN
+generation_rebind: BLOCKED_STALE_BRIDGE_SOCKET
 gate_b: REQUIRED_NOT_PROVEN
 bootstrap: NOT_APPLICABLE
-target_uniqueness: UNKNOWN
+target_uniqueness: PROVEN_BY_CURRENT_PROBE_DIAGNOSTIC
 mutation_authorized: false
+runtime_helper_cleanup: ORPHAN_BRIDGE_SOCKET_ONLY
 credentials_allowed: false
 login_allowed: false
 character_selection_allowed: false
@@ -104,13 +105,37 @@ generation_rebind_required: true
 physical_action_count: 0
 ```
 
-Generation 22 is the authoritative admission generation for the next step. The raw capability token remains mode-0600 in the task-local state path and was neither printed nor read by the agent. No credential, PID, XID, display/window identifier, Official Tibia process memory or gameplay input was observed in this generation before this persist barrier.
+Generation 22 is the authoritative admission generation. The raw capability token remains mode-0600 in the task-local state path and was neither printed nor read by the agent.
+
+## Rebind blocker and bounded infrastructure repair
+
+The reviewed Kasm probe was executed only after generation 22 had been persisted. The rebind failed closed before changing the registration:
+
+```yaml
+rebind: FAIL
+transition_error: probe_worker_failed
+official_client_exact_candidate_count: 1
+exact_client_fence: PASS
+window_proof: PASS
+structural_bridge_transport: FAIL
+bridge_socket_path_present: true
+bridge_listener_present: false
+bridge_library_loaded_in_current_client: false
+character_socket_path_present: true
+character_listener_present: false
+auth_socket_path_present: false
+physical_action_count: 0
+```
+
+This proves the `bridge.sock` pathname is an orphaned helper artifact rather than a live peer endpoint for the current client. The only infrastructure mutation admitted before rebind is therefore a guarded removal of exactly that orphaned `bridge.sock` path, after revalidating immediately inside the guarded command that the current client has no bridge library loaded and that the socket has no listener. This cleanup does not authorize or perform client input, process control, login, restart, injection, helper activation, credential access, or gameplay mutation. `character.sock` is not removed by this repair because it is not required to restore the Kasm adoption probe.
+
+If either no-listener or no-loaded-helper proof changes, cleanup is refused.
 
 ## Required before live mutation
 
 1. current Gate A PASS under the authoritative lease and canonical supervisor;
 2. authoritative registration PRESENT and exact current client fence PASS;
-3. reviewed generation rebind because generation 19 registration is older than generation 22 lease;
+3. reviewed generation rebind after the bounded orphan-socket repair;
 4. current Gate B PASS including boot/PID/start/exact-SHA/display/window/target uniqueness;
 5. canonical `input.lock` held continuously through final validation, the single movement, and immediate reconciliation;
 6. a read-only `player_state_typed_reader` sample immediately before movement with a unique object, mirrored position consistency, plausible XYZ and exact-process fence;
@@ -153,4 +178,4 @@ If causal proof fails or cannot legally run, keep `semantic_promotion_allowed: f
 
 ## Next action
 
-With generation 22 now durably persisted, execute only the reviewed generation rebind against the current Kasm exact-client probe. If and only if rebind passes, persist the new registration generation before running Gate B. No movement is permitted in either step.
+Under the still-current generation-22 lease, use the reviewed lease `guard-run` supervisor to revalidate and remove only the proven orphan `bridge.sock`. Re-run the Kasm probe afterward; if it reports the socket absent and current target remains unique/exact, retry the reviewed rebind once. No movement is permitted in this repair/rebind step.

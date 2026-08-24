@@ -1,9 +1,9 @@
 name: Track A player-state semantic promotion E2E
 
 on:
-  push:
+  pull_request:
     branches:
-      - runtime/OTC-20260824-player-state-semantic-promotion-e2e
+      - main
     paths:
       - .github/workflows/otc-20260824-player-state-semantic-promotion-e2e.yml
       - .github/scripts/tibia-official-client-re-player-state-semantic-worker.py

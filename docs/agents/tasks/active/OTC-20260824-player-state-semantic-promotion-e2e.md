@@ -7,16 +7,19 @@ project_lane: otclient
 lane: P0-STATE
 track_id: official-client-re
 task_kind: runtime_semantic_validation
-phase: admission
+phase: controller_admission
 branch: runtime/OTC-20260824-player-state-semantic-promotion-e2e
 base_branch: main
 base_main: 5d02cf9885ffb00b8a786ba02568cec1919f9cd6
 risk: high
-updated: 2026-08-24T15:14:00+02:00
+updated: 2026-08-24T15:22:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260824-player-state-semantic-promotion-e2e.md
   - docs/agents/tasks/archive/OTC-20260824-player-state-semantic-promotion-e2e.md
   - docs/agents/evidence/OTC-20260824-player-state-semantic-promotion-e2e/**
+  - .github/workflows/otc-20260824-player-state-semantic-promotion-e2e.yml
+  - .github/scripts/tibia-official-client-re-player-state-semantic-worker.py
+  - .github/scripts/test_tibia_official_client_re_player_state_semantic_worker.py
   - tools/tibia_re_surveyor/player_state.py
   - tests/tools/tibia_re_surveyor/test_player_state.py
 modules_touched:
@@ -26,6 +29,10 @@ reuses:
   - docs/agents/contracts/TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md
   - docs/agents/contracts/TIBIA_RE_CONTROL_CENTER_EXECUTION_V1.md
   - docs/agents/contracts/TIBIA_RE_CONTROL_CENTER_ADAPTER_V1.md
+  - .github/scripts/tibia-official-client-re-canonical-live-lease
+  - .github/scripts/tibia-official-client-re-canonical-live-transition.py
+  - .github/scripts/tibia-official-client-re-kasm-existing-runtime-probe.py
+  - .github/scripts/tibia-official-client-re-input-lock.py
   - tools/tibia_re_surveyor/player_state.py
   - docs/agents/evidence/OTC-20260824-control-center-package-d-physical-retry-3/runtime-admission-terminal.md
 depends_on:
@@ -44,9 +51,9 @@ track_a_runtime_agent_admission_version: 1
 runtime_access: canonical_reuse_or_mutation
 runtime_owner_task: OTC-20260824-player-state-semantic-promotion-e2e
 runtime_namespace: track-a-canonical-live
-canonical_registration: UNKNOWN
-canonical_lease_generation: UNKNOWN
-registration_lease_generation: UNKNOWN
+canonical_registration: PRESENT
+canonical_lease_generation: 19
+registration_lease_generation: 19
 gate_a: REQUIRED_NOT_PROVEN
 generation_rebind: REQUIRED_NOT_PROVEN
 gate_b: REQUIRED_NOT_PROVEN
@@ -79,11 +86,29 @@ On 2026-08-24 in the current conversation the owner explicitly stated:
 
 This authorizes exactly one controlled one-tile movement for this semantic causal E2E, and nothing else. It does not authorize login, relogin, credentials, character selection, combat, item use, chat, trade, economy, spells, repeated movement, direct Codex/OpenAI use, or a Package D `turn`.
 
-## Admission state before live client observation
+## Fresh controller-plane checkpoint
 
-The task begins fail-closed. Current controller/registration/lease state must be rediscovered after this record is persisted. No historical PID, XID, display, window, registration generation, lease generation, or semantic state is inherited.
+After this task record existed, controller-plane-only discovery found:
 
-Required before the one physical movement:
+```yaml
+lease_status: released
+lease_generation: 19
+lease_controller: none
+canonical_registration: PRESENT
+registration_lease_generation: 19
+registration_generation: 2
+candidate_count: 1
+inventory_complete: true
+client_version: "15.32"
+client_size: 52109920
+client_sha256: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
+registration_state: UNKNOWN
+registration_proof_kind: existing_runtime_adoption_v1
+```
+
+No token value, credential, PID, XID, display/window identifier or Official Tibia process memory was read for this controller-plane checkpoint. Acquiring this task's lease will advance the controller generation, so the registration must be re-evaluated and rebound through the reviewed transition before Gate B if the generations then differ.
+
+## Required before live mutation
 
 1. current Gate A PASS under the authoritative lease and canonical supervisor;
 2. authoritative registration PRESENT and exact current client fence PASS;
@@ -128,6 +153,6 @@ If causal proof fails or cannot legally run, keep `semantic_promotion_allowed: f
 - no direct Codex/OpenAI/owner-funded AI invocation;
 - at most one movement dispatch total.
 
-## Initial next action
+## Next action
 
-Rediscover controller-plane lease/registration state without observing or mutating the Official Tibia client, update this admission record, then proceed only if a legal current canonical admission path exists.
+Run the task-owned admission workflow on `synology-otclient-01`: acquire this task's fresh lease, perform the reviewed generation rebind if required, then Gate B and a read-only player-state availability check. Do not dispatch movement in this admission generation.

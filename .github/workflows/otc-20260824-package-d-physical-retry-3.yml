@@ -34,6 +34,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"
           python -m compileall -q tools/tibia_re_control_center tests/tools/tibia_re_control_center .github/scripts
           python -m unittest discover -s tests/tools/tibia_re_control_center -v
           python tests/tools/tibia_re_control_center/audit_package_a.py

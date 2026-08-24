@@ -54,9 +54,10 @@ track_a_runtime_admission_version: 1
 runtime_access: canonical_reuse_or_mutation
 runtime_owner_task: OTC-20260824-player-state-semantic-promotion-e2e-retry
 runtime_namespace: canonical-live-runtime
-canonical_registration: UNKNOWN
-canonical_lease_generation: UNKNOWN
-registration_lease_generation: UNKNOWN
+canonical_registration: PRESENT
+canonical_lease_generation: 25
+registration_generation: 2
+registration_lease_generation: 19
 gate_a: REQUIRED_NOT_PROVEN
 generation_rebind: REQUIRED_NOT_PROVEN
 gate_b: REQUIRED_NOT_PROVEN
@@ -85,8 +86,31 @@ source_prs_terminal:
   689: merged
   690: merged
   691: merged
+fresh_controller_plane_admission:
+  observed_at: 2026-08-24T21:49:00+02:00
+  lease_status: released
+  lease_generation: 25
+  registration_present: true
+  registration_generation: 2
+  registration_lease_generation: 19
+  registration_pid: 19590
+  registration_process_start_ticks: 76611792
+  registration_proof_kind: existing_runtime_adoption_v1
+  registration_state: UNKNOWN
+  registration_state_evidence: BRIDGE_3_OF_3_SEMANTICS_UNPROVEN
+  credential_or_token_material_read: false
+fresh_nonmutating_target_locator:
+  container: otclient-track-a-kasmvnc
+  display: ':1'
+  client_pid: 646
+  client_process_start_ticks: 1394843
+  client_size: 52109920
+  client_sha256: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
+  target_container_singleton: true
+  all_container_target_uniqueness: UNKNOWN
+  client_input_sent: false
 invocation_started_at: 2026-08-24T21:19:00+02:00
-last_progress_at: 2026-08-24T21:19:00+02:00
+last_progress_at: 2026-08-24T21:49:18+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: draft
 terminal_ci_wait_started_at: null
@@ -107,11 +131,13 @@ acceptance:
   - successful causal differential promotes only the exact player-position semantic contract and preserves all other Surveyor/Control Center fail-closed boundaries
   - evidence, independent audit, exact-head required CI, merge, archive and ownership/lease release complete
 current_blocker: NONE
-next_action: perform fresh Synology Track A controller-plane/runtime admission without sending client input
+next_action: run the exact-main task workflow to acquire fresh Gate A and exercise canonical adoption rebind against the freshly persisted registration facts
 ---
 
 # Player-state semantic promotion E2E retry
 
 Fresh retry authorized by the repository owner after terminal PRs #688–#691. The task starts fail-closed: no physical input is legal until current authority, registration/rebind, exact target identity, uniqueness, Gate B and the semantic baseline are all directly proven on trusted `main`.
+
+Fresh controller-plane admission established an authoritative registration at registration generation 2 / lease generation 19 while the released controller lease is generation 25. A nonmutating target locator independently observed one exact client in the canonical Kasm container, but its PID/start identity differs from the persisted registration. This is evidence requiring the reviewed transition to decide fail-closed; it is not permission to edit registration manually.
 
 The only permitted client mutation is one controlled one-tile movement for the causal player-position discriminator. Login, credential access/use, relog, restart, character selection, process-control shortcuts and automatic post-COMMIT retry are forbidden.

@@ -64,7 +64,7 @@ RUNTIME_ACCESS: none
 PERSISTENT_SESSION_ROLE: none
 PHYSICAL_E2E_REQUIRED: false
 invocation_started_at: 2026-08-24T19:32:00+02:00
-last_progress_at: 2026-08-24T20:19:08+02:00
+last_progress_at: 2026-08-24T20:23:15+02:00
 ci_checks_for_current_head: 5
 ci_check_generation: b51e0d9906b41f19daa2c2cec5b2c7b5a998ad72
 terminal_ci_wait_started_at: null
@@ -80,6 +80,8 @@ acceptance:
   - the committed registration carries the fresh fail-closed state_evidence and ordinary Gate B remains strict
   - deterministic tests, independent audit, exact-head required CI, merge and terminal closeout complete without runtime/gameplay/client input
 pr: 689
+closeout_pr: 690
+closeout_branch: docs/OTC-20260824-canonical-rebind-repair-closeout
 tdd_red: registered_identity_state_evidence_mismatch
 focused_transition_tests: 30_OF_30_PASS
 focused_py_compile: PASS
@@ -148,6 +150,8 @@ closeout:
       evidence: Package A deterministic core job 97539280788 SUCCESS; only the Package-A-only changed-path allowlist rejected this canonical task after shared CHANGELOG/MODULE_CATALOG triggers
   merge:
     pr: 689
+closeout_pr: 690
+closeout_branch: docs/OTC-20260824-canonical-rebind-repair-closeout
     merge_commit: 955d0f72cb2500ce951a48ffcadb0b11ac8b3210
   pull_requests:
     unresolved_review_threads: 0

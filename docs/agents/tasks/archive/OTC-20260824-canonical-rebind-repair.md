@@ -150,9 +150,9 @@ closeout:
       evidence: Package A deterministic core job 97539280788 SUCCESS; only the Package-A-only changed-path allowlist rejected this canonical task after shared CHANGELOG/MODULE_CATALOG triggers
   merge:
     pr: 689
-closeout_pr: 690
-closeout_branch: docs/OTC-20260824-canonical-rebind-repair-closeout
     merge_commit: 955d0f72cb2500ce951a48ffcadb0b11ac8b3210
+    closeout_pr: 690
+    closeout_merge_commit: 9dc82e7b889018864aefc5d8d5bb1c6a02ad1b43
   pull_requests:
     unresolved_review_threads: 0
     material_pr_comments: 0

@@ -159,6 +159,7 @@ closeout:
     terminal_prs:
       - blakinio/otclient#689 merged as 955d0f72cb2500ce951a48ffcadb0b11ac8b3210
       - blakinio/otclient#690 merged lifecycle closeout (effective when this archive reaches main)
+      - blakinio/otclient#691 merged terminal-record repair (effective when this correction reaches main)
   task_status: completed
   task_archived: true
   ownership_released: true

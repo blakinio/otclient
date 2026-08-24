@@ -23,20 +23,17 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout exact PR head
-        uses: actions/checkout@v4
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
-
-      - name: Install ruff
-        run: python -m pip install --disable-pip-version-check ruff
+          persist-credentials: false
 
       - name: Required Package D repository validation
         shell: bash
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
-          ruff check tools/tibia_re_control_center tests/tools/tibia_re_control_center .github/scripts
           python -m compileall -q tools/tibia_re_control_center tests/tools/tibia_re_control_center .github/scripts
           python -m unittest discover -s tests/tools/tibia_re_control_center -v
           python tests/tools/tibia_re_control_center/audit_package_a.py

@@ -58,7 +58,7 @@ jobs:
           echo "CURRENT_MAIN_SHA=$current_main"
           echo "TASK_HEAD_SHA=$(git rev-parse HEAD)"
 
-          .github/scripts/tibia-official-client-re-canonical-live-lease status
+          bash .github/scripts/tibia-official-client-re-canonical-live-lease status
 
           python3 - <<'PY'
           import json

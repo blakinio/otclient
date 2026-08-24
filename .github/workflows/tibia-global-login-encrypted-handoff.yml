@@ -1,0 +1,52 @@
+name: Track B encrypted login handoff
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/tibia-global-login-encrypted-handoff.yml'
+      - '.github/track-b-encrypted-handoff/**'
+      - '.github/scripts/test_track_b_encrypted_handoff.py'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tibia-global-login-encrypted-handoff-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  handoff:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      LAB_EPHEMERAL_HOSTED: '1'
+    steps:
+      - name: Checkout exact branch head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Validate encrypted handoff contract
+        shell: bash
+        run: python3 .github/scripts/test_track_b_encrypted_handoff.py
+
+      - name: Prepare encrypted handoff runtime
+        shell: bash
+        run: bash .github/track-b-encrypted-handoff/prepare.sh
+
+      - name: Emit encrypted one-shot game handoff
+        shell: bash
+        env:
+          TIBIA_TEST_EMAIL: ${{ secrets.TIBIA_TEST_EMAIL }}
+          TIBIA_TEST_PASSWORD: ${{ secrets.TIBIA_TEST_PASSWORD }}
+        run: bash .github/track-b-encrypted-handoff/emit.sh
+
+      - name: Upload ciphertext only
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: tibia-global-login-encrypted-handoff-${{ github.event.pull_request.head.sha || github.sha }}
+          path: artifacts/encrypted-handoff/handoff.cms
+          if-no-files-found: error
+          retention-days: 1

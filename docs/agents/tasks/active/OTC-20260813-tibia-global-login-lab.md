@@ -11,12 +11,17 @@ phase: validate
 branch: feat/OTC-20260813-tibia-global-login-lab
 base_branch: main
 created: 2026-08-13T09:10:00+02:00
-updated: 2026-08-23T17:40:00+02:00
+updated: 2026-08-24T15:11:00+02:00
 risk: medium
 related_pr: 284
 owned_paths:
   - tools/tibia-global-login-lab/**
   - .github/workflows/tibia-global-login-lab.yml
+  - .github/workflows/tibia-global-login-encrypted-handoff.yml
+  - .github/track-b-encrypted-handoff/**
+  - .github/scripts/test_track_b_encrypted_handoff.py
+  - docs/agents/prompts/OTCLIENT_GLOBAL_LOGIN_ENCRYPTED_HANDOFF_CONTINUE.md
+  - docs/agents/evidence/OTC-20260813-tibia-global-login-lab/**
   - .gitattributes
   - docs/agents/tasks/active/OTC-20260813-tibia-global-login-lab.md
 modules_touched:
@@ -34,7 +39,7 @@ continuation_policy: continue_until_real_stop
 task_completion_policy: finalize_archive_and_continue
 user_communication: low_noise
 policy_version: 2
-session_id: chatgpt-20260823-track-b-restack
+session_id: chatgpt-20260824-track-b-encrypted-handoff
 session_role: implementer
 context_pressure: medium
 context_growth: stable
@@ -44,7 +49,7 @@ decomposition_decision: phased
 decomposition_reason: one shared-state HTTP-auth -> one-shot handoff -> world-entry E2E
 validation_level: focused
 invocation_started_at: 2026-08-23T16:45:00+02:00
-last_progress_at: 2026-08-23T17:40:00+02:00
+last_progress_at: 2026-08-24T15:11:00+02:00
 heavy_validation_runs: 0
 repair_cycles_for_current_gate: 1
 identical_failure_retries: 0
@@ -782,3 +787,22 @@ Fresh workflow inspection found that the old multi-step probe could lose the fre
 The restack now stages the exact artifact plus its SHA-256 in the task-owned runtime volume during bootstrap. World entry requires both files, re-hashes the staged artifact, installs it into `/otclient/otclient`, and re-hashes the installed binary before launch. It emits only fixed non-secret markers and never logs binary contents.
 
 This repair is part of the pre-E2E gate; it changes no OTClient product/protocol code.
+
+## 2026-08-24 Molehill encrypted-handoff continuation checkpoint
+
+This checkpoint supersedes the stale restack-only next action above.
+
+Durable evidence:
+`docs/agents/evidence/OTC-20260813-tibia-global-login-lab/20260824-molehill-encrypted-handoff.md`
+
+Continuation prompt:
+`docs/agents/prompts/OTCLIENT_GLOBAL_LOGIN_ENCRYPTED_HANDOFF_CONTINUE.md`
+
+Current state:
+- GitHub-hosted gameplay asset CDN access is proven insufficient (403 across Ubuntu/Windows/macOS; official launcher archive also 403);
+- Molehill `tibia-kasm` has an exact, launcher-accepted current 15.32.bf29ac package/assets cache matching the trusted client SHA fence;
+- `synology-otclient-01` is offline and Molehill has no approved unattended NAS control path;
+- encrypted CMS one-shot handoff has passed local synthetic round-trip and contract validation but has not yet been physically proven with a real Tibia session handoff;
+- no new protocol mutation is justified yet.
+
+Exact next action: validate/publish the isolated encrypted-handoff producer lane, execute only that GitHub-Secret-bound producer, download only `handoff.cms` to Molehill, decrypt locally without logging plaintext, stage verified local current assets, and perform one bounded OTClient game-login. Success still requires real `GAME_START` plus authoritative in-game semantic evidence.

@@ -1,0 +1,174 @@
+name: Track A player-state semantic retry admission
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/track-a-player-state-semantic-retry-admission.yml
+      - docs/agents/tasks/active/OTC-20260824-player-state-semantic-promotion-e2e-retry.md
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-player-state-semantic-retry-admission
+  cancel-in-progress: false
+
+jobs:
+  admission-rebind-gate-b:
+    name: Fresh Gate A, rebind and Gate B
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.head.ref == 'runtime/OTC-20260824-player-state-semantic-promotion-e2e-retry' }}
+    runs-on: [otclient, synology]
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact task head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Fresh Track A admission and canonical rebind
+        shell: bash
+        env:
+          EXPECTED_MAIN_SHA: e98545313a606d6bf4edfb43768e042d2242392c
+          EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha || 'e98545313a606d6bf4edfb43768e042d2242392c' }}
+          EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref || 'runtime/OTC-20260824-player-state-semantic-promotion-e2e-retry' }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          umask 077
+
+          [[ "$RUNNER_NAME" == 'synology-otclient-01' ]]
+          [[ "$GITHUB_REPOSITORY" == 'blakinio/otclient' ]]
+          [[ "$HEAD_BRANCH" == 'runtime/OTC-20260824-player-state-semantic-promotion-e2e-retry' ]]
+          [[ "$EVENT_BASE_SHA" == "$EXPECTED_MAIN_SHA" ]]
+          [[ "$(git rev-parse HEAD)" == "$EVENT_HEAD_SHA" ]]
+          current_main="$(git ls-remote origin refs/heads/main | awk 'NR==1 {print $1}')"
+          [[ "$current_main" == "$EXPECTED_MAIN_SHA" ]] || {
+            echo "PLAYER_STATE_RETRY_REFUSED=LIVE_MAIN_MOVED:$current_main" >&2
+            exit 60
+          }
+
+          python3 .github/scripts/test_track_a_agent_runtime_governance.py \
+            --changed-from "$EXPECTED_MAIN_SHA" --expected-branch "$HEAD_BRANCH"
+          python3 .github/scripts/test_tibia_official_client_re_canonical_live_transition.py
+          python3 .github/scripts/test_tibia_official_client_re_kasm_existing_runtime_probe.py
+          echo 'PLAYER_STATE_RETRY_TRUSTED_MAIN=PASS'
+          echo 'PLAYER_STATE_RETRY_ADMISSION_POLICY=PASS'
+
+          task='OTC-20260824-player-state-semantic-promotion-e2e-retry'
+          session='chatgpt-player-state-semantic-retry-20260824'
+          state='/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime'
+          token_root="/home/runner/_work/_otclient_tibia_re_state/tasks/$task/runtime"
+          token="$token_root/canonical-lease-token"
+          lease='.github/scripts/tibia-official-client-re-canonical-live-lease'
+          transition='.github/scripts/tibia-official-client-re-canonical-live-transition.py'
+          probe='.github/scripts/tibia-official-client-re-kasm-existing-runtime-probe.py'
+          reg="$state/runtime-registration.json"
+          acquired=0
+          released=0
+          before_reg_sha=''
+
+          mkdir -p "$token_root"
+          chmod 700 "/home/runner/_work/_otclient_tibia_re_state/tasks/$task" "$token_root" 2>/dev/null || true
+          rm -f "$token"
+
+          cleanup() {
+            rc=$?
+            if [[ "$acquired" == 1 && "$released" != 1 ]]; then
+              bash "$lease" release --task-id "$task" --session-id "$session" --token-file "$token" >/dev/null 2>&1 || true
+            fi
+            rm -f "$token"
+            exit "$rc"
+          }
+          trap cleanup EXIT
+
+          python3 - "$state/lease.json" "$reg" <<'PY'
+          import json, pathlib, sys
+          lease=json.loads(pathlib.Path(sys.argv[1]).read_text())
+          reg=json.loads(pathlib.Path(sys.argv[2]).read_text())
+          assert lease.get('runtime_id') == 'track-a-canonical-live'
+          assert lease.get('status') == 'released'
+          assert lease.get('controller_task') is None
+          assert lease.get('controller_session') is None
+          assert reg.get('runtime_id') == 'track-a-canonical-live'
+          safe={
+            'lease_generation': lease.get('generation'),
+            'registration_generation': reg.get('registration_generation'),
+            'registration_lease_generation': reg.get('lease_generation'),
+            'registration_pid': reg.get('pid'),
+            'registration_process_start_ticks': reg.get('process_start_ticks'),
+            'registration_state': reg.get('state'),
+            'registration_state_evidence': reg.get('state_evidence'),
+            'registration_proof_kind': reg.get('proof_kind'),
+          }
+          print('PLAYER_STATE_RETRY_PRESTATE='+json.dumps(safe,sort_keys=True,separators=(',',':')))
+          PY
+          before_reg_sha="$(sha256sum "$reg" | awk '{print $1}')"
+
+          bash "$lease" acquire \
+            --task-id "$task" \
+            --session-id "$session" \
+            --token-file "$token" \
+            --ttl-seconds 1800
+          acquired=1
+          bash "$lease" validate --task-id "$task" --session-id "$session" --token-file "$token"
+          echo 'PLAYER_STATE_RETRY_GATE_A=PASS'
+
+          set +e
+          rebind_output="$(python3 "$transition" rebind \
+            --task-id "$task" \
+            --session-id "$session" \
+            --token-file "$token" \
+            --probe "$probe" 2>&1)"
+          rebind_rc=$?
+          set -e
+          printf '%s\n' "$rebind_output"
+
+          if [[ "$rebind_rc" != 0 ]]; then
+            after_reg_sha="$(sha256sum "$reg" | awk '{print $1}')"
+            [[ "$after_reg_sha" == "$before_reg_sha" ]] || {
+              echo 'PLAYER_STATE_RETRY_REGISTRATION_CHANGED_ON_FAILED_REBIND=true' >&2
+              exit 70
+            }
+            error_code="$(printf '%s\n' "$rebind_output" | sed -n 's/^TRACK_A_CANONICAL_TRANSITION_ERROR=//p' | tail -n1)"
+            [[ -n "$error_code" ]]
+            echo "PLAYER_STATE_RETRY_REBIND=BLOCKED:$error_code"
+            echo 'PLAYER_STATE_RETRY_GATE_B=NOT_REACHED'
+            echo 'PLAYER_STATE_RETRY_SEMANTIC_PRECONDITIONS=NOT_REACHED'
+            echo 'PLAYER_STATE_RETRY_READY=false'
+            echo 'PLAYER_STATE_RETRY_COMMIT=false'
+            echo 'PLAYER_STATE_RETRY_POSSIBLY_DISPATCHED=false'
+            echo 'PLAYER_STATE_RETRY_PHYSICAL_ACTION_COUNT=0'
+            bash "$lease" release --task-id "$task" --session-id "$session" --token-file "$token"
+            released=1
+            rm -f "$token"
+            python3 - "$state/lease.json" "$reg" "$before_reg_sha" <<'PY'
+          import hashlib,json,pathlib,sys
+          lease=json.loads(pathlib.Path(sys.argv[1]).read_text())
+          reg_path=pathlib.Path(sys.argv[2]); before=sys.argv[3]
+          assert lease.get('status') == 'released'
+          assert lease.get('controller_task') is None
+          assert lease.get('controller_session') is None
+          assert hashlib.sha256(reg_path.read_bytes()).hexdigest() == before
+          print('PLAYER_STATE_RETRY_RELEASE=PASS')
+          print('PLAYER_STATE_RETRY_FAILED_REBIND_REGISTRATION_UNCHANGED=true')
+          PY
+            exit 0
+          fi
+
+          echo 'PLAYER_STATE_RETRY_REBIND=PASS'
+          python3 "$transition" gate-b \
+            --task-id "$task" \
+            --session-id "$session" \
+            --token-file "$token" \
+            --probe "$probe"
+          echo 'PLAYER_STATE_RETRY_GATE_B=PASS'
+          echo 'PLAYER_STATE_RETRY_NEXT=SEMANTIC_BASELINE_REQUIRED'
+          bash "$lease" release --task-id "$task" --session-id "$session" --token-file "$token"
+          released=1
+          rm -f "$token"
+          echo 'PLAYER_STATE_RETRY_RELEASE=PASS'

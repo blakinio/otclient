@@ -210,6 +210,70 @@ class Tests(unittest.TestCase):
         finally:
             Manager.generation = 1
 
+    def test_rebind_refreshes_fail_closed_adoption_evidence_for_same_identity(self):
+        old = self.adoption_manifest()
+        old.update({
+            'schema_version': 1,
+            'runtime_id': self.m.RID,
+            'registration_generation': 4,
+            'lease_generation': 1,
+            'registered_at': 1,
+            'source_task': 'old',
+            'source_run': 'old',
+        })
+        self.write(old)
+        fresh = dict(self.adoption_manifest(), state_evidence='NO_STRUCTURAL_BRIDGE')
+        Manager.generation = 2
+        try:
+            with mock.patch.object(
+                    self.m, '_probe', side_effect=[dict(fresh), dict(fresh), dict(fresh)]), \
+                    mock.patch.object(self.m, '_lease', return_value=2):
+                self.m._rebind(
+                    self.args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 2
+                )
+            data = self.m._read()
+            self.assertEqual(data['registration_generation'], 5)
+            self.assertEqual(data['lease_generation'], 2)
+            self.assertEqual(data['state'], 'UNKNOWN')
+            self.assertEqual(data['state_evidence'], 'NO_STRUCTURAL_BRIDGE')
+            self.assertEqual(
+                self.m._stable_adoption_identity(data),
+                self.m._stable_adoption_identity(old),
+            )
+        finally:
+            Manager.generation = 1
+
+    def test_rebind_fail_closed_evidence_refresh_rejects_stable_identity_drift(self):
+        old = self.adoption_manifest()
+        old.update({
+            'schema_version': 1,
+            'runtime_id': self.m.RID,
+            'registration_generation': 4,
+            'lease_generation': 1,
+            'registered_at': 1,
+            'source_task': 'old',
+            'source_run': 'old',
+        })
+        self.write(old)
+        changed = dict(
+            self.adoption_manifest(),
+            state_evidence='NO_STRUCTURAL_BRIDGE',
+            candidate_fingerprint='d' * 64,
+        )
+        Manager.generation = 2
+        try:
+            with mock.patch.object(self.m, '_probe', return_value=changed), \
+                    mock.patch.object(self.m, '_lease', return_value=2):
+                with self.assertRaisesRegex(
+                    self.m.E, 'registered_identity_candidate_fingerprint_mismatch'
+                ):
+                    self.m._rebind(
+                        self.args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 2
+                    )
+            self.assertEqual(self.m._read(), old)
+        finally:
+            Manager.generation = 1
+
     def test_sanitized_environment_removes_credentials_capabilities_and_test_switch(self):
         with mock.patch.dict(os.environ, {
             'TIBIA_TEST_EMAIL': 'mail',

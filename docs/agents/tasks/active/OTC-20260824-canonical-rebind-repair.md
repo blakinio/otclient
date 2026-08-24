@@ -31,6 +31,8 @@ owned_paths:
   - .github/scripts/tibia-official-client-re-canonical-live-transition.py
   - .github/scripts/test_tibia_official_client_re_canonical_live_transition.py
   - docs/agents/tasks/active/OTC-20260824-canonical-rebind-repair.md
+  - docs/agents/CHANGELOG.md
+  - docs/agents/MODULE_CATALOG.md
   - docs/agents/tasks/archive/OTC-20260824-canonical-rebind-repair.md
 modules_touched:
   - canonical-live-transition
@@ -61,7 +63,7 @@ RUNTIME_ACCESS: none
 PERSISTENT_SESSION_ROLE: none
 PHYSICAL_E2E_REQUIRED: false
 invocation_started_at: 2026-08-24T19:32:00+02:00
-last_progress_at: 2026-08-24T19:51:06+02:00
+last_progress_at: 2026-08-24T19:59:49+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: draft
 terminal_ci_wait_started_at: null
@@ -76,8 +78,14 @@ acceptance:
   - stable adoption identity drift remains rejected before commit
   - the committed registration carries the fresh fail-closed state_evidence and ordinary Gate B remains strict
   - deterministic tests, independent audit, exact-head required CI, merge and terminal closeout complete without runtime/gameplay/client input
+pr: 689
+tdd_red: registered_identity_state_evidence_mismatch
+focused_transition_tests: 30_OF_30_PASS
+focused_py_compile: PASS
+focused_track_a_governance: PASS
+focused_git_diff_check: PASS
 current_blocker: NONE
-next_action: add a failing regression test for the exact evidence-only rebind transition, prove RED, then implement the smallest fail-closed repair
+next_action: commit the green implementation, run a fresh independent exact-diff audit, then freeze the final head for GitHub-hosted required CI
 ---
 
 # Canonical adoption rebind repair

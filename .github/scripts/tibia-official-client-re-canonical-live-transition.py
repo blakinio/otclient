@@ -427,6 +427,22 @@ def _match(manifest: dict[str, Any], registration: dict[str, Any]) -> None:
         if identity[key] != registration.get(key):
             raise E(f'registered_identity_{key}_mismatch')
 
+def _match_rebind_probe(manifest: dict[str, Any], registration: dict[str, Any]) -> None:
+    evidence_refresh = bool(
+        _is_adoption_manifest(manifest)
+        and registration.get('proof_kind') == ADOPTION_PROOF_KIND
+        and registration.get('state') == 'UNKNOWN'
+        and manifest.get('state') == 'UNKNOWN'
+        and registration.get('state_evidence') == 'BRIDGE_3_OF_3_SEMANTICS_UNPROVEN'
+        and manifest.get('state_evidence') == 'NO_STRUCTURAL_BRIDGE'
+    )
+    if not evidence_refresh:
+        _match(manifest, registration)
+        return
+    normalized = dict(manifest)
+    normalized['state_evidence'] = registration['state_evidence']
+    _match(normalized, registration)
+
 def _env() -> dict[str, str]:
     env = dict(os.environ)
     for key in list(env):
@@ -527,7 +543,10 @@ def _probe_reg(
     try:
         manifest = _probe(args.probe, path)
         if _is_adoption_manifest(manifest):
-            _match(manifest, registration)
+            if old:
+                _match_rebind_probe(manifest, registration)
+            else:
+                _match(manifest, registration)
         else:
             _assert_group_tracked(manifest)
             _match(manifest, registration)
@@ -829,6 +848,8 @@ def _rebind(
     )
     for key in ('display', 'window_identity', 'remote_view_endpoint', 'remote_view_mapping', 'state'):
         new[key] = manifest[key]
+    if _is_adoption_manifest(manifest):
+        new['state_evidence'] = manifest['state_evidence']
     staged = _stage(new)
     committed = False
     try:

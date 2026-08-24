@@ -32,7 +32,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
-      - name: Falsify canonical authority, rebind, identity and bootstrap invariants
+      - name: Falsify canonical authority, rebind, recovery, identity and bootstrap invariants
         shell: bash
         run: |
           python3 - <<'PY'
@@ -48,6 +48,8 @@ jobs:
                   'tibia_research_tracks_policy_version: 6',
                   'final PR #321 cancellation-safe semantics',
                   'Registration generation rebind — fail closed before Gate B',
+                  'Canonical stale-registration recovery — exact singleton replacement without client mutation',
+                  'ordinary rebind is the wrong transition',
                   'Ad-hoc manual editing of `runtime-registration.json` is never a substitute.',
                   'Initial creation/bootstrap — separate fail-closed transition',
                   'display_98_current_canonical_status: UNKNOWN',
@@ -60,7 +62,9 @@ jobs:
                   'PR #321 is the final cancellation-safe implementation',
                   'Registration-generation rebind — fail closed before Gate B equality',
                   'the only registration defect being repaired by this transition is the older lease generation',
-                  'This ADR defines the required transition but does **not** implement it.',
+                  'The reviewed canonical transition controller implements this unchanged-identity rebind path.',
+                  'Canonical stale-registration recovery — replace only a fully proven stale adoption identity',
+                  'A registration whose PID/start identity no longer matches the current runtime is **not rebindable**.',
                   'Gate B — authoritative current-runtime registration and fresh preflight',
                   'Initial creation/bootstrap is a separate transition',
                   'display_98_current_canonical_status: UNKNOWN',
@@ -71,7 +75,8 @@ jobs:
                   'fresh final manager closeout/archive: PR #322',
                   'Post-bootstrap controller-generation rebind',
                   'It cannot create a missing registration',
-                  'This contract defines the required boundary only. It does **not** implement or authorize generation rebinding.',
+                  'The reviewed canonical transition controller implements this unchanged-identity generation-rebind path.',
+                  'route only to that recovery lifecycle',
                   'foreground process-group cancellation with a signal-ignoring descendant cannot release the canonical flock early',
               ]),
               'changelog': (changelog, [

@@ -274,6 +274,103 @@ class Tests(unittest.TestCase):
         finally:
             Manager.generation = 1
 
+    def test_stale_registration_recovery_replaces_only_fully_proven_stale_adoption_identity(self):
+        old, fresh = self.recovery_pair()
+        self.write(old)
+        Manager.generation = 2
+        try:
+            with mock.patch.object(self.m, '_probe', side_effect=[dict(fresh), dict(fresh), dict(fresh)]), \
+                    mock.patch.object(self.m, '_lease', return_value=2), \
+                    mock.patch.object(self.m, '_kill') as killed:
+                self.m._stale_registration_recovery(
+                    self.args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 2
+                )
+            data = self.m._read()
+            self.assertEqual(data['registration_generation'], 5)
+            self.assertEqual(data['lease_generation'], 2)
+            self.assertEqual(data['pid'], fresh['pid'])
+            self.assertEqual(data['process_start_ticks'], fresh['process_start_ticks'])
+            self.assertEqual(data['candidate_fingerprint'], fresh['candidate_fingerprint'])
+            self.assertEqual(data['state'], 'UNKNOWN')
+            self.assertEqual(data['state_evidence'], 'NO_STRUCTURAL_BRIDGE')
+            killed.assert_not_called()
+        finally:
+            Manager.generation = 1
+
+    def test_stale_registration_recovery_rejects_partial_pid_start_replacement(self):
+        old, fresh = self.recovery_pair()
+        fresh['pid'] = old['pid']
+        fresh['window_identity'] = old['window_identity']
+        self.write(old)
+        with mock.patch.object(self.m, '_probe', return_value=fresh), mock.patch.object(self.m, '_lease', return_value=2):
+            with self.assertRaisesRegex(self.m.E, 'recovery_pid_start_pair_not_replaced'):
+                self.m._stale_registration_recovery(self.args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 2)
+        self.assertEqual(self.m._read(), old)
+
+    def test_stale_registration_recovery_rejects_boot_or_namespace_continuity_drift(self):
+        for label, mutate, code in (
+            ('boot', lambda d: d.__setitem__('boot_id_sha256', 'e' * 64), 'recovery_boot_identity_changed'),
+            ('container', lambda d: d.__setitem__('runtime_locator', 'docker:other-container:newid'), 'recovery_runtime_namespace_changed'),
+            ('display', lambda d: d.__setitem__('display', ':2'), 'recovery_display_changed'),
+            ('endpoint', lambda d: d.__setitem__('remote_view_endpoint', 'https://other:6902/'), 'recovery_remote_view_endpoint_changed'),
+        ):
+            with self.subTest(label=label):
+                old, fresh = self.recovery_pair(); mutate(fresh); self.write(old)
+                with mock.patch.object(self.m, '_probe', return_value=fresh), mock.patch.object(self.m, '_lease', return_value=2):
+                    with self.assertRaisesRegex(self.m.E, code):
+                        self.m._stale_registration_recovery(self.args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 2)
+                self.assertEqual(self.m._read(), old)
+
+    def test_stale_registration_recovery_rejects_non_fail_closed_or_non_adoption_registration(self):
+        old, fresh = self.recovery_pair()
+        for label, mutate, code in (
+            ('state', lambda d: d.update(state='IN_GAME', state_evidence='BRIDGE_3_OF_3'), 'recovery_registration_state_not_fail_closed'),
+            ('proof', lambda d: d.pop('proof_kind'), 'recovery_adoption_registration_required'),
+        ):
+            with self.subTest(label=label):
+                candidate = dict(old); mutate(candidate); self.write(candidate)
+                with mock.patch.object(self.m, '_probe') as probe:
+                    with self.assertRaisesRegex(self.m.E, code):
+                        self.m._stale_registration_recovery(self.args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 2)
+                probe.assert_not_called()
+
+    def test_stale_registration_recovery_requires_newer_generation_and_valid_fingerprint(self):
+        old, fresh = self.recovery_pair()
+        self.write(old)
+        with mock.patch.object(self.m, '_probe') as probe:
+            with self.assertRaisesRegex(self.m.E, 'recovery_generation_not_newer'):
+                self.m._stale_registration_recovery(self.args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 1)
+        probe.assert_not_called()
+
+        self.write(old)
+        bad = dict(fresh, candidate_fingerprint='e' * 64)
+        with mock.patch.object(self.m, '_probe', return_value=bad), mock.patch.object(self.m, '_lease', return_value=2):
+            with self.assertRaisesRegex(self.m.E, 'recovery_candidate_fingerprint_invalid'):
+                self.m._stale_registration_recovery(self.args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 2)
+        self.assertEqual(self.m._read(), old)
+
+    def test_stale_registration_recovery_rejects_probe_drift_and_rolls_back_after_commit(self):
+        old, fresh = self.recovery_pair()
+        changed = dict(fresh, window_identity='x11:0x17:pid:646:class:client/Tibia:title_sha256:' + 'e' * 64)
+        self.write(old)
+        with mock.patch.object(self.m, '_probe', side_effect=[dict(fresh), changed]), mock.patch.object(self.m, '_lease', return_value=2):
+            with self.assertRaisesRegex(self.m.E, 'recovery_identity_changed_before_commit'):
+                self.m._stale_registration_recovery(self.args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 2)
+        self.assertEqual(self.m._read(), old)
+
+        self.write(old)
+        with mock.patch.object(self.m, '_probe', side_effect=[dict(fresh), dict(fresh), changed]), mock.patch.object(self.m, '_lease', return_value=2):
+            with self.assertRaisesRegex(self.m.E, 'recovery_identity_changed_after_commit'):
+                self.m._stale_registration_recovery(self.args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 2)
+        self.assertEqual(self.m._read(), old)
+
+    def test_parser_accepts_stale_registration_recovery_probe_shape(self):
+        parsed = self.m.parser().parse_args([
+            'stale-registration-recovery', '--task-id', 'OTC-TEST', '--session-id', 's',
+            '--token-file', str(Path(self.temp.name) / 'tok'), '--probe', str(WORKER),
+        ])
+        self.assertEqual(parsed.operation, 'stale-registration-recovery')
+
     def test_sanitized_environment_removes_credentials_capabilities_and_test_switch(self):
         with mock.patch.dict(os.environ, {
             'TIBIA_TEST_EMAIL': 'mail',
@@ -347,6 +444,33 @@ class Tests(unittest.TestCase):
             'candidate_count': 1,
             'candidate_fingerprint': 'c' * 64,
         }
+
+    def recovery_pair(self):
+        old = self.adoption_manifest()
+        old.update({
+            'schema_version': 1,
+            'runtime_id': self.m.RID,
+            'registration_generation': 4,
+            'lease_generation': 1,
+            'registered_at': 1,
+            'pid': 19590,
+            'process_start_ticks': 76611792,
+            'window_identity': 'x11:0x9:pid:19590:class:client/Tibia:title_sha256:' + 'a' * 64,
+            'runtime_locator': 'docker:otclient-track-a-kasmvnc:oldid',
+            'candidate_fingerprint': 'c' * 64,
+            'source_task': 'old',
+            'source_run': 'old',
+        })
+        fresh = self.adoption_manifest()
+        fresh.update({
+            'pid': 646,
+            'process_start_ticks': 1394843,
+            'window_identity': 'x11:0x17:pid:646:class:client/Tibia:title_sha256:' + 'b' * 64,
+            'runtime_locator': 'docker:otclient-track-a-kasmvnc:newid',
+            'state_evidence': 'NO_STRUCTURAL_BRIDGE',
+        })
+        fresh['candidate_fingerprint'] = self.m._recovery_candidate_fingerprint(fresh)
+        return old, fresh
 
     def test_adopt_existing_commits_without_process_mutation(self):
         manifest = self.adoption_manifest()

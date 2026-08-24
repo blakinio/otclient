@@ -93,7 +93,7 @@ Historical evidence establishes that a persistent X11 display `:98` existed and 
 
 If the authoritative registration is absent, ordinary runtime reuse MUST NOT launch a replacement client. The worker must classify the runtime request under `TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md`; initial creation belongs only to `canonical_bootstrap`. If the reviewed bootstrap implementation is unavailable or the required live authorization/gates are not proven, mutation remains refused and the lane continues unrelated safe work or returns the exact blocker.
 
-If an existing registration is bound to an older lease generation, use the reviewed `canonical_rebind` path; never edit registration metadata manually.
+If an existing registration is bound to an older lease generation and fresh proof shows the same unchanged runtime identity, use reviewed `canonical_rebind`. If both registered PID/start are stale while the reviewed probe proves exactly one current same-fence canonical target with the required continuity anchors, route only to reviewed `canonical_recovery`; never use rebind to bless identity drift and never edit registration metadata manually.
 
 ## Parallel-lane routing
 
@@ -140,7 +140,7 @@ Before dispatching or refreshing any Track A researcher, the coordinator must ad
 ```yaml
 ROUTING_CONTRACT: docs/agents/programs/OTCLIENT_TIBIA_RE_HYBRID_EXECUTION_ROUTING.md
 EXECUTION_CLASS: github_hosted | synology_physical_runtime
-RUNTIME_ACCESS: none | read_only | ephemeral_isolated | canonical_reuse_or_mutation | canonical_bootstrap | canonical_rebind
+RUNTIME_ACCESS: none | read_only | ephemeral_isolated | canonical_reuse_or_mutation | canonical_bootstrap | canonical_rebind | canonical_recovery
 PERSISTENT_SESSION_ROLE: none | consumer_of_runtime_evidence | canonical_runtime_owner
 PHYSICAL_E2E_REQUIRED: true | false
 ```

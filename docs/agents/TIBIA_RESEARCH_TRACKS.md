@@ -70,9 +70,9 @@ A unique X11 `DISPLAY` isolates a virtual X server, windows, focus, screenshots,
 
 By default there is at most **one canonical persistent official-client Tibia Global runtime/session** for Track A at a time. It is a programme resource that may be reused sequentially; mutation control remains exclusive.
 
-### Five distinct transitions
+### Six distinct transitions
 
-Do not collapse controller authority, registration-generation recovery, existing-runtime identity and first creation.
+Do not collapse controller authority, existing-runtime adoption, registration-generation rebind, stale-registration recovery, exact-runtime Gate B and first creation.
 
 #### Gate A — authoritative lease and final cancellation-safe whole-lifetime supervisor
 
@@ -142,11 +142,19 @@ Under the same continuously held flock, the rebind writes a mode-restricted cand
 
 Rebind is not client mutation and must not launch, log in, stop, signal, attach to or inject into the client. It cannot create a missing registration, bless a new/reused PID, accept a changed fence, repair contradictory display/window/state evidence or reconcile an ambiguous second official client. Any such condition fails closed into explicit recovery/bootstrap as applicable. Ad-hoc manual editing of `runtime-registration.json` is never a substitute.
 
-The policy defines this transition but does not implement it. Until a reviewed implementation exists, a generation mismatch keeps ordinary canonical mutation disabled.
+The reviewed canonical transition controller implements this unchanged-identity rebind path. A generation mismatch still keeps ordinary canonical mutation disabled until that reviewed rebind succeeds.
+
+#### Canonical stale-registration recovery — exact singleton replacement without client mutation
+
+When an authoritative adoption registration exists but its registered PID **and** process-start ticks no longer identify the current singleton exact client, ordinary rebind is the wrong transition: rebind must preserve runtime identity. The only reviewed reconciliation path is `canonical_recovery` / `stale-registration-recovery`.
+
+Recovery runs under current Gate A and the same canonical coordination flock, reads/writes only the authoritative `runtime-registration.json`, and requires the reviewed adoption probe to prove a complete all-running-Docker inventory with exactly one current target on the accepted exact fence. It additionally requires continuity of host boot identity, canonical container name, display, remote-view endpoint/mapping, a fresh window proof bound to the fresh PID, and a recomputed changed candidate fingerprint. Both PID and start ticks must be replaced together. Any fence, boot, namespace, display, endpoint, mapping, uniqueness, state, fingerprint, lease or proof drift fails closed.
+
+The proof is repeated before and after atomic commit. Success increments `registration_generation`, binds the record to the current lease generation and persists only the freshly proven adoption identity while keeping state fail-closed `UNKNOWN`. Post-commit failure rolls back the exact transaction-owned record only. Recovery never launches, logs in, restarts, signals, attaches to, injects into or sends input to the client, and never grants gameplay or mutation authority. A later consumer must re-admit and pass Gate B separately.
 
 #### Gate B — authoritative exact-runtime registration and fresh preflight
 
-A current lease proves who may control; it does not prove what live process is canonical. After any required generation rebind, ordinary reuse/mutation requires the one authoritative current registration:
+A current lease proves who may control; it does not prove what live process is canonical. After any required generation rebind or canonical recovery, ordinary reuse/mutation requires the one authoritative current registration:
 
 ```text
 /home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime/runtime-registration.json
@@ -361,10 +369,10 @@ Track B / otclient-global-login:
   owned implementation: tools/tibia-global-login-lab/** and .github/workflows/tibia-global-login-lab.yml
 ```
 
-Revalidate exact live PR/task state on every continuation, but preserve the repository boundary, Linux-only rule, Track A Gate A/rebind/Gate B/bootstrap separation and Track B isolation unless the owner explicitly changes them.
+Revalidate exact live PR/task state on every continuation, but preserve the repository boundary, Linux-only rule, Track A Gate A/rebind/recovery/Gate B/bootstrap separation and Track B isolation unless the owner explicitly changes them.
 
 ## 2026-08-19 current-client fence provenance boundary
 
 The current public native-Linux package is fenced by size `52109920` and SHA-256 `ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8`; `15.32` is an embedded version-family token, not a claim of a more specific suffix. The superseded `15.32.df7b29 / 51965216 / e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe` binary remains admissible only as explicitly historical build-fenced evidence. Historical addresses, offsets, QMeta/vptr assumptions, serializers, helper binaries and runtime-bridge profiles are **not** promoted to the current binary by this identity update.
 
-This fence change grants no login, credential, GUI input, gameplay, process-control, transaction or mutation authority. All ordinary ownership/admission/lease/Gate A/rebind/Gate B/bootstrap requirements remain unchanged.
+This fence change grants no login, credential, GUI input, gameplay, process-control, transaction or mutation authority. All ordinary ownership/admission/lease/Gate A/rebind/recovery/Gate B/bootstrap requirements remain unchanged.

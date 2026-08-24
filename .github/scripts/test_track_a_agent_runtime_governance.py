@@ -14,6 +14,7 @@ CANONICAL_RUNTIME_ACCESS = {
     "canonical_reuse_or_mutation",
     "canonical_bootstrap",
     "canonical_rebind",
+    "canonical_recovery",
 }
 
 ADMISSION_FIELDS = (
@@ -303,6 +304,31 @@ def validate_track_a_task(path: Path) -> bool:
         if lease_generation == registration_generation:
             fail_task(path, "canonical_rebind requires a real older registration generation mismatch")
 
+    elif runtime_access == "canonical_recovery":
+        if mutation != "false":
+            fail_task(path, "canonical recovery is metadata reconciliation, not client mutation authority")
+        if values["canonical_registration"] != "PRESENT":
+            fail_task(path, "canonical recovery requires an existing authoritative registration")
+        if values["generation_rebind"] != "NOT_APPLICABLE":
+            fail_task(path, "canonical recovery must not masquerade as generation rebind")
+        if values["gate_b"] != "NOT_APPLICABLE":
+            fail_task(path, "canonical recovery is not Gate B")
+        if values["bootstrap"] != "NOT_APPLICABLE":
+            fail_task(path, "canonical recovery cannot use bootstrap")
+        if values["gate_a"] not in {"REQUIRED_NOT_PROVEN", "PASS"}:
+            fail_task(path, "canonical recovery requires current Gate A to be pending or PASS")
+        if values["target_uniqueness"] not in {"UNKNOWN", "PROVEN"}:
+            fail_task(path, "canonical recovery target uniqueness must remain fail-closed")
+        registration_generation = positive_generation(path, values, "registration_lease_generation")
+        if values["gate_a"] == "PASS":
+            lease_generation = positive_generation(path, values, "canonical_lease_generation")
+            if lease_generation <= registration_generation:
+                fail_task(path, "canonical recovery requires a newer current controller generation")
+        elif values["canonical_lease_generation"] != "UNKNOWN":
+            lease_generation = positive_generation(path, values, "canonical_lease_generation")
+            if lease_generation <= registration_generation:
+                fail_task(path, "known recovery controller generation must be newer than registration")
+
     return True
 
 
@@ -388,8 +414,9 @@ def static_policy_audit() -> None:
             "contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md",
             "classify `runtime_access`",
             "missing registration means bootstrap",
-            "generation mismatch means reviewed rebind",
-            "Gate A + any required rebind + Gate B",
+            "generation mismatch with unchanged runtime identity means reviewed rebind",
+            "stale registered PID/start identity requires reviewed canonical recovery rather than rebind",
+            "Gate A + any required rebind/recovery + Gate B",
             "Historical `:98`, `6082`, PID/session evidence is never current authority",
             "Stale task/PR wording cannot relax this admission gate",
         ),
@@ -416,7 +443,7 @@ def static_policy_audit() -> None:
         (
             "track_a_runtime_agent_admission_version: 1",
             "At Track A task claim/resume/checkpoint",
-            "runtime_access: none | read_only | ephemeral_isolated | canonical_reuse_or_mutation | canonical_bootstrap | canonical_rebind",
+            "runtime_access: none | read_only | ephemeral_isolated | canonical_reuse_or_mutation | canonical_bootstrap | canonical_rebind | canonical_recovery",
             "target_uniqueness: PROVEN",
             "mutation_authorized: true | false",
             "An `UNKNOWN`, `REQUIRED_NOT_PROVEN`, `REQUIRED_UNAVAILABLE`, or `REQUIRED_UNIMPLEMENTED` value on a required gate means **REFUSE the mutation**.",
@@ -426,6 +453,8 @@ def static_policy_audit() -> None:
             "### 4. `canonical_reuse_or_mutation`",
             "### 5. `canonical_bootstrap`",
             "### 6. `canonical_rebind`",
+            "### 7. `canonical_recovery`",
+            "stale registered PID shortcut",
             "bootstrap: REQUIRED_UNIMPLEMENTED",
             "generation_rebind: REQUIRED_UNAVAILABLE",
             "Manual edits to `runtime-registration.json` are forbidden as a rebind substitute.",
@@ -453,12 +482,14 @@ def static_policy_audit() -> None:
             "prompt_contract_version: 1.2.0",
             "track_a_runtime_agent_admission_version: 1",
             "docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md",
-            "none\nread_only\nephemeral_isolated\ncanonical_reuse_or_mutation\ncanonical_bootstrap\ncanonical_rebind",
+            "none\nread_only\nephemeral_isolated\ncanonical_reuse_or_mutation\ncanonical_bootstrap\ncanonical_rebind\ncanonical_recovery",
             "At task claim/resume/checkpoint",
             "target_uniqueness: PROVEN",
             "Gate A passes, any required generation rebind passes, Gate B passes",
             "Missing registration does not fall through to reuse",
-            "Registration/lease-generation mismatch does not fall through to reuse",
+            "Registration/lease-generation mismatch with unchanged runtime identity does not fall through to reuse",
+            "stale registered PID/start pair",
+            "canonical_recovery",
             "Manual editing of `runtime-registration.json` is never a substitute.",
             "display_98_current_canonical_status: UNKNOWN",
             "rfb_6082_current_backend_mapping: UNKNOWN",

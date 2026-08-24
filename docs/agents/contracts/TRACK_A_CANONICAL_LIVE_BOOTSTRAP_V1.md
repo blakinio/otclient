@@ -349,7 +349,7 @@ A reviewed generation-rebind primitive MUST run under the current Gate A authori
 
 The rebind transition MUST NOT launch, log in, stop, signal, attach to, inject into or otherwise mutate the client. It cannot create a missing registration, bless a different/reused PID, change the exact client fence, choose a replacement display/window identity, or resolve ambiguous second-client state. Such cases require explicit recovery or bootstrap as applicable and remain fail-closed.
 
-This contract defines the required boundary only. It does **not** implement or authorize generation rebinding. Until a reviewed implementation is promoted, a generation mismatch disables ordinary mutation.
+The reviewed canonical transition controller implements this unchanged-identity generation-rebind path. This bootstrap contract does not itself authorize a live rebind execution; a generation mismatch still disables ordinary mutation until the reviewed rebind succeeds under fresh current authority.
 
 ## Post-bootstrap reuse
 
@@ -358,8 +358,8 @@ Ordinary later mutation/reuse requires:
 1. acquire or renew the current authoritative lease;
 2. enter the final cancellation-safe reviewed supervisor critical section, acquire the canonical coordination flock and validate the lease under that flock;
 3. load `/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime/runtime-registration.json` only;
-4. if its lease generation differs from the current validated generation, complete the dedicated fail-closed rebind under the same authority boundary; if rebind is unavailable or fails, stop;
-5. after any required rebind, freshly revalidate boot/PID/start/exact fence/display/window and required mutation-relevant state, require registration `lease_generation` to equal the current validated generation, and fail closed if any competing or unverifiable official-client candidate/session is present;
+4. if its lease generation differs from the current validated generation, use the dedicated fail-closed rebind only when fresh proof shows the same unchanged runtime identity; if a fail-closed `existing_runtime_adoption_v1` registration instead has a stale PID/start pair and satisfies the separately reviewed `canonical_recovery` contract, route only to that recovery lifecycle; otherwise stop;
+5. after any required rebind or recovery, freshly revalidate boot/PID/start/exact fence/display/window and required mutation-relevant state, require registration `lease_generation` to equal the current validated generation, and fail closed if any competing or unverifiable official-client candidate/session is present;
 6. perform mutation through the final reviewed supervisor for the complete mutation/process-tree lifetime;
 7. update/invalidate the authoritative registration if process or identity-bearing state changes materially;
 8. release the coordination flock only when no guarded mutation descendants remain.

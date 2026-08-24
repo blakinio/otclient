@@ -1,4 +1,4 @@
-# ADR-0001: Track A canonical live runtime with authority, identity, rebind and bootstrap gates
+# ADR-0001: Track A canonical live runtime with authority, identity, rebind, recovery and bootstrap gates
 
 - Status: accepted
 - Date: 2026-08-16
@@ -12,13 +12,14 @@ Track A researches the official native Linux Tibia client on `synology-otclient-
 
 The target operating model is one reusable persistent live official-client runtime for sequential Track A work, plus task-isolated ephemeral sandboxes for experiments that do not require that runtime. Static reverse engineering, protocol reconstruction and repository work remain parallel.
 
-Five trust transitions must remain separate:
+Six trust transitions must remain separate:
 
 1. **Who may mutate?** A current authoritative controller lease is required.
 2. **How may one already-running exact runtime become registered when registration is absent?** A dedicated fail-closed metadata-only adoption transition is required.
-3. **How may an already registered runtime cross into a newer controller lease generation?** A dedicated fail-closed registration rebind is required when generations differ.
-4. **Which existing runtime may be reused/mutated?** A current exact-runtime registration and fresh preflight are required after any required rebind.
-5. **How may the first runtime be created when registration is absent and no client exists?** Initial creation is a separate fail-closed bootstrap transaction.
+3. **How may an already registered unchanged runtime cross into a newer controller lease generation?** A dedicated fail-closed registration rebind is required when generations differ.
+4. **How may a stale adoption registration be reconciled when both registered PID and start identity are gone but exactly one current exact same-fence target is freshly proven?** A distinct fail-closed canonical recovery transition is required.
+5. **Which existing runtime may be reused/mutated?** A current exact-runtime registration and fresh Gate B preflight are required after any required rebind/recovery.
+6. **How may the first runtime be created when registration is absent and no client exists?** Initial creation is a separate fail-closed bootstrap transaction.
 
 The final authority implementation is the manager/supervisor stack promoted through PRs #312, #313, #317, #316 and cancellation hardening PR #321, with fresh final closeout in PR #322. The initial-creation contract is `docs/agents/contracts/TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md`, originally promoted by PR #318 and archived by #320, then reconciled by this governance PR to the final cancellation-safe manager and the generation-rebind boundary.
 
@@ -89,11 +90,23 @@ A valid rebind MUST:
 
 A rebind MUST NOT launch, log in, stop, signal, attach to, inject into, replace or otherwise mutate the client. It MUST NOT fabricate a missing registration, bless a new PID, accept a different build, choose a new display merely to make evidence match, or reconcile an ambiguous second client. Those conditions fail closed into explicit recovery or the separately reviewed bootstrap path as applicable.
 
-This ADR defines the required transition but does **not** implement it. Until a reviewed implementation exists, a lease-generation mismatch keeps ordinary canonical mutation disabled.
+The reviewed canonical transition controller implements this unchanged-identity rebind path. A lease-generation mismatch keeps ordinary canonical mutation disabled until rebind succeeds.
 
-### 5. Gate B — authoritative current-runtime registration and fresh preflight
+### 5. Canonical stale-registration recovery — replace only a fully proven stale adoption identity
 
-A current lease does not prove what process is being targeted. After any required generation rebind, ordinary reuse/mutation requires the one authoritative registration record:
+A registration whose PID/start identity no longer matches the current runtime is **not rebindable**. Rebind proves unchanged identity; it must never bless runtime-instance replacement. For the narrow case established by terminal PR #692, Track A uses a distinct `canonical_recovery` admission class and `stale-registration-recovery` transition.
+
+A valid recovery MUST keep the existing canonical lease/capability, state root, `coordination.lock` and authoritative registration path. Under current Gate A and the continuously held flock it must require an existing fail-closed `existing_runtime_adoption_v1` registration, a newer controller generation, and a complete fresh adoption probe proving exactly one current exact target across all running Docker containers. The exact client version/size/SHA must remain unchanged.
+
+Recovery additionally requires continuity of boot identity, canonical Docker container name, display and remote-view endpoint/mapping; both PID and process-start ticks must change; the current X11 window proof must bind the fresh PID; and the fresh candidate fingerprint must recompute from the fresh locator/PID/start/fence and differ from the old fingerprint. The complete fresh proof is repeated before commit and after commit.
+
+Success atomically increments `registration_generation`, binds `lease_generation` to the current controller, and replaces the stale adoption runtime-instance fields with the freshly proven values while keeping `state: UNKNOWN`. If post-commit validation fails, rollback may restore the old record only when the current record is still exactly the transaction's own committed record. Any concurrent change fails closed.
+
+Recovery MUST NOT create a second authority namespace or registration, launch/login/restart/stop/signal/attach/inject the client, access credentials, or send gameplay/UI input. It grants no mutation authority and is not Gate B. A later trusted-main invocation must re-admit and independently pass Gate B before reuse or mutation.
+
+### 6. Gate B — authoritative current-runtime registration and fresh preflight
+
+A current lease does not prove what process is being targeted. After any required generation rebind or canonical recovery, ordinary reuse/mutation requires the one authoritative registration record:
 
 ```text
 /home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime/runtime-registration.json
@@ -127,7 +140,7 @@ Gate B is fail-closed if the registration is absent, stale, contradictory, malfo
 
 After stale lease takeover or any ordinary new controller generation, prior registration is evidence to be freshly falsified, not self-authenticating current authority. If all exact-runtime facts remain unchanged, the dedicated rebind transition may bind that verified registration to the current lease generation; otherwise mutation stays disabled.
 
-### 6. Initial creation/bootstrap is a separate transition
+### 7. Initial creation/bootstrap is a separate transition
 
 Gate B governs reuse of an already registered runtime. Generation rebind governs an already registered exact runtime crossing into a newer controller lease generation. Neither may be weakened or repurposed to solve initial creation.
 
@@ -143,9 +156,9 @@ Ordinary `guard-run` is deliberately insufficient for successful bootstrap becau
 
 Bootstrap commits the first registration bound to its creation lease generation. After safe detach and later acquisition of a newer controller lease, the runtime remains unusable for ordinary mutation until the dedicated generation-rebind transition has freshly proven the unchanged exact runtime and rebound the registration to the new current generation.
 
-This ADR does not implement bootstrap or rebind and does not authorize a live client launch/login.
+This ADR does not itself authorize any live bootstrap, rebind or recovery execution and does not authorize a live client launch/login.
 
-### 6. Exact client fence and current non-claims
+### 8. Exact client fence and current non-claims
 
 The accepted Track A official-client fence is exactly:
 
@@ -165,15 +178,15 @@ current_exact_client_pid: NOT_REGISTERED
 current_exact_client_session: NOT_REGISTERED
 ```
 
-Historical observations may guide discovery but cannot satisfy Gate B, rebind or bootstrap absence/identity checks.
+Historical observations may guide discovery but cannot satisfy Gate B, rebind, recovery or bootstrap absence/identity checks.
 
-### 7. Ephemeral isolated runtimes
+### 9. Ephemeral isolated runtimes
 
 A Track A task may create a task-owned ephemeral native-Linux runtime for startup, loader, rendering, GUI, recovery-harness or instrumentation-harness experiments when its task separately authorizes that work.
 
 Ephemeral runtimes require task-unique state/display/ports/process markers, are not the canonical registered live runtime, and may be cleaned up only by their owner. A different `DISPLAY` is a different GUI namespace, not separate Global authority. World login is not implied.
 
-### 8. Parallel research and Track B isolation
+### 10. Parallel research and Track B isolation
 
 Static reverse engineering, binary analysis, protocol reconstruction, artifact/replay analysis, evidence normalization, tooling and documentation may proceed concurrently when they do not require canonical live mutation.
 
@@ -196,7 +209,7 @@ Track B never shares Track A's canonical live runtime, authority namespace, regi
 | Rewrite `lease_generation` without exact-runtime proof under lock | Rejected: could bless stale/reused PID or wrong client |
 | Treat exact-fence absence before locking as bootstrap authority | Rejected: stale preflight can race another bootstrap |
 | Merge bootstrap into ordinary Gate B reuse/rebind | Rejected: initial creation has no pre-existing registration and needs a different supervised commit/detach transaction |
-| Gate A + fail-closed rebind + Gate B for reuse, separate bootstrap for creation | Accepted |
+| Gate A + fail-closed rebind/recovery + Gate B for reuse, separate bootstrap for creation | Accepted |
 
 ## Consequences
 
@@ -219,4 +232,4 @@ Track B never shares Track A's canonical live runtime, authority namespace, regi
 
 The current public native-Linux package is fenced by size `52109920` and SHA-256 `ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8`; `15.32` is an embedded version-family token, not a claim of a more specific suffix. The superseded `15.32.df7b29 / 51965216 / e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe` binary remains admissible only as explicitly historical build-fenced evidence. Historical addresses, offsets, QMeta/vptr assumptions, serializers, helper binaries and runtime-bridge profiles are **not** promoted to the current binary by this identity update.
 
-This fence change grants no login, credential, GUI input, gameplay, process-control, transaction or mutation authority. All ordinary ownership/admission/lease/Gate A/rebind/Gate B/bootstrap requirements remain unchanged.
+This fence change grants no login, credential, GUI input, gameplay, process-control, transaction or mutation authority. All ordinary ownership/admission/lease/Gate A/rebind/recovery/Gate B/bootstrap requirements remain unchanged.

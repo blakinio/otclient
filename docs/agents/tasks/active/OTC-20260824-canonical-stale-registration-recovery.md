@@ -1,7 +1,7 @@
 ---
 task_id: OTC-20260824-canonical-stale-registration-recovery
-status: implementing
-phase: implement
+status: validating
+phase: validate
 agent: ChatGPT
 session_id: chatgpt-canonical-stale-registration-recovery-20260824
 session_role: implementer
@@ -79,7 +79,7 @@ RUNTIME_ACCESS: none
 PERSISTENT_SESSION_ROLE: none
 PHYSICAL_E2E_REQUIRED: false
 invocation_started_at: 2026-08-24T22:57:00+02:00
-last_progress_at: 2026-08-24T23:34:00+02:00
+last_progress_at: 2026-08-24T23:47:05+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: draft
 terminal_ci_wait_started_at: null
@@ -114,10 +114,17 @@ tdd_green_run: 32779607465
 tdd_green_job: 97598518953
 tdd_green_result: PASS_37_TRANSITION_PLUS_PASS_10_KASM_PROBE
 focused_governance_tests: PASS_LOCAL_STATIC_POLICY
-independent_audit: PENDING
-required_ci: PENDING
+independent_audit: PASS
+independent_audit_run: 32781319462
+independent_audit_job: 97603796485
+independent_audit_head: 5f4f20c63efb001a1567e73625a0cc56638eedf4
+independent_audit_transition_tests: PASS_37
+independent_audit_kasm_probe_tests: PASS_10
+independent_audit_track_a_governance: PASS
+independent_audit_material_findings_open: 0
+required_ci: PENDING_FINAL_HEAD
 current_blocker: NONE
-next_action: publish synchronized recovery governance/validator docs, then run fresh independent audit and exact-head CI
+next_action: remove the one-shot independent-audit workflow, then verify exact-final-head Track A governance and required CI before readiness/merge
 ---
 
 # Canonical stale-registration recovery
@@ -125,3 +132,5 @@ next_action: publish synchronized recovery governance/validator docs, then run f
 This repository-only task introduces a separately named, fail-closed metadata recovery lifecycle for the exact terminal condition proven by PR #692. It does not execute the lifecycle against the live client and cannot use its own unmerged governance edits as runtime authority.
 
 The lifecycle remains inside the existing canonical state root, coordination flock, lease capability and authoritative `runtime-registration.json`. It may replace stale adoption runtime identity only after complete singleton exact-target proof and narrow continuity checks; all client/gameplay/login/process mutation remains forbidden.
+
+A fresh independent GitHub-hosted audit on exact head `5f4f20c63efb001a1567e73625a0cc56638eedf4` passed as run `32781319462`, job `97603796485`. It reran 37 transition tests and 10 Kasm-probe tests, reran Track A governance, checked the recovery AST for three repeated proof calls plus atomic commit/rollback, rejected client-process/input/login/credential paths, and confirmed that recovery creates no alternate canonical state or registration namespace. The one-shot audit workflow is removed before the final exact-head CI generation.

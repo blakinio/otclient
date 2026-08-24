@@ -7,12 +7,12 @@ project_lane: otclient
 lane: P0-STATE
 track_id: official-client-re
 task_kind: runtime_semantic_validation
-phase: controller_admission
+phase: generation_rebind
 branch: runtime/OTC-20260824-player-state-semantic-promotion-e2e
 base_branch: main
 base_main: 5d02cf9885ffb00b8a786ba02568cec1919f9cd6
 risk: high
-updated: 2026-08-24T15:22:00+02:00
+updated: 2026-08-24T15:36:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260824-player-state-semantic-promotion-e2e.md
   - docs/agents/tasks/archive/OTC-20260824-player-state-semantic-promotion-e2e.md
@@ -52,9 +52,10 @@ runtime_access: canonical_reuse_or_mutation
 runtime_owner_task: OTC-20260824-player-state-semantic-promotion-e2e
 runtime_namespace: track-a-canonical-live
 canonical_registration: PRESENT
-canonical_lease_generation: 19
+canonical_lease_status: active
+canonical_lease_generation: 22
 registration_lease_generation: 19
-gate_a: REQUIRED_NOT_PROVEN
+gate_a: PASS
 generation_rebind: REQUIRED_NOT_PROVEN
 gate_b: REQUIRED_NOT_PROVEN
 bootstrap: NOT_APPLICABLE
@@ -88,31 +89,28 @@ This authorizes exactly one controlled one-tile movement for this semantic causa
 
 ## Fresh controller-plane checkpoint
 
-After this task record existed, controller-plane-only discovery found:
+The first persisted discovery, before any live-client observation by this task, found a released generation-19 lease and a generation-19 exact-build registration. Two temporary workflow-triggered controller generations later returned to `released`; they are not accepted as this task's admission evidence because this task requires a durable persist barrier after acquisition and before rebind.
+
+A new direct controller-plane acquisition using the reviewed repository lease implementation then produced:
 
 ```yaml
-lease_status: released
-lease_generation: 19
-lease_controller: none
+lease_status: active
+lease_generation: 22
+lease_owner_matches_task: true
 canonical_registration: PRESENT
 registration_lease_generation: 19
-registration_generation: 2
-candidate_count: 1
-inventory_complete: true
-client_version: "15.32"
-client_size: 52109920
-client_sha256: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
-registration_state: UNKNOWN
-registration_proof_kind: existing_runtime_adoption_v1
+gate_a: PASS
+generation_rebind_required: true
+physical_action_count: 0
 ```
 
-No token value, credential, PID, XID, display/window identifier or Official Tibia process memory was read for this controller-plane checkpoint. Acquiring this task's lease will advance the controller generation, so the registration must be re-evaluated and rebound through the reviewed transition before Gate B if the generations then differ.
+Generation 22 is the authoritative admission generation for the next step. The raw capability token remains mode-0600 in the task-local state path and was neither printed nor read by the agent. No credential, PID, XID, display/window identifier, Official Tibia process memory or gameplay input was observed in this generation before this persist barrier.
 
 ## Required before live mutation
 
 1. current Gate A PASS under the authoritative lease and canonical supervisor;
 2. authoritative registration PRESENT and exact current client fence PASS;
-3. reviewed generation rebind if current registration/controller generations differ;
+3. reviewed generation rebind because generation 19 registration is older than generation 22 lease;
 4. current Gate B PASS including boot/PID/start/exact-SHA/display/window/target uniqueness;
 5. canonical `input.lock` held continuously through final validation, the single movement, and immediate reconciliation;
 6. a read-only `player_state_typed_reader` sample immediately before movement with a unique object, mirrored position consistency, plausible XYZ and exact-process fence;
@@ -155,4 +153,4 @@ If causal proof fails or cannot legally run, keep `semantic_promotion_allowed: f
 
 ## Next action
 
-Run the task-owned admission workflow on `synology-otclient-01`: acquire this task's fresh lease, perform the reviewed generation rebind if required, then Gate B and a read-only player-state availability check. Do not dispatch movement in this admission generation.
+With generation 22 now durably persisted, execute only the reviewed generation rebind against the current Kasm exact-client probe. If and only if rebind passes, persist the new registration generation before running Gate B. No movement is permitted in either step.

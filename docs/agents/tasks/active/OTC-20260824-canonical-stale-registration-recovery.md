@@ -79,7 +79,7 @@ RUNTIME_ACCESS: none
 PERSISTENT_SESSION_ROLE: none
 PHYSICAL_E2E_REQUIRED: false
 invocation_started_at: 2026-08-24T22:57:00+02:00
-last_progress_at: 2026-08-24T22:57:00+02:00
+last_progress_at: 2026-08-24T23:34:00+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: draft
 terminal_ci_wait_started_at: null
@@ -107,12 +107,17 @@ tdd_red_head: 80125b53be5a3fce4b0664bd7e990bfdbe45f7c3
 tdd_red_run: 32778517429
 tdd_red_job: 97595046076
 tdd_red_result: 36 tests executed; existing cases PASS; 10 expected recovery errors from missing parser operation/function
-focused_transition_tests: PENDING
-focused_governance_tests: PENDING
+focused_transition_tests: PASS_37
+focused_kasm_probe_tests: PASS_10
+tdd_green_head: 0517840f4dccce0f940f2f93943101ae78d4ee6d
+tdd_green_run: 32779607465
+tdd_green_job: 97598518953
+tdd_green_result: PASS_37_TRANSITION_PLUS_PASS_10_KASM_PROBE
+focused_governance_tests: PASS_LOCAL_STATIC_POLICY
 independent_audit: PENDING
 required_ci: PENDING
 current_blocker: NONE
-next_action: implement the smallest stale-registration-recovery transition that makes the Linux RED cases pass without weakening rebind or Gate B
+next_action: publish synchronized recovery governance/validator docs, then run fresh independent audit and exact-head CI
 ---
 
 # Canonical stale-registration recovery

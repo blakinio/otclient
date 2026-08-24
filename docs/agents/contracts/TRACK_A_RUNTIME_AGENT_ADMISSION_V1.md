@@ -34,7 +34,7 @@ At Track A task claim/resume/checkpoint, before substantial work in that worker 
 
 ```yaml
 track_id: official-client-re
-runtime_access: none | read_only | ephemeral_isolated | canonical_reuse_or_mutation | canonical_bootstrap | canonical_rebind
+runtime_access: none | read_only | ephemeral_isolated | canonical_reuse_or_mutation | canonical_bootstrap | canonical_rebind | canonical_recovery
 runtime_owner_task: <task id or NOT_APPLICABLE>
 runtime_namespace: <task-owned namespace, canonical namespace, or NOT_APPLICABLE>
 canonical_registration: ABSENT | PRESENT | UNKNOWN | NOT_APPLICABLE
@@ -166,6 +166,26 @@ mutation_authorized: false
 
 Manual edits to `runtime-registration.json` are forbidden as a rebind substitute.
 
+### 7. `canonical_recovery`
+
+Use only when the authoritative registration exists but no longer identifies the current runtime instance: the registered PID **and** process-start ticks are stale, while a fresh reviewed adoption probe proves exactly one current exact-fenced target. Recovery is a distinct metadata reconciliation transaction. It is not generation rebind, bootstrap, adoption, Gate B, or client mutation.
+
+Recovery MUST run under current Gate A plus the continuously held canonical `coordination.lock` and MUST reuse the one authoritative registration path. It may replace runtime-instance identity only when all of the following are freshly true:
+
+- the old registration is `existing_runtime_adoption_v1`, remains `state: UNKNOWN`, and carries only fail-closed adoption state evidence;
+- the current controller generation is newer than the registration lease generation;
+- the reviewed adoption probe proves complete inventory across all running Docker containers, exactly one exact target, the accepted client version/size/SHA fence, and a self-consistent candidate fingerprint;
+- both fresh PID and fresh process-start ticks differ from the registered pair;
+- boot identity, canonical Docker container **name** (container instance ID may change), display, remote-view endpoint and remote-view mapping remain continuous;
+- the fresh X11 window proof binds the fresh PID;
+- the full fresh adoption proof is identical before commit and after commit.
+
+Under the same authority boundary, recovery atomically increments `registration_generation`, binds `lease_generation` to the current controller and replaces only the stale runtime-instance/adoption proof fields with the freshly proven values. The recovered state remains `UNKNOWN`; recovery MUST NOT promote `IN_GAME`. A post-commit failure rolls back only when the committed record is still exactly the transaction's own record, otherwise it fails closed without overwriting concurrent state.
+
+Recovery MUST NOT launch, login, stop, signal, attach to, inject into, restart, move, click, type into or otherwise mutate the client. It creates no new state root, registration path, lock, lease, token or authority system. `mutation_authorized` remains `false` for the recovery transaction. Any later reuse or mutation requires a fresh invocation from trusted `main`, current Gate A, any then-required authority transition, and Gate B PASS.
+
+The reviewed implementation is the `stale-registration-recovery` operation in `.github/scripts/tibia-official-client-re-canonical-live-transition.py`. An unmerged task cannot use its own implementation or governance edits as runtime authority.
+
 ## Canonical current-state non-claims
 
 Historical observations are discovery input only. Until fresh authoritative evidence proves otherwise, every worker must preserve:
@@ -191,7 +211,7 @@ Therefore:
 Track A workers MUST preserve current task ownership before any live operation.
 
 - PR #303 and any replacement runtime-research task own only the runtime surfaces explicitly declared in their current task records. Other workers may consume durable evidence but MUST NOT stop, signal, attach to, reconfigure, clean, or reuse those owned surfaces.
-- Track B never shares Track A's canonical lease, registration, coordination lock, bootstrap/rebind transition, process/session, display ownership, or mutable state.
+- Track B never shares Track A's canonical lease, registration, coordination lock, bootstrap/rebind/recovery transitions, process/session, display ownership, or mutable state.
 - Broad `pkill`, Docker cleanup, display cleanup, state deletion, or any target selection that can affect an unproven owner is forbidden.
 
 If ownership or target uniqueness is ambiguous, use non-destructive repository/artifact discovery or stop that live observation/action.
@@ -260,6 +280,10 @@ A worker sees no authoritative `runtime-registration.json` and tries ordinary `g
 
 A worker sees the exact old runtime but registration `lease_generation` differs, then manually edits JSON or proceeds with Gate B. Refuse; the dedicated rebind must exist and pass first.
 
+### REFUSE — stale registered PID shortcut
+
+A worker sees one current exact client whose PID/start pair differs from the authoritative adoption registration and tries ordinary rebind, Gate B, or a manual JSON rewrite. Refuse. Use `canonical_recovery` only after current Gate A and the full reviewed singleton exact-target proof; otherwise leave the stale registration unchanged.
+
 ### REFUSE — ambiguous read-only target
 
 A worker cannot prove target uniqueness/ownership or the observed namespace, but tries to proceed because it intends no mutation. Refuse; use `none` for static evidence or obtain a proven non-conflicting live target first.
@@ -272,4 +296,4 @@ When a required gate or target proof is unavailable/unproven, preserve the evide
 
 The current public native-Linux package is fenced by size `52109920` and SHA-256 `ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8`; `15.32` is an embedded version-family token, not a claim of a more specific suffix. The superseded `15.32.df7b29 / 51965216 / e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe` binary remains admissible only as explicitly historical build-fenced evidence. Historical addresses, offsets, QMeta/vptr assumptions, serializers, helper binaries and runtime-bridge profiles are **not** promoted to the current binary by this identity update.
 
-This fence change grants no login, credential, GUI input, gameplay, process-control, transaction or mutation authority. All ordinary ownership/admission/lease/Gate A/rebind/Gate B/bootstrap requirements remain unchanged.
+This fence change grants no login, credential, GUI input, gameplay, process-control, transaction or mutation authority. All ordinary ownership/admission/lease/Gate A/rebind/recovery/Gate B/bootstrap requirements remain unchanged.

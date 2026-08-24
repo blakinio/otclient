@@ -45,13 +45,14 @@ ephemeral_isolated
 canonical_reuse_or_mutation
 canonical_bootstrap
 canonical_rebind
+canonical_recovery
 ```
 
 At task claim/resume/checkpoint, persist the complete admission record required by that contract; static/no-runtime work records `runtime_access: none`. Re-evaluate and re-persist admission before the first runtime-related operation and after any material authority/identity change.
 
 `read_only` live observation additionally requires a freshly proven non-conflicting target/namespace/ownership boundary and `target_uniqueness: PROVEN`; otherwise refuse live observation and continue only `none` static/artifact work.
 
-For ordinary canonical reuse/mutation, `mutation_authorized: true` is legal only after current Gate A passes, any required generation rebind passes, Gate B passes on the one authoritative registration, and the mutation remains inside the final PR #321 cancellation-safe whole-lifetime supervisor. Missing registration does not fall through to reuse and requires the separate bootstrap transition. Registration/lease-generation mismatch does not fall through to reuse and requires the dedicated reviewed rebind transition. Manual editing of `runtime-registration.json` is never a substitute.
+For ordinary canonical reuse/mutation, `mutation_authorized: true` is legal only after current Gate A passes, any required generation rebind passes, Gate B passes on the one authoritative registration, and the mutation remains inside the final PR #321 cancellation-safe whole-lifetime supervisor. Missing registration does not fall through to reuse and requires the separate bootstrap transition. Registration/lease-generation mismatch with unchanged runtime identity does not fall through to reuse and requires the dedicated reviewed rebind transition. A stale registered PID/start pair with one fully proven current same-fence singleton target routes only to reviewed `canonical_recovery`, never rebind. Manual editing of `runtime-registration.json` is never a substitute.
 
 Until direct current evidence proves otherwise, preserve exactly:
 

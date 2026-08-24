@@ -33,7 +33,9 @@ owned_paths:
   - .github/scripts/tibia-official-client-re-canonical-live-transition.py
   - .github/scripts/test_tibia_official_client_re_canonical_live_transition.py
   - .github/scripts/test_track_a_agent_runtime_governance.py
+  - .github/workflows/track-a-canonical-live-governance.yml
   - docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
+  - docs/agents/contracts/TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md
   - docs/agents/TIBIA_RESEARCH_TRACKS.md
   - docs/agents/decisions/ADR-0001-track-a-canonical-live-runtime.md
   - docs/agents/programs/OTCLIENT_TIBIA_RE_HYBRID_EXECUTION_ROUTING.md
@@ -86,7 +88,7 @@ terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 0
+repair_cycles_for_current_gate: 1
 context_reconstruction_attempts: 0
 stall_warnings: 0
 acceptance:
@@ -122,9 +124,13 @@ independent_audit_transition_tests: PASS_37
 independent_audit_kasm_probe_tests: PASS_10
 independent_audit_track_a_governance: PASS
 independent_audit_material_findings_open: 0
+canonical_governance_failure_run: 32781411647
+canonical_governance_failure_job: 97604081165
+canonical_governance_failure: STALE_AUDIT_EXPECTED_REBIND_NOT_IMPLEMENTED_PROSE
+canonical_governance_repair: update audit/bootstrap contract to already-promoted unchanged-identity rebind plus distinct recovery semantics
 required_ci: PENDING_FINAL_HEAD
 current_blocker: NONE
-next_action: remove the one-shot independent-audit workflow, then verify exact-final-head Track A governance and required CI before readiness/merge
+next_action: validate the narrow stale canonical-governance audit repair, then require exact-final-head Track A governance and CI PASS before readiness/merge
 ---
 
 # Canonical stale-registration recovery

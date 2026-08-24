@@ -1,12 +1,12 @@
 ---
 task_id: OTC-20260824-canonical-rebind-repair
-status: implementing
+status: validating
 agent: ChatGPT
 project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: implementation
-phase: implement
+phase: validate
 policy_version: 2
 branch: fix/OTC-20260824-canonical-rebind-repair
 base_branch: main
@@ -63,7 +63,7 @@ RUNTIME_ACCESS: none
 PERSISTENT_SESSION_ROLE: none
 PHYSICAL_E2E_REQUIRED: false
 invocation_started_at: 2026-08-24T19:32:00+02:00
-last_progress_at: 2026-08-24T19:59:49+02:00
+last_progress_at: 2026-08-24T20:02:38+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: draft
 terminal_ci_wait_started_at: null
@@ -85,7 +85,8 @@ focused_py_compile: PASS
 focused_track_a_governance: PASS
 focused_git_diff_check: PASS
 current_blocker: NONE
-next_action: commit the green implementation, run a fresh independent exact-diff audit, then freeze the final head for GitHub-hosted required CI
+implementation_head: 6976799c239d091ffc8370c7a785220848eb222d
+next_action: run the fresh GitHub-hosted independent audit and exact-head required CI; if all pass with zero material review findings, mark PR #689 ready and squash-merge
 ---
 
 # Canonical adoption rebind repair

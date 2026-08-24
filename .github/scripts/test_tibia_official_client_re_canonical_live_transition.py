@@ -334,9 +334,24 @@ class Tests(unittest.TestCase):
                         self.m._stale_registration_recovery(self.args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 2)
                 probe.assert_not_called()
 
+    def test_stale_registration_recovery_requires_newer_generation_and_valid_fingerprint(self):
+        old, fresh = self.recovery_pair()
+        self.write(old)
+        with mock.patch.object(self.m, '_probe') as probe:
+            with self.assertRaisesRegex(self.m.E, 'recovery_generation_not_newer'):
+                self.m._stale_registration_recovery(self.args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 1)
+        probe.assert_not_called()
+
+        self.write(old)
+        bad = dict(fresh, candidate_fingerprint='e' * 64)
+        with mock.patch.object(self.m, '_probe', return_value=bad), mock.patch.object(self.m, '_lease', return_value=2):
+            with self.assertRaisesRegex(self.m.E, 'recovery_candidate_fingerprint_invalid'):
+                self.m._stale_registration_recovery(self.args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 2)
+        self.assertEqual(self.m._read(), old)
+
     def test_stale_registration_recovery_rejects_probe_drift_and_rolls_back_after_commit(self):
         old, fresh = self.recovery_pair()
-        changed = dict(fresh, candidate_fingerprint='e' * 64)
+        changed = dict(fresh, window_identity='x11:0x17:pid:646:class:client/Tibia:title_sha256:' + 'e' * 64)
         self.write(old)
         with mock.patch.object(self.m, '_probe', side_effect=[dict(fresh), changed]), mock.patch.object(self.m, '_lease', return_value=2):
             with self.assertRaisesRegex(self.m.E, 'recovery_identity_changed_before_commit'):
@@ -452,9 +467,9 @@ class Tests(unittest.TestCase):
             'process_start_ticks': 1394843,
             'window_identity': 'x11:0x17:pid:646:class:client/Tibia:title_sha256:' + 'b' * 64,
             'runtime_locator': 'docker:otclient-track-a-kasmvnc:newid',
-            'candidate_fingerprint': 'd' * 64,
             'state_evidence': 'NO_STRUCTURAL_BRIDGE',
         })
+        fresh['candidate_fingerprint'] = self.m._recovery_candidate_fingerprint(fresh)
         return old, fresh
 
     def test_adopt_existing_commits_without_process_mutation(self):

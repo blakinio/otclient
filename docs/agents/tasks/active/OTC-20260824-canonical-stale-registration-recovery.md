@@ -102,13 +102,17 @@ acceptance:
   - Track A governance, independent audit, exact-head required CI, merge and terminal closeout complete with runtime_access:none
 source_terminal_pr: 692
 source_terminal_main: 6f8efdaa0b9c9fb7bbaa5c36605a23e21155883f
-tdd_red: PENDING
+tdd_red: PASS_EXPECTED_FAILURE_MISSING_RECOVERY_OPERATION
+tdd_red_head: 80125b53be5a3fce4b0664bd7e990bfdbe45f7c3
+tdd_red_run: 32778517429
+tdd_red_job: 97595046076
+tdd_red_result: 36 tests executed; existing cases PASS; 10 expected recovery errors from missing parser operation/function
 focused_transition_tests: PENDING
 focused_governance_tests: PENDING
 independent_audit: PENDING
 required_ci: PENDING
 current_blocker: NONE
-next_action: add failing transition and admission-governance tests before any production implementation
+next_action: implement the smallest stale-registration-recovery transition that makes the Linux RED cases pass without weakening rebind or Gate B
 ---
 
 # Canonical stale-registration recovery

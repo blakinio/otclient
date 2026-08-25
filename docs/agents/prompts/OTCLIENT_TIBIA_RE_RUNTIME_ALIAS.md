@@ -47,6 +47,7 @@ canonical_reuse_or_mutation
 canonical_bootstrap
 canonical_rebind
 canonical_recovery
+canonical_boot_epoch_recovery
 ```
 
 For physical canonical work, do not proceed until the current class's authority/identity gates pass. Historical runtime facts never substitute for current admission.
@@ -81,7 +82,7 @@ If the client is disconnected or at login/character-select while the persistent 
 
 If the authoritative registration is absent, ordinary reuse must refuse launch. Initial creation belongs only to `canonical_bootstrap` and only when a reviewed current implementation plus separate live authorization/gates allow it. Never create a second logged-in Global session as a shortcut.
 
-If registration exists and only the lease generation is older while runtime identity is unchanged, use reviewed `canonical_rebind`. If the authoritative adoption PID/start identity is stale but one current exact same-fence target is fully proven, use only reviewed `canonical_recovery`; never use rebind for identity replacement and never manually edit `runtime-registration.json`.
+If registration exists and only the lease generation is older while runtime identity is unchanged, use reviewed `canonical_rebind`. If the authoritative adoption PID/start identity is stale on the same boot but one current exact same-fence target is fully proven, use only reviewed `canonical_recovery`. If the registration is from a prior boot and repeated fresh singleton proof establishes a different current boot epoch, use only reviewed `canonical_boot_epoch_recovery`; never use rebind for identity replacement and never manually edit `runtime-registration.json`.
 
 ## Stable owner VNC visibility
 

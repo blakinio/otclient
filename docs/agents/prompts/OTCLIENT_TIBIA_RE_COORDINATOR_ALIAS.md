@@ -97,7 +97,7 @@ current_exact_client_session: NOT_REGISTERED
 
 Never hard-code `:98`, `6082`, PID or session as canonical merely because they worked historically. VNC reachability/visibility is not mutation authority.
 
-If registration is absent, route creation only to `canonical_bootstrap`; if only registration lease generation is stale and identity is unchanged, route to reviewed `canonical_rebind`; if registered PID/start identity is stale but a full reviewed probe proves exactly one current same-fence target, route only to reviewed `canonical_recovery`. Never authorize a second logged-in Track A session merely to unblock a lane.
+If registration is absent, route creation only to `canonical_bootstrap`; if only registration lease generation is stale and identity is unchanged, route to reviewed `canonical_rebind`; if registered PID/start identity is stale on the same boot but a full reviewed probe proves exactly one current same-fence target, route only to reviewed `canonical_recovery`; if the authoritative registration is prior-boot and repeated fresh singleton proof establishes a different boot epoch, route only to reviewed `canonical_boot_epoch_recovery`. Never authorize a second logged-in Track A session merely to unblock a lane.
 
 ## Safety
 

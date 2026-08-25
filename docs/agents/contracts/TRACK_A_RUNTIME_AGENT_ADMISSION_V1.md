@@ -34,7 +34,7 @@ At Track A task claim/resume/checkpoint, before substantial work in that worker 
 
 ```yaml
 track_id: official-client-re
-runtime_access: none | read_only | ephemeral_isolated | canonical_reuse_or_mutation | canonical_bootstrap | canonical_rebind | canonical_recovery
+runtime_access: none | read_only | ephemeral_isolated | canonical_reuse_or_mutation | canonical_bootstrap | canonical_rebind | canonical_recovery | canonical_boot_epoch_recovery
 runtime_owner_task: <task id or NOT_APPLICABLE>
 runtime_namespace: <task-owned namespace, canonical namespace, or NOT_APPLICABLE>
 canonical_registration: ABSENT | PRESENT | UNKNOWN | NOT_APPLICABLE
@@ -185,6 +185,22 @@ Under the same authority boundary, recovery atomically increments `registration_
 Recovery MUST NOT launch, login, stop, signal, attach to, inject into, restart, move, click, type into or otherwise mutate the client. It creates no new state root, registration path, lock, lease, token or authority system. `mutation_authorized` remains `false` for the recovery transaction. Any later reuse or mutation requires a fresh invocation from trusted `main`, current Gate A, any then-required authority transition, and Gate B PASS.
 
 The reviewed implementation is the `stale-registration-recovery` operation in `.github/scripts/tibia-official-client-re-canonical-live-transition.py`. An unmerged task cannot use its own implementation or governance edits as runtime authority.
+
+### 8. `canonical_boot_epoch_recovery`
+
+Use only for a prior-boot registration: the authoritative `existing_runtime_adoption_v1` registration remains exact-fenced and fail-closed, but a repeated fresh adoption probe proves that the one current target belongs to a different boot identity. This is a separate canonical registration lifecycle, not `canonical_recovery`, rebind, bootstrap or Gate B.
+
+Replacement is legal only when all of these are freshly true:
+
+- the old registration is authoritative, `state: UNKNOWN`, carries only fail-closed adoption evidence and is bound to an older controller generation;
+- the fresh probe covers all running Docker containers, proves exactly one accepted exact-client target and emits a self-consistent candidate fingerprint;
+- the fresh `boot_id_sha256` differs from the registered boot identity. That discontinuity is the proof that the registered process instance cannot still exist in the current kernel boot epoch; numeric PID reuse is therefore permitted and never treated as continuity;
+- canonical Docker container name, display, remote-view endpoint and mapping remain unambiguous and continuous, while the fresh X11 proof binds exactly one Tibia window to the freshly observed PID/process-start identity;
+- current Gate A and the canonical `coordination.lock` remain valid, and the full fresh adoption signature repeats unchanged before commit and after commit.
+
+Under that authority boundary the transition atomically increments `registration_generation`, binds `lease_generation` to the current controller and replaces the prior-boot runtime identity with only the freshly proven current values. State remains `UNKNOWN`. Post-commit failure rolls back only if the registration is still exactly this transaction's committed record; concurrent state is never overwritten.
+
+The reviewed implementation is the `boot-epoch-registration-recovery` operation in `.github/scripts/tibia-official-client-re-canonical-live-transition.py`. It performs no login, credential access, relog, restart, character selection, gameplay, input, movement, semantic promotion, signal, attach, injection or other client mutation. An unmerged task cannot use its own implementation or governance edits as runtime authority.
 
 ## Canonical current-state non-claims
 

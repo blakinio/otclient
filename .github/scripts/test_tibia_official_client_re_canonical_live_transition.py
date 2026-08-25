@@ -364,6 +364,102 @@ class Tests(unittest.TestCase):
                 self.m._stale_registration_recovery(self.args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 2)
         self.assertEqual(self.m._read(), old)
 
+    def test_boot_epoch_recovery_accepts_reused_pid_after_new_boot(self):
+        old, fresh = self.recovery_pair()
+        fresh['boot_id_sha256'] = 'e' * 64
+        fresh['pid'] = old['pid']
+        fresh['window_identity'] = (
+            f"x11:0x17:pid:{fresh['pid']}:class:client/Tibia:title_sha256:" + 'b' * 64
+        )
+        fresh['candidate_fingerprint'] = self.m._recovery_candidate_fingerprint(fresh)
+        self.write(old)
+        Manager.generation = 2
+        try:
+            with mock.patch.object(self.m, '_probe', side_effect=[dict(fresh), dict(fresh), dict(fresh)]), mock.patch.object(self.m, '_lease', return_value=2):
+                self.m._boot_epoch_registration_recovery(
+                    self.args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 2
+                )
+            data = self.m._read()
+            self.assertEqual(data['boot_id_sha256'], fresh['boot_id_sha256'])
+            self.assertEqual(data['pid'], old['pid'])
+            self.assertEqual(data['process_start_ticks'], fresh['process_start_ticks'])
+        finally:
+            Manager.generation = 1
+    def test_boot_epoch_recovery_rejects_fail_closed_boundary_violations(self):
+        base_old, base_fresh = self.recovery_pair()
+        base_fresh['boot_id_sha256'] = 'e' * 64
+        base_fresh['candidate_fingerprint'] = self.m._recovery_candidate_fingerprint(base_fresh)
+        cases = (
+            ('same_boot', lambda o, f: f.__setitem__('boot_id_sha256', o['boot_id_sha256']), 'boot_epoch_not_changed'),
+            ('old_state', lambda o, f: o.update(state='IN_GAME', state_evidence='BRIDGE_3_OF_3'), 'boot_epoch_registration_state_not_fail_closed'),
+            ('fresh_state', lambda o, f: f.update(state='IN_GAME', state_evidence='BRIDGE_3_OF_3'), 'boot_epoch_fresh_state_not_fail_closed'),
+            ('namespace', lambda o, f: f.__setitem__('runtime_locator', 'docker:other-container:newid'), 'boot_epoch_runtime_namespace_changed'),
+            ('display', lambda o, f: f.__setitem__('display', ':2'), 'boot_epoch_display_changed'),
+            ('endpoint', lambda o, f: f.__setitem__('remote_view_endpoint', 'https://other:6902/'), 'boot_epoch_remote_view_endpoint_changed'),
+            ('mapping', lambda o, f: f.__setitem__('remote_view_mapping', 'PROVEN'), 'boot_epoch_remote_view_mapping_changed'),
+            ('fence', lambda o, f: f.__setitem__('client_sha256', 'f' * 64), 'boot_epoch_exact_client_fence_failed'),
+            ('inventory', lambda o, f: f.__setitem__('candidate_count', 2), 'boot_epoch_target_not_unique'),
+            ('window', lambda o, f: f.__setitem__('window_identity', 'x11:0x17:pid:999:class:client/Tibia:title_sha256:' + 'b' * 64), 'boot_epoch_window_identity_invalid'),
+            ('fingerprint', lambda o, f: f.__setitem__('candidate_fingerprint', 'f' * 64), 'boot_epoch_candidate_fingerprint_invalid'),
+        )
+        for label, mutate, code in cases:
+            with self.subTest(label=label):
+                old, fresh = dict(base_old), dict(base_fresh)
+                mutate(old, fresh)
+                self.write(old)
+                with mock.patch.object(self.m, '_probe', return_value=fresh), mock.patch.object(self.m, '_lease', return_value=2):
+                    with self.assertRaisesRegex(self.m.E, code):
+                        self.m._boot_epoch_registration_recovery(self.args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 2)
+        self.write(base_old)
+        with mock.patch.object(self.m, '_probe') as probe:
+            with self.assertRaisesRegex(self.m.E, 'boot_epoch_generation_not_newer'):
+                self.m._boot_epoch_registration_recovery(self.args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 1)
+        probe.assert_not_called()
+    def test_boot_epoch_recovery_rejects_probe_drift_and_registration_race(self):
+        old, fresh = self.recovery_pair(); fresh['boot_id_sha256'] = 'e' * 64
+        fresh['candidate_fingerprint'] = self.m._recovery_candidate_fingerprint(fresh)
+        changed = dict(fresh, window_identity='x11:0x18:pid:646:class:client/Tibia:title_sha256:' + 'f' * 64)
+        self.write(old)
+        with mock.patch.object(self.m, '_probe', side_effect=[dict(fresh), changed]), mock.patch.object(self.m, '_lease', return_value=2):
+            with self.assertRaisesRegex(self.m.E, 'boot_epoch_identity_changed_before_commit'):
+                self.m._boot_epoch_registration_recovery(self.args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 2)
+        self.assertEqual(self.m._read(), old)
+        self.write(old); other = dict(old, source_task='other'); calls = 0
+        def racing_probe(*_args):
+            nonlocal calls
+            calls += 1
+            if calls == 1: self.write(other)
+            return dict(fresh)
+        with mock.patch.object(self.m, '_probe', side_effect=racing_probe), mock.patch.object(self.m, '_lease', return_value=2):
+            with self.assertRaisesRegex(self.m.E, 'boot_epoch_registration_changed_before_commit'):
+                self.m._boot_epoch_registration_recovery(self.args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 2)
+        self.assertEqual(self.m._read(), other)
+
+    def test_boot_epoch_recovery_rolls_back_only_exact_own_commit(self):
+        old, fresh = self.recovery_pair(); fresh['boot_id_sha256'] = 'e' * 64
+        fresh['candidate_fingerprint'] = self.m._recovery_candidate_fingerprint(fresh)
+        changed = dict(fresh, window_identity='x11:0x18:pid:646:class:client/Tibia:title_sha256:' + 'f' * 64)
+        self.write(old)
+        with mock.patch.object(self.m, '_probe', side_effect=[dict(fresh), dict(fresh), changed]), mock.patch.object(self.m, '_lease', return_value=2):
+            with self.assertRaisesRegex(self.m.E, 'boot_epoch_identity_changed_after_commit'):
+                self.m._boot_epoch_registration_recovery(self.args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 2)
+        self.assertEqual(self.m._read(), old)
+        self.write(old); concurrent = dict(old, registration_generation=99, lease_generation=99, source_task='concurrent'); calls = 0
+        def conflicting_probe(*_args):
+            nonlocal calls
+            calls += 1
+            if calls == 3:
+                self.write(concurrent)
+                return dict(fresh, window_identity='x11:changed')
+            return dict(fresh)
+        with mock.patch.object(self.m, '_probe', side_effect=conflicting_probe), mock.patch.object(self.m, '_lease', return_value=2):
+            with self.assertRaisesRegex(self.m.E, 'boot_epoch_rollback_registration_conflict'):
+                self.m._boot_epoch_registration_recovery(self.args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 2)
+        self.assertEqual(self.m._read(), concurrent)
+
+    def test_parser_accepts_boot_epoch_registration_recovery_probe_shape(self):
+        parsed = self.m.parser().parse_args(['boot-epoch-registration-recovery', '--task-id', 'OTC-TEST', '--session-id', 's', '--token-file', str(Path(self.temp.name) / 'tok'), '--probe', str(WORKER)])
+        self.assertEqual(parsed.operation, 'boot-epoch-registration-recovery')
     def test_parser_accepts_stale_registration_recovery_probe_shape(self):
         parsed = self.m.parser().parse_args([
             'stale-registration-recovery', '--task-id', 'OTC-TEST', '--session-id', 's',

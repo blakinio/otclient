@@ -94,7 +94,7 @@ The reviewed canonical transition controller implements this unchanged-identity 
 
 ### 5. Canonical stale-registration recovery — replace only a fully proven stale adoption identity
 
-A registration whose PID/start identity no longer matches the current runtime is **not rebindable**. Rebind proves unchanged identity; it must never bless runtime-instance replacement. For the narrow case established by terminal PR #692, Track A uses a distinct `canonical_recovery` admission class and `stale-registration-recovery` transition.
+A registration whose PID/start identity no longer matches the current runtime is **not rebindable**. Rebind proves unchanged identity; it must never bless runtime-instance replacement. For the narrow same-boot case established by terminal PR #692, Track A uses a distinct `canonical_recovery` admission class and `stale-registration-recovery` transition. For the boot-identity discontinuity proven terminally by PR #694, a separate `canonical_boot_epoch_recovery` / `boot-epoch-registration-recovery` lifecycle may replace the prior-boot registration only after repeated current-boot singleton exact-target proof; it is not rebind and does not relax `canonical_recovery`.
 
 A valid recovery MUST keep the existing canonical lease/capability, state root, `coordination.lock` and authoritative registration path. Under current Gate A and the continuously held flock it must require an existing fail-closed `existing_runtime_adoption_v1` registration, a newer controller generation, and a complete fresh adoption probe proving exactly one current exact target across all running Docker containers. The exact client version/size/SHA must remain unchanged.
 

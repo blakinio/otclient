@@ -887,6 +887,125 @@ def _bootstrap(
             _remove(committed)
 
 
+
+def _validate_boot_epoch_recovery_candidate(old: dict[str, Any], fresh: dict[str, Any], generation: int) -> None:
+    if old.get('proof_kind') != ADOPTION_PROOF_KIND:
+        raise E('boot_epoch_adoption_registration_required')
+    if old.get('state') != 'UNKNOWN' or old.get('state_evidence') not in {
+        'BRIDGE_3_OF_3_SEMANTICS_UNPROVEN', 'NO_STRUCTURAL_BRIDGE'
+    }:
+        raise E('boot_epoch_registration_state_not_fail_closed')
+    if int(old['lease_generation']) >= generation:
+        raise E('boot_epoch_generation_not_newer')
+    if fresh.get('proof_kind') != ADOPTION_PROOF_KIND:
+        raise E('boot_epoch_fresh_adoption_proof_required')
+    if fresh.get('state') != 'UNKNOWN' or fresh.get('state_evidence') not in {
+        'BRIDGE_3_OF_3_SEMANTICS_UNPROVEN', 'NO_STRUCTURAL_BRIDGE'
+    }:
+        raise E('boot_epoch_fresh_state_not_fail_closed')
+    if fresh.get('boot_id_sha256') == old.get('boot_id_sha256'):
+        raise E('boot_epoch_not_changed')
+    if _runtime_locator_namespace(str(fresh.get('runtime_locator', ''))) != _runtime_locator_namespace(str(old.get('runtime_locator', ''))):
+        raise E('boot_epoch_runtime_namespace_changed')
+    if fresh.get('display') != old.get('display'):
+        raise E('boot_epoch_display_changed')
+    if fresh.get('remote_view_endpoint') != old.get('remote_view_endpoint'):
+        raise E('boot_epoch_remote_view_endpoint_changed')
+    if fresh.get('remote_view_mapping') != old.get('remote_view_mapping'):
+        raise E('boot_epoch_remote_view_mapping_changed')
+    if fresh.get('client_version') != VER or fresh.get('client_size') != SIZE or fresh.get('client_sha256') != SHA:
+        raise E('boot_epoch_exact_client_fence_failed')
+    if fresh.get('inventory_scope') != 'all_running_docker_containers' or fresh.get('inventory_complete') is not True or fresh.get('candidate_count') != 1:
+        raise E('boot_epoch_target_not_unique')
+    pid = fresh.get('pid')
+    if not isinstance(pid, int) or f':pid:{pid}:class:client/Tibia:' not in str(fresh.get('window_identity', '')):
+        raise E('boot_epoch_window_identity_invalid')
+    if fresh.get('candidate_fingerprint') != _recovery_candidate_fingerprint(fresh):
+        raise E('boot_epoch_candidate_fingerprint_invalid')
+
+
+def _boot_epoch_registration_recovery(
+    args: argparse.Namespace,
+    guard: Any,
+    lease: Any,
+    manager: Any,
+    identity: Any,
+    generation: int,
+) -> None:
+    old = _read()
+    if old is None:
+        raise E('registration_absent')
+    if old.get('proof_kind') != ADOPTION_PROOF_KIND:
+        raise E('boot_epoch_adoption_registration_required')
+    if old.get('state') != 'UNKNOWN' or old.get('state_evidence') not in {
+        'BRIDGE_3_OF_3_SEMANTICS_UNPROVEN', 'NO_STRUCTURAL_BRIDGE'
+    }:
+        raise E('boot_epoch_registration_state_not_fail_closed')
+    if int(old['lease_generation']) >= generation:
+        raise E('boot_epoch_generation_not_newer')
+
+    path = STATE / '.boot-epoch-registration-recovery-manifest.json'
+    staged: Path | None = None
+    committed: dict[str, Any] | None = None
+    try:
+        first = _probe(args.probe, path)
+        _validate_boot_epoch_recovery_candidate(old, first, generation)
+        signature = _adoption_signature(first)
+        _lease(manager, lease, identity, args.token_file, generation)
+        _cancel(guard)
+        if _read() != old:
+            raise E('boot_epoch_registration_changed_before_commit')
+
+        new = dict(old)
+        new.update(
+            registration_generation=int(old['registration_generation']) + 1,
+            lease_generation=generation,
+            registered_at=int(time.time()),
+            boot_id_sha256=first['boot_id_sha256'], pid=first['pid'],
+            process_start_ticks=first['process_start_ticks'],
+            client_version=first['client_version'], client_size=first['client_size'], client_sha256=first['client_sha256'],
+            display=first['display'], window_identity=first['window_identity'],
+            remote_view_endpoint=first['remote_view_endpoint'], remote_view_mapping=first['remote_view_mapping'],
+            state='UNKNOWN', proof_kind=first['proof_kind'], runtime_locator=first['runtime_locator'],
+            inventory_scope=first['inventory_scope'], inventory_complete=first['inventory_complete'],
+            candidate_count=first['candidate_count'], candidate_fingerprint=first['candidate_fingerprint'],
+            state_evidence=first['state_evidence'], source_task=args.task_id, source_run=_runid(),
+        )
+        staged = _stage(new)
+        second = _probe(args.probe, path)
+        _validate_boot_epoch_recovery_candidate(old, second, generation)
+        if _adoption_signature(second) != signature:
+            raise E('boot_epoch_identity_changed_before_commit')
+        if _read() != old:
+            raise E('boot_epoch_registration_changed_before_commit')
+        _lease(manager, lease, identity, args.token_file, generation)
+        _cancel(guard)
+        _commit(staged); staged = None; committed = new
+        if _read() != new:
+            raise E('boot_epoch_registration_revalidation_failed')
+        third = _probe(args.probe, path)
+        _validate_boot_epoch_recovery_candidate(old, third, generation)
+        if _adoption_signature(third) != signature:
+            raise E('boot_epoch_identity_changed_after_commit')
+        _match(third, new)
+        _lease(manager, lease, identity, args.token_file, generation)
+        _cancel(guard)
+    except BaseException as exc:
+        if committed is not None:
+            current = _read()
+            if current == committed:
+                _write(old)
+            elif current is not None:
+                raise E('boot_epoch_rollback_registration_conflict') from exc
+            if _read() != old:
+                raise E('boot_epoch_rollback_revalidation_failed') from exc
+        raise
+    finally:
+        path.unlink(missing_ok=True)
+        if staged is not None:
+            staged.unlink(missing_ok=True)
+
+
 def _stale_registration_recovery(
     args: argparse.Namespace,
     guard: Any,
@@ -1202,7 +1321,7 @@ def _child(args: argparse.Namespace, guard: Any, lock_fd: int, previous_mask: se
         identity = lease.LeaseIdentity(args.task_id, args.session_id)
         generation = _lease(manager, lease, identity, args.token_file)
         _cancel(guard)
-        {'bootstrap': _bootstrap, 'adopt-existing': _adopt_existing, 'semantic-downgrade': _semantic_downgrade, 'stale-registration-recovery': _stale_registration_recovery, 'rebind': _rebind, 'gate-b': _gateb, 'guarded-dispatch': _guarded_dispatch}[args.operation](
+        {'bootstrap': _bootstrap, 'adopt-existing': _adopt_existing, 'semantic-downgrade': _semantic_downgrade, 'stale-registration-recovery': _stale_registration_recovery, 'boot-epoch-registration-recovery': _boot_epoch_registration_recovery, 'rebind': _rebind, 'gate-b': _gateb, 'guarded-dispatch': _guarded_dispatch}[args.operation](
             args, guard, lease, manager, identity, generation
         )
         label = args.operation.upper().replace('-', '_')
@@ -1278,7 +1397,7 @@ def _supervise(args: argparse.Namespace) -> int:
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(description=__doc__)
     sub = result.add_subparsers(dest='operation', required=True)
-    for name in ('bootstrap', 'adopt-existing', 'semantic-downgrade', 'stale-registration-recovery', 'rebind', 'gate-b', 'guarded-dispatch'):
+    for name in ('bootstrap', 'adopt-existing', 'semantic-downgrade', 'stale-registration-recovery', 'boot-epoch-registration-recovery', 'rebind', 'gate-b', 'guarded-dispatch'):
         command = sub.add_parser(name)
         command.add_argument('--task-id', required=True)
         command.add_argument('--session-id', required=True)

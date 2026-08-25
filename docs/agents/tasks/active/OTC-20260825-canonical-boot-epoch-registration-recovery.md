@@ -1,7 +1,7 @@
 ---
 task_id: OTC-20260825-canonical-boot-epoch-registration-recovery
-status: implementing
-phase: tdd_red
+status: validating
+phase: validating
 agent: ChatGPT
 session_id: chatgpt-canonical-boot-epoch-registration-recovery-20260825
 session_role: owner
@@ -84,7 +84,7 @@ RUNTIME_ACCESS: none
 PERSISTENT_SESSION_ROLE: none
 PHYSICAL_E2E_REQUIRED: false
 invocation_started_at: 2026-08-25T16:00:00+02:00
-last_progress_at: 2026-08-25T16:00:00+02:00
+last_progress_at: 2026-08-25T18:42:00+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: draft
 terminal_ci_wait_started_at: null
@@ -109,6 +109,10 @@ acceptance:
 source_terminal_prs: [693, 694]
 source_terminal_main: b0ebce78eff3c580ef70fc805480fd15449000b1
 baseline_transition_tests: PASS_37
+tdd_red: PASS_EXPECTED_FAILURE_BOOT_EPOCH_OPERATION_ABSENT
+focused_transition_tests: PASS_42
+focused_track_a_governance: PASS
+git_diff_check: PASS
 baseline_kasm_probe_tests: PASS_10
 baseline_track_a_governance: PASS
 runtime_recovery_executed: false
@@ -118,7 +122,7 @@ runtime_mutation_performed: false
 e2e: NOT_APPLICABLE
 e2e_reason: repository-only metadata transition implementation; owner explicitly prohibited physical runtime actions
 current_blocker: NONE
-next_action: write failing boot-epoch recovery tests and prove RED
+next_action: publish implementation head, run independent audit and exact-head required CI
 ---
 
 # Canonical boot-epoch registration recovery

@@ -147,4 +147,4 @@ Repository-only implementation task created from current main after terminal PRs
 
 ## Terminal closeout
 
-Implementation PR #696 merged as c54657d35b9b8d898f6da57aac830e51d74bea2 after exact-head 42/42 transition tests, Track A governance, canonical-live governance, CI, and fresh detached-checkout audit all passed. The Package A cross-trigger failed only its unrelated changed-path allowlist while its deterministic core passed. No canonical recovery execution, semantic promotion, login, credentials, relog, restart, character selection, gameplay, input, movement, or physical runtime action occurred. Ownership is released.
+Implementation PR #696 merged as `bc54657d35b9b8d898f6da57aac830e51d74bea2` after exact-head 42/42 transition tests, Track A governance, canonical-live governance, CI, and fresh detached-checkout audit all passed. The Package A cross-trigger failed only its unrelated changed-path allowlist while its deterministic core passed. No canonical recovery execution, semantic promotion, login, credentials, relog, restart, character selection, gameplay, input, movement, or physical runtime action occurred. Ownership is released.

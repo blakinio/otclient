@@ -1,10 +1,10 @@
 ---
 task_id: OTC-20260824-canonical-stale-registration-recovery
-status: validating
-phase: validate
+status: completed
+phase: archived
 agent: ChatGPT
 session_id: chatgpt-canonical-stale-registration-recovery-20260824
-session_role: implementer
+session_role: released
 project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
@@ -81,7 +81,7 @@ RUNTIME_ACCESS: none
 PERSISTENT_SESSION_ROLE: none
 PHYSICAL_E2E_REQUIRED: false
 invocation_started_at: 2026-08-24T22:57:00+02:00
-last_progress_at: 2026-08-24T23:47:05+02:00
+last_progress_at: 2026-08-25T09:15:17+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: draft
 terminal_ci_wait_started_at: null
@@ -128,9 +128,35 @@ canonical_governance_failure_run: 32781411647
 canonical_governance_failure_job: 97604081165
 canonical_governance_failure: STALE_AUDIT_EXPECTED_REBIND_NOT_IMPLEMENTED_PROSE
 canonical_governance_repair: update audit/bootstrap contract to already-promoted unchanged-identity rebind plus distinct recovery semantics
-required_ci: PENDING_FINAL_HEAD
+required_ci: PASS
+final_source_head: b4a8ec14bfbe97214c1f845258193b88fa189953
+implementation_pr: 693
+implementation_merge_commit: f4b92d88e9623d8c10b349803fbd7d797bd588d7
+closeout_pr: 695
+implementation_merged: true
+final_ci_run: 32781614782
+final_ci_required_job: 97604877480
+final_ci_required_result: PASS
+final_track_a_agent_governance_run: 32781614436
+final_track_a_agent_governance_result: PASS
+final_canonical_governance_run: 32781614463
+final_canonical_governance_result: PASS
+final_xres_governance_run: 32781614552
+final_xres_governance_result: PASS
+package_a_cross_trigger_run: 32781614437
+package_a_cross_trigger_result: NON_REQUIRED_PATH_BOUNDARY_FALSE_POSITIVE
+runtime_recovery_executed: false
+semantic_promotion_performed: false
+physical_action_performed: false
+runtime_mutation_performed: false
+e2e: NOT_APPLICABLE
+e2e_reason: repository-only metadata transition; owner explicitly prohibited physical runtime action
+ownership_released: true
+task_archived: true
+terminal_result: DONE
+consumer_next_action: future runtime consumer must re-admit from trusted main and may invoke canonical_recovery only if fresh evidence satisfies its merged fail-closed contract; do not auto-run semantic promotion or physical action
 current_blocker: NONE
-next_action: validate the narrow stale canonical-governance audit repair, then require exact-final-head Track A governance and CI PASS before readiness/merge
+next_action: NONE
 ---
 
 # Canonical stale-registration recovery
@@ -140,3 +166,5 @@ This repository-only task introduces a separately named, fail-closed metadata re
 The lifecycle remains inside the existing canonical state root, coordination flock, lease capability and authoritative `runtime-registration.json`. It may replace stale adoption runtime identity only after complete singleton exact-target proof and narrow continuity checks; all client/gameplay/login/process mutation remains forbidden.
 
 A fresh independent GitHub-hosted audit on exact head `5f4f20c63efb001a1567e73625a0cc56638eedf4` passed as run `32781319462`, job `97603796485`. It reran 37 transition tests and 10 Kasm-probe tests, reran Track A governance, checked the recovery AST for three repeated proof calls plus atomic commit/rollback, rejected client-process/input/login/credential paths, and confirmed that recovery creates no alternate canonical state or registration namespace. The one-shot audit workflow is removed before the final exact-head CI generation.
+
+Terminal closeout: implementation PR `#693` merged as `f4b92d88e9623d8c10b349803fbd7d797bd588d7`. Final source head `b4a8ec14bfbe97214c1f845258193b88fa189953` passed required CI and Track A governance. The unrelated Package A path-boundary cross-trigger failed only because this PR changed non-Package-A paths; its deterministic core job passed and it was not a required gate for this task. No canonical recovery execution, semantic promotion, movement, login, credential use, client input or other physical runtime action was performed.

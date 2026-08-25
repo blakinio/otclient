@@ -1,16 +1,16 @@
 ---
 task_id: OTC-20260825-canonical-boot-epoch-registration-recovery
-status: validating
-phase: validating
+status: completed
+phase: archived
 agent: ChatGPT
 session_id: chatgpt-canonical-boot-epoch-registration-recovery-20260825
-session_role: owner
+session_role: released
 project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: implementation
 policy_version: 2
-branch: fix/OTC-20260825-canonical-boot-epoch-registration-recovery
+branch: docs/OTC-20260825-canonical-boot-epoch-registration-recovery-closeout
 base_branch: main
 base_sha: b0ebce78eff3c580ef70fc805480fd15449000b1
 risk: high
@@ -84,9 +84,9 @@ RUNTIME_ACCESS: none
 PERSISTENT_SESSION_ROLE: none
 PHYSICAL_E2E_REQUIRED: false
 invocation_started_at: 2026-08-25T16:00:00+02:00
-last_progress_at: 2026-08-25T18:42:00+02:00
-ci_checks_for_current_head: 0
-ci_check_generation: draft
+last_progress_at: 2026-08-25T18:52:00+02:00
+ci_checks_for_current_head: 1
+ci_check_generation: ready
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -122,9 +122,29 @@ runtime_mutation_performed: false
 e2e: NOT_APPLICABLE
 e2e_reason: repository-only metadata transition implementation; owner explicitly prohibited physical runtime actions
 current_blocker: NONE
-next_action: publish implementation head, run independent audit and exact-head required CI
+implementation_pr: 696
+implementation_head: 8263dc1fe10911e343b2a61aa7fafb8d4c8ed48b
+implementation_merge: bc54657d35b9b8d898f6da57aac830e51d74bea2
+independent_audit: PASS
+independent_audit_review: 5021555242
+independent_audit_material_findings_open: 0
+exact_head_ci_run: 32873930391
+exact_head_ci: PASS
+exact_head_track_a_governance_run: 32873930019
+exact_head_track_a_governance: PASS
+exact_head_canonical_live_governance_run: 32873930001
+exact_head_canonical_live_governance: PASS
+package_a_cross_trigger_run: 32873929966
+package_a_cross_trigger_disposition: NON_REQUIRED_PATH_BOUNDARY_FALSE_POSITIVE_CORE_PASS
+ownership_released: true
+task_archived: true
+next_action: NONE
 ---
 
 # Canonical boot-epoch registration recovery
 
 Repository-only implementation task created from current main after terminal PRs #693 and #694. The task introduces a separately reviewed fail-closed registration lifecycle for a proven boot-epoch discontinuity. It does not execute that lifecycle against the live Tibia client and grants no runtime, login, credential, gameplay, input or semantic-promotion authority.
+
+## Terminal closeout
+
+Implementation PR #696 merged as c54657d35b9b8d898f6da57aac830e51d74bea2 after exact-head 42/42 transition tests, Track A governance, canonical-live governance, CI, and fresh detached-checkout audit all passed. The Package A cross-trigger failed only its unrelated changed-path allowlist while its deterministic core passed. No canonical recovery execution, semantic promotion, login, credentials, relog, restart, character selection, gameplay, input, movement, or physical runtime action occurred. Ownership is released.

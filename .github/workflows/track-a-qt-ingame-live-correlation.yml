@@ -31,6 +31,7 @@ env:
   VIEW_PROXY_NAME: otclient-qt-ingame-view
   VIEW_PROXY_PORT: '16082'
   VIEW_HOST_IP: 192.168.1.21
+  VIEW_ALLOWED_IP: 192.168.1.154
 
 jobs:
   correlate:
@@ -164,14 +165,18 @@ jobs:
                   try:c.close()
                   except:pass
           ls=socket.socket(); ls.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1); ls.bind(bind); ls.listen(16)
+          allowed=os.environ['ALLOWED_IP']
           while True:
-              c,_=ls.accept(); threading.Thread(target=handle,args=(c,),daemon=True).start()
+              c,addr=ls.accept()
+              if addr[0] != allowed:
+                  c.close(); continue
+              threading.Thread(target=handle,args=(c,),daemon=True).start()
           PY
           )"
           image="$(docker inspect -f '{{.Config.Image}}' "$CONTROL_CONTAINER")"
           docker run -d --rm --name "$VIEW_PROXY_NAME" --network host \
             -e SCRIPT_B64="$proxy_b64" -e BIND_IP="$VIEW_HOST_IP" -e BIND_PORT="$VIEW_PROXY_PORT" \
-            -e TARGET_IP="$chosen_ip" -e TARGET_PORT="$chosen_port" --entrypoint sh "$image" \
+            -e TARGET_IP="$chosen_ip" -e TARGET_PORT="$chosen_port" -e ALLOWED_IP="$VIEW_ALLOWED_IP" --entrypoint sh "$image" \
             -c 'echo "$SCRIPT_B64" | base64 -d >/tmp/proxy.py; exec python3 /tmp/proxy.py' >/dev/null
           sleep 1
           docker inspect -f '{{.State.Running}}' "$VIEW_PROXY_NAME" | grep -Fx true >/dev/null

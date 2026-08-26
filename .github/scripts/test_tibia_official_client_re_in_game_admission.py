@@ -124,15 +124,19 @@ class InGameAdmissionRegressionTests(unittest.TestCase):
         manifest = self.transition_manifest("IN_GAME")
         ready = mock.Mock()
         worker = mock.Mock(return_value={"status": "ABORTED", "effect_count": 0})
+        args = SimpleNamespace(
+            request_file=Path("unused"),
+            token_file=Path("unused-token"),
+        )
         with mock.patch.object(transition, "_read_guarded_request", return_value=request), \
                 mock.patch.object(transition, "_probe_reg", return_value=(registration, manifest)), \
                 mock.patch.object(transition, "_acquire_input_lock", return_value=Held()), \
                 mock.patch.object(transition, "_emit_guarded_ready", ready), \
                 mock.patch.object(transition, "_read_guarded_decision", return_value="COMMIT"), \
+                mock.patch.object(transition, "_lease"), \
                 mock.patch.object(transition, "_run_guarded_worker", worker):
             result = transition._guarded_dispatch(
-                SimpleNamespace(request_file=Path("unused")),
-                object(), object(), object(), object(), 35,
+                args, object(), object(), object(), object(), 35,
             )
         self.assertEqual(result, {"status": "ABORTED", "effect_count": 0})
         ready.assert_called_once()

@@ -11,7 +11,7 @@ phase: validate
 branch: feat/OTC-20260813-tibia-global-login-lab
 base_branch: main
 created: 2026-08-13T09:10:00+02:00
-updated: 2026-08-24T15:11:00+02:00
+updated: 2026-08-26T14:03:00+02:00
 risk: medium
 related_pr: 284
 owned_paths:
@@ -49,9 +49,9 @@ decomposition_decision: phased
 decomposition_reason: one shared-state HTTP-auth -> one-shot handoff -> world-entry E2E
 validation_level: focused
 invocation_started_at: 2026-08-23T16:45:00+02:00
-last_progress_at: 2026-08-24T15:11:00+02:00
+last_progress_at: 2026-08-26T14:03:00+02:00
 heavy_validation_runs: 0
-repair_cycles_for_current_gate: 1
+repair_cycles_for_current_gate: 3
 identical_failure_retries: 0
 context_reconstruction_attempts: 1
 execution_reason: restack canonical PR 284, refresh current public package identity/assets, then run one bounded owner-authorized world-entry E2E
@@ -806,3 +806,17 @@ Current state:
 - no new protocol mutation is justified yet.
 
 Exact next action: validate/publish the isolated encrypted-handoff producer lane, execute only that GitHub-Secret-bound producer, download only `handoff.cms` to Molehill, decrypt locally without logging plaintext, stage verified local current assets, and perform one bounded OTClient game-login. Success still requires real `GAME_START` plus authoritative in-game semantic evidence.
+
+## 2026-08-26 encrypted producer stable-rejection checkpoint
+
+This checkpoint supersedes the earlier Molehill-offline blocker. Durable evidence:
+`docs/agents/evidence/OTC-20260813-tibia-global-login-lab/20260826-encrypted-producer-stayloggedin-error7-other.md`
+
+Current state:
+- Molehill returned online and was executable; the interrupted Track B WIP was reconciled without touching Track A.
+- exact head `6c5a0baa24241dacb5ada6684715e3aad248d515` restores the historically proven `stayloggedin: True` login semantic and keeps raw rejection text secret.
+- automatic encrypted producer run `32966019711` reached WARP, current asset identifier and HTTP 200, then returned stable redacted `errorCode=7` with category `other`.
+- no plaintext-valid marker, ciphertext marker or artifact exists; the legacy full lab stayed skipped and CI passed.
+- public research still provides no authoritative CipSoft mapping for numeric code 7.
+
+Exact next action: do not perform a fourth unchanged or classifier-only login retry. Require genuinely new non-secret evidence that distinguishes or removes the hosted login rejection, such as owner-side successful official-client login/account-state confirmation or authoritative current login-service contract evidence. Once HTTP session/playdata is valid again, resume the existing encrypted handoff -> Molehill local decrypt -> fresh current-asset verification -> one bounded OTClient game-login flow.

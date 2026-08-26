@@ -84,13 +84,20 @@ task_archived: true
 archive_pr: 704
 archive_independent_audit: PASS
 archive_independent_audit_review_initial: 5033895353
-archive_independent_audit_review_exact_final_head: REQUIRED_ON_FINAL_HEAD
+archive_independent_audit_review_exact_final_head: 5033900972
 archive_independent_audit_material_findings_open: 0
-archive_exact_head_ci: REQUIRED_AFTER_AUDIT
-archive_exact_head_governance: REQUIRED_AFTER_AUDIT
-last_progress_at: 2026-08-26T20:41:00+02:00
-current_blocker: NONE_ARCHIVE_CLOSEOUT_ONLY
-next_action: run exact-final-head archive audit and CI/governance on this post-audit synchronize head, then merge PR #704
+archive_exact_final_head: e686614af40bf10df50432d64e785be78d2393e1
+archive_exact_head_ci_run: 33000660804
+archive_exact_head_ci: PASS
+archive_exact_head_required_context: CI / Required
+archive_exact_head_required_job: 98281459264
+archive_exact_head_governance_run: 33000660300
+archive_exact_head_governance: PASS
+archive_merge_commit: 3fca32f362a0b74b9f8bde8f433734d3fa2ab0a4
+archive_merged: true
+last_progress_at: 2026-08-26T20:45:00+02:00
+current_blocker: NONE
+next_action: NONE
 ---
 
 # Player-state semantic promotion E2E retry 3 — terminal archive
@@ -105,6 +112,8 @@ No exact before/after one-tile causal differential exists. Player-state semantic
 
 No login, credentials, relog, restart, character selection, process-memory write, injection or additional gameplay action was performed. No retry is permitted. Canonical lease generation 34 was released successfully and no runtime authority remains claimed.
 
-PR #703 merged the evidence-only closeout as `b38979879046752a4598be85d7666e8f4ebc6e9b`. Its exact pre-merge head `970e6a8a1208b8cbf107604e00bb86ff4ac03e8f` had fresh validator audit PASS with zero material findings, Track A governance run `33000280252` PASS, and CI run `33000280536` PASS including `CI / Required` job `98280050343`.
+PR #703 merged the evidence-only closeout as `b38979879046752a4598be85d7666e8f4ebc6e9b`. Its exact pre-merge head `970e6a8a1208b8cbf107604e00bb86ff4ac03e8f` had fresh exact-head validator audit `5033867111` PASS with zero material findings, Track A governance run `33000280252` PASS, and CI run `33000280536` PASS including `CI / Required` job `98280050343`.
 
-Durable primary runtime evidence remains at `docs/agents/evidence/OTC-20260826-player-state-semantic-promotion-e2e-retry-3/runtime-terminal.md`. Archive PR #704 removes the active task record and retains this released archive record. No runtime admission or physical action is authorized by the archive lifecycle.
+Archive PR #704 merged as `3fca32f362a0b74b9f8bde8f433734d3fa2ab0a4`. Its exact pre-merge head `e686614af40bf10df50432d64e785be78d2393e1` had fresh exact-head archive audit `5033900972` PASS with zero material findings, Track A governance run `33000660300` PASS, and CI run `33000660804` PASS including `CI / Required` job `98281459264`.
+
+Durable primary runtime evidence remains at `docs/agents/evidence/OTC-20260826-player-state-semantic-promotion-e2e-retry-3/runtime-terminal.md`. The active task record is removed, ownership is released, the task is archived, and `next_action` is `NONE`. No runtime admission or physical action is authorized by this terminal record.

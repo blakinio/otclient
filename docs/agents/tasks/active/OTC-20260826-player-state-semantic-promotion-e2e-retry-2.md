@@ -1,14 +1,14 @@
 ---
 task_id: OTC-20260826-player-state-semantic-promotion-e2e-retry-2
-status: investigating
+status: validating
 agent: ChatGPT
 session_id: chatgpt-player-state-semantic-retry2-20260826
-session_role: runtime_controller
+session_role: owner
 project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: e2e
-phase: investigate
+phase: validating
 policy_version: 2
 branch: runtime/OTC-20260826-player-state-semantic-promotion-e2e-retry-2
 base_branch: main
@@ -77,27 +77,46 @@ login_allowed: false
 relogin_allowed: false
 restart_allowed: false
 character_selection_allowed: false
-gameplay_allowed: true
-gameplay_scope: exactly one controlled one-tile movement solely for causal player-state semantic-promotion E2E after Gate A, exact required recovery/rebind, Gate B, target uniqueness and semantic preconditions all PASS
+gameplay_allowed: false
+gameplay_scope: exactly one controlled one-tile movement solely for causal player-state semantic-promotion E2E after Gate A, exact required recovery/rebind, Gate B, target uniqueness and semantic preconditions all PASS; authorization is now consumed
 physical_action_budget: 1
-physical_action_count: 0
+physical_action_count: 1
 max_movement_tiles: 1
-ready: false
-commit: false
-possibly_dispatched: false
+ready: true
+commit: true
+possibly_dispatched: true
 no_auto_retry_after_commit: true
-owner_authorization_current: true
-owner_authorization_scope: fresh Track A runtime admission; if the authoritative registration is from a previous boot epoch use only trusted-main canonical_boot_epoch_recovery after its exact validator passes; otherwise use only the exact reviewed required same-boot recovery/rebind path; then Gate B, target uniqueness and semantic preconditions; exactly one one-tile move only after all required gates PASS; UNKNOWN or BLOCKED means zero movement; no automatic retry after COMMIT; no login, credentials, relog, restart or character selection
+owner_authorization_current: false
+owner_authorization_scope: consumed by the single committed causal attempt; no additional movement, login, credentials, relog, restart or character selection is authorized
 trusted_main_at_claim: 8085b40698d409bbacba3460001e8ddca4f6c84f
 source_prs_terminal:
   694: merged
   696: merged
   697: merged
+result: AMBIGUOUS_POST_COMMIT_NO_VALID_RESULT
+runtime_workflow_run: 32944297164
+runtime_workflow_job: 98101615158
+runtime_workflow_head: 56f60bbf5d84eb43d5722349e445e99c5cb3839d
+runtime_lease_generation: 33
+runtime_lease_released: true
+attempt_1_boot_epoch_recovery: PASS_PRECOMMIT_ZERO_EFFECT
+final_authority_transition: REBIND_PASS
+gate_a_runtime: PASS
+gate_b_runtime: PASS
+target_uniqueness_runtime: PROVEN
+semantic_preconditions_runtime: PASS
+causal_proof: NOT_PROVEN
+semantic_promotion_performed: false
+movement_authorization_consumed: true
+temporary_dispatch_workflow_removed: true
+temporary_causal_worker_removed: true
+independent_audit: REQUIRED_BEFORE_MERGE
+exact_final_head_ci: REQUIRED_AFTER_AUDIT
 runtime_ownership_preflight:
   pr_475: open_draft_but_task_record_released_runtime_access_none
-  current_task: sole_new_runtime_controller_candidate_after_fresh_admission
+  current_task: closeout_only_no_runtime_authority
 invocation_started_at: 2026-08-26T08:56:00+02:00
-last_progress_at: 2026-08-26T08:56:00+02:00
+last_progress_at: 2026-08-26T17:42:55+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: draft
 terminal_ci_wait_started_at: null
@@ -118,13 +137,17 @@ acceptance:
   - successful causal differential promotes only the exact verified player-position semantic contract and preserves all other fail-closed boundaries
   - evidence, independent audit, exact-head required CI, merge, archive and authority/lease release complete
 current_blocker: NONE
-next_action: stage the proven one-shot causal worker and task-specific fail-closed admission workflow, then open Draft PR and execute fresh Track A admission
+next_action: independently audit the terminal evidence-only candidate, run exact-final-head CI, merge PR #698, then archive and release ownership
 ---
 
 # Player-state semantic promotion E2E retry 2 — 2026-08-26
 
-This task has fresh owner authorization for one causal movement discriminator only. It begins with `runtime_access: none`; no live official-client mutation is permitted until fresh current admission classifies and proves the required authority path.
+This task had fresh owner authorization for one causal movement discriminator only. It began with `runtime_access: none`; live mutation was permitted only after the required admission chain passed.
 
-A prior-boot authoritative registration may be reconciled only through the reviewed `boot-epoch-registration-recovery` transition from trusted `main`. That transition is metadata-only and remains separate from later ordinary reuse/mutation admission. Same-boot stale recovery and generation rebind remain separate transitions and cannot substitute for boot-epoch recovery.
+Attempt 1 encountered a prior-boot authoritative registration and used only the reviewed trusted-main `boot-epoch-registration-recovery` transition. That metadata-only transition passed, followed by Gate B and target uniqueness, but semantic preconditions failed before COMMIT, so attempt 1 performed zero physical action.
 
-The physical budget is exactly one movement tile. `COMMIT` is the irreversible boundary: after it, ambiguity is treated as possibly dispatched and no automatic retry is permitted.
+The final controlled attempt acquired lease generation 33. Gate A passed; the current-boot registration required and passed generation rebind; Gate B passed; target uniqueness was proven; semantic preconditions passed; and a stable typed player-position baseline was established. The controller received a valid READY envelope, atomically reserved the one-shot budget, and sent COMMIT exactly once for one eastward tile.
+
+After COMMIT the guarded worker exceeded its 30-second timeout and returned no valid causal result. The attempt is therefore conservatively classified as `AMBIGUOUS_POST_COMMIT_NO_VALID_RESULT`, `possibly_dispatched: true`, with the single physical-action budget consumed. This does not prove that the character actually changed tile. No exact before/after one-tile differential exists, so causal proof is not established and player-state semantic promotion is not performed.
+
+No retry is permitted under this task. No login, credentials, relog, restart, character selection, process-memory write, injection, or additional gameplay action is authorized or performed. Canonical lease generation 33 was released. Durable primary evidence is `docs/agents/evidence/OTC-20260826-player-state-semantic-promotion-e2e-retry-2/runtime-terminal.md`.

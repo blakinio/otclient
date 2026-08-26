@@ -1,0 +1,98 @@
+{
+  "schema": "otclient.track-a.current-game-login-schema.coordinator-promotion.v1",
+  "decision": "ACCEPT_WITH_EDITS",
+  "source": {
+    "pr": 711,
+    "live_head": "39e1f7343d8c3932356a78db1eae00147e810d7d",
+    "evidence_head": "d24b6e61d1086094112020db6e7d959c24bdb34a",
+    "run": 33017207072,
+    "job": 98338388458,
+    "artifact": 9625060590,
+    "artifact_digest": "sha256:be50b5baf632095f3eccc90aad6b0b9ff409d3dac626c8580b35deb36b245a74",
+    "redownloaded_zip_sha256": "be50b5baf632095f3eccc90aad6b0b9ff409d3dac626c8580b35deb36b245a74",
+    "result_json_sha256": "1940d58a7fcb2615da7f9d47179e6dbdf41397f89b8b522af52da75b076154dc"
+  },
+  "exact_client": {
+    "version": "15.32.75d4a0",
+    "packed_sha256": "075810c54af2d6912000eab062763db29563f5a1f4bf1d984154b2d07fd5729f",
+    "unpacked_sha256": "d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a",
+    "unpacked_size": 52105824
+  },
+  "accepted": {
+    "generated_message_slots": {
+      "clear": "+0x10",
+      "byte_size_long": "+0x18",
+      "internal_serialize": "+0x28",
+      "vtable_terminator": "+0x30"
+    },
+    "gameclient_message_login": {
+      "rtti": "0x30ed530",
+      "vtable_ap": "0x2f9ee90",
+      "clear": "0x17785c0",
+      "byte_size": "0x17728a0",
+      "serialize": "0x177a7e0",
+      "fields": {
+        "1": {"wire": "varint", "storage": "+0x30", "tag": "0x08"},
+        "2": {"wire": "varint", "storage": "+0x34", "tag": "0x10"},
+        "3": {"wire": "varint", "storage": "+0x38", "tag": "0x18"},
+        "4": {"wire": "length-delimited", "storage": "+0x18", "tag": "0x22"},
+        "5": {"wire": "length-delimited", "storage": "+0x20", "tag": "0x2a"},
+        "6": {"wire": "varint", "storage": "+0x3c", "tag": "0x30"},
+        "7": {"wire": "embedded-message", "storage": "+0x28", "type": "LoginRSAEncryptedBlock"}
+      }
+    },
+    "login_rsa_encrypted_block": {
+      "rtti": "0x30ed518",
+      "vtable_ap": "0x2f9ee50",
+      "clear": "0x1778500",
+      "byte_size": "0x1772740",
+      "serialize": "0x1770200",
+      "fields": {
+        "1": {"wire": "length-delimited", "storage": "+0x18", "tag": "0x0a"},
+        "2": {"wire": "length-delimited", "storage": "+0x20", "tag": "0x12"},
+        "3": {"wire": "varint", "storage": "+0x40", "tag": "0x18"},
+        "4": {"wire": "varint", "storage": "+0x44", "tag": "0x20"},
+        "5": {"wire": "length-delimited", "storage": "+0x28", "tag": "0x2a"},
+        "6": {"wire": "length-delimited", "storage": "+0x30", "tag": "0x32"},
+        "7": {"wire": "length-delimited", "storage": "+0x38", "tag": "0x3a"}
+      }
+    },
+    "login_handler": {
+      "rtti": "0x30b4ed0",
+      "vtable_ap": "0x30b6700",
+      "slot_0x60_target": "0xe25620",
+      "fde": "0xe25620..0xe2656d"
+    },
+    "authentication_info": {
+      "rtti": "0x30adc40",
+      "vtable_ap": "0x2f82f98"
+    },
+    "outer_transport_change_as_next_hypothesis": "REJECTED",
+    "track_b_legacy_login_body_matches_current_native_typed_payload": "DISPROVEN_STRUCTURALLY"
+  },
+  "withheld": {
+    "password_or_session_semantic_field_names": "UNKNOWN",
+    "password_or_session_to_rsa_field_mapping": "UNKNOWN",
+    "retained_authinfo_user_facing_field_names": "UNKNOWN",
+    "causal_explanation_of_track_b_0x14": "UNKNOWN"
+  },
+  "audit": {
+    "primary_artifact_rehashed": true,
+    "researcher_summary_used_as_proof": false,
+    "source_changed_files": 7,
+    "source_review_threads": 0,
+    "source_submitted_reviews": 0,
+    "material_findings_open": 0
+  },
+  "safety": {
+    "runtime_access": "none",
+    "official_client_executed": false,
+    "login_performed": false,
+    "secret_access": false,
+    "raw_client_uploaded": false
+  },
+  "e2e": {
+    "result": "NOT_APPLICABLE",
+    "reason": "docs-only coordinator promotion of static sanitized evidence"
+  }
+}

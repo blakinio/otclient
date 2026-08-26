@@ -397,7 +397,7 @@ def reference_scan(img: Image, rip_targets: set[int], direct_targets: set[int]) 
     for sec in img.sections:
         if not (sec.flags & 4) or not sec.size:
             continue
-        blob = img.raw[sec.off:sec.off + sec.size]
+        blob = img.raw[sec.offset:sec.offset + sec.size]
         for ins in img.md.disasm(blob, sec.va):
             if ins.mnemonic == 'call' and ins.operands and ins.operands[0].type == X86_OP_IMM:
                 target = int(ins.operands[0].imm)

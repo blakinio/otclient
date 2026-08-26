@@ -429,5 +429,58 @@ class PlayerStateCausalWorkerTests(unittest.TestCase):
         self.assertEqual(len(commands), 1)
         self.assertGreaterEqual(budget.remaining(), self.m.RESULT_WRITE_RESERVE_SECONDS)
 
+    def test_post_dispatch_checkpoint_precedes_hung_reconciliation(self):
+        clock, budget = self.budget(27.0)
+        reads = 0
+        events = []
+        commands = []
+
+        def reader(_reg, current_budget):
+            nonlocal reads
+            reads += 1
+            if reads == 1:
+                clock.advance(10.0)
+                events.append("baseline")
+                return self.candidate(100, 200)
+            events.append("reconciliation")
+            timeout = current_budget.timeout(
+                self.m.READER_TIMEOUT_CAP_SECONDS,
+                reserve=self.m.RESULT_WRITE_RESERVE_SECONDS,
+            )
+            clock.advance(timeout + 2.5)
+            raise subprocess.TimeoutExpired(["reader"], timeout)
+
+        checkpoints = []
+        try:
+            result = self.m.execute_once(
+                self.request(),
+                self.registration(),
+                budget=budget,
+                read_candidate_fn=reader,
+                tool_ready_fn=lambda _target, _budget: True,
+                dispatch_fn=lambda command, _budget: commands.append(tuple(command)) or 0,
+                sleep_fn=clock.advance,
+                reconciliation_attempts=12,
+                post_dispatch_checkpoint_fn=lambda checkpoint, _budget: (
+                    events.append("checkpoint"), checkpoints.append(dict(checkpoint))
+                ),
+            )
+        except TypeError as exc:
+            self.fail(f"post-dispatch checkpoint hook unavailable: {exc}")
+        self.assertEqual(events[:3], ["baseline", "checkpoint", "reconciliation"])
+        self.assertEqual(len(commands), 1)
+        self.assertEqual(len(checkpoints), 1)
+        self.assertEqual(
+            checkpoints[0],
+            {
+                "status": "AMBIGUOUS",
+                "effect_count": 1,
+                "action_hash": self.action_hash,
+                "reason_code": "POST_DISPATCH_RECONCILIATION_INCOMPLETE",
+            },
+        )
+        self.assertEqual(result["status"], "AMBIGUOUS")
+        self.assertEqual(result["effect_count"], 1)
+
 if __name__ == "__main__":
     unittest.main()

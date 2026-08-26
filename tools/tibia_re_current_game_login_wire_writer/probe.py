@@ -91,6 +91,14 @@ class Image:
         off = self.va_to_off(va)
         return self.raw[off:off + size]
 
+    def u64(self, va: int) -> int:
+        return struct.unpack_from('<Q', self.raw, self.va_to_off(va))[0]
+
+    def qword(self, va: int) -> int:
+        if va in self.relocations:
+            return int(self.relocations[va]) & 0xffffffffffffffff
+        return self.u64(va)
+
     def string_occurrences(self, value: str) -> list[int]:
         needle = value.encode('utf-8')
         out: list[int] = []
@@ -273,6 +281,71 @@ def function_control_transfers(img: Image, start: int, limit: int = 1200) -> dic
         rows.append(row)
     return {'fde': (lo, hi), 'transfers': rows}
 
+def instruction_context(img: Image, center: int, before: int = 8, after: int = 5) -> list[dict]:
+    bounds = img.containing_fde(center)
+    if bounds is None:
+        return []
+    lo, hi = bounds
+    ins = list(img.md.disasm(img.bytes(lo, hi - lo), lo))
+    indexes = [i for i, row in enumerate(ins) if row.address == center]
+    if len(indexes) != 1:
+        return []
+    i = indexes[0]
+    return [
+        {'at': hx(row.address), 'mnemonic': row.mnemonic, 'operand': row.op_str}
+        for row in ins[max(0, i - before):min(len(ins), i + after + 1)]
+    ]
+
+
+def rtti_vtable_candidates(img: Image, simple_name: str) -> list[dict]:
+    found = {}
+    for occurrence in img.string_occurrences(simple_name):
+        off = img.va_to_off(occurrence)
+        start = img.raw.rfind(b'\0', max(0, off - 192), off) + 1
+        end = img.raw.find(b'\0', off, min(len(img.raw), off + 512))
+        if end < 0:
+            continue
+        try:
+            text = img.raw[start:end].decode('ascii')
+        except UnicodeDecodeError:
+            continue
+        if simple_name not in text or '::' in text or not text.startswith('N'):
+            continue
+        name_va = img.off_to_va(start)
+        if name_va is None:
+            continue
+        for name_ref, addend in img.relocations.items():
+            if addend != name_va:
+                continue
+            rtti = name_ref - 8
+            aps = []
+            for type_slot, type_addend in img.relocations.items():
+                if type_addend != rtti:
+                    continue
+                ap = type_slot + 8
+                if not img.mapped(ap - 16, 24) or img.u64(ap - 16) != 0:
+                    continue
+                slots = []
+                for slot_off in range(0, 0xc0, 8):
+                    if not img.mapped(ap + slot_off, 8):
+                        break
+                    target = img.qword(ap + slot_off)
+                    slots.append({
+                        'offset': hex(slot_off),
+                        'target': hx(target),
+                        'executable': img.executable(target),
+                    })
+                aps.append({'address_point': hx(ap), 'slots': slots})
+            if aps:
+                found[(text, rtti)] = {
+                    'rtti_name': text,
+                    'rtti': hx(rtti),
+                    'name_va': hx(name_va),
+                    'address_points': aps,
+                }
+    return sorted(found.values(), key=lambda row: (row['rtti_name'], row['rtti']))
+
+
 def locate_class(img: Image, class_name: str, required_methods: list[str]) -> dict:
     s_candidates = find_stringdata(img, class_name)
     matches = []
@@ -400,6 +473,22 @@ def main() -> int:
         if row['mode'] == 'indirect_mem' and int(row.get('disp', 0)) >= 0
     })
 
+    adapter_indirect_contexts = [
+        {'call': sanitize_transfer(row), 'context': instruction_context(GLOBAL_IMAGE, int(row['at']))}
+        for row in adapter_indirect_calls
+    ]
+    rtti_names = (
+        'TProtocolClientMessageProcessor',
+        'TGameserverNetworkPacketRawDataProcessor',
+        'TGameserverDualConnection',
+        'TGameserverNetworkPacketConnection',
+        'TGameserverNetworkPacketProcessor',
+        'TGameserverTCPConnection',
+        'TIODeviceWriter',
+        'TProtocolWriter',
+    )
+    rtti_vtables = {name: rtti_vtable_candidates(GLOBAL_IMAGE, name) for name in rtti_names}
+
     selected = re.compile(r'(login|write|send|data|message|connect|socket|packet)', re.I)
     result = {
         'schema': 'otclient.track-a.current-game-login-wire-writer.discovery.v1',
@@ -424,9 +513,11 @@ def main() -> int:
             'adapter_fde': [hx(adapter_flow['fde'][0]), hx(adapter_flow['fde'][1])],
             'control_transfers': [sanitize_transfer(row) for row in adapter_flow['transfers']],
             'adapter_indirect_calls': [sanitize_transfer(row) for row in adapter_indirect_calls],
+            'adapter_indirect_contexts': adapter_indirect_contexts,
             'indirect_memory_displacements': [hex(value) for value in adapter_virtual_disps],
         },
         'tcp_metaobjects': [sanitize_class(c, selected) if 'error' not in c else c for c in tcp_classes],
+        'rtti_vtables': rtti_vtables,
         'dynamic_symbols': dynamic_symbols(args.client, ('QDataStream', 'QTcpSocket', 'QIODevice', 'writeRawData'))[:300],
         'classification': {
             'current_sendlogin_qmeta': 'PROVEN',
@@ -454,6 +545,8 @@ def main() -> int:
     print('SENDLOGIN_ADAPTER_FDE=' + hx(adapter_flow['fde'][0]) + '..' + hx(adapter_flow['fde'][1]))
     print('SENDLOGIN_ADAPTER_INDIRECT_CALL_COUNT=' + str(len(adapter_indirect_calls)))
     print('SENDLOGIN_ADAPTER_INDIRECT_MEMORY_DISPS=' + ','.join(hex(value) for value in adapter_virtual_disps))
+    for name, rows in rtti_vtables.items():
+        print('RTTI_VTABLE_CANDIDATES_' + name.upper() + '=' + str(len(rows)))
     print('RAW_CLIENT_UPLOADED=false')
     print('LOGIN_PERFORMED=false')
     print('SECRET_ACCESS=false')

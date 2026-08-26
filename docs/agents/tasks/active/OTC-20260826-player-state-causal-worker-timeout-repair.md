@@ -81,7 +81,7 @@ source_runtime_job: 98101615158
 source_runtime_head: 56f60bbf5d84eb43d5722349e445e99c5cb3839d
 source_terminal_result: AMBIGUOUS_POST_COMMIT_NO_VALID_RESULT
 invocation_started_at: 2026-08-26T18:44:00+02:00
-last_progress_at: 2026-08-26T19:24:00+02:00
+last_progress_at: 2026-08-26T19:25:00+02:00
 validation_level: focused
 focused_validation_result: pass
 focused_validation_note: worker and timeout suites passed on hosted run 32992814821; remaining failure was isolated to the dispatch-boundary fixture and repaired without production-code change
@@ -93,6 +93,7 @@ latest_ci_failure_disposition: fixture repaired by allowing baseline to complete
 pre_fixture_repair_head: c0a2e9869dde3cea5578ad5eb4d1f0f99e8533a2
 fixture_repair_commit: 71a27151cc46c6350c88b20f60131cfbce9753a1
 validation_checkpoint_parent: d372f06e950a661d00699ab1d8a900507455ba07
+pre_final_freeze_parent: 2d4087b035251ed8021eb39c31d3d68a1ae6e0ee
 heavy_validation_runs: 2
 ci_checks_for_current_head: 0
 ci_check_generation: final_reopen
@@ -160,4 +161,4 @@ Repair the post-COMMIT causal worker/result timing contract exposed by terminal 
 
 ## Next action
 
-Use one controlled PR reopen on the unchanged implementation to trigger all path-filtered exact-head checks; if they pass, perform the fresh validator-role audit and merge hygiene without further code changes.
+Trigger one controlled PR reopen on this frozen head; then consume only the resulting exact-head check generation. If all required checks pass, perform the fresh validator-role audit and merge hygiene without further implementation changes.

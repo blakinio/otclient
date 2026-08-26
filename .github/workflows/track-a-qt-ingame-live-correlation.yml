@@ -129,7 +129,7 @@ jobs:
               for row in out: f.write('\t'.join(row)+'\n')
           PY
           chosen_ip=''; chosen_port=''; scheme=''
-          while IFS=$'\t' read -r host_ip host_port container_port; do
+          while IFS=$'\t' read -r host_ip host_port _; do
             [[ -n "$host_port" ]] || continue
             probe_ip="$host_ip"
             [[ "$probe_ip" == '0.0.0.0' || "$probe_ip" == '::' ]] && probe_ip='127.0.0.1'

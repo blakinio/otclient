@@ -30,6 +30,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends curl python3-capstone python3-pyelftools
           python3 tools/tibia_re_login_field_provenance/test_probe.py
           python3 -m py_compile tools/tibia_re_login_field_provenance/probe.py
+          python3 -m py_compile tools/tibia_re_login_field_provenance/probe_qmeta.py
 
       - name: Prepare exact public client package through WARP
         shell: bash
@@ -79,8 +80,7 @@ jobs:
             'PROV_UNPACKED_SIZE':'52105824',
           }
           for key,value in expected.items():
-            if values[key] != value:
-              raise SystemExit(f'current public client fence moved: {key}')
+            if values[key] != value: raise SystemExit(f'current public client fence moved: {key}')
           with open(sys.argv[2],'a',encoding='utf-8') as h:
             for key,value in values.items(): h.write(f'{key}={value}\n')
           print('CURRENT_LOGIN_FIELD_PROVENANCE_EXACT_FENCE=PASS')
@@ -112,6 +112,7 @@ jobs:
           pathlib.Path(dst).write_bytes(raw)
           print('CURRENT_LOGIN_FIELD_PROVENANCE_MATERIALIZATION=PASS')
           PY
+          mkdir -p artifacts/current-game-login-field-provenance
           python3 tools/tibia_re_login_field_provenance/probe.py \
             --client "$PROV_ROOT/pkg/client" \
             --version "$PROV_VERSION" \
@@ -119,6 +120,9 @@ jobs:
             --unpacked-sha256 "$PROV_UNPACKED_SHA" \
             --unpacked-size "$PROV_UNPACKED_SIZE" \
             --output artifacts/current-game-login-field-provenance/result.json
+          python3 tools/tibia_re_login_field_provenance/probe_qmeta.py \
+            --client "$PROV_ROOT/pkg/client" \
+            --output artifacts/current-game-login-field-provenance/qmeta.json
           rm -f "$PROV_ROOT/pkg/client" "$PROV_ROOT/pkg/client.lzma"
           echo RAW_CLIENT_RETAINED=false
           echo CURRENT_GAME_LOGIN_FIELD_PROVENANCE=PASS
@@ -127,6 +131,6 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: current-game-login-field-provenance-${{ github.sha }}
-          path: artifacts/current-game-login-field-provenance/result.json
+          path: artifacts/current-game-login-field-provenance/
           if-no-files-found: error
           retention-days: 3

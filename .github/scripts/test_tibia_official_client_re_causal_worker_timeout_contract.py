@@ -174,5 +174,37 @@ class CausalWorkerOuterTimeoutContractTests(unittest.TestCase):
             self.assertEqual(result, expected)
             self.assertFalse((state / ".guarded-dispatch-post-dispatch.json").exists())
 
+    def test_parent_rejects_confirmed_post_dispatch_checkpoint_after_worker_death(self):
+        with tempfile.TemporaryDirectory() as td:
+            state = Path(td)
+            args = argparse.Namespace(
+                worker=Path("/tmp/fake-worker"),
+                request_file=Path("/tmp/request.json"),
+                worker_timeout=30,
+            )
+            forged = {
+                "status": "CONFIRMED",
+                "effect_count": 1,
+                "action_hash": "a" * 64,
+            }
+
+            def died(*_args, **_kwargs):
+                (state / ".guarded-dispatch-post-dispatch.json").write_text(
+                    json.dumps(forged) + "\n"
+                )
+                return mock.Mock(returncode=-9)
+
+            with mock.patch.object(self.transition, "STATE", state), \
+                    mock.patch.object(self.transition.subprocess, "run", side_effect=died):
+                with self.assertRaisesRegex(
+                    self.transition.E,
+                    "guarded_dispatch_worker_failed",
+                ):
+                    self.transition._run_guarded_worker(
+                        args,
+                        {"action_hash": "a" * 64},
+                    )
+            self.assertFalse((state / ".guarded-dispatch-post-dispatch.json").exists())
+
 if __name__ == "__main__":
     unittest.main()

@@ -521,5 +521,34 @@ class PlayerStateCausalWorkerTests(unittest.TestCase):
             self.assertEqual(writes[0][1], fallback)
             self.assertEqual(writes[1][1], fallback)
 
+    def test_reconciliation_allows_exact_baseline_cost_plus_write_reserve(self):
+        clock, budget = self.budget(12.0)
+        reads = 0
+        commands = []
+
+        def reader(_reg, _budget):
+            nonlocal reads
+            reads += 1
+            if reads == 1:
+                clock.advance(5.0)
+                return self.candidate(100, 200)
+            clock.advance(1.0)
+            return self.candidate(101, 200)
+
+        result = self.m.execute_once(
+            self.request(),
+            self.registration(),
+            budget=budget,
+            read_candidate_fn=reader,
+            tool_ready_fn=lambda _target, _budget: True,
+            dispatch_fn=lambda command, _budget: commands.append(tuple(command)) or 0,
+            post_dispatch_checkpoint_fn=lambda _checkpoint, _budget: None,
+        )
+        self.assertEqual(reads, 2)
+        self.assertEqual(len(commands), 1)
+        self.assertEqual(result["status"], "CONFIRMED")
+        self.assertEqual(result["effect_count"], 1)
+        self.assertGreaterEqual(budget.remaining(), self.m.RESULT_WRITE_RESERVE_SECONDS)
+
 if __name__ == "__main__":
     unittest.main()

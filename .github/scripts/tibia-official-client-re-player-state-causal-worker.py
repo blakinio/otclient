@@ -354,7 +354,7 @@ def execute_once(
     for attempt in range(max(1, reconciliation_attempts)):
         try:
             budget.require(
-                baseline_read_seconds + RESULT_WRITE_RESERVE_SECONDS,
+                baseline_read_seconds,
                 reserve=RESULT_WRITE_RESERVE_SECONDS,
             )
             if attempt:

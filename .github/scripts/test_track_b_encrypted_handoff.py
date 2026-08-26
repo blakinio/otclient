@@ -39,6 +39,9 @@ assert 'openssl' in prepare
 assert 'LAB_ENCRYPTED_HANDOFF_OPENSSL_READY=true' in prepare
 
 assert 'set +x' in emitter
+assert "    'stayloggedin': True," in emitter
+assert "    'stayloggedin': False," not in emitter
+assert 'devicecookie' not in emitter.casefold()
 assert 'CERT=.github/track-b-encrypted-handoff/recipient.pem' in emitter
 assert 'openssl cms -encrypt' in emitter
 assert '-aes-256-cbc' in emitter
@@ -47,7 +50,11 @@ assert 'rm -f /lab/secrets/login-response.json /lab/secrets/login-handoff.json' 
 assert "! grep -a -q 'sessionKey' \"$OUT\"" in emitter
 assert 'sessionKey' in emitter and 'characterName' in emitter and 'worldHost' in emitter
 assert 'LAB_ENCRYPTED_HANDOFF_ERROR_CODE=' in emitter
-assert 'errorMessage' not in emitter
+assert "error_message = doc.get('errorMessage')" in emitter
+assert 'LAB_ENCRYPTED_HANDOFF_ERROR_CATEGORY=' in emitter
+assert 'LAB_ENCRYPTED_HANDOFF_ERROR_MESSAGE=' not in emitter
+assert 'print(error_message)' not in emitter
+assert 'print(f"{error_message}")' not in emitter
 assert "docker exec \"$CONTAINER\" python3 - <<'PY'" not in emitter
 assert "docker exec -i \"$CONTAINER\" python3 - <<'PY'" in emitter
 

@@ -69,7 +69,7 @@ from pathlib import Path
 payload = {
     'email': os.environ['TIBIA_TEST_EMAIL'],
     'password': os.environ['TIBIA_TEST_PASSWORD'],
-    'stayloggedin': False,
+    'stayloggedin': True,
     'type': 'login',
     'clientversion': os.environ['TIBIA_CLIENT_VERSION_STRING'],
     'clienttype': 2,
@@ -97,6 +97,23 @@ if error_code not in (None, 0):
         print(f'LAB_ENCRYPTED_HANDOFF_ERROR_CODE={error_code}')
     else:
         print('LAB_ENCRYPTED_HANDOFF_ERROR_CODE=NONINTEGER')
+    error_message = doc.get('errorMessage')
+    message = error_message.casefold() if isinstance(error_message, str) else ''
+    if ('blocked' in message and ('minute' in message or 'temporar' in message)):
+        category = 'temporary_block'
+    elif any(token in message for token in ('authenticator', 'one-time', 'one time', 'token')):
+        category = 'authenticator'
+    elif any(token in message for token in ('password', 'credential', 'email address', 'e-mail address')):
+        category = 'credentials'
+    elif any(token in message for token in ('maintenance', 'currently down', 'server is not online')):
+        category = 'maintenance'
+    elif any(token in message for token in ('too many', 'rate limit', 'try again later')):
+        category = 'rate_limit'
+    elif 'account' in message and any(token in message for token in ('disabled', 'deleted', 'locked', 'banned', 'suspended', 'frozen', 'not active')):
+        category = 'account_state'
+    else:
+        category = 'other'
+    print(f'LAB_ENCRYPTED_HANDOFF_ERROR_CATEGORY={category}')
     raise SystemExit('official login response rejected')
 session = doc.get('session')
 playdata = doc.get('playdata')

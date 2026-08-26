@@ -1,18 +1,19 @@
 ---
 task_id: OTC-20260826-current-game-login-wire-writer-promotion
-status: investigating
+status: validating
 agent: ChatGPT
 session_role: coordinator
 project_lane: otclient
 lane: P2-NETWORK
 track_id: official-client-re
 task_kind: integration
-phase: audit
+phase: validate
 branch: docs/OTC-20260826-current-game-login-wire-writer-promotion
+related_pr: 706
 base_branch: main
 base_main: c9525b8c9fb98b61f8fcd57ccd32f4bd873a800c
 created: 2026-08-26T20:48:00+02:00
-updated: 2026-08-26T20:48:00+02:00
+updated: 2026-08-26T20:54:00+02:00
 risk: medium
 execution_mode: github_only
 execution_reason: coordinator audit and docs-only promotion of sanitized exact-current static evidence
@@ -37,6 +38,10 @@ continuation_policy: continue_until_real_stop
 policy_version: 2
 session_role_detail: independent_coordinator_validator
 validation_level: focused
+last_progress_at: 2026-08-26T20:54:00+02:00
+repair_cycles_for_current_gate: 0
+identical_failure_retries: 0
+stall_warnings: 0
 owned_paths:
   - docs/agents/evidence/OTC-20260826-current-game-login-wire-writer-promotion/**
   - docs/agents/tasks/active/OTC-20260826-current-game-login-wire-writer-promotion.md
@@ -74,33 +79,78 @@ freeze CI          33001390982 = SUCCESS
 freeze governance  33001390364 = SUCCESS
 ```
 
-The coordinator re-downloaded artifact `9617908322`; ZIP SHA-256 independently equals the GitHub artifact digest above. The contained sanitized `result.json` SHA-256 is `022a58f738b6586e9143f9e558cb19e89e4fdeb83cd4624a5c7a5cb9dbceddd7`.
+The coordinator independently re-downloaded and re-hashed artifact `9617908322`. ZIP SHA-256 equals the GitHub artifact digest exactly. Contained sanitized `result.json` SHA-256 is `022a58f738b6586e9143f9e558cb19e89e4fdeb83cd4624a5c7a5cb9dbceddd7`.
 
 ## Required review
 
-- [ ] Independently verify exact client fence and safety markers from primary artifact.
-- [ ] Falsify `sendLogin` QMeta case -> adapter -> queue vslot `+0x68` current-build chain.
-- [ ] Falsify current padding/XTEA and sequence dataflow.
-- [ ] Falsify unique final framing serializer and `QDataStream::writeRawData` boundary.
-- [ ] Falsify current Qt/QTcpSocket construction graph without claiming the OS syscall.
-- [ ] Compare current native outer transport structurally with Track B code and reject unsupported framing guesses.
-- [ ] Preserve queue asynchronous-drain and exact current generated login-message field schema as `UNKNOWN`.
-- [ ] Review complete source PR diff and ensure no proprietary client, secrets or Track B mutation is promoted.
-- [ ] Exact promotion-head CI/governance pass and review threads are zero before merge.
+- [x] Exact client fence and safety markers independently verified from primary artifact.
+- [x] `sendLogin` QMeta case -> adapter -> queue vslot `+0x68` current-build chain falsified and accepted.
+- [x] Current padding/XTEA and sequence dataflow independently checked.
+- [x] Unique final framing serializer and `QDataStream::writeRawData` boundary independently checked.
+- [x] Current Qt/QTcpSocket construction graph checked without claiming the OS syscall.
+- [x] Current native outer transport compared structurally with Track B; unsupported framing guess rejected.
+- [x] Queue asynchronous drain and exact current generated login-message field schema remain `UNKNOWN`.
+- [x] Complete source PR changed-file inventory reviewed; no proprietary client, secrets or Track B mutation is promoted.
+- [ ] Exact promotion-head CI/governance pass and review threads remain zero before merge.
+
+Durable coordinator evidence:
+
+- `docs/agents/evidence/OTC-20260826-current-game-login-wire-writer-promotion/20260826-coordinator-promotion.md`
+- `docs/agents/evidence/OTC-20260826-current-game-login-wire-writer-promotion/result.json`
+
+## Audit disposition
+
+```yaml
+audit:
+  result: PASS_BOUNDED
+  decision: ACCEPT_WITH_EDITS
+  independent_validator_role: coordinator
+  primary_artifact_rehashed: true
+  researcher_summary_used_as_proof: false
+  source_diff_reviewed: true
+  material_findings_open: 0
+accepted:
+  current_exact_client_fence: PROVEN
+  current_sendlogin_qmeta_case: PROVEN
+  current_sendlogin_adapter: PROVEN
+  current_queue_vslot_plus_0x68_target: PROVEN
+  current_padding: PROVEN
+  current_xtea_mode2_transform: PROVEN
+  current_sequence: PROVEN
+  current_framing: PROVEN
+  current_qdatastream_raw_write: PROVEN
+  current_qt_bound_binary_writer: PROVEN
+  track_b_outer_transport_shape: STRUCTURALLY_ALIGNED
+  track_b_next_guess_should_change_outer_framing: REJECTED
+withheld:
+  queue_async_drain_to_client_processor: UNKNOWN
+  current_generated_login_message_field_schema: UNKNOWN
+  final_frame_receiver_concrete_rtti_name: UNKNOWN
+  final_os_socket_syscall: UNKNOWN_OPTIONAL
+  causal_explanation_of_track_b_0x14: UNKNOWN
+```
 
 ## E2E
 
-`NOT_APPLICABLE` — coordinator promotion is static docs/evidence integration only; no client or network behavior is changed.
+```yaml
+e2e:
+  result: NOT_APPLICABLE
+  reason: docs-only coordinator promotion of exact-file static protocol evidence; no runtime behavior is changed
+```
 
 ## Context checkpoint
 
 ```yaml
 checkpoint_version: 1
-status: investigating
-phase: audit
+status: validating
+phase: validate
+branch: docs/OTC-20260826-current-game-login-wire-writer-promotion
+pr: 706
 source_pr: 699
 source_artifact: 9617908322
 source_artifact_digest_match: PASS
-material_findings_open: UNKNOWN
-next_action: independently validate source artifact claims and publish a bounded promotion report or reject the source with exact finding IDs.
+decision: ACCEPT_WITH_EDITS
+material_findings_open: 0
+blocker: none
+next_action: Run exact-head repository CI and Track A governance for PR #706; if green with zero review threads and current-main freshness, freeze ready state and merge the docs-only promotion.
 ```

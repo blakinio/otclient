@@ -39,6 +39,10 @@ assert 'openssl' in prepare
 assert 'LAB_ENCRYPTED_HANDOFF_OPENSSL_READY=true' in prepare
 
 assert 'set +x' in emitter
+assert 'CLIENT_VERSION_STRING=15.32.bf29ac' not in emitter
+assert 'tibiaclient-linux-current/package.json' in emitter
+assert 'LAB_ENCRYPTED_HANDOFF_CLIENT_VERSION_CURRENT=true' in emitter
+assert "[[ \"$CLIENT_VERSION_STRING\" =~ ^15\\.32\\.[0-9a-fA-F]{6}$ ]]" in emitter
 assert "    'stayloggedin': True," in emitter
 assert "    'stayloggedin': False," not in emitter
 assert 'devicecookie' not in emitter.casefold()

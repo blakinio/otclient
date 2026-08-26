@@ -14,7 +14,6 @@ STATE_VOLUME=otclient-tibia-global-login-state
 IMAGE=otclient-tibia-global-login-lab-runtime:local
 CERT=.github/track-b-encrypted-handoff/recipient.pem
 OUT=artifacts/encrypted-handoff/handoff.cms
-CLIENT_VERSION_STRING=15.32.bf29ac
 
 cleanup() {
   docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
@@ -54,6 +53,12 @@ done
 grep -Eq "^warp=(on|plus)$" /tmp/handoff-warp.trace
 '
 echo LAB_ENCRYPTED_HANDOFF_WARP_READY=true
+
+docker exec "$CONTAINER" bash -lc "curl --socks5-hostname 127.0.0.1:25344 --compressed -fsSL --connect-timeout 15 --max-time 60 -A 'Mozilla/5.0' https://static.tibia.com/launcher/tibiaclient-linux-current/package.json -o /tmp/current-package.json"
+CLIENT_VERSION_STRING=$(docker exec "$CONTAINER" python3 -c "import json; print(str(json.load(open('/tmp/current-package.json', encoding='utf-8')).get('version') or ''))")
+[[ "$CLIENT_VERSION_STRING" =~ ^15\.32\.[0-9a-fA-F]{6}$ ]]
+docker exec "$CONTAINER" rm -f /tmp/current-package.json
+echo LAB_ENCRYPTED_HANDOFF_CLIENT_VERSION_CURRENT=true
 
 ASSET_VERSION=$(docker exec "$CONTAINER" bash -lc \
   "curl --socks5-hostname 127.0.0.1:25344 --compressed -fsSL --connect-timeout 15 --max-time 60 -A 'Mozilla/5.0' https://static.tibia.com/launcher/assets-current/assets.json.sha256 | awk 'NR==1{print \$1}'")

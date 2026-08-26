@@ -1,4 +1,4 @@
-name: Track A current game-login field provenance
+name: Track A current game-login deep field provenance
 
 on:
   workflow_dispatch:
@@ -22,15 +22,18 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Validate probe contract
+      - name: Validate focused probe
         shell: bash
         run: |
           set -Eeuo pipefail
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends curl python3-capstone python3-pyelftools
-          python3 tools/tibia_re_login_field_provenance/test_probe.py
-          python3 -m py_compile tools/tibia_re_login_field_provenance/probe.py
           python3 -m py_compile tools/tibia_re_login_field_provenance/probe_qmeta.py
+          python3 -m py_compile tools/tibia_re_login_field_provenance/probe_deep.py
+          grep -F "'runtime_access': 'none'" tools/tibia_re_login_field_provenance/probe_deep.py >/dev/null
+          grep -F "'login_performed': False" tools/tibia_re_login_field_provenance/probe_deep.py >/dev/null
+          grep -F "'secret_access': False" tools/tibia_re_login_field_provenance/probe_deep.py >/dev/null
+          grep -F "'raw_client_uploaded': False" tools/tibia_re_login_field_provenance/probe_deep.py >/dev/null
 
       - name: Prepare exact public client package through WARP
         shell: bash
@@ -89,10 +92,9 @@ jobs:
           PY
           echo "PROV_ROOT=$r" >> "$GITHUB_ENV"
           echo "PROV_BASE=$base" >> "$GITHUB_ENV"
-          echo CURRENT_LOGIN_FIELD_PROVENANCE_WARP_READY=true
           trap - EXIT
 
-      - name: Materialize transient exact client and recover field provenance
+      - name: Materialize transient exact client and recover deep provenance
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -113,24 +115,17 @@ jobs:
           print('CURRENT_LOGIN_FIELD_PROVENANCE_MATERIALIZATION=PASS')
           PY
           mkdir -p artifacts/current-game-login-field-provenance
-          python3 tools/tibia_re_login_field_provenance/probe.py \
+          PYTHONPATH=tools/tibia_re_login_field_provenance python3 tools/tibia_re_login_field_provenance/probe_deep.py \
             --client "$PROV_ROOT/pkg/client" \
-            --version "$PROV_VERSION" \
-            --packed-sha256 "$PROV_PACKED_SHA" \
-            --unpacked-sha256 "$PROV_UNPACKED_SHA" \
-            --unpacked-size "$PROV_UNPACKED_SIZE" \
-            --output artifacts/current-game-login-field-provenance/result.json
-          python3 tools/tibia_re_login_field_provenance/probe_qmeta.py \
-            --client "$PROV_ROOT/pkg/client" \
-            --output artifacts/current-game-login-field-provenance/qmeta.json
+            --output artifacts/current-game-login-field-provenance/deep.json
           rm -f "$PROV_ROOT/pkg/client" "$PROV_ROOT/pkg/client.lzma"
           echo RAW_CLIENT_RETAINED=false
-          echo CURRENT_GAME_LOGIN_FIELD_PROVENANCE=PASS
+          echo CURRENT_GAME_LOGIN_DEEP_FIELD_PROVENANCE=PASS
 
-      - name: Upload sanitized provenance only
+      - name: Upload sanitized deep provenance only
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: current-game-login-field-provenance-${{ github.sha }}
-          path: artifacts/current-game-login-field-provenance/
+          name: current-game-login-deep-field-provenance-${{ github.sha }}
+          path: artifacts/current-game-login-field-provenance/deep.json
           if-no-files-found: error
           retention-days: 3

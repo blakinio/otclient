@@ -391,6 +391,59 @@ def dynamic_symbols(path: Path, patterns: tuple[str, ...]) -> list[str]:
     return sorted(set(out))
 
 
+def reference_scan(img: Image, rip_targets: set[int], direct_targets: set[int]) -> dict:
+    rip = {target: [] for target in rip_targets}
+    direct = {target: [] for target in direct_targets}
+    for sec in img.sections:
+        if not (sec.flags & 4) or not sec.size:
+            continue
+        blob = img.raw[sec.off:sec.off + sec.size]
+        for ins in img.md.disasm(blob, sec.va):
+            if ins.mnemonic == 'call' and ins.operands and ins.operands[0].type == X86_OP_IMM:
+                target = int(ins.operands[0].imm)
+                if target in direct:
+                    direct[target].append(ins.address)
+            for op in ins.operands:
+                if op.type != X86_OP_MEM or op.mem.base != X86_REG_RIP:
+                    continue
+                target = ins.address + ins.size + int(op.mem.disp)
+                if target in rip:
+                    rip[target].append(ins.address)
+    return {'rip': rip, 'direct': direct}
+
+
+def rip_refs(img: Image, target: int) -> list[int]:
+    return reference_scan(img, {target}, set())['rip'][target]
+
+
+def direct_calls(img: Image, target: int) -> list[int]:
+    return reference_scan(img, set(), {target})['direct'][target]
+
+
+def plt_symbol_addresses(path: Path, needles: tuple[str, ...]) -> dict[str, list[int]]:
+    out = {}
+    with path.open('rb') as fh:
+        elf = ELFFile(fh)
+        plt = elf.get_section_by_name('.plt')
+        plt_sec = elf.get_section_by_name('.plt.sec')
+        for relsec in elf.iter_sections():
+            if not isinstance(relsec, RelocationSection) or '.plt' not in relsec.name:
+                continue
+            symtab = elf.get_section(relsec['sh_link'])
+            for index, rel in enumerate(relsec.iter_relocations()):
+                name = symtab.get_symbol(rel['r_info_sym']).name if rel['r_info_sym'] else ''
+                if not name or not any(token in name for token in needles):
+                    continue
+                addresses = out.setdefault(name, [])
+                if plt_sec is not None:
+                    entsize = int(plt_sec['sh_entsize']) or 16
+                    addresses.append(int(plt_sec['sh_addr']) + index * entsize)
+                if plt is not None:
+                    entsize = int(plt['sh_entsize']) or 16
+                    addresses.append(int(plt['sh_addr']) + (index + 1) * entsize)
+    return {name: sorted(set(values)) for name, values in sorted(out.items())}
+
+
 def hx(v: int) -> str:
     return f'0x{v:x}'
 
@@ -489,6 +542,71 @@ def main() -> int:
     )
     rtti_vtables = {name: rtti_vtable_candidates(GLOBAL_IMAGE, name) for name in rtti_names}
 
+    plt_symbols = plt_symbol_addresses(args.client, ('QDataStream', 'QTcpSocket', 'QIODevice', 'QBuffer'))
+    vtable_aps = {}
+    rip_targets = set()
+    for name, rows in rtti_vtables.items():
+        aps = []
+        for row in rows:
+            for ap in row['address_points']:
+                value = int(ap['address_point'], 16)
+                aps.append(value)
+                rip_targets.add(value)
+        vtable_aps[name] = sorted(set(aps))
+
+    writer_slot_targets = {}
+    writer_rows = rtti_vtables.get('TIODeviceWriter', [])
+    if len(writer_rows) == 1 and writer_rows[0]['address_points']:
+        slots = writer_rows[0]['address_points'][0]['slots']
+        by_offset = {slot['offset']: slot for slot in slots}
+        for offset in ('0x30', '0x38', '0x58'):
+            slot = by_offset.get(offset)
+            if slot and slot['executable']:
+                target = int(slot['target'], 16)
+                writer_slot_targets[offset] = target
+                rip_targets.add(target)
+
+    direct_targets = {addr for values in plt_symbols.values() for addr in values}
+    reference_hits = reference_scan(GLOBAL_IMAGE, rip_targets, direct_targets)
+
+    def ref_record(addr: int) -> dict:
+        fde = GLOBAL_IMAGE.containing_fde(addr)
+        return {
+            'at': hx(addr),
+            'fde': [hx(fde[0]), hx(fde[1])] if fde else None,
+            'context': instruction_context(GLOBAL_IMAGE, addr, before=7, after=5),
+        }
+
+    vtable_reference_contexts = {
+        name: [
+            {'address_point': hx(ap), 'refs': [ref_record(addr) for addr in reference_hits['rip'].get(ap, [])[:12]]}
+            for ap in aps
+        ]
+        for name, aps in vtable_aps.items()
+    }
+    writer_slot_ref_fdes = {}
+    for offset, target in writer_slot_targets.items():
+        refs = reference_hits['rip'].get(target, [])
+        writer_slot_ref_fdes[offset] = {
+            'target': hx(target),
+            'refs': [ref_record(addr) for addr in refs[:24]],
+            'unique_fdes': sorted({
+                f'{hx(fde[0])}..{hx(fde[1])}'
+                for addr in refs
+                for fde in [GLOBAL_IMAGE.containing_fde(addr)]
+                if fde is not None
+            }),
+        }
+    plt_direct_calls = {
+        name: {
+            'plt_addresses': [hx(addr) for addr in addresses],
+            'direct_call_sites': [
+                hx(site) for addr in addresses for site in reference_hits['direct'].get(addr, [])[:24]
+            ],
+        }
+        for name, addresses in plt_symbols.items()
+    }
+
     selected = re.compile(r'(login|write|send|data|message|connect|socket|packet)', re.I)
     result = {
         'schema': 'otclient.track-a.current-game-login-wire-writer.discovery.v1',
@@ -518,6 +636,9 @@ def main() -> int:
         },
         'tcp_metaobjects': [sanitize_class(c, selected) if 'error' not in c else c for c in tcp_classes],
         'rtti_vtables': rtti_vtables,
+        'vtable_reference_contexts': vtable_reference_contexts,
+        'writer_slot_ref_fdes': writer_slot_ref_fdes,
+        'plt_direct_calls': plt_direct_calls,
         'dynamic_symbols': dynamic_symbols(args.client, ('QDataStream', 'QTcpSocket', 'QIODevice', 'writeRawData'))[:300],
         'classification': {
             'current_sendlogin_qmeta': 'PROVEN',
@@ -547,6 +668,9 @@ def main() -> int:
     print('SENDLOGIN_ADAPTER_INDIRECT_MEMORY_DISPS=' + ','.join(hex(value) for value in adapter_virtual_disps))
     for name, rows in rtti_vtables.items():
         print('RTTI_VTABLE_CANDIDATES_' + name.upper() + '=' + str(len(rows)))
+    print('PLT_SYMBOL_MATCH_COUNT=' + str(len(plt_direct_calls)))
+    for offset, row in writer_slot_ref_fdes.items():
+        print('WRITER_SLOT_REF_FDES_' + offset.upper().replace('0X', '0x') + '=' + ','.join(row['unique_fdes']))
     print('RAW_CLIENT_UPLOADED=false')
     print('LOGIN_PERFORMED=false')
     print('SECRET_ACCESS=false')

@@ -92,7 +92,8 @@ class DeadlineBudget:
         return min(float(cap), remaining)
 
     def require(self, minimum: float = 0.0, *, reserve: float = 0.0) -> None:
-        if self.remaining(reserve=reserve) < minimum:
+        remaining = self.remaining(reserve=reserve)
+        if remaining <= 0.0 or remaining < minimum:
             raise WorkerDeadlineExceeded("insufficient worker deadline budget")
 
     def sleep(self, seconds: float, *, reserve: float = 0.0) -> None:
@@ -262,10 +263,18 @@ def read_candidate(registration: Mapping[str, Any], budget: DeadlineBudget) -> d
 
 
 def dispatch(command: Sequence[str], budget: DeadlineBudget) -> int:
+    # Deadline exhaustion can happen before subprocess creation. Preserve that as
+    # a no-effect refusal instead of falsely claiming a possibly-dispatched input.
     try:
         return _run(command, budget, timeout_cap=DISPATCH_TIMEOUT_CAP_SECONDS).returncode
-    except (OSError, subprocess.TimeoutExpired, WorkerDeadlineExceeded):
+    except WorkerDeadlineExceeded:
+        raise
+    except subprocess.TimeoutExpired:
+        # The child was created and may already have sent input before timing out.
         return 255
+    except OSError as exc:
+        # subprocess creation failed before a child/effect could be established.
+        raise WorkerRefusal("INPUT_DISPATCH_NOT_STARTED") from exc
 
 
 def _refused(action_hash: str, reason: str) -> dict[str, Any]:
@@ -312,9 +321,17 @@ def execute_once(
 
     direction = req["parameters"]["direction"]
     command = dispatch_command(target, direction)
-    # Exactly one dispatch call after the preconditions. A timeout/error here is
-    # effect-ambiguous and is never retried.
-    rc = dispatch_fn(command, budget)
+    # Exactly one dispatch attempt after the preconditions. Deadline/spawn failure
+    # before child creation is effect_count=0; once the child starts, nonzero or
+    # timeout is conservatively effect-ambiguous and is never retried.
+    try:
+        rc = dispatch_fn(command, budget)
+    except WorkerDeadlineExceeded:
+        return _refused(req["action_hash"], "INPUT_DISPATCH_DEADLINE_BEFORE_START")
+    except WorkerRefusal:
+        return _refused(req["action_hash"], "INPUT_DISPATCH_NOT_STARTED")
+    except OSError:
+        return _refused(req["action_hash"], "INPUT_DISPATCH_NOT_STARTED")
     if rc != 0:
         return _ambiguous(req["action_hash"], "INPUT_DISPATCH_UNCERTAIN")
 

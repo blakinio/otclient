@@ -76,14 +76,20 @@ implementation_merge_commit: 43653aeffc08a70ecd4a7a53b4be90f528e62b99
 ownership_released: true
 task_archived: true
 archive_pr: 716
-archive_independent_audit: REQUIRED
-archive_independent_audit_review: PENDING
-archive_independent_audit_material_findings_open: UNKNOWN
-archive_exact_head_governance: REQUIRED
-archive_exact_head_ci: REQUIRED
-archive_merged: false
-current_blocker: NONE_ARCHIVE_CLOSEOUT_ONLY
-next_action: run fresh archive audit and exact-head governance/CI on PR #716, merge, then bind terminal archive metadata
+archive_independent_audit: PASS
+archive_independent_audit_review: 5035333798
+archive_independent_audit_material_findings_open: 0
+archive_exact_final_head: 2031760c66292bdbaf6e805f63037fc94581c6c9
+archive_exact_head_governance_run: 33016736247
+archive_exact_head_governance: PASS
+archive_exact_head_ci_run: 33016736479
+archive_exact_head_ci: PASS
+archive_exact_head_required_context: CI / Required
+archive_exact_head_required_job: 98336845734
+archive_merge_commit: 248d12ad0f3e047e921efe2074f74ccb1e20c3d3
+archive_merged: true
+current_blocker: NONE
+next_action: NONE
 ---
 
 # In-game admission hardening — terminal archive
@@ -98,4 +104,6 @@ No new `IN_GAME` producer was introduced. Current `existing_runtime_adoption_v1`
 
 The implementation exact final head `ee4adcfee582e53ce8c717d21b1b4caf2203d356` passed validator review `5035317009`, Track A causal timing `33016493691`, agent runtime governance `33016493675`, canonical live governance `33016493683`, hosted XRes `33016493615`, repository CI `33016493792`, and `CI / Required` job `98336204700` before merge.
 
-This lifecycle performed zero runtime/client observations, zero login/relog/restart/character selection, zero gameplay input, zero READY, zero COMMIT, zero physical actions, zero credentials, and zero process-memory writes. Durable evidence remains at `docs/agents/evidence/OTC-20260826-in-game-admission-hardening/root-cause-and-repair.md`.
+Archive PR #716 exact head `2031760c66292bdbaf6e805f63037fc94581c6c9` passed fresh archive audit `5035333798`, Track A agent runtime governance `33016736247`, repository CI `33016736479`, and `CI / Required` job `98336845734`, then merged as `248d12ad0f3e047e921efe2074f74ccb1e20c3d3`.
+
+This lifecycle performed zero runtime/client observations, zero login/relog/restart/character selection, zero gameplay input, zero READY, zero COMMIT, zero physical actions, zero credentials, and zero process-memory writes. Durable evidence remains at `docs/agents/evidence/OTC-20260826-in-game-admission-hardening/root-cause-and-repair.md`. The active task record is absent, ownership is released, the task is archived, `current_blocker` is `NONE`, and `next_action` is `NONE`.

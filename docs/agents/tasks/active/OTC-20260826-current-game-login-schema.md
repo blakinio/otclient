@@ -39,7 +39,7 @@ validation_level: focused
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
 owned_paths:
-  - .github/workflows/tibia-official-client-re-current-game-login-schema.yml
+  - .github/workflows/tibia-official-client-re-gameserver-tcp-writer-provenance.yml
   - tools/tibia_re_current_game_login_schema/**
   - docs/agents/evidence/OTC-20260826-current-game-login-schema/**
   - docs/agents/tasks/active/OTC-20260826-current-game-login-schema.md
@@ -81,7 +81,7 @@ Trusted `main` already proves current outer padding/XTEA/sequence/framing/Qt wri
 checkpoint_version: 1
 status: investigating
 head: cfd535402bba8fe3f95d05c1b07c430b4efdddac
-pr: null
+pr: 711
 proven:
   - no existing open PR/branch owns this exact current-login-schema scope
 unknown:

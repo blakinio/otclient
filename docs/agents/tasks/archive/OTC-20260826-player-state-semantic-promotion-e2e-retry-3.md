@@ -81,15 +81,16 @@ merge_target_pr: 703
 merge_commit: b38979879046752a4598be85d7666e8f4ebc6e9b
 ownership_released: true
 task_archived: true
-archive_pr: PENDING
+archive_pr: 704
 archive_independent_audit: REQUIRED
-archive_independent_audit_review: PENDING
+archive_independent_audit_review_initial: PENDING
+archive_independent_audit_review_exact_final_head: REQUIRED_ON_FINAL_HEAD
 archive_independent_audit_material_findings_open: UNKNOWN
-archive_exact_head_ci: REQUIRED
-archive_exact_head_governance: REQUIRED
-last_progress_at: 2026-08-26T20:36:00+02:00
+archive_exact_head_ci: REQUIRED_AFTER_AUDIT
+archive_exact_head_governance: REQUIRED_AFTER_AUDIT
+last_progress_at: 2026-08-26T20:38:00+02:00
 current_blocker: NONE_ARCHIVE_CLOSEOUT_ONLY
-next_action: open archive PR, run fresh archive audit and exact-head CI/governance, then merge
+next_action: run fresh archive audit, bind its result, then exact-head audit and CI/governance before merging PR #704
 ---
 
 # Player-state semantic promotion E2E retry 3 — terminal archive
@@ -106,4 +107,4 @@ No login, credentials, relog, restart, character selection, process-memory write
 
 PR #703 merged the evidence-only closeout as `b38979879046752a4598be85d7666e8f4ebc6e9b`. Its exact pre-merge head `970e6a8a1208b8cbf107604e00bb86ff4ac03e8f` had fresh validator audit PASS with zero material findings, Track A governance run `33000280252` PASS, and CI run `33000280536` PASS including `CI / Required` job `98280050343`.
 
-Durable primary runtime evidence remains at `docs/agents/evidence/OTC-20260826-player-state-semantic-promotion-e2e-retry-3/runtime-terminal.md`. This archive record releases task ownership permanently; no runtime admission or physical action is authorized by the archive lifecycle.
+Durable primary runtime evidence remains at `docs/agents/evidence/OTC-20260826-player-state-semantic-promotion-e2e-retry-3/runtime-terminal.md`. Archive PR #704 removes the active task record and retains this released archive record. No runtime admission or physical action is authorized by the archive lifecycle.

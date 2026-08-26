@@ -89,7 +89,7 @@ exact_final_head_required_context: CI / Required
 exact_final_head_required_job: 98324530901
 ownership_released: true
 task_archived: true
-archive_pr: PENDING
+archive_pr: 713
 archive_independent_audit: REQUIRED
 archive_independent_audit_review: PENDING
 archive_independent_audit_material_findings_open: UNKNOWN
@@ -97,7 +97,7 @@ archive_exact_head_ci: REQUIRED
 archive_exact_head_governance: REQUIRED
 archive_merged: false
 current_blocker: NONE_ARCHIVE_CLOSEOUT_ONLY
-next_action: open archive PR, run fresh archive audit and exact-head CI/governance, merge, then bind terminal archive metadata
+next_action: run fresh archive audit and exact-head CI/governance on PR #713, merge, then bind terminal archive metadata
 ---
 
 # Player-state semantic promotion E2E retry 4 — terminal archive

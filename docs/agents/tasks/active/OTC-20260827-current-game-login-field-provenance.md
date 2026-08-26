@@ -20,7 +20,7 @@ physical_e2e_required: false
 promotion_authority: coordinator_only
 implementation_authorized: false
 owned_paths:
-  - .github/workflows/tibia-official-client-re-login-field-provenance.yml
+  - .github/workflows/tibia-official-client-re-gameserver-tcp-writer-provenance.yml
   - tools/tibia_re_login_field_provenance/
   - docs/agents/tasks/active/OTC-20260827-current-game-login-field-provenance.md
 modules_touched: []
@@ -73,6 +73,10 @@ Forbidden:
 - uploading or retaining the proprietary client binary;
 - mutating Track B #284;
 - naming password/session/AuthInfo fields from intuition.
+
+## Dispatch isolation
+
+The source branch temporarily reuses the already default-registered workflow path `.github/workflows/tibia-official-client-re-gameserver-tcp-writer-provenance.yml` solely so GitHub can dispatch the branch-local workflow definition. The branch-local definition runs on `ubuntu-24.04`, not on the Synology/self-hosted runner. This source branch is never eligible for merge; coordinator promotion remains docs/evidence-only.
 
 ## Root-cause hypothesis under test
 

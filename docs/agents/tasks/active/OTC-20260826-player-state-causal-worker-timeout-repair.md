@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260826-player-state-causal-worker-timeout-repair
-status: implementing
+status: validating
 agent: ChatGPT
 session_id: chatgpt-causal-worker-timeout-repair-20260826
 session_role: owner
@@ -8,12 +8,16 @@ project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: repository_repair
-phase: implementing
+phase: validate
 policy_version: 2
 branch: fix/OTC-20260826-player-state-causal-worker-timeout-repair
 base_branch: main
 base_sha: 3db06bb0ec3ef17fa92b493f344da326ec6be793
 risk: high
+context_pressure: medium
+context_growth: stable
+context_score: 8
+estimate_confidence: high
 decomposition_decision: single
 decomposition_reason: one timing contract spans the causal worker/result boundary; parallel edits would increase shared-contract risk
 execution_mode: github_only
@@ -32,6 +36,9 @@ feature_scope:
 owned_paths:
   - .github/scripts/tibia-official-client-re-player-state-causal-worker.py
   - .github/scripts/test_tibia_official_client_re_player_state_causal_worker.py
+  - .github/scripts/test_tibia_official_client_re_causal_worker_timeout_contract.py
+  - .github/scripts/test_tibia_official_client_re_causal_worker_dispatch_boundary.py
+  - .github/workflows/track-a-causal-worker-timing.yml
   - docs/agents/tasks/active/OTC-20260826-player-state-causal-worker-timeout-repair.md
   - docs/agents/tasks/archive/OTC-20260826-player-state-causal-worker-timeout-repair.md
 modules_touched:
@@ -74,14 +81,19 @@ source_runtime_job: 98101615158
 source_runtime_head: 56f60bbf5d84eb43d5722349e445e99c5cb3839d
 source_terminal_result: AMBIGUOUS_POST_COMMIT_NO_VALID_RESULT
 invocation_started_at: 2026-08-26T18:44:00+02:00
-last_progress_at: 2026-08-26T18:53:00+02:00
+last_progress_at: 2026-08-26T19:10:00+02:00
+validation_level: focused
+focused_validation_result: pass
+focused_validation_note: repository-only local behavioral smoke PASS on the deadline/refusal/ambiguous/durable-write invariants; exact-head hosted regression remains required
+self_review_finding: pre-start dispatch deadline was initially overclassified as AMBIGUOUS/effect_count=1; repaired before CI so only a started/uncertain dispatch can be POSSIBLY_DISPATCHED
+heavy_validation_runs: 0
 ci_checks_for_current_head: 0
-ci_check_generation: draft
+ci_check_generation: pending_ready_event
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 0
+repair_cycles_for_current_gate: 1
 context_reconstruction_attempts: 0
 stall_warnings: 0
 ---
@@ -100,6 +112,26 @@ Repair the post-COMMIT causal worker/result timing contract exposed by terminal 
 - terminal causal sequence: READY -> one budget reservation -> COMMIT -> post-COMMIT worker exceeded guarded-dispatch `worker-timeout=30` -> `worker_timeout`
 - conservative terminal classification remains `POSSIBLY_DISPATCHED=true`, `NO_RETRY=true`, physical action count `1`; causal proof was not established.
 
+## Implemented contract
+
+- one monotonic absolute worker deadline starts at worker process entry;
+- outer guarded-dispatch default remains 30 s; worker total budget is 27 s, leaving 3 s parent/scheduling margin;
+- 2 s of the worker budget is reserved from tool/read/dispatch/reconciliation waits for durable result publication;
+- every subprocess timeout and reconciliation sleep is capped to the remaining non-write budget;
+- pre-effect semantic/read timeout is `REFUSED/effect_count=0`;
+- dispatch deadline/spawn failure before child creation is `REFUSED/effect_count=0`;
+- once dispatch starts, timeout/nonzero exit is conservatively `AMBIGUOUS/effect_count=1` and is never retried;
+- post-dispatch slow/hung reader, unexpected delta, or reconciliation exhaustion is `AMBIGUOUS/effect_count=1` and never dispatches again;
+- durable result uses mode-restricted temp file, file fsync, atomic replace, directory fsync and deadline admission; inability to prove durability exits nonzero;
+- current parent already rejects worker nonzero/process death before accepting any result, and a regression test locks that behavior.
+
+## Validation evidence so far
+
+- repository-only focused behavioral smoke: PASS (`FOCUSED_CAUSAL_WORKER_LOCAL_PASS=true`); no runtime was accessed;
+- self-review found one material pre-start classification bug and repaired it before hosted CI;
+- TDD covers slow/hung baseline reader, slow dispatch, dispatch-before-start deadline, spawn failure, post-dispatch hung reader, reconciliation exhaustion, result-write deadline, outer-timeout compatibility, exact one-dispatch semantics and parent process-death rejection;
+- retained GitHub-hosted workflow `.github/workflows/track-a-causal-worker-timing.yml` runs the causal worker tests plus canonical guarded-dispatch, Kasm probe and typed player-state resolver regressions on exact checkout.
+
 ## Acceptance criteria
 
 1. Use one deterministic monotonic worker deadline compatible with the known 30-second outer guarded-dispatch contract, with explicit reserved margin for durable result persistence and parent return/scheduling.
@@ -117,10 +149,6 @@ Repair the post-COMMIT causal worker/result timing contract exposed by terminal 
 
 `runtime_access:none`. No Official Tibia process/runtime observation, no Synology physical runtime, no KasmVNC, no input, no movement, no gameplay, no login, no credentials, no process-memory access, no physical retry.
 
-## Current diagnosis
-
-The historical causal worker could execute a 10-second tool check, a 20-second baseline reader, one 10-second dispatch, and up to 12 reconciliation reads each with a 20-second subprocess timeout plus sleeps. Its internal worst-case therefore exceeded the guarded-dispatch outer `worker-timeout=30`. The repair turns those independent fixed waits into slices of one monotonic budget and preserves a durable-result margin.
-
 ## Next action
 
-Implement the deadline-bounded causal worker and focused timing-contract tests on this branch, then validate through GitHub-hosted CI only.
+Trigger exact-head GitHub-hosted validation on a normal PR review event, repair only evidence-backed failures, then obtain an independent exact-head audit before squash merge and lifecycle archive.

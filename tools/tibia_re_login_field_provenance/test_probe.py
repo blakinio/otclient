@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import importlib.util
+import sys
 from pathlib import Path
 
 
@@ -10,6 +11,7 @@ SPEC = importlib.util.spec_from_file_location('field_probe', HERE / 'probe.py')
 if SPEC is None or SPEC.loader is None:
     raise SystemExit('cannot load probe module')
 probe = importlib.util.module_from_spec(SPEC)
+sys.modules[SPEC.name] = probe
 SPEC.loader.exec_module(probe)
 
 

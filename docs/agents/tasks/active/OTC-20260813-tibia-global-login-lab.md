@@ -11,7 +11,7 @@ phase: validate
 branch: feat/OTC-20260813-tibia-global-login-lab
 base_branch: main
 created: 2026-08-13T09:10:00+02:00
-updated: 2026-08-26T14:03:00+02:00
+updated: 2026-08-26T16:44:00+02:00
 risk: medium
 related_pr: 284
 owned_paths:
@@ -49,7 +49,7 @@ decomposition_decision: phased
 decomposition_reason: one shared-state HTTP-auth -> one-shot handoff -> world-entry E2E
 validation_level: focused
 invocation_started_at: 2026-08-23T16:45:00+02:00
-last_progress_at: 2026-08-26T14:03:00+02:00
+last_progress_at: 2026-08-26T16:44:00+02:00
 heavy_validation_runs: 0
 repair_cycles_for_current_gate: 3
 identical_failure_retries: 0
@@ -820,3 +820,18 @@ Current state:
 - public research still provides no authoritative CipSoft mapping for numeric code 7.
 
 Exact next action: do not perform a fourth unchanged or classifier-only login retry. Require genuinely new non-secret evidence that distinguishes or removes the hosted login rejection, such as owner-side successful official-client login/account-state confirmation or authoritative current login-service contract evidence. Once HTTP session/playdata is valid again, resume the existing encrypted handoff -> Molehill local decrypt -> fresh current-asset verification -> one bounded OTClient game-login flow.
+
+## 2026-08-26 current-build encrypted handoff / game 0x14 checkpoint
+
+Durable evidence:
+`docs/agents/evidence/OTC-20260813-tibia-global-login-lab/20260826-current-build-encrypted-handoff-game-0x14.md`
+
+Current state:
+- stale hosted HTTP identity was root-caused and repaired: producer now resolves current public `clientversion`; current cut is `15.32.75d4a0`, official Linux SHA `d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a`, size `52105824`;
+- exact-head `808e72e2410831ba12c2c844f9612795d1400237` encrypted producer succeeded through HTTP 200, valid plaintext reduction, CMS encryption and one ciphertext upload;
+- Molehill locally verified the key/certificate, decrypted without printing values, refreshed current assets (`686e88fdce30242faf6fcc83cfac63af79a7d0522782d0e64202799f5cb97414`) and staged the handoff in tmpfs;
+- exactly one local OTClient game-login sent 230 bytes and received 148 bytes; server opcode sequence included decimal 57 then decimal 20 (`0x14`), followed by structured `GAME_LOGIN_ERROR`;
+- `GAME_START=false`; semantic `IN_GAME=false`; no identical retry was performed;
+- no promoted final queue/TCP game-login writer evidence exists in trusted repo state for current build `15.32.75d4a0`; historical PR #589 evidence is explicitly older-build and does not prove final TCP serialization.
+
+Exact next action: `BLOCKED_REQUIRED_CURRENT_BUILD_GAME_LOGIN_WIRE_WRITER_EVIDENCE`. Do not resend the current packet and do not guess feature toggles. Resume only after current-build final `TProtocolMessageQueue` queue/TCP writer evidence is promoted, compare it against `ProtocolGame::sendLoginPacket()`, then permit at most one evidence-derived E2E.

@@ -149,3 +149,4 @@ jobs:
           path: artifacts/current-game-login-wire-writer/result.json
           if-no-files-found: error
           retention-days: 3
+# producer-generation: 1

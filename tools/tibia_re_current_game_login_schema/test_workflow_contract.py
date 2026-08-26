@@ -20,6 +20,10 @@ def main() -> int:
         'runs-on: [otclient, synology]',
         'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe',
         '15.32.df7b29',
+        'pipefail          sudo',
+        'package.json"          python3',
+        'PY          echo',
+        'PY          python3',
     ]
     for token in forbidden:
         assert token not in text, token

@@ -27,7 +27,8 @@ jobs:
       - name: Prepare secret-free current package through WARP
         shell: bash
         run: |
-          set -Eeuo pipefail          sudo apt-get update -qq
+          set -Eeuo pipefail
+          sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends curl python3-capstone python3-pyelftools
           r="$RUNNER_TEMP/current-login-schema"
           mkdir -p "$r/bin" "$r/state" "$r/pkg"
@@ -51,7 +52,8 @@ jobs:
           done
           grep -Eq '^warp=(on|plus)$' "$r/trace"
           base=https://static.tibia.com/launcher/tibiaclient-linux-current
-          curl --socks5-hostname 127.0.0.1:25344 --compressed -fL "$base/package.json" -o "$r/pkg/package.json"          python3 - "$r/pkg/package.json" "$GITHUB_ENV" <<'PY'
+          curl --socks5-hostname 127.0.0.1:25344 --compressed -fL "$base/package.json" -o "$r/pkg/package.json"
+          python3 - "$r/pkg/package.json" "$GITHUB_ENV" <<'PY'
           import json,re,sys
           doc=json.load(open(sys.argv[1],encoding='utf-8'))
           version=str(doc.get('version') or '')
@@ -75,7 +77,8 @@ jobs:
           print('CURRENT_SCHEMA_CLIENT_VERSION='+version)
           print('CURRENT_SCHEMA_CLIENT_UNPACKED_SHA256='+values['SCHEMA_UNPACKED_SHA'])
           print('CURRENT_SCHEMA_CLIENT_UNPACKED_SIZE='+values['SCHEMA_UNPACKED_SIZE'])
-          PY          echo "SCHEMA_ROOT=$r" >> "$GITHUB_ENV"
+          PY
+          echo "SCHEMA_ROOT=$r" >> "$GITHUB_ENV"
           echo "SCHEMA_BASE=$base" >> "$GITHUB_ENV"
           echo CURRENT_SCHEMA_WARP_READY=true
           trap - EXIT
@@ -99,7 +102,8 @@ jobs:
           if hashlib.sha256(raw).hexdigest()!=expected_sha: raise SystemExit('unpacked hash mismatch')
           pathlib.Path(dst).write_bytes(raw)
           print('CURRENT_SCHEMA_EXACT_FENCE=PASS')
-          PY          python3 tools/tibia_re_current_game_login_schema/probe.py \
+          PY
+          python3 tools/tibia_re_current_game_login_schema/probe.py \
             --client "$SCHEMA_ROOT/pkg/client" \
             --version "$SCHEMA_VERSION" \
             --packed-sha256 "$SCHEMA_PACKED_SHA" \

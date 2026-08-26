@@ -141,7 +141,7 @@ def validate_registration(data: Any) -> Target:
         and data.get("client_size") == SIZE
         and data.get("client_sha256") == SHA
         and data.get("display") == DISPLAY
-        and data.get("state") == "UNKNOWN"
+        and data.get("state") == "IN_GAME"
         and data.get("proof_kind") == PROOF_KIND
     )
     pid = data.get("pid")

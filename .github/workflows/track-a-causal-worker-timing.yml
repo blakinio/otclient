@@ -9,6 +9,7 @@ on:
       - ".github/scripts/test_tibia_official_client_re_player_state_causal_worker.py"
       - ".github/scripts/test_tibia_official_client_re_causal_worker_timeout_contract.py"
       - ".github/scripts/test_tibia_official_client_re_causal_worker_dispatch_boundary.py"
+      - ".github/scripts/test_tibia_official_client_re_in_game_admission.py"
       - ".github/scripts/tibia-official-client-re-canonical-live-transition.py"
       - ".github/scripts/test_tibia_official_client_re_canonical_live_transition.py"
       - ".github/scripts/test_tibia_official_client_re_kasm_existing_runtime_probe.py"
@@ -22,6 +23,7 @@ on:
       - ".github/scripts/test_tibia_official_client_re_player_state_causal_worker.py"
       - ".github/scripts/test_tibia_official_client_re_causal_worker_timeout_contract.py"
       - ".github/scripts/test_tibia_official_client_re_causal_worker_dispatch_boundary.py"
+      - ".github/scripts/test_tibia_official_client_re_in_game_admission.py"
       - ".github/scripts/tibia-official-client-re-canonical-live-transition.py"
       - ".github/scripts/test_tibia_official_client_re_canonical_live_transition.py"
       - ".github/scripts/test_tibia_official_client_re_kasm_existing_runtime_probe.py"
@@ -53,6 +55,7 @@ jobs:
             .github/scripts/test_tibia_official_client_re_player_state_causal_worker.py \
             .github/scripts/test_tibia_official_client_re_causal_worker_timeout_contract.py \
             .github/scripts/test_tibia_official_client_re_causal_worker_dispatch_boundary.py \
+            .github/scripts/test_tibia_official_client_re_in_game_admission.py \
             .github/scripts/tibia-official-client-re-canonical-live-transition.py \
             .github/scripts/test_tibia_official_client_re_canonical_live_transition.py \
             .github/scripts/test_tibia_official_client_re_kasm_existing_runtime_probe.py \
@@ -66,6 +69,7 @@ jobs:
           python3 .github/scripts/test_tibia_official_client_re_player_state_causal_worker.py -q
           python3 .github/scripts/test_tibia_official_client_re_causal_worker_timeout_contract.py -q
           python3 .github/scripts/test_tibia_official_client_re_causal_worker_dispatch_boundary.py -q
+          python3 .github/scripts/test_tibia_official_client_re_in_game_admission.py -q
 
       - name: Run guarded-dispatch and Kasm probe regressions
         shell: bash

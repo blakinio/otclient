@@ -84,13 +84,20 @@ exact_final_head_required_job: 98315253600
 ownership_released: true
 task_archived: true
 archive_pr: 709
-archive_independent_audit: REQUIRED
-archive_independent_audit_review: PENDING
-archive_independent_audit_material_findings_open: UNKNOWN
-archive_exact_head_ci: REQUIRED
-archive_exact_head_governance: REQUIRED
-current_blocker: NONE_ARCHIVE_CLOSEOUT_ONLY
-next_action: run fresh archive audit and exact-head CI/governance on PR #709, merge, then bind terminal archive validation metadata
+archive_independent_audit: PASS
+archive_independent_audit_review: 5034801988
+archive_independent_audit_material_findings_open: 0
+archive_exact_final_head: 0771583b824614823623d1df2ae29328a4f28dae
+archive_exact_head_ci_run: 33010700434
+archive_exact_head_ci: PASS
+archive_exact_head_required_context: CI / Required
+archive_exact_head_required_job: 98315983655
+archive_exact_head_governance_run: 33010700228
+archive_exact_head_governance: PASS
+archive_merge_commit: cfd535402bba8fe3f95d05c1b07c430b4efdddac
+archive_merged: true
+current_blocker: NONE
+next_action: NONE
 ---
 
 # Player-state causal worker post-COMMIT failure RCA — terminal archive
@@ -103,6 +110,8 @@ The repaired parent accepts that fallback only after worker nonzero/timeout and 
 
 PR #708 merged the repair as `2103570b500934256486a048f1809623ce56cf29`. Its frozen exact final head `2cb78e380598f1db65e3291a16f326893350ada9` passed fresh validator review `5034765463`, causal timing run `33010300021`, Track A governance `33010299981`, canonical live governance `33010299982`, hosted XRes validation `33010299993`, repository CI `33010300271`, and `CI / Required` job `98315253600`.
 
+Archive PR #709 merged as `cfd535402bba8fe3f95d05c1b07c430b4efdddac`. Its exact archive head `0771583b824614823623d1df2ae29328a4f28dae` passed fresh archive audit `5034801988`, Track A governance run `33010700228`, CI run `33010700434`, and `CI / Required` job `98315983655`.
+
 `RETRY_4_SAFE_TO_AUTHORIZE=true` is a terminal recommendation about this repaired failure mode only. `retry_4_authorized=false` remains binding. Any future retry-4 requires a separate explicit owner authorization and fresh fail-closed Track A admission from then-current trusted main.
 
-This RCA performed no live runtime observation, gameplay, input, movement, READY, COMMIT, login, credentials, relog, restart, character selection, or process-memory mutation. Durable technical evidence remains at `docs/agents/evidence/OTC-20260826-player-state-causal-worker-postcommit-failure-rca/root-cause-and-repair.md`.
+This RCA performed no live runtime observation, gameplay, input, movement, READY, COMMIT, login, credentials, relog, restart, character selection, or process-memory mutation. Durable technical evidence remains at `docs/agents/evidence/OTC-20260826-player-state-causal-worker-postcommit-failure-rca/root-cause-and-repair.md`. The active task record is absent, ownership is released, the task is archived, `current_blocker` is `NONE`, and `next_action` is `NONE`.

@@ -394,5 +394,40 @@ class PlayerStateCausalWorkerTests(unittest.TestCase):
                 )
 
 
+    def test_reconciliation_does_not_start_doomed_reader_that_consumes_write_reserve(self):
+        clock, budget = self.budget(27.0)
+        reads = 0
+        commands = []
+
+        def reader(_reg, current_budget):
+            nonlocal reads
+            reads += 1
+            if reads <= 2:
+                clock.advance(10.0)
+                return self.candidate(100, 200)
+            timeout = current_budget.timeout(
+                self.m.READER_TIMEOUT_CAP_SECONDS,
+                reserve=self.m.RESULT_WRITE_RESERVE_SECONDS,
+            )
+            clock.advance(timeout + 2.5)
+            raise subprocess.TimeoutExpired(["reader"], timeout)
+
+        result = self.m.execute_once(
+            self.request(),
+            self.registration(),
+            budget=budget,
+            read_candidate_fn=reader,
+            tool_ready_fn=lambda _target, _budget: True,
+            dispatch_fn=lambda command, _budget: commands.append(tuple(command)) or 0,
+            sleep_fn=clock.advance,
+            reconciliation_attempts=12,
+        )
+        self.assertEqual(reads, 2)
+        self.assertEqual(result["status"], "AMBIGUOUS")
+        self.assertEqual(result["effect_count"], 1)
+        self.assertEqual(result["reason_code"], "RECONCILIATION_DEADLINE_EXHAUSTED")
+        self.assertEqual(len(commands), 1)
+        self.assertGreaterEqual(budget.remaining(), self.m.RESULT_WRITE_RESERVE_SECONDS)
+
 if __name__ == "__main__":
     unittest.main()

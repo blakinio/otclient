@@ -313,7 +313,12 @@ def execute_once(
         budget.require(reserve=RESULT_WRITE_RESERVE_SECONDS)
         if not tool_ready_fn(target, budget):
             raise WorkerRefusal("INPUT_TOOL_UNAVAILABLE")
+        baseline_budget_before = budget.remaining(reserve=RESULT_WRITE_RESERVE_SECONDS)
         before = validate_candidate(read_candidate_fn(registration, budget))
+        baseline_read_seconds = max(
+            0.0,
+            baseline_budget_before - budget.remaining(reserve=RESULT_WRITE_RESERVE_SECONDS),
+        )
     except WorkerDeadlineExceeded:
         return _refused(fallback_hash, "SEMANTIC_PRECONDITION_TIMEOUT")
     except (WorkerRefusal, OSError, RuntimeError, subprocess.TimeoutExpired):
@@ -338,7 +343,10 @@ def execute_once(
     last = before
     for attempt in range(max(1, reconciliation_attempts)):
         try:
-            budget.require(reserve=RESULT_WRITE_RESERVE_SECONDS)
+            budget.require(
+                baseline_read_seconds + RESULT_WRITE_RESERVE_SECONDS,
+                reserve=RESULT_WRITE_RESERVE_SECONDS,
+            )
             if attempt:
                 if sleep_fn is None:
                     budget.sleep(

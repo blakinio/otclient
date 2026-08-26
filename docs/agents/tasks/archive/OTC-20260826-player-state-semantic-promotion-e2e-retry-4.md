@@ -90,14 +90,20 @@ exact_final_head_required_job: 98324530901
 ownership_released: true
 task_archived: true
 archive_pr: 713
-archive_independent_audit: REQUIRED
-archive_independent_audit_review: PENDING
-archive_independent_audit_material_findings_open: UNKNOWN
-archive_exact_head_ci: REQUIRED
-archive_exact_head_governance: REQUIRED
-archive_merged: false
-current_blocker: NONE_ARCHIVE_CLOSEOUT_ONLY
-next_action: run fresh archive audit and exact-head CI/governance on PR #713, merge, then bind terminal archive metadata
+archive_independent_audit: PASS
+archive_independent_audit_review: 5035045501
+archive_independent_audit_material_findings_open: 0
+archive_exact_final_head: 8d34649488c0751fd3d9d4d88d1ecbaea91790f8
+archive_exact_head_ci_run: 33013404075
+archive_exact_head_ci: PASS
+archive_exact_head_required_context: CI / Required
+archive_exact_head_required_job: 98325321126
+archive_exact_head_governance_run: 33013403890
+archive_exact_head_governance: PASS
+archive_merge_commit: 64a9a8888a1252669cd410ff3a0c050449a6d5fc
+archive_merged: true
+current_blocker: NONE
+next_action: NONE
 ---
 
 # Player-state semantic promotion E2E retry 4 — terminal archive
@@ -110,4 +116,6 @@ The #708 durable-result repair behaved as intended: unlike retry-3, the canonica
 
 PR #712 merged terminal evidence as `b4de5a1726f5a868f82279c4c135752139a1d10e`. Its exact final head `7053ffd32639791e58566616fd7c4c12a2433097` passed validator review `5035025724`, Track A governance run `33013177009`, CI run `33013177400`, and `CI / Required` job `98324530901`. The physical workflow was removed before that head and is not present in the merged diff.
 
-This task performed no login, credentials, relog, restart, character selection, process-memory write, semantic promotion, or second gameplay action. Durable runtime evidence remains at `docs/agents/evidence/OTC-20260826-player-state-semantic-promotion-e2e-retry-4/runtime-terminal.md`.
+Archive PR #713 merged as `64a9a8888a1252669cd410ff3a0c050449a6d5fc`. Its exact archive head `8d34649488c0751fd3d9d4d88d1ecbaea91790f8` passed fresh archive audit `5035045501`, Track A governance run `33013403890`, CI run `33013404075`, and `CI / Required` job `98325321126`.
+
+This task performed no login, credentials, relog, restart, character selection, process-memory write, semantic promotion, or second gameplay action. Durable runtime evidence remains at `docs/agents/evidence/OTC-20260826-player-state-semantic-promotion-e2e-retry-4/runtime-terminal.md`. The active task record is absent, ownership is released, the task is archived, `current_blocker` is `NONE`, and `next_action` is `NONE`.

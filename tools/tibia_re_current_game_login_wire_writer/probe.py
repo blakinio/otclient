@@ -13,6 +13,7 @@ from capstone import Cs, CS_ARCH_X86, CS_MODE_64
 from capstone.x86_const import X86_OP_IMM, X86_OP_MEM, X86_REG_RIP
 from elftools.elf.elffile import ELFFile
 from elftools.elf.relocation import RelocationSection
+from elftools.dwarf.callframe import FDE
 
 
 @dataclass(frozen=True)
@@ -43,6 +44,12 @@ class Image:
                     if not rel.is_RELA():
                         continue
                     self.relocations[int(rel['r_offset'])] = int(rel['r_addend'])
+            dwarf = elf.get_dwarf_info()
+            self.fdes = sorted(
+                (int(entry['initial_location']), int(entry['initial_location']) + int(entry['address_range']))
+                for entry in dwarf.EH_CFI_entries()
+                if isinstance(entry, FDE)
+            )
         self.md = Cs(CS_ARCH_X86, CS_MODE_64)
         self.md.detail = True
 
@@ -67,6 +74,12 @@ class Image:
 
     def executable(self, va: int) -> bool:
         return any((s.flags & 4) and s.va <= va < s.va + s.size for s in self.sections)
+
+    def containing_fde(self, va: int) -> tuple[int, int] | None:
+        matches = [(lo, hi) for lo, hi in self.fdes if lo <= va < hi]
+        if len(matches) != 1:
+            return None
+        return matches[0]
 
     def u32(self, va: int) -> int:
         return struct.unpack_from('<I', self.raw, self.va_to_off(va))[0]
@@ -225,13 +238,40 @@ def immediate_edges(img: Image, start: int, size: int = 0x280) -> list[dict]:
         if ins.mnemonic not in {'call', 'jmp'} or not ins.operands:
             continue
         op = ins.operands[0]
-        if op.type != X86_OP_IMM:
-            continue
-        target = int(op.imm)
-        if img.executable(target):
-            out.append({'at': ins.address, 'kind': ins.mnemonic, 'target': target})
+        if op.type == X86_OP_IMM:
+            target = int(op.imm)
+            if img.executable(target):
+                out.append({'at': ins.address, 'kind': ins.mnemonic, 'target': target})
+        if ins.mnemonic == 'jmp':
+            break
     return out
 
+
+def function_control_transfers(img: Image, start: int, limit: int = 1200) -> dict:
+    bounds = img.containing_fde(start)
+    if bounds is None:
+        raise RuntimeError(f'no unique FDE for 0x{start:x}')
+    lo, hi = bounds
+    rows = []
+    for ins in list(img.md.disasm(img.bytes(lo, hi - lo), lo))[:limit]:
+        if ins.mnemonic not in {'call', 'jmp'} or not ins.operands:
+            continue
+        op = ins.operands[0]
+        row = {'at': ins.address, 'kind': ins.mnemonic, 'operand': ins.op_str}
+        if op.type == X86_OP_IMM:
+            row['mode'] = 'direct'
+            row['target'] = int(op.imm)
+        elif op.type == X86_OP_MEM:
+            row['mode'] = 'indirect_mem'
+            row['base'] = img.md.reg_name(op.mem.base) if op.mem.base else ''
+            row['index'] = img.md.reg_name(op.mem.index) if op.mem.index else ''
+            row['scale'] = int(op.mem.scale)
+            row['disp'] = int(op.mem.disp)
+        else:
+            row['mode'] = 'indirect_reg'
+            row['reg'] = img.md.reg_name(op.reg)
+        rows.append(row)
+    return {'fde': (lo, hi), 'transfers': rows}
 
 def locate_class(img: Image, class_name: str, required_methods: list[str]) -> dict:
     s_candidates = find_stringdata(img, class_name)
@@ -282,6 +322,16 @@ def hx(v: int) -> str:
     return f'0x{v:x}'
 
 
+def sanitize_transfer(row: dict) -> dict:
+    out = dict(row)
+    out['at'] = hx(int(out['at']))
+    if 'target' in out:
+        out['target'] = hx(int(out['target']))
+    if 'disp' in out:
+        out['disp_hex'] = hex(int(out['disp']))
+    return out
+
+
 def sanitize_class(c: dict, method_filter: re.Pattern[str] | None = None) -> dict:
     methods = c['methods']
     if method_filter:
@@ -326,7 +376,7 @@ def main() -> int:
 
     queue = locate_class(GLOBAL_IMAGE, 'tibia::protocol::TProtocolMessageQueue', ['sendLogin'])
     tcp_classes = []
-    for class_name in ('tibia::net::TGameserverTCPConnection', 'tibia::net::TTCPConnection'):
+    for class_name in ('tibia::network::TGameserverTCPConnection', 'tibia::network::TTCPConnection'):
         try:
             tcp_classes.append(locate_class(GLOBAL_IMAGE, class_name, []))
         except RuntimeError as exc:
@@ -337,6 +387,18 @@ def main() -> int:
         raise RuntimeError(f'expected one sendLogin method, got {len(send)}')
     send = send[0]
     send_edges = immediate_edges(GLOBAL_IMAGE, send['target'])
+    if len(send_edges) != 1 or send_edges[0]['kind'] != 'jmp':
+        raise RuntimeError(f'expected one terminal sendLogin case jump, got {send_edges!r}')
+    send_login_adapter = int(send_edges[0]['target'])
+    adapter_flow = function_control_transfers(GLOBAL_IMAGE, send_login_adapter)
+    adapter_indirect_calls = [
+        row for row in adapter_flow['transfers']
+        if row['kind'] == 'call' and row['mode'].startswith('indirect_')
+    ]
+    adapter_virtual_disps = sorted({
+        int(row['disp']) for row in adapter_indirect_calls
+        if row['mode'] == 'indirect_mem' and int(row.get('disp', 0)) >= 0
+    })
 
     selected = re.compile(r'(login|write|send|data|message|connect|socket|packet)', re.I)
     result = {
@@ -357,11 +419,20 @@ def main() -> int:
             'target': hx(send['target']),
             'edges': [{**e, 'at': hx(e['at']), 'target': hx(e['target'])} for e in send_edges],
         },
+        'send_login_adapter': {
+            'address': hx(send_login_adapter),
+            'adapter_fde': [hx(adapter_flow['fde'][0]), hx(adapter_flow['fde'][1])],
+            'control_transfers': [sanitize_transfer(row) for row in adapter_flow['transfers']],
+            'adapter_indirect_calls': [sanitize_transfer(row) for row in adapter_indirect_calls],
+            'indirect_memory_displacements': [hex(value) for value in adapter_virtual_disps],
+        },
         'tcp_metaobjects': [sanitize_class(c, selected) if 'error' not in c else c for c in tcp_classes],
         'dynamic_symbols': dynamic_symbols(args.client, ('QDataStream', 'QTcpSocket', 'QIODevice', 'writeRawData'))[:300],
         'classification': {
             'current_sendlogin_qmeta': 'PROVEN',
             'current_sendlogin_first_direct_edges': 'PROVEN',
+            'current_sendlogin_adapter_fde': 'PROVEN',
+            'current_sendlogin_adapter_indirect_calls': 'PROVEN',
             'current_tcp_metaobjects': 'DISCOVERY_ONLY',
             'final_writer_contract': 'UNKNOWN',
         },
@@ -379,6 +450,10 @@ def main() -> int:
     print('SENDLOGIN_DIRECT_EDGE_COUNT=' + str(len(send_edges)))
     for i, edge in enumerate(send_edges[:12]):
         print(f'SENDLOGIN_EDGE_{i}={edge["kind"]}@{hx(edge["at"])}->{hx(edge["target"])}')
+    print('SENDLOGIN_ADAPTER=' + hx(send_login_adapter))
+    print('SENDLOGIN_ADAPTER_FDE=' + hx(adapter_flow['fde'][0]) + '..' + hx(adapter_flow['fde'][1]))
+    print('SENDLOGIN_ADAPTER_INDIRECT_CALL_COUNT=' + str(len(adapter_indirect_calls)))
+    print('SENDLOGIN_ADAPTER_INDIRECT_MEMORY_DISPS=' + ','.join(hex(value) for value in adapter_virtual_disps))
     print('RAW_CLIENT_UPLOADED=false')
     print('LOGIN_PERFORMED=false')
     print('SECRET_ACCESS=false')

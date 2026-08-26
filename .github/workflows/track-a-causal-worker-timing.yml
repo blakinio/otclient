@@ -1,0 +1,87 @@
+name: Track A causal worker timing
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - ".github/scripts/tibia-official-client-re-player-state-causal-worker.py"
+      - ".github/scripts/test_tibia_official_client_re_player_state_causal_worker.py"
+      - ".github/scripts/test_tibia_official_client_re_causal_worker_timeout_contract.py"
+      - ".github/scripts/test_tibia_official_client_re_causal_worker_dispatch_boundary.py"
+      - ".github/scripts/tibia-official-client-re-canonical-live-transition.py"
+      - ".github/scripts/test_tibia_official_client_re_canonical_live_transition.py"
+      - ".github/scripts/test_tibia_official_client_re_kasm_existing_runtime_probe.py"
+      - "tools/tibia_re_surveyor/player_state.py"
+      - "tests/tools/tibia_re_surveyor/test_player_state.py"
+      - ".github/workflows/track-a-causal-worker-timing.yml"
+  push:
+    branches: [main]
+    paths:
+      - ".github/scripts/tibia-official-client-re-player-state-causal-worker.py"
+      - ".github/scripts/test_tibia_official_client_re_player_state_causal_worker.py"
+      - ".github/scripts/test_tibia_official_client_re_causal_worker_timeout_contract.py"
+      - ".github/scripts/test_tibia_official_client_re_causal_worker_dispatch_boundary.py"
+      - ".github/scripts/tibia-official-client-re-canonical-live-transition.py"
+      - ".github/scripts/test_tibia_official_client_re_canonical_live_transition.py"
+      - ".github/scripts/test_tibia_official_client_re_kasm_existing_runtime_probe.py"
+      - "tools/tibia_re_surveyor/player_state.py"
+      - "tests/tools/tibia_re_surveyor/test_player_state.py"
+      - ".github/workflows/track-a-causal-worker-timing.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Causal timing regression
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Compile timing-contract Python
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile \
+            .github/scripts/tibia-official-client-re-player-state-causal-worker.py \
+            .github/scripts/test_tibia_official_client_re_player_state_causal_worker.py \
+            .github/scripts/test_tibia_official_client_re_causal_worker_timeout_contract.py \
+            .github/scripts/test_tibia_official_client_re_causal_worker_dispatch_boundary.py \
+            .github/scripts/tibia-official-client-re-canonical-live-transition.py \
+            .github/scripts/test_tibia_official_client_re_canonical_live_transition.py \
+            .github/scripts/test_tibia_official_client_re_kasm_existing_runtime_probe.py \
+            tools/tibia_re_surveyor/player_state.py \
+            tests/tools/tibia_re_surveyor/test_player_state.py
+
+      - name: Run causal worker timing TDD
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/test_tibia_official_client_re_player_state_causal_worker.py -q
+          python3 .github/scripts/test_tibia_official_client_re_causal_worker_timeout_contract.py -q
+          python3 .github/scripts/test_tibia_official_client_re_causal_worker_dispatch_boundary.py -q
+
+      - name: Run guarded-dispatch and Kasm probe regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/test_tibia_official_client_re_canonical_live_transition.py -q
+          python3 .github/scripts/test_tibia_official_client_re_kasm_existing_runtime_probe.py -q
+
+      - name: Run player-state resolver regression
+        env:
+          PYTHONPATH: .
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tests/tools/tibia_re_surveyor/test_player_state.py -q
+
+      - name: Verify full PR whitespace
+        shell: bash
+        run: git diff --check "${{ github.event.pull_request.base.sha }}"...HEAD

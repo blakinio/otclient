@@ -91,7 +91,12 @@ from pathlib import Path
 response_path = Path('/lab/secrets/login-response.json')
 handoff_path = Path('/lab/secrets/login-handoff.json')
 doc = json.loads(response_path.read_text(encoding='utf-8'))
-if doc.get('errorCode') not in (None, 0):
+error_code = doc.get('errorCode')
+if error_code not in (None, 0):
+    if isinstance(error_code, int):
+        print(f'LAB_ENCRYPTED_HANDOFF_ERROR_CODE={error_code}')
+    else:
+        print('LAB_ENCRYPTED_HANDOFF_ERROR_CODE=NONINTEGER')
     raise SystemExit('official login response rejected')
 session = doc.get('session')
 playdata = doc.get('playdata')

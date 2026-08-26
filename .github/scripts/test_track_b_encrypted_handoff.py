@@ -46,6 +46,8 @@ assert '/lab/secrets/login-response.json' in emitter
 assert 'rm -f /lab/secrets/login-response.json /lab/secrets/login-handoff.json' in emitter
 assert "! grep -a -q 'sessionKey' \"$OUT\"" in emitter
 assert 'sessionKey' in emitter and 'characterName' in emitter and 'worldHost' in emitter
+assert 'LAB_ENCRYPTED_HANDOFF_ERROR_CODE=' in emitter
+assert 'errorMessage' not in emitter
 assert "docker exec \"$CONTAINER\" python3 - <<'PY'" not in emitter
 assert "docker exec -i \"$CONTAINER\" python3 - <<'PY'" in emitter
 

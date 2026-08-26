@@ -1,0 +1,83 @@
+{
+  "schema": "otclient.track-a.current-game-login-wire-writer.coordinator-promotion.v1",
+  "decision": "ACCEPT_WITH_EDITS",
+  "source": {
+    "pr": 699,
+    "research_head": "3d87d729b73f868aefe1662c72af666a4921b1d8",
+    "freeze_head": "7de745105ce06271ff45bcdf5e5eaf91268008e5",
+    "run": 32998976901,
+    "artifact": 9617908322,
+    "artifact_digest": "sha256:a43ed724d00e18575d969859ad3345d69f2650ee5790d3dbcf13767de1b9ebf4",
+    "redownloaded_zip_sha256": "a43ed724d00e18575d969859ad3345d69f2650ee5790d3dbcf13767de1b9ebf4",
+    "result_json_sha256": "022a58f738b6586e9143f9e558cb19e89e4fdeb83cd4624a5c7a5cb9dbceddd7"
+  },
+  "exact_client": {
+    "version": "15.32.75d4a0",
+    "packed_sha256": "075810c54af2d6912000eab062763db29563f5a1f4bf1d984154b2d07fd5729f",
+    "unpacked_sha256": "d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a",
+    "unpacked_size": 52105824
+  },
+  "audit": {
+    "primary_artifact_rehashed": true,
+    "researcher_summary_used_as_proof": false,
+    "artifact_checks": {
+      "exact_client": "PASS",
+      "safety_markers": "PASS",
+      "sendlogin_single_terminal_edge": "PASS",
+      "queue_unique_vslot_plus_0x68": "PASS",
+      "unique_frame_serializer": "PASS",
+      "final_frame_vslot_candidate": "PASS",
+      "current_xtea_target": "PASS",
+      "current_sequence_target": "PASS"
+    },
+    "source_changed_files": 6,
+    "source_review_threads": 0,
+    "material_findings_open": 0
+  },
+  "accepted": {
+    "send_login_qmeta_index": 196,
+    "send_login_case": "0xde82a2",
+    "send_login_adapter": "0xbd3050",
+    "queue_vtable_ap": "0x30ed588",
+    "queue_slot_0x68_target": "0xbd24a0",
+    "client_processor_plus_0x10": "0xc29350",
+    "raw_processor_plus_0x10": "0xb36c70",
+    "dual_connection_plus_0x78": "0xb43920",
+    "dual_connection_plus_0x80": "0xb43d10",
+    "network_packet_processor_plus_0x68": "0xf4eca0",
+    "xtea_helper_vtable_ap": "0x2f82ea0",
+    "xtea_helper_slot_0x28": "0xf71eb0",
+    "frame_serializer_fde": "0xf4edd0..0xf4ef15",
+    "qdatastream_write_raw_data_plt": "0x4d6260",
+    "qtcpsocket_ctor_plt": "0x4d6bc0",
+    "tiodevicewriter_ctor_fde": "0x1946510..0x1946652",
+    "outbound_order": [
+      "padding-count byte and pad to 8-byte boundary",
+      "conditional shared::TXteaHelper transform for mode 2",
+      "32-bit sequence dword from TGameserverDualConnection for mode 3",
+      "16-bit block count ceil(payload_length/8)",
+      "32-bit message sequence dword",
+      "raw transformed payload via QDataStream::writeRawData"
+    ],
+    "track_b_outer_transport_shape": "STRUCTURALLY_ALIGNED",
+    "outer_framing_change_as_next_hypothesis": "REJECTED"
+  },
+  "not_promoted": {
+    "final_frame_receiver_concrete_rtti_name": "UNKNOWN",
+    "final_os_socket_syscall": "UNKNOWN_OPTIONAL",
+    "queue_async_drain_to_client_processor": "UNKNOWN",
+    "current_generated_login_message_field_schema": "UNKNOWN",
+    "causal_explanation_of_track_b_0x14": "UNKNOWN"
+  },
+  "safety": {
+    "runtime_access": "none",
+    "official_client_executed": false,
+    "login_performed": false,
+    "secret_access": false,
+    "raw_client_uploaded": false
+  },
+  "e2e": {
+    "result": "NOT_APPLICABLE",
+    "reason": "docs-only coordinator promotion of exact-file static evidence"
+  }
+}

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+import json
 import subprocess
 import sys
 import tempfile
@@ -106,6 +107,104 @@ class CausalWorkerOuterTimeoutContractTests(unittest.TestCase):
                     )
             self.assertFalse((state / ".guarded-dispatch-result.json").exists())
 
+
+    def test_parent_accepts_only_durable_post_dispatch_ambiguous_checkpoint_after_worker_death(self):
+        with tempfile.TemporaryDirectory() as td:
+            state = Path(td)
+            args = argparse.Namespace(
+                worker=Path("/tmp/fake-worker"),
+                request_file=Path("/tmp/request.json"),
+                worker_timeout=30,
+            )
+            expected = {
+                "status": "AMBIGUOUS",
+                "effect_count": 1,
+                "action_hash": "a" * 64,
+                "reason_code": "POST_DISPATCH_RECONCILIATION_INCOMPLETE",
+            }
+
+            def died(*_args, **_kwargs):
+                (state / ".guarded-dispatch-post-dispatch.json").write_text(
+                    json.dumps(expected) + "\n"
+                )
+                return mock.Mock(returncode=-9)
+
+            with mock.patch.object(self.transition, "STATE", state), \
+                    mock.patch.object(self.transition.subprocess, "run", side_effect=died):
+                try:
+                    result = self.transition._run_guarded_worker(
+                        args,
+                        {"action_hash": "a" * 64},
+                    )
+                except Exception as exc:
+                    self.fail(f"durable post-dispatch checkpoint was not accepted: {exc}")
+            self.assertEqual(result, expected)
+            self.assertFalse((state / ".guarded-dispatch-post-dispatch.json").exists())
+
+    def test_parent_accepts_durable_post_dispatch_checkpoint_after_worker_timeout(self):
+        with tempfile.TemporaryDirectory() as td:
+            state = Path(td)
+            args = argparse.Namespace(
+                worker=Path("/tmp/fake-worker"),
+                request_file=Path("/tmp/request.json"),
+                worker_timeout=30,
+            )
+            expected = {
+                "status": "AMBIGUOUS",
+                "effect_count": 1,
+                "action_hash": "a" * 64,
+                "reason_code": "POST_DISPATCH_RECONCILIATION_INCOMPLETE",
+            }
+
+            def timed_out(*_args, **_kwargs):
+                (state / ".guarded-dispatch-post-dispatch.json").write_text(
+                    json.dumps(expected) + "\n"
+                )
+                raise subprocess.TimeoutExpired(["fake-worker"], 30)
+
+            with mock.patch.object(self.transition, "STATE", state), \
+                    mock.patch.object(self.transition.subprocess, "run", side_effect=timed_out):
+                try:
+                    result = self.transition._run_guarded_worker(
+                        args,
+                        {"action_hash": "a" * 64},
+                    )
+                except Exception as exc:
+                    self.fail(f"durable checkpoint was lost on timeout: {exc}")
+            self.assertEqual(result, expected)
+            self.assertFalse((state / ".guarded-dispatch-post-dispatch.json").exists())
+
+    def test_parent_rejects_confirmed_post_dispatch_checkpoint_after_worker_death(self):
+        with tempfile.TemporaryDirectory() as td:
+            state = Path(td)
+            args = argparse.Namespace(
+                worker=Path("/tmp/fake-worker"),
+                request_file=Path("/tmp/request.json"),
+                worker_timeout=30,
+            )
+            forged = {
+                "status": "CONFIRMED",
+                "effect_count": 1,
+                "action_hash": "a" * 64,
+            }
+
+            def died(*_args, **_kwargs):
+                (state / ".guarded-dispatch-post-dispatch.json").write_text(
+                    json.dumps(forged) + "\n"
+                )
+                return mock.Mock(returncode=-9)
+
+            with mock.patch.object(self.transition, "STATE", state), \
+                    mock.patch.object(self.transition.subprocess, "run", side_effect=died):
+                with self.assertRaisesRegex(
+                    self.transition.E,
+                    "guarded_dispatch_worker_failed",
+                ):
+                    self.transition._run_guarded_worker(
+                        args,
+                        {"action_hash": "a" * 64},
+                    )
+            self.assertFalse((state / ".guarded-dispatch-post-dispatch.json").exists())
 
 if __name__ == "__main__":
     unittest.main()

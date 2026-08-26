@@ -394,5 +394,161 @@ class PlayerStateCausalWorkerTests(unittest.TestCase):
                 )
 
 
+    def test_reconciliation_does_not_start_doomed_reader_that_consumes_write_reserve(self):
+        clock, budget = self.budget(27.0)
+        reads = 0
+        commands = []
+
+        def reader(_reg, current_budget):
+            nonlocal reads
+            reads += 1
+            if reads <= 2:
+                clock.advance(10.0)
+                return self.candidate(100, 200)
+            timeout = current_budget.timeout(
+                self.m.READER_TIMEOUT_CAP_SECONDS,
+                reserve=self.m.RESULT_WRITE_RESERVE_SECONDS,
+            )
+            clock.advance(timeout + 2.5)
+            raise subprocess.TimeoutExpired(["reader"], timeout)
+
+        result = self.m.execute_once(
+            self.request(),
+            self.registration(),
+            budget=budget,
+            read_candidate_fn=reader,
+            tool_ready_fn=lambda _target, _budget: True,
+            dispatch_fn=lambda command, _budget: commands.append(tuple(command)) or 0,
+            sleep_fn=clock.advance,
+            reconciliation_attempts=12,
+        )
+        self.assertEqual(reads, 2)
+        self.assertEqual(result["status"], "AMBIGUOUS")
+        self.assertEqual(result["effect_count"], 1)
+        self.assertEqual(result["reason_code"], "RECONCILIATION_DEADLINE_EXHAUSTED")
+        self.assertEqual(len(commands), 1)
+        self.assertGreaterEqual(budget.remaining(), self.m.RESULT_WRITE_RESERVE_SECONDS)
+
+    def test_post_dispatch_checkpoint_precedes_hung_reconciliation(self):
+        clock, budget = self.budget(27.0)
+        reads = 0
+        events = []
+        commands = []
+
+        def reader(_reg, current_budget):
+            nonlocal reads
+            reads += 1
+            if reads == 1:
+                clock.advance(10.0)
+                events.append("baseline")
+                return self.candidate(100, 200)
+            events.append("reconciliation")
+            timeout = current_budget.timeout(
+                self.m.READER_TIMEOUT_CAP_SECONDS,
+                reserve=self.m.RESULT_WRITE_RESERVE_SECONDS,
+            )
+            clock.advance(timeout + 2.5)
+            raise subprocess.TimeoutExpired(["reader"], timeout)
+
+        checkpoints = []
+        try:
+            result = self.m.execute_once(
+                self.request(),
+                self.registration(),
+                budget=budget,
+                read_candidate_fn=reader,
+                tool_ready_fn=lambda _target, _budget: True,
+                dispatch_fn=lambda command, _budget: commands.append(tuple(command)) or 0,
+                sleep_fn=clock.advance,
+                reconciliation_attempts=12,
+                post_dispatch_checkpoint_fn=lambda checkpoint, _budget: (
+                    events.append("checkpoint"), checkpoints.append(dict(checkpoint))
+                ),
+            )
+        except TypeError as exc:
+            self.fail(f"post-dispatch checkpoint hook unavailable: {exc}")
+        self.assertEqual(events[:3], ["baseline", "checkpoint", "reconciliation"])
+        self.assertEqual(len(commands), 1)
+        self.assertEqual(len(checkpoints), 1)
+        self.assertEqual(
+            checkpoints[0],
+            {
+                "status": "AMBIGUOUS",
+                "effect_count": 1,
+                "action_hash": self.action_hash,
+                "reason_code": "POST_DISPATCH_RECONCILIATION_INCOMPLETE",
+            },
+        )
+        self.assertEqual(result["status"], "AMBIGUOUS")
+        self.assertEqual(result["effect_count"], 1)
+
+    def test_main_persists_post_dispatch_checkpoint_to_distinct_path(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            request_path = root / "request.json"
+            result_path = root / "result.json"
+            registration_path = root / "registration.json"
+            request_path.write_text(json.dumps(self.request()))
+            registration_path.write_text(json.dumps(self.registration()))
+            seen = {}
+            writes = []
+            fallback = {
+                "status": "AMBIGUOUS",
+                "effect_count": 1,
+                "action_hash": self.action_hash,
+                "reason_code": "POST_DISPATCH_RECONCILIATION_INCOMPLETE",
+            }
+
+            def fake_execute(*_args, **kwargs):
+                seen["hook"] = kwargs.get("post_dispatch_checkpoint_fn")
+                if seen["hook"] is not None:
+                    seen["hook"](fallback, kwargs["budget"])
+                return fallback
+
+            def fake_write(path, result, _budget):
+                writes.append((Path(path), dict(result)))
+
+            with mock.patch.object(self.m, "REGISTRATION", registration_path), \
+                    mock.patch.object(self.m, "execute_once", side_effect=fake_execute), \
+                    mock.patch.object(self.m, "write_result", side_effect=fake_write):
+                rc = self.m.main(["guarded-dispatch", str(request_path), str(result_path)])
+            self.assertEqual(rc, 0)
+            self.assertIsNotNone(seen.get("hook"))
+            self.assertEqual(
+                [path.name for path, _result in writes],
+                [".guarded-dispatch-post-dispatch.json", "result.json"],
+            )
+            self.assertEqual(writes[0][1], fallback)
+            self.assertEqual(writes[1][1], fallback)
+
+    def test_reconciliation_allows_exact_baseline_cost_plus_write_reserve(self):
+        clock, budget = self.budget(12.0)
+        reads = 0
+        commands = []
+
+        def reader(_reg, _budget):
+            nonlocal reads
+            reads += 1
+            if reads == 1:
+                clock.advance(5.0)
+                return self.candidate(100, 200)
+            clock.advance(1.0)
+            return self.candidate(101, 200)
+
+        result = self.m.execute_once(
+            self.request(),
+            self.registration(),
+            budget=budget,
+            read_candidate_fn=reader,
+            tool_ready_fn=lambda _target, _budget: True,
+            dispatch_fn=lambda command, _budget: commands.append(tuple(command)) or 0,
+            post_dispatch_checkpoint_fn=lambda _checkpoint, _budget: None,
+        )
+        self.assertEqual(reads, 2)
+        self.assertEqual(len(commands), 1)
+        self.assertEqual(result["status"], "CONFIRMED")
+        self.assertEqual(result["effect_count"], 1)
+        self.assertGreaterEqual(budget.remaining(), self.m.RESULT_WRITE_RESERVE_SECONDS)
+
 if __name__ == "__main__":
     unittest.main()

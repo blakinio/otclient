@@ -50,6 +50,8 @@ TOOL_READY_TIMEOUT_CAP_SECONDS = 10.0
 READER_TIMEOUT_CAP_SECONDS = 20.0
 DISPATCH_TIMEOUT_CAP_SECONDS = 10.0
 RECONCILIATION_SLEEP_SECONDS = 0.15
+POST_DISPATCH_CHECKPOINT_FILENAME = ".guarded-dispatch-post-dispatch.json"
+POST_DISPATCH_CHECKPOINT_REASON = "POST_DISPATCH_RECONCILIATION_INCOMPLETE"
 
 
 class WorkerRefusal(RuntimeError):
@@ -305,6 +307,7 @@ def execute_once(
     dispatch_fn: Callable[[Sequence[str], DeadlineBudget], int] = dispatch,
     sleep_fn: Callable[[float], None] | None = None,
     reconciliation_attempts: int = 12,
+    post_dispatch_checkpoint_fn: Callable[[Mapping[str, Any], DeadlineBudget], None] | None = None,
 ) -> dict[str, Any]:
     fallback_hash = request.get("action_hash", "0" * 64) if isinstance(request, dict) else "0" * 64
     try:
@@ -313,7 +316,12 @@ def execute_once(
         budget.require(reserve=RESULT_WRITE_RESERVE_SECONDS)
         if not tool_ready_fn(target, budget):
             raise WorkerRefusal("INPUT_TOOL_UNAVAILABLE")
+        baseline_budget_before = budget.remaining(reserve=RESULT_WRITE_RESERVE_SECONDS)
         before = validate_candidate(read_candidate_fn(registration, budget))
+        baseline_read_seconds = max(
+            0.0,
+            baseline_budget_before - budget.remaining(reserve=RESULT_WRITE_RESERVE_SECONDS),
+        )
     except WorkerDeadlineExceeded:
         return _refused(fallback_hash, "SEMANTIC_PRECONDITION_TIMEOUT")
     except (WorkerRefusal, OSError, RuntimeError, subprocess.TimeoutExpired):
@@ -335,10 +343,20 @@ def execute_once(
     if rc != 0:
         return _ambiguous(req["action_hash"], "INPUT_DISPATCH_UNCERTAIN")
 
+    post_dispatch_checkpoint = _ambiguous(req["action_hash"], POST_DISPATCH_CHECKPOINT_REASON)
+    if post_dispatch_checkpoint_fn is not None:
+        try:
+            post_dispatch_checkpoint_fn(post_dispatch_checkpoint, budget)
+        except (OSError, WorkerDeadlineExceeded):
+            return post_dispatch_checkpoint
+
     last = before
     for attempt in range(max(1, reconciliation_attempts)):
         try:
-            budget.require(reserve=RESULT_WRITE_RESERVE_SECONDS)
+            budget.require(
+                baseline_read_seconds,
+                reserve=RESULT_WRITE_RESERVE_SECONDS,
+            )
             if attempt:
                 if sleep_fn is None:
                     budget.sleep(
@@ -426,7 +444,24 @@ def main(argv: Sequence[str] | None = None) -> int:
         registration = json.loads(REGISTRATION.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return 2
-    result = execute_once(request, registration, budget=budget)
+    checkpoint_path = result_path.with_name(POST_DISPATCH_CHECKPOINT_FILENAME)
+    try:
+        checkpoint_path.unlink(missing_ok=True)
+    except OSError:
+        return 2
+
+    def persist_post_dispatch_checkpoint(
+        checkpoint: Mapping[str, Any],
+        checkpoint_budget: DeadlineBudget,
+    ) -> None:
+        write_result(checkpoint_path, checkpoint, checkpoint_budget)
+
+    result = execute_once(
+        request,
+        registration,
+        budget=budget,
+        post_dispatch_checkpoint_fn=persist_post_dispatch_checkpoint,
+    )
     try:
         write_result(result_path, result, budget)
     except (OSError, WorkerDeadlineExceeded):

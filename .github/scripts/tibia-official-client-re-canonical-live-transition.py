@@ -1240,36 +1240,74 @@ def _read_guarded_decision(stream: Any = None) -> str:
     return raw.rstrip('\n')
 
 
+def _load_guarded_worker_result(path: Path, request: dict[str, Any]) -> dict[str, Any]:
+    try:
+        result = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        raise E('guarded_dispatch_worker_result_invalid', str(exc)) from exc
+    allowed_keys = {'status', 'effect_count', 'action_hash', 'reason_code'}
+    if not isinstance(result, dict) or not set(result).issubset(allowed_keys):
+        raise E('guarded_dispatch_worker_result_invalid')
+    if result.get('action_hash') != request['action_hash']:
+        raise E('guarded_dispatch_worker_action_hash_mismatch')
+    if result.get('effect_count') not in {0, 1}:
+        raise E('guarded_dispatch_worker_effect_count_invalid')
+    if result.get('status') not in {'CONFIRMED', 'AMBIGUOUS', 'REFUSED'}:
+        raise E('guarded_dispatch_worker_result_invalid')
+    reason = result.get('reason_code')
+    if reason is not None and (
+        not isinstance(reason, str)
+        or not reason
+        or any(c not in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_' for c in reason)
+    ):
+        raise E('guarded_dispatch_worker_result_invalid')
+    return result
+
+
+def _post_dispatch_checkpoint_is_acceptable(result: dict[str, Any], request: dict[str, Any]) -> bool:
+    return result == {
+        'status': 'AMBIGUOUS',
+        'effect_count': 1,
+        'action_hash': request['action_hash'],
+        'reason_code': 'POST_DISPATCH_RECONCILIATION_INCOMPLETE',
+    }
+
+
 def _run_guarded_worker(args: argparse.Namespace, request: dict[str, Any]) -> dict[str, Any]:
     result_path = STATE / '.guarded-dispatch-result.json'
+    checkpoint_path = STATE / '.guarded-dispatch-post-dispatch.json'
     result_path.unlink(missing_ok=True)
+    checkpoint_path.unlink(missing_ok=True)
+    completed = None
+    timeout_error: subprocess.TimeoutExpired | None = None
     try:
-        completed = subprocess.run(
-            [str(args.worker), 'guarded-dispatch', str(args.request_file), str(result_path)],
-            env=_env(), close_fds=True, check=False, timeout=args.worker_timeout,
-        )
-        if completed.returncode:
-            raise E('guarded_dispatch_worker_failed')
         try:
-            result = json.loads(result_path.read_text())
-        except (OSError, json.JSONDecodeError) as exc:
-            raise E('guarded_dispatch_worker_result_invalid', str(exc)) from exc
-        allowed_keys = {'status', 'effect_count', 'action_hash', 'reason_code'}
-        if not isinstance(result, dict) or not set(result).issubset(allowed_keys):
-            raise E('guarded_dispatch_worker_result_invalid')
-        if result.get('action_hash') != request['action_hash']:
-            raise E('guarded_dispatch_worker_action_hash_mismatch')
-        if result.get('effect_count') not in {0, 1}:
-            raise E('guarded_dispatch_worker_effect_count_invalid')
-        if result.get('status') not in {'CONFIRMED', 'AMBIGUOUS', 'REFUSED'}:
-            raise E('guarded_dispatch_worker_result_invalid')
-        reason = result.get('reason_code')
-        if reason is not None and (not isinstance(reason, str) or not reason or any(c not in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_' for c in reason)):
-            raise E('guarded_dispatch_worker_result_invalid')
-        return result
+            completed = subprocess.run(
+                [str(args.worker), 'guarded-dispatch', str(args.request_file), str(result_path)],
+                env=_env(), close_fds=True, check=False, timeout=args.worker_timeout,
+            )
+        except subprocess.TimeoutExpired as exc:
+            timeout_error = exc
+
+        if timeout_error is not None or (completed is not None and completed.returncode):
+            try:
+                checkpoint = _load_guarded_worker_result(checkpoint_path, request)
+            except E:
+                if timeout_error is not None:
+                    raise timeout_error
+                raise E('guarded_dispatch_worker_failed')
+            if not _post_dispatch_checkpoint_is_acceptable(checkpoint, request):
+                if timeout_error is not None:
+                    raise timeout_error
+                raise E('guarded_dispatch_worker_failed')
+            return checkpoint
+
+        if completed is None:
+            raise E('guarded_dispatch_worker_failed')
+        return _load_guarded_worker_result(result_path, request)
     finally:
         result_path.unlink(missing_ok=True)
-
+        checkpoint_path.unlink(missing_ok=True)
 
 def _guarded_dispatch(
     args: argparse.Namespace,

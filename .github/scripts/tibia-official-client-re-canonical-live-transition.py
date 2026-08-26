@@ -1196,6 +1196,16 @@ def _read_guarded_request(path: Path) -> dict[str, Any]:
     return data
 
 
+def _require_guarded_request_semantics(
+    request: dict[str, Any],
+    registration: dict[str, Any],
+    manifest: dict[str, Any],
+) -> None:
+    if request.get('kind') != 'move':
+        return
+    if registration.get('state') != 'IN_GAME' or manifest.get('state') != 'IN_GAME':
+        raise E('guarded_dispatch_move_requires_proven_ingame')
+
 def _guarded_fence_digest(registration: dict[str, Any], manifest: dict[str, Any]) -> str:
     fields = {
         'runtime_id': registration.get('runtime_id'),
@@ -1321,11 +1331,13 @@ def _guarded_dispatch(
     first_registration, first_manifest = _probe_reg(
         args, guard, lease, manager, identity, generation, False
     )
+    _require_guarded_request_semantics(request, first_registration, first_manifest)
     first_fence = _guarded_fence_digest(first_registration, first_manifest)
     with _acquire_input_lock(args, guard):
         second_registration, second_manifest = _probe_reg(
             args, guard, lease, manager, identity, generation, False
         )
+        _require_guarded_request_semantics(request, second_registration, second_manifest)
         second_fence = _guarded_fence_digest(second_registration, second_manifest)
         if second_fence != first_fence:
             raise E('guarded_dispatch_fence_changed_before_ready')
@@ -1338,6 +1350,7 @@ def _guarded_dispatch(
         third_registration, third_manifest = _probe_reg(
             args, guard, lease, manager, identity, generation, False
         )
+        _require_guarded_request_semantics(request, third_registration, third_manifest)
         third_fence = _guarded_fence_digest(third_registration, third_manifest)
         if third_fence != second_fence:
             raise E('guarded_dispatch_fence_changed_before_effect')

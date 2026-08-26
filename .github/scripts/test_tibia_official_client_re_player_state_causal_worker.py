@@ -72,7 +72,7 @@ class PlayerStateCausalWorkerTests(unittest.TestCase):
             "display": ":1",
             "window_identity": "x11:0x400011:pid:646:class:client/Tibia:title_sha256:" + "b" * 64,
             "runtime_locator": "docker:otclient-track-a-kasmvnc:container123",
-            "state": "UNKNOWN",
+            "state": "IN_GAME",
             "proof_kind": "existing_runtime_adoption_v1",
         }
 

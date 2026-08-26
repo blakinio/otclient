@@ -3,16 +3,14 @@ from pathlib import Path
 
 
 def main() -> int:
-    probe = Path(__file__).with_name('probe.py')
-    text = probe.read_text(encoding='utf-8')
+    text = Path(__file__).with_name('probe.py').read_text(encoding='utf-8')
     required = [
         'tibiaclient-linux-current/package.json',
         'GameclientMessageLogin', 'LoginRSAEncryptedBlock', 'GameclientMessageEnterWorld',
-        'expected_mangled_rtti', "'tibia::protobuf::protocol::' + simple_name",
-        "row['rtti_name'] == expected",
-        'required_generated_offsets',
-        'generated_vtable_slots',
-        'slot_snapshots',
+        'expected_mangled_rtti', 'required_generated_offsets', 'generated_vtable_slots', 'slot_snapshots',
+        'TLoginProtocolMessageHandler', 'TAuthenticationAndEncryptionInfo',
+        'recover_exact_named_vtable', 'producer_reference_intersection',
+        'login_handler_owner_slots', 'producer_candidates',
         "current_generated_method_slots': 'DISCOVERY_ONLY'",
         "runtime_access': 'none'", "raw_client_uploaded': False",
     ]
@@ -21,7 +19,7 @@ def main() -> int:
     forbidden = [
         '15.32.df7b29',
         'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe',
-        '0x30c84a0', '0x30c8428', '0x176dec0', '0x176db40',
+        '0xe1abe0', '0x2f63240', '0x30c84a0', '0x30c8428',
         "generated_slot(vt, '0x20')", "generated_slot(vt, '0x40')", "generated_slot(vt, '0x60')",
     ]
     for token in forbidden:

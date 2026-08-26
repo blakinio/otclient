@@ -518,9 +518,24 @@ MESSAGE_CLASSES = (
 )
 
 
+def expected_mangled_full(full: str) -> str:
+    return 'N' + ''.join(str(len(part)) + part for part in full.split('::')) + 'E'
+
+
 def expected_mangled_rtti(simple_name: str) -> str:
     full = 'tibia::protobuf::protocol::' + simple_name
-    return 'N' + ''.join(str(len(part)) + part for part in full.split('::')) + 'E'
+    return expected_mangled_full(full)
+
+
+def recover_exact_named_vtable(img: Image, simple_name: str, full_name: str) -> dict:
+    expected = expected_mangled_full(full_name)
+    rows = [row for row in rtti_vtable_candidates(img, simple_name) if row['rtti_name'] == expected]
+    if len(rows) != 1:
+        raise RuntimeError(f'{full_name}: expected one exact RTTI row, got {len(rows)}')
+    aps = rows[0].get('address_points', [])
+    if len(aps) != 1:
+        raise RuntimeError(f'{full_name}: expected one vtable AP, got {len(aps)}')
+    return {'rtti_name': rows[0]['rtti_name'], 'rtti': rows[0]['rtti'], **aps[0]}
 
 
 def recover_vtable(img: Image, simple_name: str) -> dict:
@@ -608,6 +623,43 @@ def main() -> int:
             'slot_snapshots': slot_snapshots,
         }
 
+    login_handler = recover_exact_named_vtable(
+        GLOBAL_IMAGE, 'TLoginProtocolMessageHandler',
+        'tibia::authentication::TLoginProtocolMessageHandler')
+    auth_info = recover_exact_named_vtable(
+        GLOBAL_IMAGE, 'TAuthenticationAndEncryptionInfo',
+        'tibia::authentication::TAuthenticationAndEncryptionInfo')
+
+    login_ap = int(classes['GameclientMessageLogin']['vtable_ap'], 16)
+    rsa_ap = int(classes['LoginRSAEncryptedBlock']['vtable_ap'], 16)
+    producer_reference_intersection = reference_scan(GLOBAL_IMAGE, {login_ap, rsa_ap}, set())['rip']
+
+    def fde_key(site: int) -> str | None:
+        fde = GLOBAL_IMAGE.containing_fde(site)
+        return f'{hx(fde[0])}..{hx(fde[1])}' if fde else None
+
+    login_fdes = {fde_key(site) for site in producer_reference_intersection.get(login_ap, [])}
+    rsa_fdes = {fde_key(site) for site in producer_reference_intersection.get(rsa_ap, [])}
+    common_fdes = sorted((login_fdes & rsa_fdes) - {None})
+    login_handler_owner_slots = []
+    for slot in login_handler['slots']:
+        if not slot.get('executable'):
+            continue
+        target = int(slot['target'], 16)
+        key = fde_key(target)
+        if key in common_fdes:
+            login_handler_owner_slots.append({**slot, 'fde': key})
+    producer_candidates = []
+    for key in common_fdes:
+        lo_s, hi_s = key.split('..')
+        lo = int(lo_s, 16)
+        producer_candidates.append({
+            'fde': [lo_s, hi_s],
+            'login_vtable_refs': [hx(site) for site in producer_reference_intersection.get(login_ap, []) if fde_key(site) == key],
+            'rsa_vtable_refs': [hx(site) for site in producer_reference_intersection.get(rsa_ap, []) if fde_key(site) == key],
+            'snapshot': fde_instructions(GLOBAL_IMAGE, lo, limit=1600),
+        })
+
     result = {
         'schema': 'otclient.track-a.current-game-login-schema.discovery.v1',
         'exact_client': {
@@ -620,6 +672,11 @@ def main() -> int:
         'secret_access': False,
         'raw_client_uploaded': False,
         'classes': classes,
+        'login_handler': login_handler,
+        'authentication_info': auth_info,
+        'producer_reference_intersection': {hx(k): [hx(site) for site in v] for k, v in producer_reference_intersection.items()},
+        'login_handler_owner_slots': login_handler_owner_slots,
+        'producer_candidates': producer_candidates,
         'classification': {
             'current_rtti_vtables': 'PROVEN',
             'current_generated_method_slots': 'DISCOVERY_ONLY',
@@ -635,6 +692,8 @@ def main() -> int:
         print('SCHEMA_CLASS=' + name)
         print('SCHEMA_VTABLE=' + row['vtable_ap'])
         print('SCHEMA_GENERATED_SLOT_COUNT=' + str(len(row['generated_vtable_slots'])))
+    print('PRODUCER_CANDIDATE_COUNT=' + str(len(producer_candidates)))
+    print('LOGIN_HANDLER_OWNER_SLOT_COUNT=' + str(len(login_handler_owner_slots)))
     print('RAW_CLIENT_UPLOADED=false')
     print('LOGIN_PERFORMED=false')
     print('SECRET_ACCESS=false')

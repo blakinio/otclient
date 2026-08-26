@@ -66,10 +66,10 @@ open_material_findings: 0
 unresolved_review_threads: 0
 ownership_released: true
 task_archived: true
-archive_pr: PENDING
+archive_pr: 702
 archive_independent_audit: PENDING
 archive_exact_head_ci: PENDING
-last_progress_at: 2026-08-26T19:35:52+02:00
+last_progress_at: 2026-08-26T19:37:00+02:00
 current_blocker: none
 next_action: finalize archive PR exact-head governance/audit and merge; never perform a physical retry
 ---

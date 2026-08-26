@@ -1,0 +1,297 @@
+name: Track A player-state retry2 single controlled causal commit
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/track-a-player-state-semantic-retry2-controlled-commit.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-player-state-semantic-retry2-controlled-commit
+  cancel-in-progress: false
+
+jobs:
+  single-controlled-causal-commit:
+    name: Single controlled one-tile causal discriminator
+    if: ${{ github.event.pull_request.head.ref == 'runtime/OTC-20260826-player-state-semantic-promotion-e2e-retry-2' }}
+    runs-on: [otclient, synology]
+    timeout-minutes: 12
+    steps:
+      - name: Checkout exact task head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Verify exact trusted head and deterministic guards
+        shell: bash
+        env:
+          EXPECTED_MAIN_SHA: 8085b40698d409bbacba3460001e8ddca4f6c84f
+          EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          [[ "$RUNNER_NAME" == 'synology-otclient-01' ]]
+          [[ "$GITHUB_REPOSITORY" == 'blakinio/otclient' ]]
+          [[ "$HEAD_BRANCH" == 'runtime/OTC-20260826-player-state-semantic-promotion-e2e-retry-2' ]]
+          [[ "$EVENT_BASE_SHA" == "$EXPECTED_MAIN_SHA" ]]
+          [[ "$(git rev-parse HEAD)" == "$EVENT_HEAD_SHA" ]]
+          [[ "$(git ls-remote origin refs/heads/main | awk 'NR==1 {print $1}')" == "$EXPECTED_MAIN_SHA" ]]
+          python3 .github/scripts/test_track_a_agent_runtime_governance.py --changed-from "$EXPECTED_MAIN_SHA" --expected-branch "$HEAD_BRANCH"
+          python3 .github/scripts/test_tibia_official_client_re_canonical_live_transition.py
+          python3 .github/scripts/test_tibia_official_client_re_kasm_existing_runtime_probe.py
+          python3 .github/scripts/test_tibia_official_client_re_player_state_causal_worker.py
+          python3 -m unittest tests.tools.tibia_re_surveyor.test_player_state -v
+          git diff --check "$EXPECTED_MAIN_SHA"...HEAD
+          echo 'PLAYER_STATE_RETRY2_CONTROLLED_PRERUNTIME=PASS'
+
+      - name: Gate A through one-shot causal commit
+        shell: bash
+        env:
+          EXPECTED_MAIN_SHA: 8085b40698d409bbacba3460001e8ddca4f6c84f
+          EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          umask 077
+          [[ "$RUNNER_NAME" == 'synology-otclient-01' ]]
+          [[ "$(git rev-parse HEAD)" == "$EVENT_HEAD_SHA" ]]
+          [[ "$(git ls-remote origin refs/heads/main | awk 'NR==1 {print $1}')" == "$EXPECTED_MAIN_SHA" ]]
+
+          task='OTC-20260826-player-state-semantic-promotion-e2e-retry-2'
+          session='chatgpt-player-state-semantic-retry2-controlled-commit-20260826'
+          state='/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime'
+          token_root="/home/runner/_work/_otclient_tibia_re_state/tasks/$task/runtime"
+          token="$token_root/canonical-lease-token"
+          budget_marker="$token_root/player-state-causal-commit.json"
+          lease='.github/scripts/tibia-official-client-re-canonical-live-lease'
+          transition='.github/scripts/tibia-official-client-re-canonical-live-transition.py'
+          probe='.github/scripts/tibia-official-client-re-kasm-existing-runtime-probe.py'
+          worker='.github/scripts/tibia-official-client-re-player-state-causal-worker.py'
+          reg="$state/runtime-registration.json"
+          live_manifest="$token_root/current-adoption-probe.json"
+          request="$token_root/player-state-causal-request.json"
+          acquired=0
+          released=0
+
+          mkdir -p "$token_root"
+          chmod 700 "$token_root" 2>/dev/null || true
+          rm -f "$token" "$live_manifest" "$request"
+          chmod +x "$worker"
+
+          cleanup() {
+            rc=$?
+            if [[ "$acquired" == 1 && "$released" != 1 ]]; then
+              bash "$lease" release --task-id "$task" --session-id "$session" --token-file "$token" >/dev/null 2>&1 || true
+            fi
+            rm -f "$token" "$live_manifest" "$request"
+            exit "$rc"
+          }
+          trap cleanup EXIT
+
+          block_zero() {
+            reason="$1"
+            echo "PLAYER_STATE_RETRY2_RESULT=BLOCKED_WITH_REASON:$reason"
+            echo 'PLAYER_STATE_RETRY2_READY=false'
+            echo 'PLAYER_STATE_RETRY2_COMMIT=false'
+            echo 'PLAYER_STATE_RETRY2_POSSIBLY_DISPATCHED=false'
+            echo 'PLAYER_STATE_RETRY2_PHYSICAL_ACTION_COUNT=0'
+            echo 'PLAYER_STATE_RETRY2_SEMANTIC_PROMOTION_ELIGIBLE=false'
+            if [[ "$acquired" == 1 && "$released" != 1 ]]; then
+              bash "$lease" release --task-id "$task" --session-id "$session" --token-file "$token"
+              released=1
+              echo 'PLAYER_STATE_RETRY2_RELEASE=PASS'
+            fi
+            exit 0
+          }
+
+          [[ -f "$state/lease.json" && -f "$reg" ]] || block_zero 'CANONICAL_CONTROLLER_STATE_UNAVAILABLE'
+          [[ ! -e "$budget_marker" ]] || block_zero 'ONE_SHOT_EFFECT_BUDGET_ALREADY_RESERVED'
+          python3 - "$state/lease.json" <<'PY' || block_zero 'CANONICAL_PRESTATE_NOT_RELEASED'
+          import json,pathlib,sys
+          lease=json.loads(pathlib.Path(sys.argv[1]).read_text())
+          assert lease.get('status') == 'released'
+          assert lease.get('controller_task') is None
+          assert lease.get('controller_session') is None
+          PY
+
+          bash "$lease" acquire --task-id "$task" --session-id "$session" --token-file "$token" --ttl-seconds 1800
+          acquired=1
+          bash "$lease" validate --task-id "$task" --session-id "$session" --token-file "$token"
+          echo 'PLAYER_STATE_RETRY2_GATE_A=PASS'
+
+          python3 "$probe" probe "$live_manifest" || block_zero 'FRESH_ADOPTION_PROBE_FAILED'
+          decision="$(python3 - "$state/lease.json" "$reg" "$live_manifest" "$transition" <<'PY'
+          import importlib.util,json,pathlib,sys
+          lease=json.loads(pathlib.Path(sys.argv[1]).read_text())
+          old=json.loads(pathlib.Path(sys.argv[2]).read_text())
+          fresh=json.loads(pathlib.Path(sys.argv[3]).read_text())
+          generation=int(lease['generation'])
+          spec=importlib.util.spec_from_file_location('canonical_transition',pathlib.Path(sys.argv[4]))
+          if spec is None or spec.loader is None:
+              print('BLOCK:TRANSITION_VALIDATOR_UNAVAILABLE'); raise SystemExit(0)
+          module=importlib.util.module_from_spec(spec); sys.modules[spec.name]=module; spec.loader.exec_module(module)
+          if old.get('boot_id_sha256') != fresh.get('boot_id_sha256'):
+              try: module._validate_boot_epoch_recovery_candidate(old,fresh,generation)
+              except Exception as exc: print('BLOCK:BOOT_EPOCH_RECOVERY_CONTRACT_NOT_PROVEN:'+getattr(exc,'code',type(exc).__name__))
+              else: print('BOOT_EPOCH_RECOVERY')
+              raise SystemExit(0)
+          same_pid=old.get('pid') == fresh.get('pid')
+          same_start=old.get('process_start_ticks') == fresh.get('process_start_ticks')
+          if same_pid != same_start:
+              print('BLOCK:PARTIAL_PID_START_DRIFT'); raise SystemExit(0)
+          if same_pid and same_start:
+              if int(old.get('lease_generation',-1)) < generation: print('REBIND')
+              elif int(old.get('lease_generation',-1)) == generation: print('NONE')
+              else: print('BLOCK:REGISTRATION_GENERATION_AHEAD')
+              raise SystemExit(0)
+          try: module._validate_stale_recovery_candidate(old,fresh,generation)
+          except Exception as exc: print('BLOCK:RECOVERY_CONTRACT_NOT_PROVEN:'+getattr(exc,'code',type(exc).__name__))
+          else: print('RECOVERY')
+          PY
+          )"
+          echo "PLAYER_STATE_RETRY2_AUTHORITY_TRANSITION_DECISION=$decision"
+          case "$decision" in
+            BOOT_EPOCH_RECOVERY)
+              python3 "$transition" boot-epoch-registration-recovery --task-id "$task" --session-id "$session" --token-file "$token" --probe "$probe" || block_zero 'BOOT_EPOCH_RECOVERY_FAILED'
+              echo 'PLAYER_STATE_RETRY2_BOOT_EPOCH_RECOVERY=PASS'
+              ;;
+            RECOVERY)
+              python3 "$transition" stale-registration-recovery --task-id "$task" --session-id "$session" --token-file "$token" --probe "$probe" || block_zero 'STALE_RECOVERY_FAILED'
+              echo 'PLAYER_STATE_RETRY2_RECOVERY=PASS'
+              ;;
+            REBIND)
+              python3 "$transition" rebind --task-id "$task" --session-id "$session" --token-file "$token" --probe "$probe" || block_zero 'REBIND_FAILED'
+              echo 'PLAYER_STATE_RETRY2_REBIND=PASS'
+              ;;
+            NONE)
+              echo 'PLAYER_STATE_RETRY2_AUTHORITY_TRANSITION=NOT_REQUIRED'
+              ;;
+            BLOCK:*) block_zero "$decision" ;;
+            *) block_zero 'AUTHORITY_TRANSITION_DECISION_INVALID' ;;
+          esac
+          rm -f "$live_manifest"
+
+          python3 "$transition" gate-b --task-id "$task" --session-id "$session" --token-file "$token" --probe "$probe" || block_zero 'GATE_B_FAILED'
+          echo 'PLAYER_STATE_RETRY2_GATE_B=PASS'
+          echo 'PLAYER_STATE_RETRY2_TARGET_UNIQUENESS=PROVEN'
+
+          python3 - "$reg" "$worker" <<'PY' || pre_rc=$?
+          import importlib.util,json,pathlib,sys,time
+          reg=json.loads(pathlib.Path(sys.argv[1]).read_text())
+          spec=importlib.util.spec_from_file_location('player_state_causal_worker',pathlib.Path(sys.argv[2]))
+          if spec is None or spec.loader is None: raise SystemExit(2)
+          module=importlib.util.module_from_spec(spec); sys.modules[spec.name]=module; spec.loader.exec_module(module)
+          target=module.validate_registration(reg)
+          if not module.tool_ready(target): raise SystemExit(3)
+          first=module.read_candidate(reg); p1=module.validate_candidate(first)
+          time.sleep(0.5)
+          second=module.read_candidate(reg); p2=module.validate_candidate(second)
+          if p1 != p2: raise SystemExit(4)
+          print('PLAYER_STATE_RETRY2_SEMANTIC_PRECONDITIONS=PASS')
+          print('PLAYER_STATE_RETRY2_STABLE_BASELINE='+','.join(map(str,p2)))
+          PY
+          [[ "${pre_rc:-0}" == 0 ]] || block_zero 'STABLE_SEMANTIC_PRECONDITIONS_FAILED'
+
+          python3 - "$request" <<'PY'
+          import hashlib,json,pathlib,sys
+          semantic={'schema_version':1,'kind':'move','parameters':{'direction':'east','tiles':1}}
+          semantic['action_hash']=hashlib.sha256(json.dumps(semantic,sort_keys=True,separators=(',',':')).encode()).hexdigest()
+          p=pathlib.Path(sys.argv[1]); p.write_text(json.dumps(semantic,sort_keys=True,separators=(',',':'))+'\n'); p.chmod(0o600)
+          print('PLAYER_STATE_RETRY2_REQUEST=ONE_TILE_EAST')
+          PY
+
+          set +e
+          python3 - "$transition" "$task" "$session" "$token" "$probe" "$worker" "$request" "$budget_marker" <<'PY'
+          import json,os,pathlib,subprocess,sys
+          transition,task,session,token,probe,worker,request,budget=sys.argv[1:]
+          req=json.loads(pathlib.Path(request).read_text())
+          cmd=[sys.executable,transition,'guarded-dispatch','--task-id',task,'--session-id',session,'--token-file',token,'--probe',probe,'--worker',worker,'--request-file',request,'--worker-timeout','30','--input-lock-timeout','10']
+          proc=subprocess.Popen(cmd,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,bufsize=1)
+          ready=False; committed=False; result=None
+          try:
+              assert proc.stdout is not None and proc.stdin is not None
+              for raw in proc.stdout:
+                  line=raw.rstrip('\n'); print(line,flush=True)
+                  if line.startswith('TRACK_A_GUARDED_DISPATCH_READY='):
+                      if ready:
+                          if not committed: proc.stdin.write('ABORT\n'); proc.stdin.flush()
+                          continue
+                      ready=True
+                      payload=json.loads(line.split('=',1)[1])
+                      valid=(payload.get('protocol')=='track-a-guarded-dispatch-v1' and payload.get('status')=='READY' and payload.get('action_hash')==req['action_hash'] and isinstance(payload.get('fence_digest'),str) and len(payload['fence_digest'])==64)
+                      if not valid:
+                          proc.stdin.write('ABORT\n'); proc.stdin.flush(); continue
+                      try: fd=os.open(budget,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
+                      except FileExistsError:
+                          proc.stdin.write('ABORT\n'); proc.stdin.flush(); continue
+                      with os.fdopen(fd,'w') as handle:
+                          json.dump({'schema_version':1,'task':task,'action_hash':req['action_hash'],'github_run_id':os.environ.get('GITHUB_RUN_ID'),'state':'COMMIT_RESERVED'},handle,sort_keys=True,separators=(',',':'))
+                          handle.write('\n'); handle.flush(); os.fsync(handle.fileno())
+                      print('PLAYER_STATE_RETRY2_READY=true',flush=True)
+                      print('PLAYER_STATE_RETRY2_BUDGET_RESERVATION=PASS',flush=True)
+                      proc.stdin.write('COMMIT\n'); proc.stdin.flush(); committed=True
+                      print('PLAYER_STATE_RETRY2_COMMIT=true',flush=True)
+                  elif line.startswith('TRACK_A_GUARDED_DISPATCH_RESULT='):
+                      result=json.loads(line.split('=',1)[1])
+              rc=proc.wait(timeout=40)
+          except BaseException:
+              try: proc.terminate()
+              except Exception: pass
+              if committed:
+                  print('PLAYER_STATE_RETRY2_RESULT=AMBIGUOUS_POST_COMMIT_CONTROLLER_FAILURE',flush=True)
+                  print('PLAYER_STATE_RETRY2_POSSIBLY_DISPATCHED=true',flush=True)
+                  print('PLAYER_STATE_RETRY2_NO_RETRY=true',flush=True)
+                  raise SystemExit(0)
+              print('PLAYER_STATE_RETRY2_RESULT=BLOCKED_PRECOMMIT_CONTROLLER_FAILURE',flush=True)
+              raise SystemExit(20)
+          if not committed:
+              print('PLAYER_STATE_RETRY2_COMMIT=false',flush=True)
+              print('PLAYER_STATE_RETRY2_POSSIBLY_DISPATCHED=false',flush=True)
+              print('PLAYER_STATE_RETRY2_PHYSICAL_ACTION_COUNT=0',flush=True)
+              print('PLAYER_STATE_RETRY2_RESULT=BLOCKED_READY_OR_COMMIT_REFUSED',flush=True)
+              raise SystemExit(0)
+          print('PLAYER_STATE_RETRY2_NO_RETRY=true',flush=True)
+          if rc != 0 or not isinstance(result,dict):
+              print('PLAYER_STATE_RETRY2_RESULT=AMBIGUOUS_POST_COMMIT_NO_VALID_RESULT',flush=True)
+              print('PLAYER_STATE_RETRY2_POSSIBLY_DISPATCHED=true',flush=True)
+              print('PLAYER_STATE_RETRY2_PHYSICAL_ACTION_COUNT=1',flush=True)
+              raise SystemExit(0)
+          status=result.get('status'); effects=result.get('effect_count')
+          print(f'PLAYER_STATE_RETRY2_WORKER_STATUS={status}',flush=True)
+          print(f'PLAYER_STATE_RETRY2_PHYSICAL_ACTION_COUNT={effects}',flush=True)
+          if status=='CONFIRMED' and effects==1:
+              print('PLAYER_STATE_RETRY2_CAUSAL_DELTA=EXACT_ONE_TILE_CONFIRMED',flush=True)
+              print('PLAYER_STATE_RETRY2_POSSIBLY_DISPATCHED=false',flush=True)
+              print('PLAYER_STATE_RETRY2_RESULT=CONFIRMED_PASS',flush=True)
+              print('PLAYER_STATE_RETRY2_SEMANTIC_PROMOTION_ELIGIBLE=true',flush=True)
+          elif status=='REFUSED' and effects==0:
+              print('PLAYER_STATE_RETRY2_POSSIBLY_DISPATCHED=false',flush=True)
+              print('PLAYER_STATE_RETRY2_RESULT=BLOCKED_AFTER_COMMIT_NO_EFFECT',flush=True)
+              print('PLAYER_STATE_RETRY2_SEMANTIC_PROMOTION_ELIGIBLE=false',flush=True)
+          else:
+              print('PLAYER_STATE_RETRY2_POSSIBLY_DISPATCHED=true',flush=True)
+              print('PLAYER_STATE_RETRY2_RESULT=AMBIGUOUS_POST_COMMIT',flush=True)
+              print('PLAYER_STATE_RETRY2_SEMANTIC_PROMOTION_ELIGIBLE=false',flush=True)
+          PY
+          controller_rc=$?
+          set -e
+          if [[ "$controller_rc" != 0 ]]; then block_zero 'GUARDED_DISPATCH_PRECOMMIT_CONTROLLER_FAILURE'; fi
+
+          bash "$lease" release --task-id "$task" --session-id "$session" --token-file "$token"
+          released=1
+          rm -f "$token" "$live_manifest" "$request"
+          python3 - "$state/lease.json" <<'PY'
+          import json,pathlib,sys
+          lease=json.loads(pathlib.Path(sys.argv[1]).read_text())
+          assert lease.get('status') == 'released'
+          assert lease.get('controller_task') is None
+          assert lease.get('controller_session') is None
+          print('PLAYER_STATE_RETRY2_RELEASE=PASS')
+          PY

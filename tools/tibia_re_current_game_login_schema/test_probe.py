@@ -4,22 +4,17 @@ from pathlib import Path
 
 def main() -> int:
     probe = Path(__file__).with_name('probe.py')
-    assert probe.is_file(), 'probe.py missing'
     text = probe.read_text(encoding='utf-8')
     required = [
         'tibiaclient-linux-current/package.json',
-        'GameclientMessageLogin',
-        'LoginRSAEncryptedBlock',
-        'GameclientMessageEnterWorld',
-        'recover_vtable',
-        'expected_mangled_rtti',
-        "'tibia::protobuf::protocol::' + simple_name",
+        'GameclientMessageLogin', 'LoginRSAEncryptedBlock', 'GameclientMessageEnterWorld',
+        'expected_mangled_rtti', "'tibia::protobuf::protocol::' + simple_name",
         "row['rtti_name'] == expected",
-        'internal_serialize',
-        'byte_size_long',
-        'wire_fields',
-        "runtime_access': 'none'",
-        "raw_client_uploaded': False",
+        'required_generated_offsets',
+        'generated_vtable_slots',
+        'slot_snapshots',
+        "current_generated_method_slots': 'DISCOVERY_ONLY'",
+        "runtime_access': 'none'", "raw_client_uploaded': False",
     ]
     for token in required:
         assert token in text, token
@@ -27,6 +22,7 @@ def main() -> int:
         '15.32.df7b29',
         'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe',
         '0x30c84a0', '0x30c8428', '0x176dec0', '0x176db40',
+        "generated_slot(vt, '0x20')", "generated_slot(vt, '0x40')", "generated_slot(vt, '0x60')",
     ]
     for token in forbidden:
         assert token not in text, token

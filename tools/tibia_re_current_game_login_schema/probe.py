@@ -534,12 +534,19 @@ def recover_vtable(img: Image, simple_name: str) -> dict:
     return {'rtti_name': rows[0]['rtti_name'], 'rtti': rows[0]['rtti'], **aps[0]}
 
 
-def generated_slot(vtable: dict, offset: str) -> int:
-    slots = {row['offset']: row for row in vtable['slots']}
-    row = slots.get(offset)
-    if not row or not row.get('executable'):
-        raise RuntimeError(f"{vtable['rtti_name']}: missing executable slot {offset}")
-    return int(row['target'], 16)
+required_generated_offsets = tuple(hex(value) for value in range(0, 0x68, 8))
+
+
+def generated_vtable_slots(vtable: dict) -> list[dict]:
+    by_offset = {row['offset']: row for row in vtable['slots']}
+    rows = []
+    for offset in required_generated_offsets:
+        row = by_offset.get(offset)
+        if row is None:
+            raise RuntimeError(f"{vtable['rtti_name']}: missing generated slot {offset}")
+        rows.append(row)
+    return rows
+
 
 
 def function_snapshot(img: Image, target: int) -> dict:
@@ -579,23 +586,26 @@ def main() -> int:
     classes = {}
     for name in MESSAGE_CLASSES:
         vt = recover_vtable(GLOBAL_IMAGE, name)
-        clear = generated_slot(vt, '0x20')
-        byte_size_long = generated_slot(vt, '0x40')
-        internal_serialize = generated_slot(vt, '0x60')
-        clear_snapshot = function_snapshot(GLOBAL_IMAGE, clear)
-        size_snapshot = function_snapshot(GLOBAL_IMAGE, byte_size_long)
-        serialize_snapshot = function_snapshot(GLOBAL_IMAGE, internal_serialize)
+        generated_vtable_slots_current = generated_vtable_slots(vt)
+        slot_snapshots = {}
+        for slot in generated_vtable_slots_current:
+            offset = slot['offset']
+            if slot.get('executable'):
+                target = int(slot['target'], 16)
+                snapshot = function_snapshot(GLOBAL_IMAGE, target)
+                slot_snapshots[offset] = {
+                    'target': slot['target'],
+                    'snapshot': snapshot,
+                    'wire_fields': wire_fields(snapshot),
+                }
+            else:
+                slot_snapshots[offset] = {'target': slot['target'], 'snapshot': None}
         classes[name] = {
             'rtti_name': vt['rtti_name'],
             'rtti': vt['rtti'],
             'vtable_ap': vt['address_point'],
-            'clear': {'target': hx(clear), 'snapshot': clear_snapshot},
-            'byte_size_long': {'target': hx(byte_size_long), 'snapshot': size_snapshot},
-            'internal_serialize': {
-                'target': hx(internal_serialize),
-                'snapshot': serialize_snapshot,
-                'wire_fields': wire_fields(serialize_snapshot),
-            },
+            'generated_vtable_slots': generated_vtable_slots_current,
+            'slot_snapshots': slot_snapshots,
         }
 
     result = {
@@ -624,7 +634,7 @@ def main() -> int:
     for name, row in classes.items():
         print('SCHEMA_CLASS=' + name)
         print('SCHEMA_VTABLE=' + row['vtable_ap'])
-        print('SCHEMA_INTERNAL_SERIALIZE=' + row['internal_serialize']['target'])
+        print('SCHEMA_GENERATED_SLOT_COUNT=' + str(len(row['generated_vtable_slots'])))
     print('RAW_CLIENT_UPLOADED=false')
     print('LOGIN_PERFORMED=false')
     print('SECRET_ACCESS=false')

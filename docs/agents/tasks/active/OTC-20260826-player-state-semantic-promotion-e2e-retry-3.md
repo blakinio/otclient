@@ -99,16 +99,18 @@ semantic_promotion_performed: false
 movement_authorization_consumed: true
 temporary_dispatch_workflow_removed: true
 trusted_main_causal_worker_reused: true
-independent_audit: REQUIRED
-independent_audit_review: PENDING
-independent_audit_material_findings_open: UNKNOWN
+independent_audit: PASS
+independent_audit_review_initial: 5033860250
+independent_audit_review_exact_final_head: REQUIRED_ON_FINAL_HEAD
+independent_audit_material_findings_open: 0
+exact_final_head: PENDING_AUDITED_SYNCHRONIZE_HEAD
 exact_final_head_ci: REQUIRED_AFTER_AUDIT
 exact_final_head_governance: REQUIRED_AFTER_AUDIT
 runtime_ownership_preflight:
   current_task: closeout_only_no_runtime_authority
-last_progress_at: 2026-08-26T20:28:00+02:00
+last_progress_at: 2026-08-26T20:33:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: pending_closeout_commit
+ci_check_generation: audited_closeout_synchronize
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
 acceptance:
@@ -122,7 +124,7 @@ acceptance:
   - successful causal differential alone may promote the exact verified player-position semantic contract
   - evidence, independent audit, exact-head required CI, merge, archive and authority/lease release complete
 current_blocker: NONE_RUNTIME_TERMINAL_CLOSEOUT_ONLY
-next_action: perform fresh independent audit of exact terminal evidence, then exact-final-head CI, merge PR #703, archive, and release ownership
+next_action: run fresh validator audit and exact-head CI/governance on this post-audit synchronize head, then merge PR #703, archive, and release ownership
 ---
 
 # Player-state semantic promotion E2E retry 3 — 2026-08-26

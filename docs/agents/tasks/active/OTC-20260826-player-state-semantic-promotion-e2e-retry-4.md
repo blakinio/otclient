@@ -73,12 +73,25 @@ runtime_job: 98322159507
 runtime_head: 8e6ca5b6594425ee7d1d6679c5fda6f44714d1ee
 runtime_release: PASS
 semantic_promotion_eligible: false
-independent_audit: REQUIRED
+physical_workflow_retired: true
+closeout_initial_head: a2c1a8742f40e0b292dd00a46f06b91fe9e32b13
+closeout_initial_governance_run: 33012979836
+closeout_initial_governance: PASS
+closeout_initial_ci_run: 33012979999
+closeout_initial_ci: PASS
+closeout_initial_required_context: CI / Required
+closeout_initial_required_job: 98323887774
+independent_audit: PASS
+independent_audit_review_initial: 5035020106
+independent_audit_material_findings_open: 0
+exact_final_head: PENDING_BINDING_COMMIT
+independent_audit_review_exact_final_head: REQUIRED
 exact_final_head_ci: REQUIRED
+exact_final_head_governance: REQUIRED
 ownership_released: false
 task_archived: false
 current_blocker: NONE_CLOSEOUT_ONLY
-next_action: remove the consumed physical workflow, run fresh independent audit and exact-head CI, merge terminal evidence, archive task and release ownership
+next_action: run fresh independent audit and exact-head CI/governance on the binding head, merge terminal evidence, archive task and release ownership
 ---
 
 # Player-state semantic promotion E2E retry 4
@@ -87,4 +100,4 @@ The owner-authorized retry-4 consumed its single COMMIT boundary exactly once af
 
 No exact one-tile causal delta was confirmed. Therefore semantic promotion is not eligible and was not performed. The owner movement authorization is consumed permanently and no retry was or may be attempted from this task. The canonical lease generation 35 was released successfully.
 
-Durable runtime evidence is stored at `docs/agents/evidence/OTC-20260826-player-state-semantic-promotion-e2e-retry-4/runtime-terminal.md`. Remaining work is repository-only closeout: retire the physical workflow, independently audit the terminal record, require exact-head CI, merge, archive, and release task ownership.
+Durable runtime evidence is stored at `docs/agents/evidence/OTC-20260826-player-state-semantic-promotion-e2e-retry-4/runtime-terminal.md`. The consumed physical workflow has been removed. Initial closeout head `a2c1a8742f40e0b292dd00a46f06b91fe9e32b13` passed independent validator review `5035020106`, Track A governance `33012979836`, repository CI `33012979999`, and `CI / Required` job `98323887774`. The binding commit created by this record must itself pass a fresh exact-head audit, governance and CI before merge.

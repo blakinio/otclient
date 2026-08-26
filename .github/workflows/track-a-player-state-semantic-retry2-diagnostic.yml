@@ -1,0 +1,194 @@
+name: Track A player-state retry2 read-only diagnostic
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/track-a-player-state-semantic-retry2-diagnostic.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-player-state-semantic-retry2-diagnostic
+  cancel-in-progress: false
+
+jobs:
+  diagnose-player-state-precondition:
+    name: Admitted read-only player-state diagnostic
+    if: ${{ github.event.pull_request.head.ref == 'runtime/OTC-20260826-player-state-semantic-promotion-e2e-retry-2' }}
+    runs-on: [otclient, synology]
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact task head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Fresh admitted read-only diagnostic
+        shell: bash
+        env:
+          EXPECTED_MAIN_SHA: 8085b40698d409bbacba3460001e8ddca4f6c84f
+          EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          umask 077
+          [[ "$RUNNER_NAME" == 'synology-otclient-01' ]]
+          [[ "$EVENT_BASE_SHA" == "$EXPECTED_MAIN_SHA" ]]
+          [[ "$(git rev-parse HEAD)" == "$EVENT_HEAD_SHA" ]]
+          [[ "$(git ls-remote origin refs/heads/main | awk 'NR==1 {print $1}')" == "$EXPECTED_MAIN_SHA" ]]
+
+          task='OTC-20260826-player-state-semantic-promotion-e2e-retry-2'
+          session='chatgpt-player-state-semantic-retry2-diagnostic-20260826'
+          state='/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime'
+          token_root="/home/runner/_work/_otclient_tibia_re_state/tasks/$task/diagnostic"
+          token="$token_root/canonical-lease-token"
+          lease='.github/scripts/tibia-official-client-re-canonical-live-lease'
+          transition='.github/scripts/tibia-official-client-re-canonical-live-transition.py'
+          probe='.github/scripts/tibia-official-client-re-kasm-existing-runtime-probe.py'
+          worker='.github/scripts/tibia-official-client-re-player-state-causal-worker.py'
+          reg="$state/runtime-registration.json"
+          live_manifest="$token_root/current-adoption-probe.json"
+          acquired=0
+          released=0
+
+          mkdir -p "$token_root"
+          chmod 700 "$token_root" 2>/dev/null || true
+          rm -f "$token" "$live_manifest"
+
+          cleanup() {
+            rc=$?
+            if [[ "$acquired" == 1 && "$released" != 1 ]]; then
+              bash "$lease" release --task-id "$task" --session-id "$session" --token-file "$token" >/dev/null 2>&1 || true
+            fi
+            rm -f "$token" "$live_manifest"
+            exit "$rc"
+          }
+          trap cleanup EXIT
+
+          [[ -f "$state/lease.json" && -f "$reg" ]]
+          python3 - "$state/lease.json" <<'PY'
+          import json,pathlib,sys
+          lease=json.loads(pathlib.Path(sys.argv[1]).read_text())
+          assert lease.get('status') == 'released'
+          assert lease.get('controller_task') is None
+          assert lease.get('controller_session') is None
+          print('PLAYER_STATE_DIAGNOSTIC_PRESTATE=RELEASED')
+          PY
+
+          bash "$lease" acquire --task-id "$task" --session-id "$session" --token-file "$token" --ttl-seconds 1200
+          acquired=1
+          bash "$lease" validate --task-id "$task" --session-id "$session" --token-file "$token"
+          echo 'PLAYER_STATE_DIAGNOSTIC_GATE_A=PASS'
+
+          python3 "$probe" probe "$live_manifest"
+          decision="$(python3 - "$state/lease.json" "$reg" "$live_manifest" "$transition" <<'PY'
+          import importlib.util,json,pathlib,sys
+          lease=json.loads(pathlib.Path(sys.argv[1]).read_text())
+          old=json.loads(pathlib.Path(sys.argv[2]).read_text())
+          fresh=json.loads(pathlib.Path(sys.argv[3]).read_text())
+          generation=int(lease['generation'])
+          spec=importlib.util.spec_from_file_location('canonical_transition', pathlib.Path(sys.argv[4]))
+          if spec is None or spec.loader is None:
+              print('BLOCK:TRANSITION_VALIDATOR_UNAVAILABLE'); raise SystemExit(0)
+          module=importlib.util.module_from_spec(spec); sys.modules[spec.name]=module; spec.loader.exec_module(module)
+          if old.get('boot_id_sha256') != fresh.get('boot_id_sha256'):
+              try: module._validate_boot_epoch_recovery_candidate(old, fresh, generation)
+              except Exception as exc: print('BLOCK:BOOT_EPOCH_RECOVERY_CONTRACT_NOT_PROVEN:'+getattr(exc,'code',type(exc).__name__))
+              else: print('BOOT_EPOCH_RECOVERY')
+              raise SystemExit(0)
+          same_pid=old.get('pid') == fresh.get('pid')
+          same_start=old.get('process_start_ticks') == fresh.get('process_start_ticks')
+          if same_pid != same_start:
+              print('BLOCK:PARTIAL_PID_START_DRIFT'); raise SystemExit(0)
+          if same_pid and same_start:
+              if int(old.get('lease_generation', -1)) < generation: print('REBIND')
+              elif int(old.get('lease_generation', -1)) == generation: print('NONE')
+              else: print('BLOCK:REGISTRATION_GENERATION_AHEAD')
+              raise SystemExit(0)
+          try: module._validate_stale_recovery_candidate(old, fresh, generation)
+          except Exception as exc: print('BLOCK:RECOVERY_CONTRACT_NOT_PROVEN:'+getattr(exc,'code',type(exc).__name__))
+          else: print('RECOVERY')
+          PY
+          )"
+          echo "PLAYER_STATE_DIAGNOSTIC_AUTHORITY_TRANSITION_DECISION=$decision"
+          case "$decision" in
+            BOOT_EPOCH_RECOVERY)
+              python3 "$transition" boot-epoch-registration-recovery --task-id "$task" --session-id "$session" --token-file "$token" --probe "$probe"
+              echo 'PLAYER_STATE_DIAGNOSTIC_BOOT_EPOCH_RECOVERY=PASS'
+              ;;
+            RECOVERY)
+              python3 "$transition" stale-registration-recovery --task-id "$task" --session-id "$session" --token-file "$token" --probe "$probe"
+              echo 'PLAYER_STATE_DIAGNOSTIC_RECOVERY=PASS'
+              ;;
+            REBIND)
+              python3 "$transition" rebind --task-id "$task" --session-id "$session" --token-file "$token" --probe "$probe"
+              echo 'PLAYER_STATE_DIAGNOSTIC_REBIND=PASS'
+              ;;
+            NONE)
+              echo 'PLAYER_STATE_DIAGNOSTIC_AUTHORITY_TRANSITION=NOT_REQUIRED'
+              ;;
+            *)
+              echo "PLAYER_STATE_DIAGNOSTIC_BLOCKED=$decision" >&2
+              exit 20
+              ;;
+          esac
+          rm -f "$live_manifest"
+
+          python3 "$transition" gate-b --task-id "$task" --session-id "$session" --token-file "$token" --probe "$probe"
+          echo 'PLAYER_STATE_DIAGNOSTIC_GATE_B=PASS'
+
+          python3 - "$reg" "$worker" <<'PY'
+          import importlib.util,json,pathlib,subprocess,sys
+          reg=json.loads(pathlib.Path(sys.argv[1]).read_text())
+          root=pathlib.Path.cwd()
+          if str(root) not in sys.path: sys.path.insert(0,str(root))
+          from tools.tibia_re_surveyor.player_state import read_player_state
+
+          def compact(text):
+              return ' '.join(str(text).replace('\x00','').split())[:1200]
+
+          def runner(args):
+              cp=subprocess.run(args,check=False,text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=30)
+              print('PLAYER_STATE_DIAGNOSTIC_READER_RC='+str(cp.returncode))
+              if cp.stdout.strip(): print('PLAYER_STATE_DIAGNOSTIC_READER_STDOUT='+compact(cp.stdout))
+              if cp.stderr.strip(): print('PLAYER_STATE_DIAGNOSTIC_READER_STDERR='+compact(cp.stderr))
+              if cp.returncode: raise RuntimeError('reader command failed')
+              return cp.stdout
+
+          doc=read_player_state(
+              pid=int(reg['pid']),
+              start_ticks=int(reg['process_start_ticks']),
+              runner=runner,
+              container='otclient-track-a-kasmvnc',
+          )
+          safe={k:doc.get(k) for k in ('state','reader_id','reason','object_count','position_mirror_consistent','process_memory_access','semantic_state','semantic_promotion_allowed')}
+          pos=doc.get('position')
+          if isinstance(pos,dict): safe['position']={k:pos.get(k) for k in ('x','y','z')}
+          print('PLAYER_STATE_DIAGNOSTIC_CANDIDATE='+json.dumps(safe,sort_keys=True,separators=(',',':')))
+
+          spec=importlib.util.spec_from_file_location('player_state_causal_worker',pathlib.Path(sys.argv[2]))
+          if spec is None or spec.loader is None: raise SystemExit(2)
+          module=importlib.util.module_from_spec(spec); sys.modules[spec.name]=module; spec.loader.exec_module(module)
+          try:
+              module.validate_candidate(doc)
+          except Exception as exc:
+              print('PLAYER_STATE_DIAGNOSTIC_VALIDATE=BLOCK:'+str(exc))
+          else:
+              print('PLAYER_STATE_DIAGNOSTIC_VALIDATE=PASS')
+          PY
+
+          bash "$lease" release --task-id "$task" --session-id "$session" --token-file "$token"
+          released=1
+          python3 - "$state/lease.json" <<'PY'
+          import json,pathlib,sys
+          state=json.loads(pathlib.Path(sys.argv[1]).read_text())
+          assert state.get('status') == 'released'
+          assert state.get('controller_task') is None
+          assert state.get('controller_session') is None
+          print('PLAYER_STATE_DIAGNOSTIC_RELEASE=PASS')
+          PY

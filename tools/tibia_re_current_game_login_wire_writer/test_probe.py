@@ -9,6 +9,8 @@ def main() -> int:
         "containing_fde", "function_control_transfers", "instruction_context", "rtti_vtable_candidates",
         "plt_symbol_addresses", "rip_refs", "direct_calls", "vtable_reference_contexts", "writer_slot_ref_fdes",
         "fde_instructions", "named_vslot_target", "semantic_snapshot", "serializer_candidates", "TXteaHelper",
+        "queue_plus_0x68", "final_frame_candidate", "final_frame_vtable_candidates",
+        "qtcpsocket_ctor_contexts", "writer_setup_call_contexts",
         "tibia::protocol::TProtocolMessageQueue", "sendLogin", "send_login_adapter", "adapter_fde",
         "adapter_indirect_calls", "adapter_indirect_contexts",
         "tibia::network::TGameserverTCPConnection", "tibia::network::TTCPConnection",

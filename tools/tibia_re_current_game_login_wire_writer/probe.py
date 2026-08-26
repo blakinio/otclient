@@ -554,6 +554,7 @@ def main() -> int:
         for row in adapter_indirect_calls
     ]
     rtti_names = (
+        'TProtocolMessageQueue',
         'TProtocolClientMessageProcessor',
         'TGameserverNetworkPacketRawDataProcessor',
         'TGameserverDualConnection',
@@ -632,6 +633,7 @@ def main() -> int:
     }
 
     semantic_targets = {
+        'queue_plus_0x68': named_vslot_target(rtti_vtables, 'TProtocolMessageQueue', '0x68'),
         'client_processor_plus_0x10': named_vslot_target(rtti_vtables, 'TProtocolClientMessageProcessor', '0x10'),
         'raw_processor_plus_0x10': named_vslot_target(rtti_vtables, 'TGameserverNetworkPacketRawDataProcessor', '0x10'),
         'dual_connection_plus_0x78': named_vslot_target(rtti_vtables, 'TGameserverDualConnection', '0x78'),
@@ -719,8 +721,11 @@ def main() -> int:
         })
     setup_common_fdes = sorted(set.intersection(*setup_sets)) if setup_sets else []
 
+    queue68_flow = function_control_transfers(GLOBAL_IMAGE, semantic_targets['queue_plus_0x68'])
     semantic_snapshot = {
         'send_login_adapter': fde_instructions(GLOBAL_IMAGE, send_login_adapter),
+        'queue_plus_0x68': fde_instructions(GLOBAL_IMAGE, semantic_targets['queue_plus_0x68']),
+        'queue_plus_0x68_transfers': [sanitize_transfer(row) for row in queue68_flow['transfers']],
         'client_processor_plus_0x10': fde_instructions(GLOBAL_IMAGE, semantic_targets['client_processor_plus_0x10']),
         'raw_processor_plus_0x10': fde_instructions(GLOBAL_IMAGE, semantic_targets['raw_processor_plus_0x10']),
         'dual_connection_plus_0x78': fde_instructions(GLOBAL_IMAGE, semantic_targets['dual_connection_plus_0x78']),
@@ -731,6 +736,52 @@ def main() -> int:
     }
     if 'xtea_plus_0x28' in semantic_targets:
         semantic_snapshot['xtea_plus_0x28'] = fde_instructions(GLOBAL_IMAGE, semantic_targets['xtea_plus_0x28'])
+
+    def has_ins(snapshot: dict, mnemonic: str, operand_fragment: str) -> bool:
+        return any(row['mnemonic'] == mnemonic and operand_fragment in row['operand'] for row in snapshot['instructions'])
+
+    frame_candidates = [
+        row for row in serializer_candidates
+        if has_ins(row['snapshot'], 'sar', 'rsi, 3')
+        and has_ins(row['snapshot'], 'mov', 'esi, dword ptr [rbp]')
+        and len(row['writeRawData_sites']) == 1
+    ]
+    if len(frame_candidates) != 1:
+        raise RuntimeError(f'expected one framing serializer candidate, got {len(frame_candidates)}')
+    frame_candidate = frame_candidates[0]
+    frame_start = int(frame_candidate['fde'][0], 16)
+    frame_vtables = []
+    for where, addend in GLOBAL_IMAGE.relocations.items():
+        if int(addend) != frame_start:
+            continue
+        for slot_off in range(0, 0x80, 8):
+            ap = int(where) - slot_off
+            if not GLOBAL_IMAGE.mapped(ap - 16, 24) or GLOBAL_IMAGE.qword(ap - 16) != 0:
+                continue
+            typeinfo = GLOBAL_IMAGE.relocations.get(ap - 8)
+            if typeinfo is None:
+                continue
+            refs = rip_refs(GLOBAL_IMAGE, ap)
+            frame_vtables.append({
+                'address_point': hx(ap), 'slot_offset': hex(slot_off),
+                'typeinfo': hx(int(typeinfo)),
+                'refs': [ref_record(site) for site in refs[:16]],
+            })
+    unique_frame_vtables = {(r['address_point'], r['slot_offset'], r['typeinfo']): r for r in frame_vtables}
+    frame_vtables = list(unique_frame_vtables.values())
+
+    setup_fde_set = set(setup_common_fdes)
+    qtcpsocket_ctor_contexts = [
+        {'at': hx(site), 'context': instruction_context(GLOBAL_IMAGE, site, 18, 12)}
+        for name, row in plt_direct_calls.items() if 'QTcpSocketC1EP7QObject' in name
+        for site_s in row['direct_call_sites'] for site in [int(site_s, 16)]
+        if fde_key_for_site(site) in setup_fde_set
+    ]
+    writer_setup_call_contexts = [
+        {'at': hx(site), 'context': instruction_context(GLOBAL_IMAGE, site, 24, 14)}
+        for row in writer_ctor_candidates for site_s in row['direct_call_sites'] for site in [int(site_s, 16)]
+        if fde_key_for_site(site) in setup_fde_set
+    ]
 
     selected = re.compile(r'(login|write|send|data|message|connect|socket|packet)', re.I)
     result = {
@@ -768,6 +819,10 @@ def main() -> int:
         'semantic_snapshot': semantic_snapshot,
         'serializer_candidates': serializer_candidates,
         'writer_ctor_candidates': writer_ctor_candidates,
+        'final_frame_candidate': frame_candidate,
+        'final_frame_vtable_candidates': frame_vtables,
+        'qtcpsocket_ctor_contexts': qtcpsocket_ctor_contexts,
+        'writer_setup_call_contexts': writer_setup_call_contexts,
         'dynamic_symbols': dynamic_symbols(args.client, ('QDataStream', 'QTcpSocket', 'QIODevice', 'writeRawData'))[:300],
         'classification': {
             'current_sendlogin_qmeta': 'PROVEN',
@@ -801,6 +856,11 @@ def main() -> int:
     print('SERIALIZER_CANDIDATE_COUNT=' + str(len(serializer_candidates)))
     print('WRITER_CTOR_CANDIDATE_COUNT=' + str(len(writer_ctor_candidates)))
     print('SETUP_COMMON_FDES=' + ','.join(setup_common_fdes))
+    print('QUEUE_PLUS_0X68_TARGET=' + hx(semantic_targets['queue_plus_0x68']))
+    print('FINAL_FRAME_FDE=' + '..'.join(frame_candidate['fde']))
+    print('FINAL_FRAME_VTABLE_CANDIDATE_COUNT=' + str(len(frame_vtables)))
+    print('QTCPSOCKET_SETUP_CTOR_COUNT=' + str(len(qtcpsocket_ctor_contexts)))
+    print('WRITER_SETUP_CALL_COUNT=' + str(len(writer_setup_call_contexts)))
     for offset, row in writer_slot_ref_fdes.items():
         print('WRITER_SLOT_REF_FDES_' + offset.upper().replace('0X', '0x') + '=' + ','.join(row['unique_fdes']))
     print('RAW_CLIENT_UPLOADED=false')

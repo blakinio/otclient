@@ -67,11 +67,13 @@ unresolved_review_threads: 0
 ownership_released: true
 task_archived: true
 archive_pr: 702
-archive_independent_audit: PENDING
-archive_exact_head_ci: PENDING
-last_progress_at: 2026-08-26T19:37:00+02:00
+archive_independent_audit: PASS
+archive_independent_audit_review: 5033377846
+archive_independent_audit_material_findings_open: 0
+archive_final_exact_head_ci_required: true
+last_progress_at: 2026-08-26T19:40:00+02:00
 current_blocker: none
-next_action: finalize archive PR exact-head governance/audit and merge; never perform a physical retry
+next_action: NONE
 ---
 
 # Player-state causal-worker timeout repair — terminal closeout
@@ -84,8 +86,8 @@ Pre-effect semantic/read timeout remains `REFUSED/effect_count=0`. Deadline exha
 
 TDD covers slow/hung baseline reads, slow dispatch, the not-started/started dispatch boundary, spawn failure, post-dispatch hung reads, reconciliation exhaustion, result-write deadline admission, outer-timeout compatibility, exact one-dispatch semantics and parent process-death rejection. During implementation an initial overclassification of pre-start dispatch deadline as ambiguous was found and repaired. A later hosted failure was isolated to a test fixture that exhausted the budget before reaching the intended dispatch boundary; the fixture was corrected without changing production semantics.
 
-Final exact-head `0aa3f4dc58a5d4c20939bb6ce239a031af82b3ec` passed Track A causal timing run `32994066909`, Track A governance run `32994066917` and CI run `32994067664`, including `CI / Required` job `98259212152`. A duplicate CI generation on the same SHA had been cancelled by concurrency and left a stale failing `CI / Required`; its cancelled root job was rerun once without code changes, producing successful required job `98261917845` in run `32994067929`. No branch protection was bypassed.
+Final implementation head `0aa3f4dc58a5d4c20939bb6ce239a031af82b3ec` passed Track A causal timing run `32994066909`, Track A governance run `32994066917` and CI run `32994067664`, including `CI / Required` job `98259212152`. A duplicate CI generation on the same SHA had been cancelled by concurrency and left a stale failing `CI / Required`; its cancelled root job was rerun once without code changes, producing successful required job `98261917845` in run `32994067929`. No branch protection was bypassed.
 
-Fresh validator-role audit review `5033262455` on the exact implementation head reported PASS with zero material findings. Physical E2E is `NOT_APPLICABLE` because the owner explicitly constrained this repair to repository-only deterministic validation.
+Fresh implementation validator-role audit review `5033262455` reported PASS with zero material findings. Fresh docs-only archive audit review `5033377846` likewise reported PASS with zero material findings on the pre-evidence-binding archive head. This archive PR remains subject to the repository's required exact-final-head CI and a final audit refresh before merge; those merge gates are PR evidence and are not predeclared as passing in this record.
 
-The terminal evidence from #698 is unchanged: after its already-consumed COMMIT, absence of causal confirmation remains `POSSIBLY_DISPATCHED/AMBIGUOUS`, `NO_RETRY=true`; this repair does not retroactively prove movement or authorize another attempt. After merge, no physical retry is to be executed.
+Physical E2E is `NOT_APPLICABLE` because the owner explicitly constrained this repair to repository-only deterministic validation. The terminal evidence from #698 is unchanged: after its already-consumed COMMIT, absence of causal confirmation remains `POSSIBLY_DISPATCHED/AMBIGUOUS`, `NO_RETRY=true`; this repair does not retroactively prove movement or authorize another attempt. After merge, no physical retry is to be executed.

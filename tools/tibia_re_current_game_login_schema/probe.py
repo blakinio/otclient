@@ -518,10 +518,16 @@ MESSAGE_CLASSES = (
 )
 
 
+def expected_mangled_rtti(simple_name: str) -> str:
+    full = 'tibia::protobuf::protocol::' + simple_name
+    return 'N' + ''.join(str(len(part)) + part for part in full.split('::')) + 'E'
+
+
 def recover_vtable(img: Image, simple_name: str) -> dict:
-    rows = rtti_vtable_candidates(img, simple_name)
+    expected = expected_mangled_rtti(simple_name)
+    rows = [row for row in rtti_vtable_candidates(img, simple_name) if row['rtti_name'] == expected]
     if len(rows) != 1:
-        raise RuntimeError(f'{simple_name}: expected one RTTI row, got {len(rows)}')
+        raise RuntimeError(f'{simple_name}: expected one exact RTTI row, got {len(rows)}')
     aps = rows[0].get('address_points', [])
     if len(aps) != 1:
         raise RuntimeError(f'{simple_name}: expected one vtable AP, got {len(aps)}')

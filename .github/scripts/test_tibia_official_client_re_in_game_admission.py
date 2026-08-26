@@ -134,6 +134,7 @@ class InGameAdmissionRegressionTests(unittest.TestCase):
                 mock.patch.object(transition, "_emit_guarded_ready", ready), \
                 mock.patch.object(transition, "_read_guarded_decision", return_value="COMMIT"), \
                 mock.patch.object(transition, "_lease"), \
+                mock.patch.object(transition, "_cancel"), \
                 mock.patch.object(transition, "_run_guarded_worker", worker):
             result = transition._guarded_dispatch(
                 args, object(), object(), object(), object(), 35,

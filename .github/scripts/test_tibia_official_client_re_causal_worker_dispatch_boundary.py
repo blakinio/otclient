@@ -72,15 +72,20 @@ class DispatchBoundaryTests(unittest.TestCase):
     def test_deadline_before_subprocess_creation_is_refused_effect_zero(self):
         clock = Clock()
         budget = self.m.DeadlineBudget(
-            clock() + self.m.RESULT_WRITE_RESERVE_SECONDS,
+            clock() + self.m.RESULT_WRITE_RESERVE_SECONDS + 1.0,
             clock=clock,
         )
+
+        def baseline(_reg, _budget):
+            clock.now += 1.0
+            return self.candidate
+
         with mock.patch.object(self.m.subprocess, "run") as run:
             result = self.m.execute_once(
                 self.request,
                 self.registration,
                 budget=budget,
-                read_candidate_fn=lambda _reg, _budget: self.candidate,
+                read_candidate_fn=baseline,
                 tool_ready_fn=lambda _target, _budget: True,
                 dispatch_fn=self.m.dispatch,
             )

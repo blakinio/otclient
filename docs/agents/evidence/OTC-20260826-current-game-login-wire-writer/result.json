@@ -1,0 +1,110 @@
+{
+  "classification": {
+    "current_framing": "PROVEN",
+    "current_generated_login_message_field_schema": "UNKNOWN",
+    "current_qdatastream_raw_write": "PROVEN",
+    "current_qt_bound_binary_writer": "PROVEN",
+    "current_queue_async_drain_to_client_processor": "UNKNOWN",
+    "current_queue_vslot_plus_0x68_target": "PROVEN",
+    "current_sequence": "PROVEN",
+    "current_sendlogin_adapter": "PROVEN",
+    "current_sendlogin_qmeta_case": "PROVEN",
+    "current_xtea_mode2_transform": "PROVEN",
+    "final_os_socket_syscall": "UNKNOWN_OPTIONAL",
+    "track_b_next_guess_should_change_outer_framing": "REJECTED",
+    "track_b_outer_transport_shape": "STRUCTURALLY_ALIGNED"
+  },
+  "exact_client": {
+    "packed_sha256": "075810c54af2d6912000eab062763db29563f5a1f4bf1d984154b2d07fd5729f",
+    "unpacked_sha256": "d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a",
+    "unpacked_size": 52105824,
+    "version": "15.32.75d4a0"
+  },
+  "framing": {
+    "qdatastream_write_raw_data_plt": "0x4d6260",
+    "receiver_vtable_candidate": {
+      "address_point": "0x2f95fd8",
+      "slot_0x10": "0xf4edd0",
+      "typeinfo": "0x30ea3c8"
+    },
+    "serializer_fde": [
+      "0xf4edd0",
+      "0xf4ef15"
+    ],
+    "wire_order": [
+      "ceil(payload_length/8)",
+      "dword(message+0)",
+      "raw transformed payload via QDataStream::writeRawData"
+    ]
+  },
+  "login_queue": {
+    "adapter": "0xbd3050",
+    "adapter_fde": [
+      "0xbd3050",
+      "0xbd34dd"
+    ],
+    "qmeta_case": "0xde82a2",
+    "qmeta_index": 196,
+    "qmeta_terminal_jump": "0xde82ae -> 0xbd3050",
+    "qmetaobject": "0x30b73e0",
+    "queue_rtti": "0x30ed548",
+    "queue_vtable_ap": "0x30ed588",
+    "queue_vslot_plus_0x68": "0xbd24a0",
+    "queue_vslot_plus_0x68_fde": [
+      "0xbd24a0",
+      "0xbd28c4"
+    ],
+    "static_metacall": "0xde76a0"
+  },
+  "p2_targets": {
+    "TGameserverDualConnection+0x78": "0xb43920",
+    "TGameserverDualConnection+0x80": "0xb43d10",
+    "TGameserverNetworkPacketConnection+0x78": "0xb53930",
+    "TGameserverNetworkPacketConnection+0x80": "0xb68c70",
+    "TGameserverNetworkPacketProcessor+0x60": "0xf39430",
+    "TGameserverNetworkPacketProcessor+0x68": "0xf4eca0",
+    "TGameserverNetworkPacketRawDataProcessor+0x10": "0xb36c70",
+    "TProtocolClientMessageProcessor+0x10": "0xc29350"
+  },
+  "qt_binding": {
+    "qdatastream_qiodevice_ctor_plt": "0x4d46d0",
+    "qtcpsocket_ctor_calls": [
+      "0x195636a",
+      "0x1956707"
+    ],
+    "qtcpsocket_ctor_plt": "0x4d6bc0",
+    "tcp_connection_rtti": "0x30b48e0",
+    "tcp_connection_vtable_ap": "0x30b6438",
+    "tiodevicewriter_ctor_fde": [
+      "0x1946510",
+      "0x1946652"
+    ],
+    "tiodevicewriter_rtti": "0x30b49c8",
+    "tiodevicewriter_vtable_ap": "0x2f89480"
+  },
+  "safety": {
+    "login_performed": false,
+    "raw_client_uploaded": false,
+    "runtime_access": "none",
+    "secret_access": false
+  },
+  "schema": "otclient.track-a.current-game-login-wire-writer.promotion.v1",
+  "sequence": {
+    "mode_3": "store DualConnection this+0x9c into message+0 then increment owner",
+    "nonmatching_mode": "message+0 = 0",
+    "owner": "TGameserverDualConnection"
+  },
+  "source": {
+    "artifact": 9617908322,
+    "artifact_digest": "sha256:a43ed724d00e18575d969859ad3345d69f2650ee5790d3dbcf13767de1b9ebf4",
+    "head": "3d87d729b73f868aefe1662c72af666a4921b1d8",
+    "run": 32998976901
+  },
+  "transform": {
+    "compression_on_recovered_outbound_path": "NO_SEPARATE_TRANSFORM_OBSERVED",
+    "mode_2_xtea_slot": "shared::TXteaHelper vtable +0x28 -> 0xf71eb0",
+    "padding": "prepend padding-count byte and pad working container to multiple of 8",
+    "xtea_rtti": "0x30adc00",
+    "xtea_vtable_ap": "0x2f82ea0"
+  }
+}

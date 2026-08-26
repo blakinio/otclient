@@ -1,4 +1,4 @@
-﻿---
+---
 task_id: OTC-20260826-player-state-semantic-promotion-e2e-retry-3
 status: investigating
 phase: investigating

@@ -20,6 +20,9 @@ concurrency:
 jobs:
   build-linux:
     name: Build exact native Linux OTClient
+    # The canonical Track B PR uses the encrypted one-shot producer. Keep the
+    # legacy secret-bearing full lab manual-only for that source branch.
+    if: github.event_name != 'pull_request' || github.head_ref != 'feat/OTC-20260813-tibia-global-login-lab'
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout exact branch head

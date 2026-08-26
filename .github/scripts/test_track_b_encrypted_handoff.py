@@ -25,6 +25,10 @@ assert 'TIBIA_TEST_EMAIL' not in workflow[prep_step:emit_step]
 assert 'TIBIA_TEST_PASSWORD' not in workflow[prep_step:emit_step]
 assert '.github/track-b-encrypted-handoff/**' in workflow
 assert '.github/scripts/test_track_b_encrypted_handoff.py' in workflow
+assert 'run_handoff: ${{ steps.scope.outputs.run_handoff }}' in workflow
+assert "if: needs.scope.outputs.run_handoff == 'true'" in workflow
+assert "git diff --quiet HEAD^ HEAD --" in workflow
+assert "'.github/track-b-encrypted-handoff'" in workflow
 assert 'retention-days: 1' in workflow and 'handoff.cms' in workflow
 assert '.github/track-b-encrypted-handoff' not in main_workflow
 
@@ -42,6 +46,13 @@ assert '/lab/secrets/login-response.json' in emitter
 assert 'rm -f /lab/secrets/login-response.json /lab/secrets/login-handoff.json' in emitter
 assert "! grep -a -q 'sessionKey' \"$OUT\"" in emitter
 assert 'sessionKey' in emitter and 'characterName' in emitter and 'worldHost' in emitter
+assert "docker exec \"$CONTAINER\" python3 - <<'PY'" not in emitter
+assert "docker exec -i \"$CONTAINER\" python3 - <<'PY'" in emitter
+
+build_job = main_workflow.index('  build-linux:')
+build_steps = main_workflow.index('    steps:', build_job)
+build_header = main_workflow[build_job:build_steps]
+assert "github.event_name != 'pull_request' || github.head_ref != 'feat/OTC-20260813-tibia-global-login-lab'" in build_header
 
 assert cert.startswith('-----BEGIN CERTIFICATE-----')
 assert 'PRIVATE KEY' not in cert

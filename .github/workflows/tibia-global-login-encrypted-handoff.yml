@@ -17,7 +17,35 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  scope:
+    runs-on: ubuntu-24.04
+    outputs:
+      run_handoff: ${{ steps.scope.outputs.run_handoff }}
+    steps:
+      - name: Checkout exact branch head for scope gate
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Gate encrypted producer to current head delta
+        id: scope
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            run_handoff=true
+          elif git diff --quiet HEAD^ HEAD --               '.github/workflows/tibia-global-login-encrypted-handoff.yml'               '.github/track-b-encrypted-handoff'               '.github/scripts/test_track_b_encrypted_handoff.py'; then
+            run_handoff=false
+          else
+            run_handoff=true
+          fi
+          echo "run_handoff=$run_handoff" >> "$GITHUB_OUTPUT"
+          echo "TRACK_B_ENCRYPTED_HANDOFF_SCOPE=$run_handoff"
+
   handoff:
+    needs: scope
+    if: needs.scope.outputs.run_handoff == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:

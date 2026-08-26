@@ -85,7 +85,7 @@ http_status=$(docker exec "$CONTAINER" bash -lc \
 [[ "$http_status" == 200 ]]
 echo LAB_ENCRYPTED_HANDOFF_HTTP_LOGIN_200=true
 
-docker exec "$CONTAINER" python3 - <<'PY'
+docker exec -i "$CONTAINER" python3 - <<'PY'
 import json
 from pathlib import Path
 response_path = Path('/lab/secrets/login-response.json')

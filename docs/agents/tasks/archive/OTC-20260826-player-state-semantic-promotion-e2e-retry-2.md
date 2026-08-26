@@ -17,18 +17,18 @@ base_sha: ca687efa72eb8bcea6a31f1840a07f89500f4ab8
 pr: 698
 risk: critical
 runtime_access: none
-runtime_owner_task: null
-runtime_namespace: null
-canonical_registration: NOT_APPLICABLE_CLOSEOUT
-canonical_lease_generation: 33
-registration_generation: NOT_APPLICABLE_CLOSEOUT
-registration_lease_generation: NOT_APPLICABLE_CLOSEOUT
-gate_a: PASS_RUNTIME_TERMINAL
-generation_rebind: PASS_RUNTIME_TERMINAL
-gate_b: PASS_RUNTIME_TERMINAL
+runtime_owner_task: NOT_APPLICABLE
+runtime_namespace: NOT_APPLICABLE
+canonical_registration: NOT_APPLICABLE
+canonical_lease_generation: NOT_APPLICABLE
+registration_generation: NOT_APPLICABLE
+registration_lease_generation: NOT_APPLICABLE
+gate_a: NOT_APPLICABLE
+generation_rebind: NOT_APPLICABLE
+gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
-target_uniqueness: PROVEN_RUNTIME_TERMINAL
-semantic_preconditions: PASS_RUNTIME_TERMINAL
+target_uniqueness: NOT_APPLICABLE
+semantic_preconditions: NOT_APPLICABLE
 mutation_authorized: false
 credentials_allowed: false
 login_allowed: false
@@ -55,6 +55,11 @@ attempt_1_workflow_run: 32943313499
 attempt_1_workflow_job: 98098662994
 attempt_1_boot_epoch_recovery: PASS_PRECOMMIT_ZERO_EFFECT
 final_authority_transition: REBIND_PASS
+gate_a_runtime: PASS
+generation_rebind_runtime: PASS
+gate_b_runtime: PASS
+target_uniqueness_runtime: PROVEN
+semantic_preconditions_runtime: PASS
 causal_proof: NOT_PROVEN
 semantic_promotion_performed: false
 product_code_changed: false
@@ -74,7 +79,7 @@ merge_target_pr: 698
 merge_commit: ca687efa72eb8bcea6a31f1840a07f89500f4ab8
 ownership_released: true
 task_archived: true
-last_progress_at: 2026-08-26T18:21:44+02:00
+last_progress_at: 2026-08-26T18:24:00+02:00
 current_blocker: terminal post-COMMIT ambiguity; no valid causal worker result exists and retry is forbidden
 next_action: NONE
 ---

@@ -50,6 +50,8 @@ TOOL_READY_TIMEOUT_CAP_SECONDS = 10.0
 READER_TIMEOUT_CAP_SECONDS = 20.0
 DISPATCH_TIMEOUT_CAP_SECONDS = 10.0
 RECONCILIATION_SLEEP_SECONDS = 0.15
+POST_DISPATCH_CHECKPOINT_FILENAME = ".guarded-dispatch-post-dispatch.json"
+POST_DISPATCH_CHECKPOINT_REASON = "POST_DISPATCH_RECONCILIATION_INCOMPLETE"
 
 
 class WorkerRefusal(RuntimeError):
@@ -305,6 +307,7 @@ def execute_once(
     dispatch_fn: Callable[[Sequence[str], DeadlineBudget], int] = dispatch,
     sleep_fn: Callable[[float], None] | None = None,
     reconciliation_attempts: int = 12,
+    post_dispatch_checkpoint_fn: Callable[[Mapping[str, Any], DeadlineBudget], None] | None = None,
 ) -> dict[str, Any]:
     fallback_hash = request.get("action_hash", "0" * 64) if isinstance(request, dict) else "0" * 64
     try:
@@ -339,6 +342,13 @@ def execute_once(
         return _refused(req["action_hash"], "INPUT_DISPATCH_NOT_STARTED")
     if rc != 0:
         return _ambiguous(req["action_hash"], "INPUT_DISPATCH_UNCERTAIN")
+
+    post_dispatch_checkpoint = _ambiguous(req["action_hash"], POST_DISPATCH_CHECKPOINT_REASON)
+    if post_dispatch_checkpoint_fn is not None:
+        try:
+            post_dispatch_checkpoint_fn(post_dispatch_checkpoint, budget)
+        except (OSError, WorkerDeadlineExceeded):
+            return post_dispatch_checkpoint
 
     last = before
     for attempt in range(max(1, reconciliation_attempts)):
@@ -434,7 +444,24 @@ def main(argv: Sequence[str] | None = None) -> int:
         registration = json.loads(REGISTRATION.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return 2
-    result = execute_once(request, registration, budget=budget)
+    checkpoint_path = result_path.with_name(POST_DISPATCH_CHECKPOINT_FILENAME)
+    try:
+        checkpoint_path.unlink(missing_ok=True)
+    except OSError:
+        return 2
+
+    def persist_post_dispatch_checkpoint(
+        checkpoint: Mapping[str, Any],
+        checkpoint_budget: DeadlineBudget,
+    ) -> None:
+        write_result(checkpoint_path, checkpoint, checkpoint_budget)
+
+    result = execute_once(
+        request,
+        registration,
+        budget=budget,
+        post_dispatch_checkpoint_fn=persist_post_dispatch_checkpoint,
+    )
     try:
         write_result(result_path, result, budget)
     except (OSError, WorkerDeadlineExceeded):

@@ -482,5 +482,44 @@ class PlayerStateCausalWorkerTests(unittest.TestCase):
         self.assertEqual(result["status"], "AMBIGUOUS")
         self.assertEqual(result["effect_count"], 1)
 
+    def test_main_persists_post_dispatch_checkpoint_to_distinct_path(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            request_path = root / "request.json"
+            result_path = root / "result.json"
+            registration_path = root / "registration.json"
+            request_path.write_text(json.dumps(self.request()))
+            registration_path.write_text(json.dumps(self.registration()))
+            seen = {}
+            writes = []
+            fallback = {
+                "status": "AMBIGUOUS",
+                "effect_count": 1,
+                "action_hash": self.action_hash,
+                "reason_code": "POST_DISPATCH_RECONCILIATION_INCOMPLETE",
+            }
+
+            def fake_execute(*_args, **kwargs):
+                seen["hook"] = kwargs.get("post_dispatch_checkpoint_fn")
+                if seen["hook"] is not None:
+                    seen["hook"](fallback, kwargs["budget"])
+                return fallback
+
+            def fake_write(path, result, _budget):
+                writes.append((Path(path), dict(result)))
+
+            with mock.patch.object(self.m, "REGISTRATION", registration_path), \
+                    mock.patch.object(self.m, "execute_once", side_effect=fake_execute), \
+                    mock.patch.object(self.m, "write_result", side_effect=fake_write):
+                rc = self.m.main(["guarded-dispatch", str(request_path), str(result_path)])
+            self.assertEqual(rc, 0)
+            self.assertIsNotNone(seen.get("hook"))
+            self.assertEqual(
+                [path.name for path, _result in writes],
+                [".guarded-dispatch-post-dispatch.json", "result.json"],
+            )
+            self.assertEqual(writes[0][1], fallback)
+            self.assertEqual(writes[1][1], fallback)
+
 if __name__ == "__main__":
     unittest.main()

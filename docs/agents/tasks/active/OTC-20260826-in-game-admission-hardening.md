@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260826-in-game-admission-hardening
-status: implementing
+status: validating
 phase: validating
 agent: ChatGPT
 session_role: owner
@@ -39,13 +39,32 @@ physical_action_budget: 0
 physical_action_count: 0
 semantic_promotion_performed: false
 root_cause_status: PROVEN
+repair_status: IMPLEMENTED_AND_HOSTED_GREEN
+no_new_ingame_producer: true
 tdd_red_head: 9e9a4995c0785617d90967d0ad70cf75c885890e
 tdd_red_run: 33014845948
 tdd_green_head: 54de1a00b234158a731a30708b3d11d808e0ef55
 tdd_green_run: 33015945329
-tdd_green: PASS
-current_blocker: NONE_VALIDATION_ONLY
-next_action: obtain clean governance and repository CI on the current head, record durable evidence, run independent exact-head audit, merge and archive
+boundary_validation_head: d2e52ff261805014399c856ce3a024f58fa6cace
+boundary_validation_causal_timing_run: 33016340057
+boundary_validation_agent_governance_run: 33016340032
+boundary_validation_canonical_governance_run: 33016340047
+boundary_validation_xres_run: 33016340059
+boundary_validation_ci_run: 33016340233
+boundary_validation_required_job: 98335600449
+boundary_validation: PASS
+durable_evidence: docs/agents/evidence/OTC-20260826-in-game-admission-hardening/root-cause-and-repair.md
+independent_audit: REQUIRED
+independent_audit_review: PENDING
+exact_final_head: PENDING_BINDING_COMMIT
+exact_final_head_causal_timing: REQUIRED
+exact_final_head_agent_governance: REQUIRED
+exact_final_head_canonical_governance: REQUIRED
+exact_final_head_ci: REQUIRED
+ownership_released: false
+task_archived: false
+current_blocker: NONE_AUDIT_CI_ONLY
+next_action: freeze this binding head, run fresh independent audit and exact-head hosted checks, merge PR #715, archive task and release ownership
 ---
 
 # In-game admission hardening
@@ -60,4 +79,8 @@ Proven data flow on source main:
 
 Implemented contract: for guarded `kind=move`, current registration and every fresh manifest crossing the guarded-dispatch effect boundary must both be `IN_GAME`; otherwise the request fails closed before `READY` or before the worker effect. Direct worker invocation independently requires `IN_GAME` before any tool/read/dispatch work. This task does not create or infer a new `IN_GAME` proof mechanism.
 
-TDD RED on `9e9a4995c0785617d90967d0ad70cf75c885890e`, run `33014845948`, proved both defects: canonical emitted READY instead of raising the new semantic admission refusal, and the worker returned post-dispatch `AMBIGUOUS` instead of pre-dispatch `REFUSED` for an UNKNOWN registration. The minimal repair on `54de1a00b234158a731a30708b3d11d808e0ef55` passed hosted causal timing run `33015945329`.
+TDD RED on `9e9a4995c0785617d90967d0ad70cf75c885890e`, run `33014845948`, proved both defects. The minimal repair on `54de1a00b234158a731a30708b3d11d808e0ef55` first passed hosted causal timing run `33015945329`. Strengthened boundary coverage was then added for `UNKNOWN`, `LOGIN`, `CHARACTER_SELECT`, `DISCONNECTED`, post-READY state drift, and a synthetic positive `IN_GAME` path.
+
+The fully strengthened boundary candidate `d2e52ff261805014399c856ce3a024f58fa6cace` passed Track A causal timing `33016340057`, agent runtime governance `33016340032`, canonical live governance `33016340047`, hosted XRes validation `33016340059`, repository CI `33016340233`, and `CI / Required` job `98335600449`. Durable root-cause/repair evidence is stored at `docs/agents/evidence/OTC-20260826-in-game-admission-hardening/root-cause-and-repair.md`.
+
+The task has not proven any current client `IN_GAME`; current adoption semantics remain fail-closed. No future physical action is authorized by this task.

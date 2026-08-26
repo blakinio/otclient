@@ -8,13 +8,30 @@ track_id: official-client-re
 task_kind: discovery
 phase: investigate
 branch: research/OTC-20260826-current-game-login-wire-writer
+related_pr: 699
 base_branch: main
 base_main: 8085b40698d409bbacba3460001e8ddca4f6c84f
 created: 2026-08-26T17:12:00+02:00
-updated: 2026-08-26T18:05:00+02:00
+updated: 2026-08-26T19:49:00+02:00
 risk: high
 execution_mode: github_actions_hosted
 execution_reason: current-build static protocol reconstruction is deterministic/disposable P2 work
+execution_class: github_hosted
+runtime_access: none
+persistent_session_role: none
+physical_e2e_required: false
+runtime_owner_task: NOT_APPLICABLE
+runtime_namespace: NOT_APPLICABLE
+canonical_registration: NOT_APPLICABLE
+canonical_lease_generation: NOT_APPLICABLE
+registration_lease_generation: NOT_APPLICABLE
+gate_a: NOT_APPLICABLE
+generation_rebind: NOT_APPLICABLE
+gate_b: NOT_APPLICABLE
+bootstrap: NOT_APPLICABLE
+target_uniqueness: NOT_APPLICABLE
+mutation_authorized: false
+owner_funded_ai_api_authorized: false
 run_scope: autonomous_program
 continuation_policy: continue_until_real_stop
 policy_version: 2
@@ -28,9 +45,9 @@ decomposition_decision: single
 decomposition_reason: one sequential current-build queue-to-TCP writer proof with one evidence output
 validation_level: focused
 invocation_started_at: 2026-08-26T17:11:00+02:00
-last_progress_at: 2026-08-26T17:12:00+02:00
+last_progress_at: 2026-08-26T19:49:00+02:00
 heavy_validation_runs: 0
-repair_cycles_for_current_gate: 0
+repair_cycles_for_current_gate: 1
 identical_failure_retries: 0
 context_reconstruction_attempts: 0
 stall_warnings: 0

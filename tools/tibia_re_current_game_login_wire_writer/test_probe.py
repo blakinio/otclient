@@ -8,6 +8,7 @@ def main() -> int:
         "find_stringdata", "find_metadata", "find_qmeta_static_metacall", "recover_jump_table",
         "containing_fde", "function_control_transfers", "instruction_context", "rtti_vtable_candidates",
         "plt_symbol_addresses", "rip_refs", "direct_calls", "vtable_reference_contexts", "writer_slot_ref_fdes",
+        "fde_instructions", "named_vslot_target", "semantic_snapshot", "serializer_candidates", "TXteaHelper",
         "tibia::protocol::TProtocolMessageQueue", "sendLogin", "send_login_adapter", "adapter_fde",
         "adapter_indirect_calls", "adapter_indirect_contexts",
         "tibia::network::TGameserverTCPConnection", "tibia::network::TTCPConnection",
@@ -20,6 +21,7 @@ def main() -> int:
     ]
     for token in required:
         assert token in text, token
+
     forbidden = [
         '15.32.df7b29', '15.32.bf29ac',
         'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe',

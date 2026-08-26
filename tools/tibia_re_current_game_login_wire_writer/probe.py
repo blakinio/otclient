@@ -297,6 +297,29 @@ def instruction_context(img: Image, center: int, before: int = 8, after: int = 5
     ]
 
 
+
+def fde_instructions(img: Image, start: int, limit: int = 900) -> dict:
+    bounds = img.containing_fde(start)
+    if bounds is None:
+        raise RuntimeError(f'no unique FDE for 0x{start:x}')
+    lo, hi = bounds
+    rows = [
+        {'at': hx(ins.address), 'mnemonic': ins.mnemonic, 'operand': ins.op_str}
+        for ins in list(img.md.disasm(img.bytes(lo, hi - lo), lo))[:limit]
+    ]
+    return {'fde': [hx(lo), hx(hi)], 'instructions': rows}
+
+
+def named_vslot_target(vtables: dict, name: str, offset: str) -> int:
+    rows = vtables.get(name, [])
+    if len(rows) != 1 or len(rows[0].get('address_points', [])) != 1:
+        raise RuntimeError(f'{name}: expected one RTTI/vtable candidate')
+    slots = {row['offset']: row for row in rows[0]['address_points'][0]['slots']}
+    row = slots.get(offset)
+    if not row or not row.get('executable'):
+        raise RuntimeError(f'{name}: executable slot {offset} not found')
+    return int(row['target'], 16)
+
 def rtti_vtable_candidates(img: Image, simple_name: str) -> list[dict]:
     found = {}
     for occurrence in img.string_occurrences(simple_name):
@@ -539,6 +562,7 @@ def main() -> int:
         'TGameserverTCPConnection',
         'TIODeviceWriter',
         'TProtocolWriter',
+        'TXteaHelper',
     )
     rtti_vtables = {name: rtti_vtable_candidates(GLOBAL_IMAGE, name) for name in rtti_names}
 
@@ -607,6 +631,107 @@ def main() -> int:
         for name, addresses in plt_symbols.items()
     }
 
+    semantic_targets = {
+        'client_processor_plus_0x10': named_vslot_target(rtti_vtables, 'TProtocolClientMessageProcessor', '0x10'),
+        'raw_processor_plus_0x10': named_vslot_target(rtti_vtables, 'TGameserverNetworkPacketRawDataProcessor', '0x10'),
+        'dual_connection_plus_0x78': named_vslot_target(rtti_vtables, 'TGameserverDualConnection', '0x78'),
+        'dual_connection_plus_0x80': named_vslot_target(rtti_vtables, 'TGameserverDualConnection', '0x80'),
+        'packet_connection_plus_0x78': named_vslot_target(rtti_vtables, 'TGameserverNetworkPacketConnection', '0x78'),
+        'packet_connection_plus_0x80': named_vslot_target(rtti_vtables, 'TGameserverNetworkPacketConnection', '0x80'),
+        'packet_processor_plus_0x60': named_vslot_target(rtti_vtables, 'TGameserverNetworkPacketProcessor', '0x60'),
+        'packet_processor_plus_0x68': named_vslot_target(rtti_vtables, 'TGameserverNetworkPacketProcessor', '0x68'),
+    }
+    if rtti_vtables.get('TXteaHelper'):
+        semantic_targets['xtea_plus_0x20'] = named_vslot_target(rtti_vtables, 'TXteaHelper', '0x20')
+        semantic_targets['xtea_plus_0x28'] = named_vslot_target(rtti_vtables, 'TXteaHelper', '0x28')
+
+    def fde_key_for_site(site: int) -> str | None:
+        fde = GLOBAL_IMAGE.containing_fde(site)
+        return f'{hx(fde[0])}..{hx(fde[1])}' if fde else None
+
+    write_raw_names = [name for name in plt_direct_calls if 'QDataStream12writeRawData' in name]
+    write_raw_sites = [
+        int(site, 16)
+        for name in write_raw_names
+        for site in plt_direct_calls[name]['direct_call_sites']
+    ]
+    write_raw_fdes = {fde_key_for_site(site) for site in write_raw_sites}
+    write_raw_fdes.discard(None)
+    writer58_fdes = set(writer_slot_ref_fdes.get('0x58', {}).get('unique_fdes', []))
+    serializer_fdes = sorted(write_raw_fdes & writer58_fdes)
+
+    packet68_flow = function_control_transfers(GLOBAL_IMAGE, semantic_targets['packet_processor_plus_0x68'])
+    serializer_candidates = []
+    for key in serializer_fdes:
+        lo_s, hi_s = key.split('..')
+        lo, hi = int(lo_s, 16), int(hi_s, 16)
+        predecessor = [
+            sanitize_transfer(row) for row in packet68_flow['transfers']
+            if row.get('mode') == 'direct' and lo <= int(row.get('target', -1)) < hi
+        ]
+        serializer_candidates.append({
+            'fde': [lo_s, hi_s],
+            'writer_slot_0x58_refs': [
+                row['at'] for row in writer_slot_ref_fdes['0x58']['refs']
+                if row.get('fde') == [lo_s, hi_s]
+            ],
+            'writeRawData_sites': [hx(site) for site in write_raw_sites if lo <= site < hi],
+            'packet_processor_plus_0x68_direct_edges': predecessor,
+            'snapshot': fde_instructions(GLOBAL_IMAGE, lo),
+        })
+
+    writer_ref_fdes = {
+        f'{row["fde"][0]}..{row["fde"][1]}'
+        for ap in vtable_reference_contexts.get('TIODeviceWriter', [])
+        for row in ap['refs'] if row.get('fde')
+    }
+    qds_device_ctor_sites = [
+        int(site, 16)
+        for name, row in plt_direct_calls.items()
+        if 'QDataStreamC1EP9QIODevice' in name
+        for site in row['direct_call_sites']
+    ]
+    qds_ctor_fdes = {fde_key_for_site(site) for site in qds_device_ctor_sites}
+    qds_ctor_fdes.discard(None)
+    writer_ctor_fdes = sorted(writer_ref_fdes & qds_ctor_fdes)
+    writer_ctor_candidates = []
+    for key in writer_ctor_fdes:
+        lo_s, hi_s = key.split('..')
+        lo, hi = int(lo_s, 16), int(hi_s, 16)
+        call_sites = direct_calls(GLOBAL_IMAGE, lo)
+        writer_ctor_candidates.append({
+            'fde': [lo_s, hi_s],
+            'direct_call_sites': [hx(site) for site in call_sites],
+            'call_contexts': [instruction_context(GLOBAL_IMAGE, site, 18, 8) for site in call_sites[:8]],
+            'snapshot': fde_instructions(GLOBAL_IMAGE, lo),
+        })
+
+    setup_names = (
+        'TGameserverTCPConnection', 'TProtocolWriter',
+        'TProtocolClientMessageProcessor', 'TGameserverNetworkPacketRawDataProcessor',
+    )
+    setup_sets = []
+    for name in setup_names:
+        setup_sets.append({
+            f'{row["fde"][0]}..{row["fde"][1]}'
+            for ap in vtable_reference_contexts.get(name, [])
+            for row in ap['refs'] if row.get('fde')
+        })
+    setup_common_fdes = sorted(set.intersection(*setup_sets)) if setup_sets else []
+
+    semantic_snapshot = {
+        'send_login_adapter': fde_instructions(GLOBAL_IMAGE, send_login_adapter),
+        'client_processor_plus_0x10': fde_instructions(GLOBAL_IMAGE, semantic_targets['client_processor_plus_0x10']),
+        'raw_processor_plus_0x10': fde_instructions(GLOBAL_IMAGE, semantic_targets['raw_processor_plus_0x10']),
+        'dual_connection_plus_0x78': fde_instructions(GLOBAL_IMAGE, semantic_targets['dual_connection_plus_0x78']),
+        'dual_connection_plus_0x80': fde_instructions(GLOBAL_IMAGE, semantic_targets['dual_connection_plus_0x80']),
+        'packet_processor_plus_0x68': fde_instructions(GLOBAL_IMAGE, semantic_targets['packet_processor_plus_0x68']),
+        'packet_processor_plus_0x68_transfers': [sanitize_transfer(row) for row in packet68_flow['transfers']],
+        'setup_common_fdes': setup_common_fdes,
+    }
+    if 'xtea_plus_0x28' in semantic_targets:
+        semantic_snapshot['xtea_plus_0x28'] = fde_instructions(GLOBAL_IMAGE, semantic_targets['xtea_plus_0x28'])
+
     selected = re.compile(r'(login|write|send|data|message|connect|socket|packet)', re.I)
     result = {
         'schema': 'otclient.track-a.current-game-login-wire-writer.discovery.v1',
@@ -639,6 +764,10 @@ def main() -> int:
         'vtable_reference_contexts': vtable_reference_contexts,
         'writer_slot_ref_fdes': writer_slot_ref_fdes,
         'plt_direct_calls': plt_direct_calls,
+        'semantic_targets': {name: hx(value) for name, value in semantic_targets.items()},
+        'semantic_snapshot': semantic_snapshot,
+        'serializer_candidates': serializer_candidates,
+        'writer_ctor_candidates': writer_ctor_candidates,
         'dynamic_symbols': dynamic_symbols(args.client, ('QDataStream', 'QTcpSocket', 'QIODevice', 'writeRawData'))[:300],
         'classification': {
             'current_sendlogin_qmeta': 'PROVEN',
@@ -669,6 +798,9 @@ def main() -> int:
     for name, rows in rtti_vtables.items():
         print('RTTI_VTABLE_CANDIDATES_' + name.upper() + '=' + str(len(rows)))
     print('PLT_SYMBOL_MATCH_COUNT=' + str(len(plt_direct_calls)))
+    print('SERIALIZER_CANDIDATE_COUNT=' + str(len(serializer_candidates)))
+    print('WRITER_CTOR_CANDIDATE_COUNT=' + str(len(writer_ctor_candidates)))
+    print('SETUP_COMMON_FDES=' + ','.join(setup_common_fdes))
     for offset, row in writer_slot_ref_fdes.items():
         print('WRITER_SLOT_REF_FDES_' + offset.upper().replace('0X', '0x') + '=' + ','.join(row['unique_fdes']))
     print('RAW_CLIENT_UPLOADED=false')

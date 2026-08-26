@@ -110,15 +110,17 @@ semantic_promotion_performed: false
 movement_authorization_consumed: true
 temporary_dispatch_workflow_removed: true
 temporary_causal_worker_removed: true
-independent_audit: REQUIRED_BEFORE_MERGE
+independent_audit: PASS
+independent_audit_review: 5032403917
+independent_audit_material_findings_open: 0
 exact_final_head_ci: REQUIRED_AFTER_AUDIT
 runtime_ownership_preflight:
   pr_475: open_draft_but_task_record_released_runtime_access_none
   current_task: closeout_only_no_runtime_authority
 invocation_started_at: 2026-08-26T08:56:00+02:00
-last_progress_at: 2026-08-26T17:42:55+02:00
+last_progress_at: 2026-08-26T17:47:20+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: draft
+ci_check_generation: ready
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -137,7 +139,7 @@ acceptance:
   - successful causal differential promotes only the exact verified player-position semantic contract and preserves all other fail-closed boundaries
   - evidence, independent audit, exact-head required CI, merge, archive and authority/lease release complete
 current_blocker: NONE
-next_action: independently audit the terminal evidence-only candidate, run exact-final-head CI, merge PR #698, then archive and release ownership
+next_action: run exact-final-head required CI on the post-audit synchronize generation, merge PR #698, then archive and release ownership
 ---
 
 # Player-state semantic promotion E2E retry 2 — 2026-08-26

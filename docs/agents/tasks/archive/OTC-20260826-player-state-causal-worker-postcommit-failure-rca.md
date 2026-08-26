@@ -83,14 +83,14 @@ exact_final_head_required_context: CI / Required
 exact_final_head_required_job: 98315253600
 ownership_released: true
 task_archived: true
-archive_pr: PENDING
+archive_pr: 709
 archive_independent_audit: REQUIRED
 archive_independent_audit_review: PENDING
 archive_independent_audit_material_findings_open: UNKNOWN
 archive_exact_head_ci: REQUIRED
 archive_exact_head_governance: REQUIRED
 current_blocker: NONE_ARCHIVE_CLOSEOUT_ONLY
-next_action: open archive PR, run fresh archive audit and exact-head CI/governance, then merge and bind terminal archive metadata
+next_action: run fresh archive audit and exact-head CI/governance on PR #709, merge, then bind terminal archive validation metadata
 ---
 
 # Player-state causal worker post-COMMIT failure RCA — terminal archive

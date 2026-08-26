@@ -11,7 +11,7 @@ branch: research/OTC-20260826-current-game-login-wire-writer
 base_branch: main
 base_main: 8085b40698d409bbacba3460001e8ddca4f6c84f
 created: 2026-08-26T17:12:00+02:00
-updated: 2026-08-26T17:12:00+02:00
+updated: 2026-08-26T18:05:00+02:00
 risk: high
 execution_mode: github_actions_hosted
 execution_reason: current-build static protocol reconstruction is deterministic/disposable P2 work
@@ -37,7 +37,7 @@ stall_warnings: 0
 ci_checks_for_current_head: 0
 unchanged_state_checks: 0
 owned_paths:
-  - .github/workflows/tibia-official-client-re-current-game-login-wire-writer.yml
+  - .github/workflows/tibia-official-client-re-gameserver-tcp-writer-provenance.yml
   - tools/tibia_re_current_game_login_wire_writer/**
   - docs/agents/evidence/OTC-20260826-current-game-login-wire-writer/**
   - docs/agents/tasks/active/OTC-20260826-current-game-login-wire-writer.md
@@ -113,7 +113,7 @@ context_routes:
   - P2-NETWORK
   - current-build-game-login-wire
 owned_paths:
-  - .github/workflows/tibia-official-client-re-current-game-login-wire-writer.yml
+  - .github/workflows/tibia-official-client-re-gameserver-tcp-writer-provenance.yml
   - tools/tibia_re_current_game_login_wire_writer/**
   - docs/agents/evidence/OTC-20260826-current-game-login-wire-writer/**
   - docs/agents/tasks/active/OTC-20260826-current-game-login-wire-writer.md

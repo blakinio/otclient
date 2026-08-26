@@ -75,7 +75,7 @@ implementation_required_job: 98336204700
 implementation_merge_commit: 43653aeffc08a70ecd4a7a53b4be90f528e62b99
 ownership_released: true
 task_archived: true
-archive_pr: PENDING
+archive_pr: 716
 archive_independent_audit: REQUIRED
 archive_independent_audit_review: PENDING
 archive_independent_audit_material_findings_open: UNKNOWN
@@ -83,7 +83,7 @@ archive_exact_head_governance: REQUIRED
 archive_exact_head_ci: REQUIRED
 archive_merged: false
 current_blocker: NONE_ARCHIVE_CLOSEOUT_ONLY
-next_action: open archive PR, run fresh archive audit and exact-head governance/CI, merge, then bind terminal archive metadata
+next_action: run fresh archive audit and exact-head governance/CI on PR #716, merge, then bind terminal archive metadata
 ---
 
 # In-game admission hardening — terminal archive

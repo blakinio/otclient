@@ -9,7 +9,7 @@ track_id: official-client-re
 task_kind: discovery
 phase: research
 branch: research/OTC-20260827-current-game-login-field-provenance
-related_pr: null
+related_pr: 722
 base_branch: main
 base_main: b74992cf7a628268fe451551897672bceed55e1e
 created: 2026-08-27T18:00:00+02:00

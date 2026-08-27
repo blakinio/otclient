@@ -119,4 +119,11 @@ for required in (
 ):
     assert required in src, required
 
+for required in (
+    'producer_scalar_global_refs',
+    'login_handler_vtable_refs',
+    'PRODUCER_SCALAR_DISCRIMINATOR',
+):
+    assert required in src, required
+
 print('CURRENT_GAME_LOGIN_AUTHINFO_WRITER_CONTRACT=PASS')

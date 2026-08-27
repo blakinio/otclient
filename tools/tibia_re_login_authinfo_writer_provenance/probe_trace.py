@@ -329,6 +329,14 @@ def main() -> int:
         'ismaincharacter': exact_cstring_occ('ismaincharacter'),
         'CharName': exact_cstring_occ('CharName'),
     }
+    producer_scalar_targets = {
+        'outer_field1_map_sentinel': {0x31b9e58},
+        'outer_field1_map_root': {0x31b9e60},
+        'outer_default_string_storage': {0x3172d78},
+        'producer_static_managed_0': {0x31b9e80},
+        'producer_static_managed_1': {0x31b9e90},
+    }
+    literal_targets.update(producer_scalar_targets)
     if len(literal_targets['sessionkey']) != 1:
         raise SystemExit(f'SESSIONKEY_LITERAL_AMBIGUOUS={len(literal_targets["sessionkey"])}')
 
@@ -411,6 +419,18 @@ def main() -> int:
             key = '..'.join(hx(v) for v in fde) if fde else 'UNKNOWN'
             grouped.setdefault(key, []).append(hx(site))
         auth_slot_ref_fdes[slot] = grouped
+    producer_scalar_global_refs = {
+        key: [
+            {'site': hx(site), 'fde': fde_key(img, site), 'context': core.context(img, site, 24, 32)}
+            for site in scan['extra_literal_refs'].get(key, [])[:160]
+        ]
+        for key in producer_scalar_targets
+    }
+    login_handler_vtable_refs = [
+        {'site': hx(site), 'fde': fde_key(img, site), 'context': core.context(img, site, 28, 40)}
+        for site in scan['vtable_refs']['handler'][:160]
+    ]
+
     gameserver_session_vtable_refs = [
         {'site': hx(site), 'fde': fde_key(img, site), 'context': core.context(img, site, 18, 18)}
         for site in scan['extra_vtable_refs']['gameserver_session'][:160]
@@ -698,6 +718,8 @@ def main() -> int:
             'relocation_owners': owner.reloc_owners_for_fde(
                 img, caller_fde[0], caller_fde[1]),
         },
+        'producer_scalar_global_refs': producer_scalar_global_refs,
+        'login_handler_vtable_refs': login_handler_vtable_refs,
         'gameserver_session': {
             'rtti': game_session['rtti'],
             'address_point': game_session['address_point'],
@@ -746,6 +768,7 @@ def main() -> int:
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+    print('PRODUCER_SCALAR_DISCRIMINATOR=PASS')
     print('XTEA_KEY_FIELD_DISCRIMINATOR=PASS')
     print('GAMECLIENT_PAYLOAD_TAG_DISCRIMINATOR=PASS')
     print('GAMECLIENT_MESSAGE_WIRE_DISCRIMINATOR=PASS')

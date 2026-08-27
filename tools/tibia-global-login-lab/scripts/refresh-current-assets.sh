@@ -7,8 +7,7 @@ set +x
 
 CONTAINER=otclient-tibia-global-login-lab
 TASK=OTC-20260813-tibia-global-login-lab
-PACKAGE_BASE=https://static.tibia.com/launcher/tibiaclient-linux-current
-ASSET_HASH_URL=https://static.tibia.com/launcher/assets-current/assets.json.sha256
+ASSET_BASE=https://static.tibia.com/launcher/assets-current
 PACKAGE_MANIFEST=/lab/state/current-package/package.json
 
 docker inspect "$CONTAINER" >/dev/null
@@ -36,8 +35,7 @@ rm -f /tmp/lab-refresh-warp.trace
 '
 
 docker exec \
-  -e PACKAGE_BASE="$PACKAGE_BASE" \
-  -e ASSET_HASH_URL="$ASSET_HASH_URL" \
+  -e ASSET_BASE="$ASSET_BASE" \
   -e PACKAGE_MANIFEST="$PACKAGE_MANIFEST" \
   -i "$CONTAINER" python3 - <<'PY'
 import hashlib
@@ -49,31 +47,36 @@ import subprocess
 import tempfile
 import urllib.parse
 
-base = os.environ['PACKAGE_BASE'].rstrip('/')
+asset_base = os.environ['ASSET_BASE'].rstrip('/')
 manifest_path = Path(os.environ['PACKAGE_MANIFEST'])
-asset_hash_url = os.environ['ASSET_HASH_URL']
 out = Path('/lab/state/things/1532')
+assets_manifest = Path('/tmp/current-assets.json')
+assets_hash_file = Path('/tmp/current-assets.json.sha256')
+
 if not manifest_path.is_file():
     raise SystemExit('staged current package manifest missing')
-doc = json.loads(manifest_path.read_text(encoding='utf-8'))
-version = str(doc.get('version') or '')
+package_doc = json.loads(manifest_path.read_text(encoding='utf-8'))
+version = str(package_doc.get('version') or '')
 if not version.startswith('15.32'):
     raise SystemExit('staged package version family mismatch')
-rows = [row for row in doc.get('files', []) if isinstance(row, dict) and isinstance(row.get('localfile'), str)]
-by_local = {row['localfile']: row for row in rows}
 
-out.mkdir(parents=True, exist_ok=True)
-for old in out.iterdir():
-    if old.is_file():
-        old.unlink()
-
-def curl_get(url, path):
+def get(url, path):
     subprocess.run([
         'curl', '--socks5-hostname', '127.0.0.1:25344', '--compressed', '-fL',
         '-A', 'Mozilla/5.0 (X11; Linux x86_64)', '-e', url, '-H', 'Accept: */*',
         '--retry', '3', '--retry-all-errors', '--connect-timeout', '15',
         '--max-time', '180', url, '-o', str(path),
     ], check=True)
+
+def collect_rows(node, rows):
+    if isinstance(node, dict):
+        if isinstance(node.get('url'), str) and node.get('packedhash'):
+            rows.append(node)
+        for value in node.values():
+            collect_rows(value, rows)
+    elif isinstance(node, list):
+        for value in node:
+            collect_rows(value, rows)
 
 def decode_package(data, row):
     packed_hash = str(row.get('packedhash') or '').lower()
@@ -107,55 +110,80 @@ def decode_package(data, row):
 def fetch_row(row):
     rel = str(row.get('url') or '')
     if not rel:
-        raise RuntimeError('package row URL missing')
-    url = base + '/' + urllib.parse.quote(rel, safe='/._-~')
+        raise RuntimeError('asset row URL missing')
+    url = asset_base + '/' + urllib.parse.quote(rel, safe='/._-~')
     with tempfile.NamedTemporaryFile(delete=False) as handle:
         tmp = Path(handle.name)
     try:
-        curl_get(url, tmp)
+        get(url, tmp)
         return decode_package(tmp.read_bytes(), row)
     finally:
         tmp.unlink(missing_ok=True)
 
-catalog_row = by_local.get('assets/catalog-content.json')
-if not catalog_row:
-    raise SystemExit('package catalog-content row missing')
-catalog_raw = fetch_row(catalog_row)
-(out / 'catalog-content.json').write_bytes(catalog_raw)
-catalog = json.loads(catalog_raw)
-
-required_types = {'appearances', 'staticdata', 'proficiencies'}
-wanted = {
-    entry['file'] for entry in catalog
-    if isinstance(entry, dict)
-    and entry.get('type') in required_types
-    and isinstance(entry.get('file'), str)
-}
-if not any(name.startswith('appearances-') and name.endswith('.dat') for name in wanted):
-    raise SystemExit('catalog appearances entry missing')
-if not any(name.startswith('staticdata-') and name.endswith('.dat') for name in wanted):
-    raise SystemExit('catalog staticdata entry missing')
-
-for name in sorted(wanted):
-    row = by_local.get('assets/' + name)
-    if not row:
-        raise SystemExit('required package asset row missing')
-    (out / name).write_bytes(fetch_row(row))
-
-with tempfile.NamedTemporaryFile(delete=False) as handle:
-    hash_tmp = Path(handle.name)
 try:
-    curl_get(asset_hash_url, hash_tmp)
-    asset_hash = hash_tmp.read_text(encoding='utf-8').strip().split()[0]
-finally:
-    hash_tmp.unlink(missing_ok=True)
-if len(asset_hash) != 64 or any(ch not in '0123456789abcdefABCDEF' for ch in asset_hash):
-    raise SystemExit('official asset identifier invalid')
-(out / 'assets.json.sha256').write_text(asset_hash, encoding='utf-8')
+    get(asset_base + '/assets.json', assets_manifest)
+    get(asset_base + '/assets.json.sha256', assets_hash_file)
+    expected_manifest_hash = assets_hash_file.read_text(encoding='utf-8').strip().split()[0]
+    actual_manifest_hash = hashlib.sha256(assets_manifest.read_bytes()).hexdigest()
+    if len(expected_manifest_hash) != 64 or any(ch not in '0123456789abcdefABCDEF' for ch in expected_manifest_hash):
+        raise SystemExit('official asset identifier invalid')
+    if actual_manifest_hash.lower() != expected_manifest_hash.lower():
+        raise SystemExit('current assets manifest hash mismatch')
 
-print('LAB_CURRENT_PACKAGE_VERSION_FAMILY_15_32=true')
-print('LAB_CURRENT_ASSET_FILE_COUNT=' + str(len(wanted) + 2))
-print('LAB_LOGIN_MINIMAL_ASSETS_REFRESHED=true')
+    assets_doc = json.loads(assets_manifest.read_text(encoding='utf-8'))
+    rows = []
+    collect_rows(assets_doc, rows)
+    if not rows:
+        raise SystemExit('current assets manifest contains no package rows')
+
+    catalog_rows = [
+        row for row in rows
+        if urllib.parse.unquote(str(row.get('url') or '')).split('/')[-1].replace('.lzma', '') == 'catalog-content.json'
+    ]
+    if len(catalog_rows) != 1:
+        raise SystemExit('current assets catalog-content row missing or ambiguous')
+
+    catalog_raw = fetch_row(catalog_rows[0])
+    catalog = json.loads(catalog_raw)
+    required_types = {'appearances', 'staticdata', 'proficiencies'}
+    wanted = {
+        entry['file'] for entry in catalog
+        if isinstance(entry, dict)
+        and entry.get('type') in required_types
+        and isinstance(entry.get('file'), str)
+    }
+    if not any(name.startswith('appearances-') and name.endswith('.dat') for name in wanted):
+        raise SystemExit('catalog appearances entry missing')
+    if not any(name.startswith('staticdata-') and name.endswith('.dat') for name in wanted):
+        raise SystemExit('catalog staticdata entry missing')
+
+    by_final = {}
+    for row in rows:
+        final = urllib.parse.unquote(str(row.get('url') or '')).split('/')[-1].replace('.lzma', '')
+        if final:
+            by_final.setdefault(final, []).append(row)
+
+    out.mkdir(parents=True, exist_ok=True)
+    for old in out.iterdir():
+        if old.is_file():
+            old.unlink()
+    (out / 'catalog-content.json').write_bytes(catalog_raw)
+
+    for name in sorted(wanted):
+        matches = by_final.get(name, [])
+        if len(matches) != 1:
+            raise SystemExit(f'required current asset row missing or ambiguous: {name}')
+        (out / name).write_bytes(fetch_row(matches[0]))
+
+    (out / 'assets.json.sha256').write_text(expected_manifest_hash, encoding='utf-8')
+
+    print('LAB_CURRENT_PACKAGE_VERSION_FAMILY_15_32=true')
+    print('LAB_CURRENT_ASSETS_MANIFEST_HASH_MATCH=true')
+    print('LAB_CURRENT_ASSET_FILE_COUNT=' + str(len(wanted) + 2))
+    print('LAB_LOGIN_MINIMAL_ASSETS_REFRESHED=true')
+finally:
+    assets_manifest.unlink(missing_ok=True)
+    assets_hash_file.unlink(missing_ok=True)
 PY
 
 docker exec "$CONTAINER" sh -c 'rm -f /lab/state/userspace-warp/wireproxy.pid'

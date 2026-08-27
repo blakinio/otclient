@@ -9,6 +9,8 @@ on:
       - '.github/workflows/tibia-global-login-lab.yml'
       - 'tools/tibia-global-login-lab/**'
       - 'src/client/tibiagloballoginwire.h'
+      - 'src/framework/net/outputmessage.cpp'
+      - 'src/framework/net/protocol.cpp'
 
 permissions:
   contents: read
@@ -29,7 +31,11 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
 
-      - name: Compile and run focused current-login contract
+      - name: Validate current-login send integration source contract
+        shell: bash
+        run: python3 tools/tibia-global-login-lab/tests/current_login_send_contract.py
+
+      - name: Compile and run focused current-login wire contract
         shell: bash
         run: |
           set -Eeuo pipefail

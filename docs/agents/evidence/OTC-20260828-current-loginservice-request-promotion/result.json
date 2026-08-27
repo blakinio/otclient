@@ -1,0 +1,56 @@
+{
+  "schema": "otclient.track-a.current-loginservice-request-promotion.v1",
+  "decision": "PASS_BOUNDED_ACCEPT_WITH_EDITS",
+  "source": {
+    "pr": 733,
+    "head": "d278ae8e05e5f6a74c63b598d9d11e1c21f20b14",
+    "run": 33127322903,
+    "job": 98708447828,
+    "artifact": 9668894065,
+    "artifact_sha256": "bd56db67ddb29e7e95915bfe13df10431afa016f3cbb369b42da096a700c876d",
+    "result_sha256": "43ec2cba35b22c4f8e651d7039c1b6aefd7047ee3cae8654e8af8acd21f392c9"
+  },
+  "exact_client": {
+    "version": "15.32.75d4a0",
+    "packed_sha256": "075810c54af2d6912000eab062763db29563f5a1f4bf1d984154b2d07fd5729f",
+    "unpacked_sha256": "d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a",
+    "unpacked_size": 52105824
+  },
+  "accepted": {
+    "request_builder_fde": "0xe1e780..0xe1eb21",
+    "unconditional_keys": [
+      "type",
+      "email",
+      "password",
+      "stayloggedin",
+      "devicecookie",
+      "clienttype",
+      "operatingsystem",
+      "clientversion",
+      "assetversion"
+    ],
+    "type_value": "login",
+    "operatingsystem_value_source": "QSysInfo::prettyProductName()",
+    "conditional_keys": [
+      "token",
+      "deviceverificationcode",
+      "trusteddevicetoken",
+      "emailcode",
+      "loginconfirmationcode",
+      "loginconfirmationtoken"
+    ],
+    "track_b_missing_unconditional_key": "operatingsystem"
+  },
+  "rejected_as_primary_login_fields": [
+    "fromtimestamp",
+    "isreturner",
+    "showrewardnews",
+    "viewedid"
+  ],
+  "safety": {
+    "runtime_access": "none",
+    "login_performed": false,
+    "secret_access": false,
+    "raw_client_uploaded": false
+  }
+}

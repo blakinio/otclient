@@ -132,7 +132,9 @@ inline std::vector<uint8_t> encodeLogin(
     return envelope;
 }
 
-inline std::vector<uint8_t> transcodeLegacy1532(const std::span<const uint8_t> legacy)
+inline std::vector<uint8_t> transcodeLegacy1532(
+    const std::span<const uint8_t> legacy,
+    const bool challengeOnLogin)
 {
     std::size_t pos = 0;
     uint8_t opcode = 0;
@@ -172,9 +174,13 @@ inline std::vector<uint8_t> transcodeLegacy1532(const std::span<const uint8_t> l
 
     if (!detail::readU8(legacy, pos, gm) || gm != 0 ||
         !detail::readString(legacy, pos, retainedValue) || retainedValue.empty() ||
-        !detail::readString(legacy, pos, selectedCharacter) || selectedCharacter.empty() ||
-        !detail::readU32(legacy, pos, challengeTimestamp) ||
-        !detail::readU8(legacy, pos, challengeRandom)) {
+        !detail::readString(legacy, pos, selectedCharacter) || selectedCharacter.empty()) {
+        return {};
+    }
+
+    if (challengeOnLogin &&
+        (!detail::readU32(legacy, pos, challengeTimestamp) ||
+         !detail::readU8(legacy, pos, challengeRandom))) {
         return {};
     }
 

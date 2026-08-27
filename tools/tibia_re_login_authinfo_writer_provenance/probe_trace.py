@@ -228,7 +228,8 @@ def schema_storage_target(img: core.Image, literal_site: int, literal_targets: s
         if op.type != X86_OP_MEM or op.mem.base != X86_REG_RIP:
             continue
         target = row.address + row.size + int(op.mem.disp)
-        if target not in literal_targets and img.mapped(target):
+        in_section = any(section.va <= target < section.va + section.size for section in img.sections)
+        if target not in literal_targets and in_section:
             return target
     return None
 

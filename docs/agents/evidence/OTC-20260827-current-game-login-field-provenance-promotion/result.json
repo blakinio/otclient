@@ -1,0 +1,56 @@
+{
+  "schema": "otclient.track-a.current-game-login-field-provenance.promotion.v1",
+  "decision": "PASS_BOUNDED",
+  "source": {
+    "pr": 722,
+    "source_head": "36320a5e024f1ffab70592be52404da351b16b27",
+    "workflow_run": 33046520991,
+    "workflow_job": 98431684189,
+    "artifact_id": 9635892718,
+    "artifact_sha256": "fca8de5f33c1c80f57b80a7575a9f9eabf2664d7355c25275e02c2a479b49e62",
+    "result_json_sha256": "d4926050670959c78d3dc59d1fd3dff32ea328fbde0603c538ab43e3ea2510a7"
+  },
+  "exact_client": {
+    "version": "15.32.75d4a0",
+    "packed_sha256": "075810c54af2d6912000eab062763db29563f5a1f4bf1d984154b2d07fd5729f",
+    "unpacked_sha256": "d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a",
+    "unpacked_size": 52105824
+  },
+  "identities": {
+    "TAuthenticationAndEncryptionInfo": {"rtti": "0x30adc40", "vtable_address_point": "0x2f82f98"},
+    "TLoginProtocolMessageHandler": {"rtti": "0x30b4ed0", "vtable_address_point": "0x30b6700"},
+    "login_producer": {"slot": "0x60", "target": "0xe25620", "fde": ["0xe25620", "0xe2656d"]}
+  },
+  "auth_slot_targets": {
+    "0x10": "0xe26570",
+    "0x18": "0xe1bfd0",
+    "0x30": "0xe199c0",
+    "0x40": "0xe19960",
+    "0x50": "0x7bf680",
+    "0x60": "0xe19990",
+    "0x90": "0xe199f0"
+  },
+  "producer_structural_mapping": {
+    "auth_slot_0x30": "LoginRSAEncryptedBlock.field1",
+    "auth_slot_0x40": "LoginRSAEncryptedBlock.field2",
+    "producer_input_dword_plus_0x18": "LoginRSAEncryptedBlock.field3",
+    "producer_input_dword_plus_0x1c": "LoginRSAEncryptedBlock.field4",
+    "auth_slot_0x18": "LoginRSAEncryptedBlock.field5",
+    "auth_slot_0x50": "LoginRSAEncryptedBlock.field6",
+    "auth_slot_0x60": "LoginRSAEncryptedBlock.field7",
+    "auth_slot_0x70": "GameclientMessageLogin.field4",
+    "auth_slot_0x80": "GameclientMessageLogin.field5"
+  },
+  "classification": {
+    "structural_value_provenance": "PROVEN_FOR_LISTED_MAPPINGS",
+    "user_facing_semantic_field_names": "UNKNOWN",
+    "password_session_to_rsa_field_mapping": "UNKNOWN",
+    "track_b_safe_semantic_mapping": "INSUFFICIENT"
+  },
+  "safety": {
+    "runtime_access": "none",
+    "login_performed": false,
+    "secret_access": false,
+    "raw_client_uploaded": false
+  }
+}

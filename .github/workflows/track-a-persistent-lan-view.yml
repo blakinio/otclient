@@ -20,8 +20,10 @@ jobs:
       TARGET_CONTAINER: otclient-track-a-kasmvnc
       CONTROL_CONTAINER: otclient-synology-runner
       VIEW_CONTAINER: otclient-track-a-lan-view
+      STATIC_CONTAINER: otclient-track-a-kasm-static
       VIEW_HOST_IP: 192.168.1.21
       VIEW_PORT: '16083'
+      STATIC_PORT: '16084'
     steps:
       - name: Checkout exact trusted main
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
@@ -48,7 +50,46 @@ jobs:
           echo "port=$port" >> "$GITHUB_OUTPUT"
           echo KASM_HOST_PORT="$port"
 
-      - name: Deploy persistent LAN proxy
+      - name: Deploy stable static frontend sidecar
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          image="$(docker inspect -f '{{.Config.Image}}' "$TARGET_CONTAINER")"
+          docker rm -f "$STATIC_CONTAINER" >/dev/null 2>&1 || true
+          docker run -d --name "$STATIC_CONTAINER" --restart unless-stopped --network host \
+            --entrypoint python3 "$image" -m http.server "$STATIC_PORT" --bind "$VIEW_HOST_IP" \
+            --directory /usr/share/kasmvnc/www >/dev/null
+          for _ in $(seq 1 20); do
+            if curl -fsS --max-time 2 "http://$VIEW_HOST_IP:$STATIC_PORT/" >/dev/null; then
+              break
+            fi
+            sleep 0.25
+          done
+          docker inspect -f '{{.State.Running}} {{.HostConfig.RestartPolicy.Name}}' "$STATIC_CONTAINER" | grep -Fx 'true unless-stopped'
+          curl -fsS --max-time 5 "http://$VIEW_HOST_IP:$STATIC_PORT/" >/dev/null
+          echo STATIC_FRONTEND_READY=true
+          echo STATIC_FRONTEND_URL="http://$VIEW_HOST_IP:$STATIC_PORT/"
+
+      - name: Stress stable static frontend
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          image="$(docker inspect -f '{{.Config.Image}}' "$CONTROL_CONTAINER")"
+          docker run --rm --network host --entrypoint python3 "$image" - <<'PY'
+          import concurrent.futures, urllib.request
+          base='http://192.168.1.21:16084'
+          paths=['/','/main.bundle.js','/assets/webutil-DUkojxeL.js','/assets/webutil-Dix4qgyj.css']
+          def one(p):
+              with urllib.request.urlopen(base+p, timeout=10) as r:
+                  data=r.read(); expected=int(r.headers.get('Content-Length','-1'))
+                  return r.status == 200 and len(data) == expected
+          with concurrent.futures.ThreadPoolExecutor(max_workers=16) as ex:
+              results=list(ex.map(one, paths*16))
+          assert all(results), results
+          print('STATIC_FRONTEND_64_OF_64=PASS')
+          PY
+
+      - name: Deploy persistent WebSocket transport proxy
         shell: bash
         env:
           KASM_PORT: ${{ steps.kasm.outputs.port }}
@@ -86,5 +127,5 @@ jobs:
             --entrypoint sh "$image" -c 'echo "$SCRIPT_B64" | base64 -d >/tmp/proxy.py; exec python3 /tmp/proxy.py' >/dev/null
           sleep 1
           docker inspect -f '{{.State.Running}} {{.HostConfig.RestartPolicy.Name}}' "$VIEW_CONTAINER" | grep -Fx 'true unless-stopped'
-          echo PERSISTENT_LAN_VIEW=READY
-          echo PERSISTENT_VIEW_URL="https://$VIEW_HOST_IP:$VIEW_PORT/"
+          echo PERSISTENT_WS_TRANSPORT=READY
+          echo PERSISTENT_WS_URL="https://$VIEW_HOST_IP:$VIEW_PORT/websockify"

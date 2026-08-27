@@ -1,0 +1,106 @@
+name: Track A persistent LAN view
+
+on:
+  workflow_dispatch:
+    inputs:
+      authorization:
+        description: Type ENABLE_PERSISTENT_LAN_VIEW
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: github.actor == 'blakinio' && inputs.authorization == 'ENABLE_PERSISTENT_LAN_VIEW'
+    runs-on: [otclient, synology]
+    timeout-minutes: 5
+    env:
+      TARGET_CONTAINER: otclient-track-a-kasmvnc
+      CONTROL_CONTAINER: otclient-synology-runner
+      VIEW_CONTAINER: otclient-track-a-lan-view
+      VIEW_HOST_IP: 192.168.1.21
+      VIEW_PORT: '16083'
+    steps:
+      - name: Checkout exact trusted main
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+          ref: main
+
+      - name: Prove trusted source and existing client
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$(git rev-parse HEAD)" = "$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          docker inspect -f '{{.State.Running}}' "$TARGET_CONTAINER" | grep -Fx true >/dev/null
+          test "$(docker exec "$TARGET_CONTAINER" pgrep -x client | wc -l)" -eq 1
+          echo TARGET_RUNTIME=PROVEN
+
+      - name: Discover Kasm host-loopback endpoint
+        id: kasm
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          port="$(docker inspect -f '{{(index (index .NetworkSettings.Ports "6901/tcp") 0).HostPort}}' "$TARGET_CONTAINER")"
+          [[ "$port" =~ ^[0-9]+$ ]]
+          echo "port=$port" >> "$GITHUB_OUTPUT"
+          echo KASM_HOST_PORT="$port"
+
+      - name: Prove upstream requires no HTTP authentication
+        shell: bash
+        env:
+          KASM_PORT: ${{ steps.kasm.outputs.port }}
+        run: |
+          set -Eeuo pipefail
+          image="$(docker inspect -f '{{.Config.Image}}' "$CONTROL_CONTAINER")"
+          code="$(docker run --rm --network host -e KASM_PORT="$KASM_PORT" --entrypoint python3 "$image" -c 'import os,ssl,urllib.request,urllib.error; u="https://127.0.0.1:"+os.environ["KASM_PORT"]+"/"; c=ssl._create_unverified_context();
+          try:
+           r=urllib.request.urlopen(u,context=c,timeout=5); print(r.status)
+          except urllib.error.HTTPError as e: print(e.code)')"
+          [[ "$code" != '401' && "$code" != '403' ]]
+          echo UPSTREAM_AUTH_REQUIRED=false
+          echo UPSTREAM_HTTP_STATUS="$code"
+
+      - name: Deploy persistent LAN proxy
+        shell: bash
+        env:
+          KASM_PORT: ${{ steps.kasm.outputs.port }}
+        run: |
+          set -Eeuo pipefail
+          docker rm -f "$VIEW_CONTAINER" >/dev/null 2>&1 || true
+          proxy_b64="$(base64 -w0 <<'PY'
+          import os,select,socket,threading
+          bind=('0.0.0.0',int(os.environ['BIND_PORT']))
+          target=('127.0.0.1',int(os.environ['TARGET_PORT']))
+          def handle(c):
+              s=socket.create_connection(target,timeout=10); c.setblocking(False); s.setblocking(False)
+              try:
+                  while True:
+                      r,_,_=select.select([c,s],[],[],30)
+                      if not r: continue
+                      for src in r:
+                          try: data=src.recv(65536)
+                          except BlockingIOError: continue
+                          if not data: return
+                          (s if src is c else c).sendall(data)
+              finally:
+                  try: s.close()
+                  except Exception: pass
+                  try: c.close()
+                  except Exception: pass
+          ls=socket.socket(); ls.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1); ls.bind(bind); ls.listen(32)
+          while True:
+              c,_=ls.accept(); threading.Thread(target=handle,args=(c,),daemon=True).start()
+          PY
+          )"
+          image="$(docker inspect -f '{{.Config.Image}}' "$CONTROL_CONTAINER")"
+          docker run -d --name "$VIEW_CONTAINER" --restart unless-stopped --network host \
+            -e SCRIPT_B64="$proxy_b64" -e BIND_PORT="$VIEW_PORT" -e TARGET_PORT="$KASM_PORT" \
+            --entrypoint sh "$image" -c 'echo "$SCRIPT_B64" | base64 -d >/tmp/proxy.py; exec python3 /tmp/proxy.py' >/dev/null
+          sleep 1
+          docker inspect -f '{{.State.Running}} {{.HostConfig.RestartPolicy.Name}}' "$VIEW_CONTAINER" | grep -Fx 'true unless-stopped'
+          echo PERSISTENT_LAN_VIEW=READY
+          echo PERSISTENT_VIEW_URL="https://$VIEW_HOST_IP:$VIEW_PORT/"
+          echo VIEW_AUTH_REQUIRED=false

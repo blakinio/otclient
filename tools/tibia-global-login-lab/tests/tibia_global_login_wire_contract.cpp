@@ -3,7 +3,28 @@
 #include <array>
 #include <cstdint>
 #include <iostream>
+#include <string_view>
 #include <vector>
+
+namespace
+{
+void addU8(std::vector<uint8_t>& out, const uint8_t value) { out.push_back(value); }
+void addU16(std::vector<uint8_t>& out, const uint16_t value)
+{
+    out.push_back(static_cast<uint8_t>(value));
+    out.push_back(static_cast<uint8_t>(value >> 8));
+}
+void addU32(std::vector<uint8_t>& out, const uint32_t value)
+{
+    for (unsigned shift = 0; shift < 32; shift += 8)
+        out.push_back(static_cast<uint8_t>(value >> shift));
+}
+void addString(std::vector<uint8_t>& out, const std::string_view value)
+{
+    addU16(out, static_cast<uint16_t>(value.size()));
+    out.insert(out.end(), value.begin(), value.end());
+}
+} // namespace
 
 int main()
 {
@@ -24,13 +45,6 @@ int main()
         return 1;
     }
 
-    const auto actual = otclient::tibia_global_login::encodeLogin(
-        0x12345678u,
-        0x5au,
-        "S",
-        "C",
-        converted);
-
     const std::vector<uint8_t> expected{
         0x08, 0x0a, 0xc2, 0x3e, 0x2a,
         0x08, 0x07, 0x10, 0xfc, 0x0b, 0x18, 0xfc, 0x0b,
@@ -40,13 +54,39 @@ int main()
         0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
     };
 
-    if (actual == expected) {
-        std::cout << "CURRENT_TIBIA_LOGIN_XTEA_KEY_BYTES=PASS\n";
-        std::cout << "CURRENT_TIBIA_LOGIN_WIRE_CONTRACT=PASS\n";
-        return 0;
+    const auto direct = otclient::tibia_global_login::encodeLogin(
+        0x12345678u, 0x5au, "S", "C", converted);
+    if (direct != expected) {
+        std::cerr << "CURRENT_TIBIA_LOGIN_WIRE_CONTRACT=FAIL actual_size=" << direct.size()
+                  << " expected_size=" << expected.size() << '\n';
+        return 1;
     }
 
-    std::cerr << "CURRENT_TIBIA_LOGIN_WIRE_CONTRACT=FAIL actual_size=" << actual.size()
-              << " expected_size=" << expected.size() << '\n';
-    return 1;
+    std::vector<uint8_t> legacy;
+    addU8(legacy, 0x0a);       // historical pending-game opcode
+    addU16(legacy, 10);        // OTClient Linux OS value
+    addU16(legacy, 1532);      // protocol version
+    addU32(legacy, 1532);      // client version
+    addString(legacy, "1532");
+    addString(legacy, std::string(64, 'a'));
+    addU8(legacy, 0);          // preview
+    addU8(legacy, 0);          // historical RSA zero byte
+    legacy.insert(legacy.end(), xteaKey.begin(), xteaKey.end());
+    addU8(legacy, 0);          // historical GM byte
+    addString(legacy, "S");
+    addString(legacy, "C");
+    addU32(legacy, 0x12345678u);
+    addU8(legacy, 0x5a);
+
+    const auto transcoded = otclient::tibia_global_login::transcodeLegacy1532(legacy);
+    if (transcoded != expected) {
+        std::cerr << "CURRENT_TIBIA_LOGIN_TRANSCODE=FAIL actual_size=" << transcoded.size()
+                  << " expected_size=" << expected.size() << '\n';
+        return 1;
+    }
+
+    std::cout << "CURRENT_TIBIA_LOGIN_XTEA_KEY_BYTES=PASS\n";
+    std::cout << "CURRENT_TIBIA_LOGIN_WIRE_CONTRACT=PASS\n";
+    std::cout << "CURRENT_TIBIA_LOGIN_TRANSCODE=PASS\n";
+    return 0;
 }

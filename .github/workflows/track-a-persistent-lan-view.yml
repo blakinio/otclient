@@ -1,4 +1,4 @@
-name: Track A persistent LAN view
+name: Track A native Synology Tibia runtime inventory
 
 on:
   push:
@@ -11,195 +11,55 @@ permissions:
   contents: read
 
 jobs:
-  deploy:
+  inventory:
     if: github.actor == 'blakinio'
     runs-on: [otclient, synology]
     timeout-minutes: 5
-    env:
-      TARGET_CONTAINER: otclient-track-a-kasmvnc
-      CONTROL_CONTAINER: otclient-synology-runner
-      VIEW_CONTAINER: otclient-track-a-legacy-novnc
-      EXPECTED_MAIN: 462320593ce3efc764af443c23c51ac725e1759a
-      VNC_PORT: '5902'
-      NOVNC_INTERNAL_PORT: '6083'
-      NOVNC_HOST_PORT: '16085'
     steps:
       - name: Checkout diagnostic branch
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
 
-      - name: Prove current runtime and historical RFB backend
-        id: target
+      - name: Inventory native Synology processes
         shell: bash
         run: |
           set -Eeuo pipefail
-          test "$(git ls-remote origin refs/heads/main | awk '{print $1}')" = "$EXPECTED_MAIN"
-          docker inspect -f '{{.State.Running}}' "$TARGET_CONTAINER" | grep -Fx true >/dev/null
-          test "$(docker exec "$TARGET_CONTAINER" pgrep -x client | wc -l)" -eq 1
-          test "$(docker exec "$TARGET_CONTAINER" pgrep -x x11vnc | wc -l)" -eq 1
-          docker exec "$TARGET_CONTAINER" sh -lc "ss -ltn 2>/dev/null | grep -q ':$VNC_PORT '"
-          ip="$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$TARGET_CONTAINER")"
-          [[ "$ip" =~ ^172\.[0-9]+\.[0-9]+\.[0-9]+$ ]]
-          echo "ip=$ip" >> "$GITHUB_OUTPUT"
-          TARGET_IP="$ip" python3 - <<'PY'
-          import os,socket
-          s=socket.create_connection((os.environ['TARGET_IP'],5902),5)
-          banner=s.recv(12); s.close(); assert banner.startswith(b'RFB '), banner
-          print('HISTORICAL_X11VNC_RFB=PASS')
-          PY
-          echo TARGET_RUNTIME=PROVEN
-
-      - name: Start persistent websockify in live runner
-        shell: bash
-        env:
-          TARGET_IP: ${{ steps.target.outputs.ip }}
-        run: |
-          set -Eeuo pipefail
-          test "$(hostname)" = "$(docker exec "$CONTROL_CONTAINER" hostname)"
-          websockify="$(command -v websockify)"; test -x "$websockify"
-          test -d /usr/share/novnc
-          pidfile=/tmp/oteryn-legacy-novnc.pid
-          logfile=/tmp/oteryn-legacy-novnc.log
-          webroot=/tmp/oteryn-legacy-novnc-web
-          if [[ -f "$pidfile" ]]; then
-            old="$(cat "$pidfile" 2>/dev/null || true)"
-            if [[ "$old" =~ ^[0-9]+$ ]] && kill -0 "$old" 2>/dev/null; then
-              args="$(ps -p "$old" -o args= || true)"
-              [[ "$args" == *websockify*" $NOVNC_INTERNAL_PORT "* ]] || { echo UNEXPECTED_EXISTING_PID="$old"; exit 1; }
-              kill "$old"
-              for _ in $(seq 1 20); do kill -0 "$old" 2>/dev/null || break; sleep .1; done
-            fi
-            rm -f "$pidfile"
-          fi
-          if ss -ltn 2>/dev/null | grep -q ":$NOVNC_INTERNAL_PORT "; then
-            echo UNEXPECTED_LISTENER_ON_INTERNAL_NOVNC_PORT=true
-            exit 1
-          fi
-          rm -rf "$webroot"; cp -a /usr/share/novnc "$webroot"
-          cat >"$webroot/index.html" <<'HTML'
-          <!doctype html><meta charset="utf-8"><title>Oteryn Tibia Viewer</title>
-          <script>location.replace('/vnc.html?autoconnect=1&resize=scale&quality=5&compression=3&show_dot=true&path=websockify');</script>
-          HTML
-          env -u RUNNER_TRACKING_ID nohup "$websockify" --web "$webroot" \
-            "$NOVNC_INTERNAL_PORT" "$TARGET_IP:$VNC_PORT" >"$logfile" 2>&1 </dev/null &
-          pid=$!; printf '%s\n' "$pid" >"$pidfile"
-          for _ in $(seq 1 30); do
-            if kill -0 "$pid" 2>/dev/null && curl -fsS --max-time 2 "http://127.0.0.1:$NOVNC_INTERNAL_PORT/" >/dev/null; then
-              echo WEBSOCKIFY_PID="$pid"
-              echo HISTORICAL_WEBSOCKIFY_INTERNAL=PASS
-              exit 0
-            fi
-            sleep .25
-          done
-          cat "$logfile" || true
-          exit 1
-
-      - name: Prove internal noVNC WebSocket
-        shell: bash
-        run: |
-          set -Eeuo pipefail
+          echo '=== HOST ==='
+          hostname
+          uname -a
+          echo '=== PROCESS MATCHES ==='
+          ps -eo pid,ppid,user,lstart,args | grep -Ei '/bin/client|Tibia|Xvnc|kasm|x11vnc|websockify|Xorg|Xvfb' | grep -v grep || true
+          echo '=== NATIVE CLIENT EXES ==='
           python3 - <<'PY'
-          import base64,os,socket,urllib.request
-          with urllib.request.urlopen('http://127.0.0.1:6083/vnc.html',timeout=5) as r:
-              body=r.read(); assert r.status==200 and b'noVNC' in body
-          key=base64.b64encode(os.urandom(16)).decode()
-          req=(
-              'GET /websockify HTTP/1.1\r\nHost: 127.0.0.1:6083\r\n'
-              'Upgrade: websocket\r\nConnection: Upgrade\r\n'
-              f'Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n\r\n'
-          ).encode()
-          s=socket.create_connection(('127.0.0.1',6083),5); s.sendall(req); data=s.recv(4096); s.close()
-          assert b' 101 ' in data.split(b'\r\n',1)[0], data[:200]
-          print('HISTORICAL_NOVNC_INTERNAL_HTTP=PASS')
-          print('HISTORICAL_NOVNC_INTERNAL_WEBSOCKET=PASS')
-          PY
-
-      - name: Publish live runner noVNC to Synology LAN
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          mode="$(docker inspect -f '{{.HostConfig.NetworkMode}}' "$CONTROL_CONTAINER")"
-          control_ip="$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$CONTROL_CONTAINER")"
-          if [[ "$mode" == host ]]; then
-            target_host=127.0.0.1
-          else
-            [[ "$control_ip" =~ ^172\.[0-9]+\.[0-9]+\.[0-9]+$ ]]
-            target_host="$control_ip"
-          fi
-          echo CONTROL_NETWORK_MODE="$mode"
-          echo CONTROL_PROXY_TARGET="$target_host:$NOVNC_INTERNAL_PORT"
-          image="$(docker inspect -f '{{.Config.Image}}' "$CONTROL_CONTAINER")"; test -n "$image"
-          docker rm -f "$VIEW_CONTAINER" >/dev/null 2>&1 || true
-          proxy_b64="$(base64 -w0 <<'PY'
-          import os,socket,threading
-          bind=('0.0.0.0',int(os.environ['BIND_PORT']))
-          target=(os.environ['TARGET_HOST'],int(os.environ['TARGET_PORT']))
-          def pump(src,dst):
+          import hashlib, os, pathlib
+          rows=[]
+          for p in pathlib.Path('/proc').iterdir():
+              if not p.name.isdigit():
+                  continue
               try:
-                  while True:
-                      data=src.recv(65536)
-                      if not data:
-                          try: dst.shutdown(socket.SHUT_WR)
-                          except OSError: pass
-                          return
-                      dst.sendall(data)
+                  exe=os.path.realpath(p/'exe')
               except OSError:
-                  try: dst.shutdown(socket.SHUT_WR)
-                  except OSError: pass
-          def handle(c):
-              s=None
+                  continue
+              if not exe or (os.path.basename(exe) != 'client' and 'Tibia' not in exe):
+                  continue
               try:
-                  s=socket.create_connection(target,timeout=10)
-                  s.settimeout(None)
-                  a=threading.Thread(target=pump,args=(c,s),daemon=True)
-                  b=threading.Thread(target=pump,args=(s,c),daemon=True)
-                  a.start(); b.start(); a.join(); b.join()
-              finally:
-                  for x in (s,c):
-                      if x:
-                          try: x.close()
-                          except OSError: pass
-          ls=socket.socket(); ls.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
-          ls.bind(bind); ls.listen(64)
-          while True:
-              c,_=ls.accept(); threading.Thread(target=handle,args=(c,),daemon=True).start()
+                  st=os.stat(exe)
+                  h=hashlib.sha256()
+                  with open(exe,'rb') as f:
+                      for chunk in iter(lambda:f.read(1024*1024),b''):
+                          h.update(chunk)
+                  cmd=(p/'cmdline').read_bytes().replace(b'\0',b' ').decode('utf-8','replace')
+                  rows.append((int(p.name),exe,st.st_size,h.hexdigest(),cmd))
+              except Exception as exc:
+                  rows.append((int(p.name),exe,'ERR',type(exc).__name__,''))
+          for row in sorted(rows):
+              print('PID=%s\nEXE=%s\nSIZE=%s\nSHA256=%s\nCMD=%s\n---' % row)
+          print('NATIVE_CLIENT_COUNT='+str(len(rows)))
           PY
-          )"
-          docker run -d --name "$VIEW_CONTAINER" --restart unless-stopped --network host \
-            -e SCRIPT_B64="$proxy_b64" -e BIND_PORT="$NOVNC_HOST_PORT" \
-            -e TARGET_HOST="$target_host" -e TARGET_PORT="$NOVNC_INTERNAL_PORT" \
-            --entrypoint sh "$image" -c 'echo "$SCRIPT_B64" | base64 -d >/tmp/proxy.py; exec python3 /tmp/proxy.py' >/dev/null
-          sleep 1
-          docker inspect -f '{{.State.Running}} {{.HostConfig.RestartPolicy.Name}}' "$VIEW_CONTAINER" | grep -Fx 'true unless-stopped'
-          echo HISTORICAL_NOVNC_LAN_PROXY=RUNNING
-
-      - name: Stress and verify host-facing noVNC
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          python3 - <<'PY'
-          import base64,concurrent.futures,os,socket,urllib.request
-          base='http://192.168.1.21:16085'
-          paths=['/','/vnc.html','/app/ui.js','/app/styles/base.css','/core/rfb.js']
-          def one(p):
-              with urllib.request.urlopen(base+p,timeout=10) as r:
-                  data=r.read(); expected=r.headers.get('Content-Length')
-                  ok=r.status==200 and (expected is None or len(data)==int(expected))
-                  return p,r.status,len(data),expected,ok
-          with concurrent.futures.ThreadPoolExecutor(max_workers=16) as ex:
-              rows=list(ex.map(one,paths*16))
-          bad=[r for r in rows if not r[-1]]
-          assert not bad,bad
-          print('HISTORICAL_NOVNC_HOST_STATIC_80_OF_80=PASS')
-          key=base64.b64encode(os.urandom(16)).decode()
-          req=(
-              'GET /websockify HTTP/1.1\r\nHost: 192.168.1.21:16085\r\n'
-              'Upgrade: websocket\r\nConnection: Upgrade\r\n'
-              f'Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n\r\n'
-          ).encode()
-          s=socket.create_connection(('192.168.1.21',16085),5); s.sendall(req); data=s.recv(4096); s.close()
-          assert b' 101 ' in data.split(b'\r\n',1)[0],data[:200]
-          print('HISTORICAL_NOVNC_HOST_WEBSOCKET=PASS')
-          PY
-          echo HISTORICAL_NOVNC_URL=http://192.168.1.21:16085/
+          echo '=== X SOCKETS ==='
+          ls -l /tmp/.X11-unix 2>/dev/null || true
+          echo '=== LISTENERS ==='
+          ss -ltnp 2>/dev/null | grep -E ':(590[0-9]|608[0-9]|6901|844[0-9]|1608[0-9])[[:space:]]' || true
+          echo '=== RUNTIME STATE ==='
+          find /work/_otclient_tibia_re_state /home/runner/_work/_otclient_tibia_re_state -maxdepth 3 -type f \( -name '*.json' -o -name '*.pid' \) -print 2>/dev/null | sort | head -200 || true

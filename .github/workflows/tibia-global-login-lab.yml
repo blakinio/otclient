@@ -9,8 +9,8 @@ on:
       - '.github/workflows/tibia-global-login-lab.yml'
       - 'tools/tibia-global-login-lab/**'
       - 'src/client/tibiagloballoginwire.h'
+      - 'src/client/protocolgame.cpp'
       - 'src/framework/net/outputmessage.cpp'
-      - 'src/framework/net/protocol.cpp'
 
 permissions:
   contents: read

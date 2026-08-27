@@ -11,21 +11,24 @@ permissions:
   contents: read
 
 jobs:
-  probe:
+  deploy:
     if: github.actor == 'blakinio'
     runs-on: [otclient, synology]
     timeout-minutes: 5
     env:
       TARGET_CONTAINER: otclient-track-a-kasmvnc
+      CONTROL_CONTAINER: otclient-synology-runner
+      VIEW_CONTAINER: otclient-track-a-legacy-novnc
       EXPECTED_MAIN: 462320593ce3efc764af443c23c51ac725e1759a
       VNC_PORT: '5902'
+      NOVNC_PORT: '16085'
     steps:
       - name: Checkout diagnostic branch
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
 
-      - name: Prove current runtime
+      - name: Prove current runtime and historical RFB backend
         id: target
         shell: bash
         run: |
@@ -33,68 +36,63 @@ jobs:
           test "$(git ls-remote origin refs/heads/main | awk '{print $1}')" = "$EXPECTED_MAIN"
           docker inspect -f '{{.State.Running}}' "$TARGET_CONTAINER" | grep -Fx true >/dev/null
           test "$(docker exec "$TARGET_CONTAINER" pgrep -x client | wc -l)" -eq 1
-          docker exec "$TARGET_CONTAINER" test -S /tmp/.X11-unix/X1
-          docker exec -u kasm-user -e DISPLAY=:1 "$TARGET_CONTAINER" xdpyinfo >/dev/null
+          test "$(docker exec "$TARGET_CONTAINER" pgrep -x x11vnc | wc -l)" -eq 1
+          docker exec "$TARGET_CONTAINER" sh -lc "ss -ltn 2>/dev/null | grep -q ':$VNC_PORT '"
           ip="$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$TARGET_CONTAINER")"
           [[ "$ip" =~ ^172\.[0-9]+\.[0-9]+\.[0-9]+$ ]]
           echo "ip=$ip" >> "$GITHUB_OUTPUT"
+          TARGET_IP="$ip" python3 - <<'PY'
+          import os,socket
+          s=socket.create_connection((os.environ['TARGET_IP'],5902),5)
+          banner=s.recv(12); s.close(); assert banner.startswith(b'RFB '), banner
+          print('HISTORICAL_X11VNC_RFB=PASS')
+          PY
           echo TARGET_RUNTIME=PROVEN
 
-      - name: Install minimal x11vnc transplant
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          x11vnc="$(command -v x11vnc)"; test -x "$x11vnc"
-          lib="$(ldd "$x11vnc" | awk '$1=="libvncserver.so.1" {print $3}')"
-          lib="$(readlink -f "$lib")"; test -f "$lib"
-          docker exec -u 0 "$TARGET_CONTAINER" rm -rf /tmp/oteryn-view-probe
-          docker exec -u 0 "$TARGET_CONTAINER" mkdir -p /tmp/oteryn-view-probe/lib
-          docker cp "$x11vnc" "$TARGET_CONTAINER:/tmp/oteryn-view-probe/x11vnc"
-          docker cp "$lib" "$TARGET_CONTAINER:/tmp/oteryn-view-probe/lib/libvncserver.so.1"
-          docker exec -u 0 "$TARGET_CONTAINER" chmod 755 /tmp/oteryn-view-probe/x11vnc
-          docker exec -u 0 "$TARGET_CONTAINER" chmod 644 /tmp/oteryn-view-probe/lib/libvncserver.so.1
-          docker exec -u 0 "$TARGET_CONTAINER" chown -R kasm-user:kasm-user /tmp/oteryn-view-probe
-          missing="$(docker exec -u 0 -e LD_LIBRARY_PATH=/tmp/oteryn-view-probe/lib "$TARGET_CONTAINER" sh -lc "ldd /tmp/oteryn-view-probe/x11vnc 2>&1 | grep 'not found' || true")"
-          test -z "$missing" || { printf '%s\n' "$missing"; exit 1; }
-          docker exec -u kasm-user -e LD_LIBRARY_PATH=/tmp/oteryn-view-probe/lib "$TARGET_CONTAINER" /tmp/oteryn-view-probe/x11vnc -version 2>&1 | head -20
-          echo X11VNC_BINARY_PROBE=PASS
-
-      - name: Start dedicated read-only x11vnc on display one
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          test -z "$(docker exec "$TARGET_CONTAINER" pgrep -x x11vnc || true)"
-          docker exec "$TARGET_CONTAINER" sh -lc "! ss -ltn 2>/dev/null | grep -q ':$VNC_PORT '"
-          docker exec -d -u kasm-user \
-            -e DISPLAY=:1 -e LD_LIBRARY_PATH=/tmp/oteryn-view-probe/lib \
-            "$TARGET_CONTAINER" /tmp/oteryn-view-probe/x11vnc \
-            -display :1 -auth /home/kasm-user/.Xauthority -rfbport "$VNC_PORT" \
-            -listen 0.0.0.0 -forever -shared -nopw -xkb -repeat \
-            -wait 10 -defer 10 -deferupdate 20 -threads -noxrecord -noxfixes \
-            -o /tmp/oteryn-view-probe/x11vnc.log
-          for _ in $(seq 1 20); do
-            pid="$(docker exec "$TARGET_CONTAINER" pgrep -x x11vnc || true)"
-            if [[ -n "$pid" ]] && docker exec "$TARGET_CONTAINER" sh -lc "ss -ltn 2>/dev/null | grep -q ':$VNC_PORT '"; then
-              echo X11VNC_PID="$pid"
-              exit 0
-            fi
-            sleep .25
-          done
-          docker exec "$TARGET_CONTAINER" cat /tmp/oteryn-view-probe/x11vnc.log || true
-          exit 1
-
-      - name: Verify RFB from runner namespace
+      - name: Deploy historical noVNC websockify helper
         shell: bash
         env:
           TARGET_IP: ${{ steps.target.outputs.ip }}
         run: |
           set -Eeuo pipefail
+          image="$(docker inspect -f '{{.Config.Image}}' "$CONTROL_CONTAINER")"
+          test -n "$image"
+          docker rm -f "$VIEW_CONTAINER" >/dev/null 2>&1 || true
+          docker run -d --name "$VIEW_CONTAINER" --restart unless-stopped --network host \
+            -e TARGET_IP="$TARGET_IP" -e VNC_PORT="$VNC_PORT" -e NOVNC_PORT="$NOVNC_PORT" \
+            --entrypoint sh "$image" -lc '
+              set -eu
+              test -d /usr/share/novnc
+              command -v websockify >/dev/null
+              exec websockify --web /usr/share/novnc "$NOVNC_PORT" "$TARGET_IP:$VNC_PORT"
+            ' >/dev/null
+          for _ in $(seq 1 30); do
+            if curl -fsS --max-time 2 "http://127.0.0.1:$NOVNC_PORT/vnc.html" >/dev/null; then
+              break
+            fi
+            sleep .25
+          done
+          docker inspect -f '{{.State.Running}} {{.HostConfig.RestartPolicy.Name}}' "$VIEW_CONTAINER" | grep -Fx 'true unless-stopped'
+          curl -fsS --max-time 5 "http://127.0.0.1:$NOVNC_PORT/vnc.html" >/dev/null
+          echo HISTORICAL_NOVNC_HELPER=RUNNING
+
+      - name: Verify noVNC HTTP and WebSocket
+        shell: bash
+        run: |
+          set -Eeuo pipefail
           python3 - <<'PY'
-          import os,socket
-          ip=os.environ['TARGET_IP']; port=5902
-          s=socket.create_connection((ip,port),5)
-          banner=s.recv(12); s.close()
-          assert banner.startswith(b'RFB '), banner
-          print('HISTORICAL_X11VNC_RFB=PASS')
-          print('TARGET_IP='+ip)
+          import base64,os,socket,urllib.request
+          with urllib.request.urlopen('http://127.0.0.1:16085/vnc.html',timeout=5) as r:
+              body=r.read(); assert r.status==200 and b'noVNC' in body
+          key=base64.b64encode(os.urandom(16)).decode()
+          req=(
+              'GET /websockify HTTP/1.1\r\nHost: 127.0.0.1:16085\r\n'
+              'Upgrade: websocket\r\nConnection: Upgrade\r\n'
+              f'Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n\r\n'
+          ).encode()
+          s=socket.create_connection(('127.0.0.1',16085),5); s.sendall(req); data=s.recv(4096); s.close()
+          assert b' 101 ' in data.split(b'\r\n',1)[0], data[:200]
+          print('HISTORICAL_NOVNC_HTTP=PASS')
+          print('HISTORICAL_NOVNC_WEBSOCKET=PASS')
           PY
+          echo HISTORICAL_NOVNC_URL="http://192.168.1.21:$NOVNC_PORT/vnc.html?autoconnect=1&resize=scale&quality=5&compression=3&show_dot=true&path=websockify"

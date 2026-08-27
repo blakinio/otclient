@@ -116,6 +116,29 @@ jobs:
             safe=$(printf '%s' "$rel" | tr '/.-' '___')
             echo "PACKAGE_LAYOUT_CANDIDATE_${safe}_HTTP=$code"
           done
+
+          asset_base=https://static.tibia.com/launcher/assets-current
+          asset_url="$asset_base/assets.json"
+          asset_hash_url="$asset_base/assets.json.sha256"
+          asset_code=$(curl --socks5-hostname 127.0.0.1:25344 --compressed -sS -o "$r/assets.json" \
+            -A 'Mozilla/5.0 (X11; Linux x86_64)' -e "$asset_url" -H 'Accept: */*' \
+            --connect-timeout 15 --max-time 60 -w '%{http_code}' "$asset_url" || true)
+          asset_hash_code=$(curl --socks5-hostname 127.0.0.1:25344 --compressed -sS -o "$r/assets.json.sha256" \
+            -A 'Mozilla/5.0 (X11; Linux x86_64)' -e "$asset_hash_url" -H 'Accept: */*' \
+            --connect-timeout 15 --max-time 30 -w '%{http_code}' "$asset_hash_url" || true)
+          echo "PACKAGE_LAYOUT_WARP_ASSETS_JSON_HTTP=$asset_code"
+          echo "PACKAGE_LAYOUT_WARP_ASSETS_HASH_HTTP=$asset_hash_code"
+          if [[ "$asset_code" == 200 ]]; then
+            grep -Eq '^[[:space:]]*[\[{]' "$r/assets.json"
+            echo "PACKAGE_LAYOUT_WARP_ASSETS_JSON_BYTES=$(wc -c < "$r/assets.json" | tr -d ' ')"
+            echo PACKAGE_LAYOUT_WARP_ASSETS_JSON_BODY_PRESENT=true
+          fi
+          if [[ "$asset_hash_code" == 200 ]]; then
+            expected=$(awk 'NR==1{print $1}' "$r/assets.json.sha256")
+            actual=$(sha256sum "$r/assets.json" | awk '{print $1}')
+            echo "PACKAGE_LAYOUT_WARP_ASSETS_HASH_FORMAT=$([[ "$expected" =~ ^[0-9a-fA-F]{64}$ ]] && echo true || echo false)"
+            echo "PACKAGE_LAYOUT_WARP_ASSETS_HASH_MATCH=$([[ "$asset_code" == 200 && "$actual" == "$expected" ]] && echo true || echo false)"
+          fi
           echo PACKAGE_LAYOUT_DISCRIMINATOR_COMPLETE=true
 
   cdn-egress:

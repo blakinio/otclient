@@ -201,6 +201,67 @@ if text.count(old_xvfb) != 1:
     raise SystemExit(f"expected exactly one Xvfb bootstrap block, found {text.count(old_xvfb)}")
 text = text.replace(old_xvfb, new_xvfb, 1)
 
+# GAME_START alone is not the terminal oracle. Require an online game object,
+# a local player, and a numeric position without logging any position values.
+old_game_start = "    onGameStart=function() mark('GAME_START=true') end,\n"
+new_game_start = """    onGameStart=function()
+      mark('GAME_START=true')
+      scheduleEvent(function()
+        local ok,confirmed=pcall(function()
+          if not g_game.isOnline() then return false end
+          local player=g_game.getLocalPlayer()
+          if not player then return false end
+          local pos=player:getPosition()
+          if not pos then return false end
+          return tonumber(pos.x)~=nil and tonumber(pos.y)~=nil and tonumber(pos.z)~=nil
+        end)
+        if ok and confirmed then mark('IN_GAME=true') end
+      end,100)
+    end,
+"""
+if text.count(old_game_start) != 1:
+    raise SystemExit(f"expected exactly one GAME_START callback, found {text.count(old_game_start)}")
+text = text.replace(old_game_start, new_game_start, 1)
+
+old_poll = """for _ in $(seq 1 300); do
+  docker exec "$CONTAINER" grep -q '\\[TIBIA_GLOBAL_LAB\\] GAME_START=true' /lab/runtime/otclient.stdout.log && break
+  docker exec "$CONTAINER" grep -q '\\[TIBIA_GLOBAL_LAB\\] PROBE_TIMEOUT=true' /lab/runtime/otclient.stdout.log && break
+  docker exec "$CONTAINER" pgrep -f '/otclient/otclient|./otclient' >/dev/null 2>&1 || break
+  sleep 0.5
+done
+"""
+new_poll = """for _ in $(seq 1 300); do
+  docker exec "$CONTAINER" grep -q '\\[TIBIA_GLOBAL_LAB\\] IN_GAME=true' /lab/runtime/otclient.stdout.log && break
+  docker exec "$CONTAINER" grep -q '\\[TIBIA_GLOBAL_LAB\\] PROBE_TIMEOUT=true' /lab/runtime/otclient.stdout.log && break
+  docker exec "$CONTAINER" pgrep -f '/otclient/otclient|./otclient' >/dev/null 2>&1 || break
+  sleep 0.5
+done
+"""
+if text.count(old_poll) != 1:
+    raise SystemExit(f"expected exactly one terminal poll block, found {text.count(old_poll)}")
+text = text.replace(old_poll, new_poll, 1)
+
+old_terminal = """if docker exec "$CONTAINER" grep -q '\\[TIBIA_GLOBAL_LAB\\] GAME_START=true' /lab/runtime/otclient.stdout.log; then
+  echo TIBIA_GLOBAL_LAB_GAME_START_PROVEN=true
+  exit 0
+fi
+
+echo TIBIA_GLOBAL_LAB_GAME_START_PROVEN=false
+"""
+new_terminal = """if docker exec "$CONTAINER" grep -q '\\[TIBIA_GLOBAL_LAB\\] GAME_START=true' /lab/runtime/otclient.stdout.log && \\
+   docker exec "$CONTAINER" grep -q '\\[TIBIA_GLOBAL_LAB\\] IN_GAME=true' /lab/runtime/otclient.stdout.log; then
+  echo TIBIA_GLOBAL_LAB_GAME_START_PROVEN=true
+  echo TIBIA_GLOBAL_LAB_IN_GAME_PROVEN=true
+  exit 0
+fi
+
+echo TIBIA_GLOBAL_LAB_GAME_START_PROVEN=false
+echo TIBIA_GLOBAL_LAB_IN_GAME_PROVEN=false
+"""
+if text.count(old_terminal) != 1:
+    raise SystemExit(f"expected exactly one GAME_START terminal block, found {text.count(old_terminal)}")
+text = text.replace(old_terminal, new_terminal, 1)
+
 dst.write_text(text, encoding="utf-8")
 PY
 

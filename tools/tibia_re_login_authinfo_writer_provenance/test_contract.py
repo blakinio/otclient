@@ -29,3 +29,9 @@ for required in (
     "'raw_client_uploaded': False",
 ):
     assert required in src, required
+
+# The hosted discriminator must disassemble the client only once. Deep/owner
+# helpers are imported/reused by probe_trace, not executed as separate full scans.
+assert 'python3 tools/tibia_re_login_authinfo_writer_provenance/probe_deep.py \\' not in wf
+assert 'python3 tools/tibia_re_login_authinfo_writer_provenance/probe_owner.py \\' not in wf
+print('CURRENT_GAME_LOGIN_AUTHINFO_WRITER_CONTRACT=PASS')

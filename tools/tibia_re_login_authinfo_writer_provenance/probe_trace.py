@@ -105,7 +105,7 @@ def main() -> int:
 
     population_fde = tuple(top[0]['fde_tuple'])
     population = population_fde[0]
-    callers = owner.direct_callers(img, population)
+    callers = sorted(site for site, target in scan['direct_calls'] if target == population)
     if len(callers) != 1:
         raise SystemExit(f'AUTHINFO_POPULATION_CALLER_AMBIGUOUS={len(callers)}')
     caller_site = callers[0]
@@ -113,7 +113,7 @@ def main() -> int:
     if not caller_fde:
         raise SystemExit('AUTHINFO_POPULATION_CALLER_FDE_UNKNOWN')
 
-    caller_parents = owner.direct_callers(img, caller_fde[0])
+    caller_parents = sorted(site for site, target in scan['direct_calls'] if target == caller_fde[0])
     caller_owners = owner.vtable_owners_for_target(img, caller_fde[0])
     population_snapshot = deep.snapshot_fde(img, population_fde)
     caller_snapshot = deep.snapshot_fde(img, caller_fde)

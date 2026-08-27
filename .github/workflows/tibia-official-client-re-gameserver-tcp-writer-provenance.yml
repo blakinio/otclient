@@ -118,12 +118,6 @@ jobs:
           pathlib.Path(dst).write_bytes(raw)
           PY
           mkdir -p artifacts/current-game-login-authinfo-writer-provenance
-          python3 tools/tibia_re_login_authinfo_writer_provenance/probe_deep.py \
-            --client "$PROV_ROOT/pkg/client" \
-            --output artifacts/current-game-login-authinfo-writer-provenance/deep.json
-          python3 tools/tibia_re_login_authinfo_writer_provenance/probe_owner.py \
-            --client "$PROV_ROOT/pkg/client" \
-            --output artifacts/current-game-login-authinfo-writer-provenance/owner.json
           python3 tools/tibia_re_login_authinfo_writer_provenance/probe_trace.py \
             --client "$PROV_ROOT/pkg/client" \
             --output artifacts/current-game-login-authinfo-writer-provenance/trace.json

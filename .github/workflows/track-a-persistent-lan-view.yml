@@ -53,6 +53,7 @@ jobs:
           docker cp "$lib" "$TARGET_CONTAINER:/tmp/oteryn-view-probe/lib/libvncserver.so.1"
           docker exec -u 0 "$TARGET_CONTAINER" chmod 755 /tmp/oteryn-view-probe/x11vnc
           docker exec -u 0 "$TARGET_CONTAINER" chmod 644 /tmp/oteryn-view-probe/lib/libvncserver.so.1
+          docker exec -u 0 "$TARGET_CONTAINER" chown -R kasm-user:kasm-user /tmp/oteryn-view-probe
           missing="$(docker exec -u 0 -e LD_LIBRARY_PATH=/tmp/oteryn-view-probe/lib "$TARGET_CONTAINER" sh -lc "ldd /tmp/oteryn-view-probe/x11vnc 2>&1 | grep 'not found' || true")"
           test -z "$missing" || { printf '%s\n' "$missing"; exit 1; }
           docker exec -u kasm-user -e LD_LIBRARY_PATH=/tmp/oteryn-view-probe/lib "$TARGET_CONTAINER" /tmp/oteryn-view-probe/x11vnc -version 2>&1 | head -20

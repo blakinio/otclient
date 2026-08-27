@@ -408,7 +408,34 @@ def main() -> int:
     ]
 
     print('TRACE_PHASE=QMETA_BEGIN', flush=True)
+    queue_stringdata = 0x1CE67C0
+    queue_metadata = 0x1CE35A0
+    queue_meta = core.parse_meta(img, queue_stringdata, queue_metadata)
+    if not queue_meta or queue_meta['class_name'] != 'tibia::protocol::TProtocolMessageQueue':
+        raise SystemExit('CURRENT_QUEUE_QMETA_CONTRACT_MISMATCH')
+    if queue_meta['method_count'] != 355 or queue_meta['signal_count'] != 192:
+        raise SystemExit('CURRENT_QUEUE_QMETA_COUNTS_MISMATCH')
+    queue_wrapped = {'stringdata': hx(queue_stringdata), 'metadata': hx(queue_metadata), **queue_meta}
+    queue_methods = {}
+    for wanted in ('receivedLoginChallengeMessage', 'sendLogin'):
+        rows = [row for row in queue_meta['rows'] if row['name'] == wanted]
+        if len(rows) != 1:
+            raise SystemExit(f'CURRENT_QUEUE_METHOD_AMBIGUOUS:{wanted}:{len(rows)}')
+        row = rows[0]
+        queue_methods[wanted] = {'method': row, 'params': decode_qmeta_params(img, queue_wrapped, row)}
+    challenge_types = queue_methods['receivedLoginChallengeMessage']['params']['argument_types']
+    send_login_types = queue_methods['sendLogin']['params']['argument_types']
+    if len(challenge_types) != 1 or not str(challenge_types[0].get('custom_type') or '').endswith('GameserverMessageLoginChallenge'):
+        raise SystemExit('CURRENT_CHALLENGE_TYPE_MISMATCH')
+    if len(send_login_types) != 1 or not str(send_login_types[0].get('custom_type') or '').endswith('GameclientMessageLogin'):
+        raise SystemExit('CURRENT_SENDLOGIN_TYPE_MISMATCH')
+
     exact_qmeta_classes = {
+        'TProtocolMessageQueue': {
+            'class_name': queue_meta['class_name'], 'stringdata': hx(queue_stringdata),
+            'metadata': hx(queue_metadata), 'method_count': queue_meta['method_count'],
+            'signal_count': queue_meta['signal_count'], 'methods': queue_methods,
+        },
         'TLoginRequestUploader': exact_qmeta_class(
             img, 'tibia::authentication::TLoginRequestUploader', ('loginSuccessful',)),
         'TCharacterSelectionController': exact_qmeta_class(
@@ -420,6 +447,57 @@ def main() -> int:
     }
 
     print('TRACE_PHASE=QMETA_DONE', flush=True)
+    def selected_method(class_key: str, method_name: str) -> dict:
+        rows = [row for row in exact_qmeta_classes[class_key]['methods'] if row['name'] == method_name]
+        if len(rows) != 1:
+            raise SystemExit(f'SEMANTIC_METHOD_AMBIGUOUS:{class_key}:{method_name}:{len(rows)}')
+        return rows[0]
+
+    def immediate_jumps(start: int) -> list[int]:
+        return [
+            int(ins.operands[0].imm)
+            for ins in img.md.disasm(img.bytes(start, 0x80), start)
+            if ins.mnemonic == 'jmp' and ins.operands and ins.operands[0].type == X86_OP_IMM
+        ]
+
+    runtime_fde_for_key = {}
+    for name, rows in schema_storage_runtime_refs.items():
+        fdes = {row['fde'] for row in rows if not row['initializer_fde'] and row['fde']}
+        if fdes:
+            runtime_fde_for_key[name] = sorted(fdes)
+
+    login_success_target = int(selected_method('TLoginRequestUploader', 'loginSuccessful')['target'], 16)
+    request_character_target = int(selected_method('TCharacterSelectionController', 'requestCharacterLogin')['target'], 16)
+    connect_existing_target = int(selected_method('TGameClient', 'connectClientToGameserverWithExistingCredentials')['target'], 16)
+    on_connect_target = int(selected_method('TGameClient', 'onConnectClientToGameserver')['target'], 16)
+    connect_existing_jumps = immediate_jumps(connect_existing_target)
+    on_connect_jumps = immediate_jumps(on_connect_target)
+    if len(connect_existing_jumps) < 1 or len(on_connect_jumps) < 1:
+        raise SystemExit('CURRENT_GAMECLIENT_BUSINESS_TARGET_MISSING')
+
+    semantic_targets = {
+        'loginSuccessful': login_success_target,
+        'requestCharacterLogin': request_character_target,
+        'connectClientToGameserverWithExistingCredentials_business': connect_existing_jumps[0],
+        'onConnectClientToGameserver_business': on_connect_jumps[0],
+    }
+    for key, fdes in runtime_fde_for_key.items():
+        if len(fdes) == 1:
+            semantic_targets[f'{key}_runtime_parser'] = int(fdes[0].split('..', 1)[0], 16)
+
+    semantic_edge_callers = {
+        name: [
+            {'site': hx(site), 'fde': fde_key(img, site), 'context': core.context(img, site, 12, 18)}
+            for site, target in scan['direct_calls'] if target == target_va
+        ]
+        for name, target_va in semantic_targets.items()
+    }
+    targeted_semantic_snapshots = {
+        name: deep.snapshot_fde(img, fde)
+        for name, target_va in semantic_targets.items()
+        if (fde := img.fde(target_va)) is not None
+    }
+
     terms = (
         'TPlaySessionData',
         'TCharacterLoginData',
@@ -492,6 +570,9 @@ def main() -> int:
         'character_parser_literal_refs': character_parser_literal_refs,
         'literal_refs': {name: literal_ref_rows(name) for name in literal_targets},
         'exact_qmeta_classes': exact_qmeta_classes,
+        'semantic_targets': {name: hx(target) for name, target in semantic_targets.items()},
+        'semantic_edge_callers': semantic_edge_callers,
+        'targeted_semantic_snapshots': targeted_semantic_snapshots,
         'auth_slot_ref_fdes': auth_slot_ref_fdes,
         'qmeta': qmeta_subset(img),
         'type_and_method_neighborhoods': {

@@ -67,4 +67,13 @@ for required in (
 ):
     assert required in src, required
 
+for required in (
+    'semantic_edge_callers',
+    'targeted_semantic_snapshots',
+    'TProtocolMessageQueue',
+    'receivedLoginChallengeMessage',
+    'GameserverMessageLoginChallenge',
+):
+    assert required in src, required
+
 print('CURRENT_GAME_LOGIN_AUTHINFO_WRITER_CONTRACT=PASS')

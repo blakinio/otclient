@@ -60,4 +60,11 @@ for required in (
 ):
     assert required in src, required
 
+for required in (
+    'schema_storage_targets',
+    'schema_storage_runtime_refs',
+    'raw_rip_refs',
+):
+    assert required in src, required
+
 print('CURRENT_GAME_LOGIN_AUTHINFO_WRITER_CONTRACT=PASS')

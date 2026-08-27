@@ -190,6 +190,49 @@ def exact_qmeta_class(img: core.Image, class_name: str, required_methods: tuple[
     return next(iter(uniq.values()))
 
 
+def raw_rip_refs(img: core.Image, targets_by_name: dict[str, set[int]]) -> dict[str, list[int]]:
+    by_target = {}
+    for name, targets in targets_by_name.items():
+        for target in targets:
+            by_target.setdefault(target, set()).add(name)
+    out = {name: [] for name in targets_by_name}
+    for section in img.sections:
+        if not (section.flags & 4):
+            continue
+        blob = img.raw[section.offset:section.offset + section.size]
+        for pos in range(0, max(0, len(blob) - 7)):
+            if not (0x40 <= blob[pos] <= 0x4f):
+                continue
+            if blob[pos + 1] not in (0x8d, 0x8b) or (blob[pos + 2] & 0xc7) != 0x05:
+                continue
+            disp = int.from_bytes(blob[pos + 3:pos + 7], 'little', signed=True)
+            site = section.va + pos
+            target = (site + 7 + disp) & 0xffffffffffffffff
+            for name in by_target.get(target, ()):
+                out[name].append(site)
+    return out
+
+
+def schema_storage_target(img: core.Image, literal_site: int, literal_targets: set[int]) -> int | None:
+    fde = img.fde(literal_site)
+    if not fde:
+        return None
+    instructions = list(img.md.disasm(img.bytes(fde[0], fde[1] - fde[0]), fde[0]))
+    indexes = [i for i, row in enumerate(instructions) if row.address == literal_site]
+    if len(indexes) != 1:
+        return None
+    for row in reversed(instructions[max(0, indexes[0] - 5):indexes[0]]):
+        if row.mnemonic != 'lea' or len(row.operands) < 2:
+            continue
+        op = row.operands[1]
+        if op.type != X86_OP_MEM or op.mem.base != X86_REG_RIP:
+            continue
+        target = row.address + row.size + int(op.mem.disp)
+        if target not in literal_targets and img.mapped(target):
+            return target
+    return None
+
+
 def qmeta_subset(img: core.Image) -> dict:
     names = (
         'requestCharacterLogin',
@@ -323,6 +366,29 @@ def main() -> int:
         ]
 
     sessionkey_literal_refs = literal_ref_rows('sessionkey')
+    all_literal_targets = set().union(*literal_targets.values()) if literal_targets else set()
+    schema_storage_targets = {}
+    for name, sites in scan['extra_literal_refs'].items():
+        targets = {
+            target for site in sites
+            if (target := schema_storage_target(img, site, all_literal_targets)) is not None
+        }
+        schema_storage_targets[name] = targets
+    storage_refs = raw_rip_refs(img, schema_storage_targets)
+    initializer_fdes = {
+        img.fde(site) for sites in scan['extra_literal_refs'].values() for site in sites if img.fde(site)
+    }
+    schema_storage_runtime_refs = {
+        name: [
+            {
+                'site': hx(site), 'fde': fde_key(img, site),
+                'initializer_fde': img.fde(site) in initializer_fdes,
+                'context': core.context(img, site, 14, 24),
+            }
+            for site in sites[:300]
+        ]
+        for name, sites in storage_refs.items()
+    }
     character_keys = ('characters', 'worldid', 'ismaincharacter')
     character_ref_fdes = collections.defaultdict(set)
     for key in character_keys:
@@ -417,6 +483,11 @@ def main() -> int:
             'setup_snapshot': gameserver_setup_snapshot,
         },
         'sessionkey_literal_refs': sessionkey_literal_refs,
+        'schema_storage_targets': {
+            name: [hx(target) for target in sorted(targets)]
+            for name, targets in schema_storage_targets.items()
+        },
+        'schema_storage_runtime_refs': schema_storage_runtime_refs,
         'character_parser_literal_refs': character_parser_literal_refs,
         'literal_refs': {name: literal_ref_rows(name) for name in literal_targets},
         'exact_qmeta_classes': exact_qmeta_classes,

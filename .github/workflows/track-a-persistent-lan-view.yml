@@ -1,4 +1,4 @@
-name: Track A original Synology Kasm logger prep
+name: Track A Synology state logger diagnostic
 
 on:
   push:
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 jobs:
-  prepare:
+  diagnose:
     if: github.actor == 'blakinio'
     runs-on: [otclient, synology]
     timeout-minutes: 5
@@ -23,103 +23,49 @@ jobs:
       LOGGER_SCRIPT: /tmp/oteryn-qt-ingame-detached-logger.py
       LOGGER_LOG: /tmp/oteryn-qt-ingame-correlation.jsonl
       LOGGER_PIDFILE: /tmp/oteryn-qt-ingame-detached-logger.pid
-      DURATION: '900'
     steps:
       - name: Checkout diagnostic branch
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
 
-      - name: Prove original Synology Kasm runtime
-        id: target
+      - name: Inspect previous logger attempt
         shell: bash
         run: |
           set -Eeuo pipefail
-          docker inspect -f '{{.State.Running}}' "$TARGET_CONTAINER" | grep -Fx true >/dev/null
+          echo '=== PIDFILE ==='
+          docker exec "$TARGET_CONTAINER" sh -lc 'test -f /tmp/oteryn-qt-ingame-detached-logger.pid && cat /tmp/oteryn-qt-ingame-detached-logger.pid || true'
+          echo '=== PROCESS ==='
+          docker exec "$TARGET_CONTAINER" sh -lc '
+            if test -f /tmp/oteryn-qt-ingame-detached-logger.pid; then
+              p=$(cat /tmp/oteryn-qt-ingame-detached-logger.pid 2>/dev/null || true)
+              if echo "$p" | grep -Eq "^[0-9]+$" && test -r "/proc/$p/cmdline"; then tr "\0" " " <"/proc/$p/cmdline"; echo; fi
+            fi'
+          echo '=== LOG ==='
+          docker exec "$TARGET_CONTAINER" sh -lc 'test -f /tmp/oteryn-qt-ingame-correlation.jsonl && tail -n 20 /tmp/oteryn-qt-ingame-correlation.jsonl || true'
+
+      - name: Run bounded foreground logger probe
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          docker cp .github/scripts/track-a-qt-ingame-detached-logger.py "$TARGET_CONTAINER:$LOGGER_SCRIPT"
+          docker exec -u 0 "$TARGET_CONTAINER" chown kasm-user:kasm-user "$LOGGER_SCRIPT"
+          docker exec -u 0 "$TARGET_CONTAINER" chmod 500 "$LOGGER_SCRIPT"
           mapfile -t pids < <(docker exec "$TARGET_CONTAINER" pgrep -x client)
           test "${#pids[@]}" -eq 1
           pid="${pids[0]}"
-          test "$(docker exec "$TARGET_CONTAINER" stat -Lc %s "/proc/$pid/exe")" = "$EXPECTED_SIZE"
-          test "$(docker exec "$TARGET_CONTAINER" sha256sum "/proc/$pid/exe" | awk '{print $1}')" = "$EXPECTED_SHA"
-          docker exec -u kasm-user -e DISPLAY=:1 "$TARGET_CONTAINER" xdpyinfo >/dev/null
-          mapping="$(docker inspect -f '{{(index (index .NetworkSettings.Ports "6901/tcp") 0).HostIp}}:{{(index (index .NetworkSettings.Ports "6901/tcp") 0).HostPort}}' "$TARGET_CONTAINER")"
-          test "$mapping" = '127.0.0.1:6901'
           start="$(docker exec -i "$TARGET_CONTAINER" python3 - "$pid" <<'PY'
           import pathlib,sys
           raw=pathlib.Path('/proc/'+sys.argv[1]+'/stat').read_text(encoding='ascii')
           print(raw[raw.rfind(')')+2:].split()[19])
           PY
           )"
-          [[ "$start" =~ ^[0-9]+$ ]]
-          echo "pid=$pid" >> "$GITHUB_OUTPUT"
-          echo "start=$start" >> "$GITHUB_OUTPUT"
-          echo ORIGINAL_SYNOLOGY_KASM_RUNTIME=PASS
-          echo ORIGINAL_KASM_LOOPBACK=127.0.0.1:6901
-
-      - name: Remove only temporary viewer helpers created during diagnosis
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          for name in otclient-track-a-legacy-novnc otclient-kasm-static otclient-kasm-view otclient-qt-ingame-view; do
-            if docker inspect "$name" >/dev/null 2>&1; then
-              docker rm -f "$name" >/dev/null
-              echo REMOVED_HELPER_CONTAINER="$name"
-            fi
-          done
-          pidfile=/tmp/oteryn-legacy-novnc.pid
-          if [[ -f "$pidfile" ]]; then
-            old="$(cat "$pidfile" 2>/dev/null || true)"
-            if [[ "$old" =~ ^[0-9]+$ ]] && kill -0 "$old" 2>/dev/null; then
-              args="$(ps -p "$old" -o args= || true)"
-              if [[ "$args" == *'/usr/bin/websockify'*' 6083 '* ]]; then
-                kill "$old"
-                echo REMOVED_HELPER_WEBSOCKIFY="$old"
-              fi
-            fi
-            rm -f "$pidfile"
-          fi
-          mapfile -t x11pids < <(docker exec "$TARGET_CONTAINER" sh -lc "pgrep -f '^/tmp/oteryn-view-probe/x11vnc ' || true")
-          for p in "${x11pids[@]}"; do
-            [[ "$p" =~ ^[0-9]+$ ]] || continue
-            docker exec "$TARGET_CONTAINER" kill "$p"
-            echo REMOVED_HELPER_X11VNC="$p"
-          done
-          docker exec -u 0 "$TARGET_CONTAINER" rm -rf /tmp/oteryn-view-probe
-          echo TEMP_VIEW_HELPERS_CLEANED=PASS
-
-      - name: Start fresh secret-free read-only state logger
-        shell: bash
-        env:
-          TARGET_PID: ${{ steps.target.outputs.pid }}
-          TARGET_START: ${{ steps.target.outputs.start }}
-        run: |
-          set -Eeuo pipefail
-          python3 -m py_compile .github/scripts/track-a-qt-ingame-detached-logger.py
-          docker cp .github/scripts/track-a-qt-ingame-detached-logger.py "$TARGET_CONTAINER:$LOGGER_SCRIPT"
-          docker exec -u 0 "$TARGET_CONTAINER" chown kasm-user:kasm-user "$LOGGER_SCRIPT"
-          docker exec -u 0 "$TARGET_CONTAINER" chmod 500 "$LOGGER_SCRIPT"
-          if docker exec "$TARGET_CONTAINER" test -f "$LOGGER_PIDFILE"; then
-            old="$(docker exec "$TARGET_CONTAINER" cat "$LOGGER_PIDFILE" 2>/dev/null || true)"
-            if [[ "$old" =~ ^[0-9]+$ ]] && docker exec "$TARGET_CONTAINER" kill -0 "$old" 2>/dev/null; then
-              cmd="$(docker exec "$TARGET_CONTAINER" sh -lc 'tr "\0" " " </proc/'"$old"'/cmdline' 2>/dev/null || true)"
-              [[ "$cmd" == *'oteryn-qt-ingame-detached-logger.py'* ]] && docker exec "$TARGET_CONTAINER" kill "$old"
-            fi
-          fi
-          docker exec -u kasm-user "$TARGET_CONTAINER" rm -f "$LOGGER_PIDFILE" "$LOGGER_LOG"
-          logger_pid="$(docker exec -u kasm-user "$TARGET_CONTAINER" sh -lc '
-            nohup python3 "$1" "$2" "$3" "$4" "$5" "$6" >"$7" 2>&1 </dev/null & echo $!
-          ' sh "$LOGGER_SCRIPT" "$TARGET_PID" "$TARGET_START" "$EXPECTED_SIZE" "$EXPECTED_SHA" "$DURATION" "$LOGGER_LOG")"
-          [[ "$logger_pid" =~ ^[0-9]+$ ]]
-          docker exec -u kasm-user "$TARGET_CONTAINER" sh -lc 'printf "%s\n" "$1" >"$2"' sh "$logger_pid" "$LOGGER_PIDFILE"
-          for _ in $(seq 1 180); do
-            if docker exec "$TARGET_CONTAINER" grep -q '"event":"LOGGER_READY"' "$LOGGER_LOG" 2>/dev/null; then break; fi
-            docker exec "$TARGET_CONTAINER" kill -0 "$logger_pid" 2>/dev/null
-            sleep 1
-          done
-          docker exec "$TARGET_CONTAINER" grep -q '"event":"LOGGER_READY"' "$LOGGER_LOG"
-          docker exec "$TARGET_CONTAINER" tail -n 3 "$LOGGER_LOG"
-          echo LOGGER_READY=true
-          echo LOGGER_DURATION_SECONDS="$DURATION"
-          echo CREDENTIAL_ACCESS=false
-          echo PACKET_PAYLOAD_CAPTURE=false
-          echo RAW_WINDOW_TITLES_RETAINED=false
+          docker exec -u kasm-user "$TARGET_CONTAINER" rm -f /tmp/oteryn-qt-ingame-probe.jsonl
+          set +e
+          docker exec -u kasm-user "$TARGET_CONTAINER" python3 "$LOGGER_SCRIPT" "$pid" "$start" "$EXPECTED_SIZE" "$EXPECTED_SHA" 2 /tmp/oteryn-qt-ingame-probe.jsonl
+          rc=$?
+          set -e
+          echo LOGGER_PROBE_RC="$rc"
+          docker exec "$TARGET_CONTAINER" sh -lc 'test -f /tmp/oteryn-qt-ingame-probe.jsonl && cat /tmp/oteryn-qt-ingame-probe.jsonl || true'
+          test "$rc" -eq 0
+          echo LOGGER_FOREGROUND_PROBE=PASS

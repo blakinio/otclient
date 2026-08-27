@@ -41,6 +41,8 @@ assert 'rm -f' in clear_pid
 assert 'kill ' not in clear_pid
 assert 'LAB_WIREPROXY_CROSS_CONTAINER_PID_CLEARED=true' in clear_pid
 
+# The launcher package manifest now identifies the client package/version only.
+# Asset catalog rows are resolved independently from assets-current/assets.json.
 assert 'TIBIA_TEST_EMAIL' not in stage_package
 assert 'TIBIA_TEST_PASSWORD' not in stage_package
 assert 'tibiaclient-linux-current' in stage_package
@@ -48,13 +50,15 @@ assert "url = base + '/package.json'" in stage_package
 assert "'Mozilla/5.0 (X11; Linux x86_64)'" in stage_package
 assert "'Accept: */*'" in stage_package
 assert "startswith('15.32')" in stage_package
-assert 'assets/catalog-content.json' in stage_package
+assert 'assets/catalog-content.json' not in stage_package
 assert 'LAB_CURRENT_PACKAGE_MANIFEST_STAGED=true' in stage_package
 
 assert '/lab/state/current-package/package.json' in refresh
-assert 'tibiaclient-linux-current' in refresh
+assert 'https://static.tibia.com/launcher/assets-current' in refresh
+assert "assets_manifest = Path('/tmp/current-assets.json')" in refresh
+assert "get(asset_base + '/assets.json', assets_manifest)" in refresh
 assert "{'appearances', 'staticdata', 'proficiencies'}" in refresh
-assert "get(base + '/assets.json', manifest)" not in refresh
+assert 'catalog-content.json' in refresh
 assert 'LAB_LOGIN_MINIMAL_ASSETS_REFRESHED=true' in refresh
 
 assert 'LAB_LOGIN_MINIMAL_ASSETS_READY=true' in wrapper

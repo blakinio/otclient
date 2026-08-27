@@ -1,0 +1,43 @@
+{
+  "schema": "otclient.track-a.current-game-login-value-promotion.v1",
+  "decision": "PASS_BOUNDED_ACCEPT_WITH_EDITS",
+  "source": {
+    "pr": 729,
+    "head": "9876df611c8bf7f9c5cd07b3b28f5d12ee8c6e28",
+    "run": 33121134592,
+    "job": 98687978755,
+    "artifact": 9666544571,
+    "artifact_sha256": "af5b57e8dbd5a5b0b597f71d4d367e7c9511aa98c56c10ba7cc8380db9050ebf",
+    "trace_sha256": "c1b37821925939295cde1bdcae657af338d7cfd370704e201bcb438d7d52180d"
+  },
+  "exact_client": {
+    "version": "15.32.75d4a0",
+    "packed_sha256": "075810c54af2d6912000eab062763db29563f5a1f4bf1d984154b2d07fd5729f",
+    "unpacked_sha256": "d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a",
+    "unpacked_size": 52105824
+  },
+  "accepted": {
+    "gameclient_message_type": 10,
+    "gameclient_message_type_field": 1,
+    "gameclient_login_payload_field": 1000,
+    "gameclient_login_field1_linux_value": 7,
+    "gameclient_login_field2_value": 1532,
+    "gameclient_login_field3_value": 1532,
+    "login_rsa_encrypted_block_field5": "XTEA_KEY_BYTES_16",
+    "legacy_raw_0x0a_rsa_body_matches_current": false,
+    "separate_login_rsa_transform_in_proved_primary_path": false
+  },
+  "unknown": [
+    "GameclientMessageLogin.field4 user-facing name",
+    "GameclientMessageLogin.field5 user-facing name",
+    "GameclientMessageLogin.field6 semantic name/value",
+    "LoginRSAEncryptedBlock.fields1/2/6/7 user-facing names",
+    "PASSWORD_REQUIRED_FOR_GAME_LOGIN"
+  ],
+  "safety": {
+    "runtime_access": "none",
+    "login_performed": false,
+    "secret_access": false,
+    "raw_client_uploaded": false
+  }
+}

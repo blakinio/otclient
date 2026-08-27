@@ -7,7 +7,6 @@ prepare = (root / 'tools/tibia-global-login-lab/scripts/prepare-ephemeral-runtim
 clear_pid = (root / 'tools/tibia-global-login-lab/scripts/clear-stale-wireproxy-pid.sh').read_text(encoding='utf-8')
 stage_package = (root / 'tools/tibia-global-login-lab/scripts/stage-current-package-manifest.sh').read_text(encoding='utf-8')
 refresh = (root / 'tools/tibia-global-login-lab/scripts/refresh-current-assets.sh').read_text(encoding='utf-8')
-world_probe = (root / 'tools/tibia-global-login-lab/scripts/world-entry-probe.sh').read_text(encoding='utf-8')
 wrapper = (root / 'tools/tibia-global-login-lab/scripts/world-entry-probe-1532.sh').read_text(encoding='utf-8')
 
 probe = workflow.index('  probe:')
@@ -67,14 +66,18 @@ assert "-name 'appearances-*.dat'" in wrapper
 assert "-name 'staticdata-*.dat'" in wrapper
 assert 'expected exactly one historical full-asset gate' in wrapper
 
-# Terminal proof is stronger than a callback: after GAME_START, require the
-# client to be online with a local player whose position has numeric x/y/z.
-assert "mark('GAME_START=true')" in world_probe
-assert 'g_game.isOnline()' in world_probe
-assert 'g_game.getLocalPlayer()' in world_probe
-assert 'player:getPosition()' in world_probe
-assert "mark('IN_GAME=true')" in world_probe
-assert "grep -q '\\[TIBIA_GLOBAL_LAB\\] IN_GAME=true'" in world_probe
-assert 'TIBIA_GLOBAL_LAB_IN_GAME_PROVEN=true' in world_probe
+# Terminal proof is stronger than a callback. The 1532 lab-only transformer
+# changes onGameStart to require online/local-player/numeric-position without
+# logging the position, polls for IN_GAME, and exits 0 only on both markers.
+assert "mark('GAME_START=true')" in wrapper
+assert 'g_game.isOnline()' in wrapper
+assert 'g_game.getLocalPlayer()' in wrapper
+assert 'player:getPosition()' in wrapper
+assert "mark('IN_GAME=true')" in wrapper
+assert "grep -q '\\\\[TIBIA_GLOBAL_LAB\\\\] IN_GAME=true'" in wrapper
+assert 'TIBIA_GLOBAL_LAB_IN_GAME_PROVEN=true' in wrapper
+assert 'expected exactly one GAME_START callback' in wrapper
+assert 'expected exactly one terminal poll block' in wrapper
+assert 'expected exactly one GAME_START terminal block' in wrapper
 
 print('EPHEMERAL_RUNNER_CONTRACT=PASS')

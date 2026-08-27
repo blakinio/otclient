@@ -32,24 +32,36 @@ jobs:
           test "$(git ls-remote origin refs/heads/main | awk '{print $1}')" = "$EXPECTED_MAIN"
           docker inspect -f '{{.State.Running}}' "$TARGET_CONTAINER" | grep -Fx true >/dev/null
           test "$(docker exec "$TARGET_CONTAINER" pgrep -x client | wc -l)" -eq 1
+          docker exec "$TARGET_CONTAINER" test -S /tmp/.X11-unix/X1
           echo READ_ONLY_RUNTIME_INVENTORY=PASS
 
-      - name: Inspect current VNC connections
+      - name: Inspect historical noVNC tool availability
         shell: bash
         run: |
           set -Eeuo pipefail
-          docker exec "$TARGET_CONTAINER" sh -lc 'ss -tnp 2>/dev/null | grep -E ":(5901|6901)[[:space:]]" || true'
+          echo '=== CONTAINER ==='
+          docker exec "$TARGET_CONTAINER" sh -lc '
+            printf "x11vnc="; command -v x11vnc || true
+            printf "websockify="; command -v websockify || true
+            printf "python_websockify="; python3 - <<"PY"
+          try:
+              import websockify
+              print(websockify.__file__)
+          except Exception as exc:
+              print("UNAVAILABLE:" + type(exc).__name__)
+          PY
+            test -d /usr/share/novnc && echo novnc_dir=/usr/share/novnc || echo novnc_dir=UNAVAILABLE
+            DISPLAY=:1 xdpyinfo >/dev/null 2>&1 && echo display_1=PASS || echo display_1=FAIL
+          '
+          echo '=== RUNNER ==='
+          printf 'x11vnc='; command -v x11vnc || true
+          printf 'websockify='; command -v websockify || true
+          test -d /usr/share/novnc && echo novnc_dir=/usr/share/novnc || echo novnc_dir=UNAVAILABLE
 
-      - name: Inspect Xvnc log tail
+      - name: Inspect safe package paths only
         shell: bash
         run: |
           set -Eeuo pipefail
           docker exec "$TARGET_CONTAINER" sh -lc '
-            f=$(ls -1t /home/kasm-user/.vnc/*.log 2>/dev/null | head -1)
-            test -n "$f"
-            echo LOG_FILE=$f
-            echo === RELEVANT ===
-            tail -n 500 "$f" | grep -Ei "connection|rfb|websocket|security|disconnect|client|protocol|auth|accepted|rejected|closed|error|read|write" | tail -n 250 || true
-            echo === RAW_TAIL ===
-            tail -n 120 "$f"
+            find /usr /opt /dockerstartup -maxdepth 4 -type f \( -name x11vnc -o -name websockify -o -name vnc.html \) 2>/dev/null | sort | head -100
           '

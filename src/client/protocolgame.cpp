@@ -49,7 +49,15 @@ void ProtocolGame::onConnect()
 
     m_localPlayer = g_game.getLocalPlayer();
 
-    if (g_game.getFeature(Otc::GameProtocolChecksum))
+    const bool currentTibiaGlobalLoginTransport =
+        g_game.getClientVersion() == 1532 &&
+        g_game.getProtocolVersion() == 1532 &&
+        g_game.getFeature(Otc::GameChallengeOnLogin) &&
+        g_game.getFeature(Otc::GameSequencedPackets);
+
+    if (currentTibiaGlobalLoginTransport)
+        enabledSequencedPackets();
+    else if (g_game.getFeature(Otc::GameProtocolChecksum))
         enableChecksum();
 
     if (!g_game.getFeature(Otc::GameChallengeOnLogin))

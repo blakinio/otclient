@@ -7,16 +7,29 @@
 
 int main()
 {
-    std::array<uint8_t, 16> xteaKey{};
-    for (uint8_t i = 0; i < xteaKey.size(); ++i)
-        xteaKey[i] = i;
+    const std::array<uint32_t, 4> xteaWords{
+        0x03020100u,
+        0x07060504u,
+        0x0b0a0908u,
+        0x0f0e0d0cu,
+    };
+    const std::array<uint8_t, 16> xteaKey{
+        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+        0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+    };
+
+    const auto converted = otclient::tibia_global_login::xteaKeyBytes(xteaWords);
+    if (converted != xteaKey) {
+        std::cerr << "CURRENT_TIBIA_LOGIN_XTEA_KEY_BYTES=FAIL\n";
+        return 1;
+    }
 
     const auto actual = otclient::tibia_global_login::encodeLogin(
         0x12345678u,
         0x5au,
         "S",
         "C",
-        xteaKey);
+        converted);
 
     const std::vector<uint8_t> expected{
         0x08, 0x0a, 0xc2, 0x3e, 0x2a,
@@ -28,6 +41,7 @@ int main()
     };
 
     if (actual == expected) {
+        std::cout << "CURRENT_TIBIA_LOGIN_XTEA_KEY_BYTES=PASS\n";
         std::cout << "CURRENT_TIBIA_LOGIN_WIRE_CONTRACT=PASS\n";
         return 0;
     }

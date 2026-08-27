@@ -121,7 +121,6 @@ void OutputMessage::encryptRsa()
         g_game.getFeature(Otc::GameClientVersion) &&
         g_game.getFeature(Otc::GamePreviewState) &&
         g_game.getFeature(Otc::GameSessionKey) &&
-        g_game.getFeature(Otc::GameChallengeOnLogin) &&
         g_game.getFeature(Otc::GameSequencedPackets);
 
     if (currentTibiaGlobalLogin) {
@@ -132,7 +131,8 @@ void OutputMessage::encryptRsa()
         const auto typed = otclient::tibia_global_login::transcodeLegacy1532(
             std::span<const uint8_t>(
                 reinterpret_cast<const uint8_t*>(legacyView.data()),
-                legacyView.size()));
+                legacyView.size()),
+            g_game.getFeature(Otc::GameChallengeOnLogin));
         if (typed.empty())
             throw stdext::exception("current Tibia Global login transcode failed");
 

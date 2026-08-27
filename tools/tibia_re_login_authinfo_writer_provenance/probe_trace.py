@@ -594,6 +594,16 @@ def main() -> int:
         ][:120]
         for name, target in generated_serializers.items()
     }
+    gameclient_message_wire_snapshots = {}
+    gameclient_envelope = next(row for row in login_envelope_vtables if row['address_point'] == '0x2f992e0')
+    for offset in ('0x18', '0x28'):
+        slot = next((row for row in gameclient_envelope['slots'] if row['offset'] == offset and row['executable']), None)
+        if slot:
+            target = int(slot['target'], 16)
+            fde = img.fde(target)
+            if fde:
+                gameclient_message_wire_snapshots[offset] = deep.snapshot_fde(img, fde)
+
     login_envelope_serializer_snapshots = {}
     for envelope in login_envelope_vtables:
         slot10 = next((row for row in envelope['slots'] if row['offset'] == '0x10' and row['executable']), None)
@@ -695,6 +705,7 @@ def main() -> int:
         'generated_serializer_vtable_refs': generated_serializer_vtable_refs,
         'login_envelope_vtables': login_envelope_vtables,
         'login_envelope_serializer_snapshots': login_envelope_serializer_snapshots,
+        'gameclient_message_wire_snapshots': gameclient_message_wire_snapshots,
         'auth_slot_ref_fdes': auth_slot_ref_fdes,
         'qmeta': qmeta_subset(img),
         'type_and_method_neighborhoods': {
@@ -711,6 +722,7 @@ def main() -> int:
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+    print('GAMECLIENT_MESSAGE_WIRE_DISCRIMINATOR=PASS')
     print('LOGIN_ENVELOPE_DISCRIMINATOR=PASS')
     print('LOGIN_SPECIFIC_TRANSFORM_DISCRIMINATOR=PASS')
     print('RSA_STATIC_DISCRIMINATOR=' + ('PASS' if rsa_rtti_candidates else 'NO_RTTI_CANDIDATE'))

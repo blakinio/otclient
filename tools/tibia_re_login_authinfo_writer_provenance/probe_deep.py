@@ -33,12 +33,14 @@ def safe_ascii(img: core.Image, va: int) -> str | None:
     return core.safe_cstr(img, va, 240)
 
 
-def scan_executable(img: core.Image, auth_targets: dict[str, int], auth_ap: int, handler_ap: int, extra_vtables: dict[str, int] | None = None) -> dict:
+def scan_executable(img: core.Image, auth_targets: dict[str, int], auth_ap: int, handler_ap: int, extra_vtables: dict[str, int] | None = None, extra_literal_targets: dict[str, set[int]] | None = None) -> dict:
     target_to_slot = {target: slot for slot, target in auth_targets.items()}
     slot_rip_refs: dict[str, list[int]] = {slot: [] for slot in auth_targets}
     vtable_refs = {'auth': [], 'handler': []}
     extra_vtables = extra_vtables or {}
     extra_vtable_refs = {name: [] for name in extra_vtables}
+    extra_literal_targets = extra_literal_targets or {}
+    extra_literal_refs = {name: [] for name in extra_literal_targets}
     direct_calls: list[tuple[int, int]] = []
     rip_exec_refs: dict[int, list[int]] = collections.defaultdict(list)
 
@@ -63,12 +65,16 @@ def scan_executable(img: core.Image, auth_targets: dict[str, int], auth_ap: int,
                 for name, ap in extra_vtables.items():
                     if target == ap:
                         extra_vtable_refs[name].append(ins.address)
+                for name, targets in extra_literal_targets.items():
+                    if target in targets:
+                        extra_literal_refs[name].append(ins.address)
                 if img.executable(target):
                     rip_exec_refs[target].append(ins.address)
     return {
         'slot_rip_refs': slot_rip_refs,
         'vtable_refs': vtable_refs,
         'extra_vtable_refs': extra_vtable_refs,
+        'extra_literal_refs': extra_literal_refs,
         'direct_calls': direct_calls,
         'rip_exec_refs': rip_exec_refs,
     }

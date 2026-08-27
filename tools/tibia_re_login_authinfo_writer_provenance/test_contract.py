@@ -50,4 +50,14 @@ for required in (
 ):
     assert required in src, required
 
+for required in (
+    'sessionkey_literal_refs',
+    'character_parser_literal_refs',
+    'exact_qmeta_classes',
+    'onConnectClientToGameserver',
+    'loginSuccessful',
+    'requestCharacterLogin',
+):
+    assert required in src, required
+
 print('CURRENT_GAME_LOGIN_AUTHINFO_WRITER_CONTRACT=PASS')

@@ -106,6 +106,81 @@ def valid_qmeta_records(img: core.Image, method: str) -> list[dict]:
     return rows
 
 
+def recover_qmeta_jump_table(img: core.Image, static_metacall: int, method_count: int) -> dict:
+    ins = list(img.md.disasm(img.bytes(static_metacall, 0x800), static_metacall))[:320]
+    candidates = []
+    for pos, row in enumerate(ins):
+        if row.mnemonic != 'lea' or len(row.operands) < 2:
+            continue
+        op = row.operands[1]
+        if op.type != X86_OP_MEM or op.mem.base != X86_REG_RIP:
+            continue
+        reg = row.operands[0].reg
+        table = row.address + row.size + int(op.mem.disp)
+        used = any(
+            any(xop.type == X86_OP_MEM and xop.mem.base == reg and xop.mem.scale == 4 for xop in x.operands)
+            for x in ins[pos + 1:pos + 12]
+        )
+        if not used:
+            continue
+        try:
+            targets = [table + img.i32(table + 4 * i) for i in range(method_count)]
+        except Exception:
+            continue
+        if all(img.executable(target) for target in targets):
+            candidates.append((table, targets))
+    uniq = {(table, tuple(targets)) for table, targets in candidates}
+    if len(uniq) != 1:
+        raise RuntimeError(f'QMETA_JUMP_TABLE_AMBIGUOUS:{len(uniq)}')
+    table, targets = next(iter(uniq))
+    return {'table': hx(table), 'targets': [hx(target) for target in targets]}
+
+
+def exact_qmeta_class(img: core.Image, class_name: str, required_methods: tuple[str, ...]) -> dict:
+    candidates = []
+    for sbase in core.stringdata_bases_for_literal(img, class_name):
+        for mbase in range(max(0, sbase - 0x20000) & ~3, sbase + 0x20000, 4):
+            meta = core.parse_meta(img, sbase, mbase)
+            if not meta or meta['class_name'] != class_name:
+                continue
+            names = {row['name'] for row in meta['rows']}
+            if not set(required_methods).issubset(names):
+                continue
+            static = []
+            for where, value in img.rel.items():
+                if value != sbase or img.rel.get(where + 8) != mbase:
+                    continue
+                target = img.rel.get(where + 16)
+                if target is not None and img.executable(target):
+                    static.append({'qmetaobject': hx(where - 8), 'static_metacall': hx(target)})
+            if len(static) != 1:
+                continue
+            jump = recover_qmeta_jump_table(img, int(static[0]['static_metacall'], 16), meta['method_count'])
+            methods = []
+            for row in meta['rows']:
+                if row['name'] not in required_methods:
+                    continue
+                target = int(jump['targets'][row['index']], 16)
+                wrapped = {'stringdata': hx(sbase), 'metadata': hx(mbase), **meta}
+                methods.append({
+                    'name': row['name'], 'index': row['index'], 'argc': row['argc'],
+                    'flags': row['flags'], 'target': hx(target),
+                    'params': decode_qmeta_params(img, wrapped, row),
+                    'target_fde': fde_key(img, target),
+                    'target_edges': calls_in_fde(img, img.fde(target)) if img.fde(target) else [],
+                    'target_context': core.context(img, target, 8, 18),
+                })
+            candidates.append({
+                'class_name': class_name, 'stringdata': hx(sbase), 'metadata': hx(mbase),
+                'method_count': meta['method_count'], 'signal_count': meta['signal_count'],
+                'static': static[0], 'jump_table': jump['table'], 'methods': methods,
+            })
+    uniq = {(row['stringdata'], row['metadata']): row for row in candidates}
+    if len(uniq) != 1:
+        raise RuntimeError(f'QMETA_CLASS_AMBIGUOUS:{class_name}:{len(uniq)}')
+    return next(iter(uniq.values()))
+
+
 def qmeta_subset(img: core.Image) -> dict:
     names = (
         'requestCharacterLogin',
@@ -146,10 +221,33 @@ def main() -> int:
     if not producer_fde:
         raise SystemExit('LOGIN_PRODUCER_FDE_UNKNOWN')
 
+    def exact_cstring_occ(text: str) -> set[int]:
+        out = set()
+        raw_text = text.encode('utf-8')
+        for va in img.occ(text):
+            off = img.va_to_off(va)
+            before_ok = off == 0 or img.raw[off - 1] == 0
+            after = off + len(raw_text)
+            after_ok = after < len(img.raw) and img.raw[after] == 0
+            if before_ok and after_ok:
+                out.add(va)
+        return out
+
+    literal_targets = {
+        'sessionkey': exact_cstring_occ('sessionkey'),
+        'characters': exact_cstring_occ('characters'),
+        'worldid': exact_cstring_occ('worldid'),
+        'ismaincharacter': exact_cstring_occ('ismaincharacter'),
+        'CharName': exact_cstring_occ('CharName'),
+    }
+    if len(literal_targets['sessionkey']) != 1:
+        raise SystemExit(f'SESSIONKEY_LITERAL_AMBIGUOUS={len(literal_targets["sessionkey"])}')
+
     scan = deep.scan_executable(
         img, auth_targets, int(auth['address_point'], 16),
         int(handler['address_point'], 16),
-        extra_vtables={'gameserver_session': int(game_session['address_point'], 16)})
+        extra_vtables={'gameserver_session': int(game_session['address_point'], 16)},
+        extra_literal_targets=literal_targets)
     candidates = deep.candidate_population_fdes(
         img, scan['slot_rip_refs'], producer_fde)
 
@@ -203,6 +301,44 @@ def main() -> int:
         {'site': hx(site), 'fde': fde_key(img, site), 'context': core.context(img, site, 18, 18)}
         for site in scan['extra_vtable_refs']['gameserver_session'][:160]
     ]
+    gameserver_fdes = sorted({img.fde(site) for site in scan['extra_vtable_refs']['gameserver_session'] if img.fde(site)})
+    gameserver_setup_fde = max(gameserver_fdes, key=lambda row: row[1] - row[0]) if gameserver_fdes else None
+    gameserver_setup_snapshot = deep.snapshot_fde(img, gameserver_setup_fde) if gameserver_setup_fde else None
+
+    def literal_ref_rows(name: str) -> list[dict]:
+        return [
+            {'site': hx(site), 'fde': fde_key(img, site), 'context': core.context(img, site, 14, 20)}
+            for site in scan['extra_literal_refs'].get(name, [])[:200]
+        ]
+
+    sessionkey_literal_refs = literal_ref_rows('sessionkey')
+    character_keys = ('characters', 'worldid', 'ismaincharacter')
+    character_ref_fdes = collections.defaultdict(set)
+    for key in character_keys:
+        for site in scan['extra_literal_refs'].get(key, []):
+            fde = img.fde(site)
+            if fde:
+                character_ref_fdes[fde].add(key)
+    character_parser_literal_refs = [
+        {
+            'fde': [hx(v) for v in fde],
+            'matched_keys': sorted(keys),
+            'snapshot': deep.snapshot_fde(img, fde),
+        }
+        for fde, keys in sorted(character_ref_fdes.items())
+        if len(keys) >= 2
+    ]
+
+    exact_qmeta_classes = {
+        'TLoginRequestUploader': exact_qmeta_class(
+            img, 'tibia::authentication::TLoginRequestUploader', ('loginSuccessful',)),
+        'TCharacterSelectionController': exact_qmeta_class(
+            img, 'tibia::gamewindow::TCharacterSelectionController',
+            ('requestCharacterLogin', 'onCharacterSelectionConfirmed')),
+        'TGameClient': exact_qmeta_class(
+            img, 'tibia::client::TGameClient',
+            ('connectClientToGameserverWithExistingCredentials', 'onConnectClientToGameserver')),
+    }
 
     terms = (
         'TPlaySessionData',
@@ -265,7 +401,12 @@ def main() -> int:
             'rtti': game_session['rtti'],
             'address_point': game_session['address_point'],
             'gameserver_session_vtable_refs': gameserver_session_vtable_refs,
+            'setup_snapshot': gameserver_setup_snapshot,
         },
+        'sessionkey_literal_refs': sessionkey_literal_refs,
+        'character_parser_literal_refs': character_parser_literal_refs,
+        'literal_refs': {name: literal_ref_rows(name) for name in literal_targets},
+        'exact_qmeta_classes': exact_qmeta_classes,
         'auth_slot_ref_fdes': auth_slot_ref_fdes,
         'qmeta': qmeta_subset(img),
         'type_and_method_neighborhoods': {

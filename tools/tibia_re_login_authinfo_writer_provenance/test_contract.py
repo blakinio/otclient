@@ -42,4 +42,12 @@ for required in (
 ):
     assert required in src, required
 
+for required in (
+    'gameserver_session_vtable_refs',
+    'auth_slot_ref_fdes',
+    'receivedLoginChallengeMessage',
+    'valid_qmeta_records',
+):
+    assert required in src, required
+
 print('CURRENT_GAME_LOGIN_AUTHINFO_WRITER_CONTRACT=PASS')

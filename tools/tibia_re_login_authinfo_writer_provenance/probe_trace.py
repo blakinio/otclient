@@ -67,6 +67,45 @@ def devirtualized_guard(img: core.Image, fde: tuple[int, int]) -> dict:
             'virtual_slot': hex(slot) if slot is not None else None}
 
 
+def decode_qmeta_params(img: core.Image, meta: dict, row: dict) -> dict:
+    sbase = int(meta['stringdata'], 16)
+    mbase = int(meta['metadata'], 16)
+    argc = int(row['argc'])
+    offset = int(row['param_offset'])
+    raw = [img.u32(mbase + 4 * (offset + i)) for i in range(1 + 2 * argc)]
+    def decode_type(value: int):
+        if value & 0x80000000:
+            idx = value & 0x7fffffff
+            try:
+                return {'raw': hex(value), 'custom_type': core.qstring(img, sbase, idx)}
+            except Exception:
+                return {'raw': hex(value), 'custom_type': None}
+        return {'raw': hex(value), 'builtin_type_id': value}
+    return {
+        'return_type': decode_type(raw[0]) if raw else None,
+        'argument_types': [decode_type(v) for v in raw[1:1 + argc]],
+        'argument_name_indexes': raw[1 + argc:1 + 2 * argc],
+    }
+
+
+def valid_qmeta_records(img: core.Image, method: str) -> list[dict]:
+    rows = []
+    for meta in core.meta_for_method(img, method):
+        if not meta.get('static'):
+            continue
+        selected = [row for row in meta['rows'] if row['name'] == method]
+        for row in selected:
+            rows.append({
+                'class_name': meta['class_name'],
+                'stringdata': meta['stringdata'],
+                'metadata': meta['metadata'],
+                'static': meta['static'],
+                'method': row,
+                'params': decode_qmeta_params(img, meta, row),
+            })
+    return rows
+
+
 def qmeta_subset(img: core.Image) -> dict:
     names = (
         'requestCharacterLogin',
@@ -74,8 +113,9 @@ def qmeta_subset(img: core.Image) -> dict:
         'onStartGameServerLoginStateEntered',
         'connectClientToGameserverWithExistingCredentials',
         'loginSuccessful',
+        'receivedLoginChallengeMessage',
     )
-    return {name: core.meta_for_method(img, name) for name in names}
+    return {name: valid_qmeta_records(img, name) for name in names}
 
 
 def main() -> int:
@@ -93,6 +133,8 @@ def main() -> int:
         'tibia::authentication::TLoginProtocolMessageHandler')
     game_client = core.exact_vtable(
         img, 'TGameClient', 'tibia::client::TGameClient')
+    game_session = core.exact_vtable(
+        img, 'TGameserverGameSession', 'tibia::game::TGameserverGameSession')
     auth_targets = {
         row['offset']: int(row['target'], 16)
         for row in auth['slots'] if row['executable']
@@ -106,7 +148,8 @@ def main() -> int:
 
     scan = deep.scan_executable(
         img, auth_targets, int(auth['address_point'], 16),
-        int(handler['address_point'], 16))
+        int(handler['address_point'], 16),
+        extra_vtables={'gameserver_session': int(game_session['address_point'], 16)})
     candidates = deep.candidate_population_fdes(
         img, scan['slot_rip_refs'], producer_fde)
 
@@ -147,6 +190,19 @@ def main() -> int:
     caller_owners = owner.vtable_owners_for_target(img, caller_fde[0])
     population_snapshot = deep.snapshot_fde(img, population_fde)
     caller_snapshot = deep.snapshot_fde(img, caller_fde)
+
+    auth_slot_ref_fdes = {}
+    for slot, sites in scan['slot_rip_refs'].items():
+        grouped = {}
+        for site in sites:
+            fde = img.fde(site)
+            key = '..'.join(hx(v) for v in fde) if fde else 'UNKNOWN'
+            grouped.setdefault(key, []).append(hx(site))
+        auth_slot_ref_fdes[slot] = grouped
+    gameserver_session_vtable_refs = [
+        {'site': hx(site), 'fde': fde_key(img, site), 'context': core.context(img, site, 18, 18)}
+        for site in scan['extra_vtable_refs']['gameserver_session'][:160]
+    ]
 
     terms = (
         'TPlaySessionData',
@@ -205,6 +261,12 @@ def main() -> int:
             'relocation_owners': owner.reloc_owners_for_fde(
                 img, caller_fde[0], caller_fde[1]),
         },
+        'gameserver_session': {
+            'rtti': game_session['rtti'],
+            'address_point': game_session['address_point'],
+            'gameserver_session_vtable_refs': gameserver_session_vtable_refs,
+        },
+        'auth_slot_ref_fdes': auth_slot_ref_fdes,
         'qmeta': qmeta_subset(img),
         'type_and_method_neighborhoods': {
             term: owner.string_neighborhood(img, term, radius=0x2200)

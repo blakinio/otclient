@@ -136,4 +136,10 @@ for required in (
 ):
     assert required in src, required
 
+for required in (
+    'final_static_literal_resolution',
+    'FINAL_STATIC_LITERAL_RESOLUTION',
+):
+    assert required in src, required
+
 print('CURRENT_GAME_LOGIN_AUTHINFO_WRITER_CONTRACT=PASS')

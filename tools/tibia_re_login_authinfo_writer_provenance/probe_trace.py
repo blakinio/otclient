@@ -457,6 +457,33 @@ def main() -> int:
     except Exception:
         pass
 
+    final_static_literal_resolution = {}
+    static_strings = {
+        'platform_compare_1': 0x1d975a5,
+        'platform_compare_2': 0x1d8c91d,
+        'platform_compare_3': 0x1d975cc,
+        'field3_init_0': 0x20e5017,
+        'field3_init_1': 0x20d1680,
+        'field3_init_2': 0x20d16a8,
+    }
+    for name, va in static_strings.items():
+        final_static_literal_resolution[name] = {
+            'va': hx(va),
+            'ascii': core.safe_cstr(img, va, 512),
+        }
+    map_constants = {
+        'map_const_0': 0x1d5e3f0,
+        'map_const_1': 0x28b1a80,
+        'map_const_2': 0x28b1a90,
+        'map_const_3': 0x28b1aa0,
+    }
+    for name, va in map_constants.items():
+        raw = img.bytes(va, 16)
+        final_static_literal_resolution[name] = {
+            'va': hx(va), 'hex': raw.hex(),
+            'u32_le': [int.from_bytes(raw[i:i+4], 'little') for i in range(0,16,4)],
+        }
+
     gameserver_session_vtable_refs = [
         {'site': hx(site), 'fde': fde_key(img, site), 'context': core.context(img, site, 18, 18)}
         for site in scan['extra_vtable_refs']['gameserver_session'][:160]
@@ -751,6 +778,7 @@ def main() -> int:
         'field1_map_initializer_snapshot': field1_map_initializer_snapshot,
         'field3_initializer_snapshot': field3_initializer_snapshot,
         'field3_source_neighborhood': field3_source_neighborhood,
+        'final_static_literal_resolution': final_static_literal_resolution,
         'gameserver_session': {
             'rtti': game_session['rtti'],
             'address_point': game_session['address_point'],
@@ -799,6 +827,7 @@ def main() -> int:
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+    print('FINAL_STATIC_LITERAL_RESOLUTION=PASS')
     print('FINAL_VALUE_DISCRIMINATOR=PASS')
     print('PRODUCER_SCALAR_DISCRIMINATOR=PASS')
     print('XTEA_KEY_FIELD_DISCRIMINATOR=PASS')

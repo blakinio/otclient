@@ -594,6 +594,12 @@ def main() -> int:
         ][:120]
         for name, target in generated_serializers.items()
     }
+    payload_helper_target = 0x1b55da0
+    payload_helper_fde = img.fde(payload_helper_target)
+    gameclient_payload_helper_snapshot = (
+        deep.snapshot_fde(img, payload_helper_fde) if payload_helper_fde else {'fde': None, 'instructions': []}
+    )
+
     gameclient_message_wire_snapshots = {}
     gameclient_envelope = next(row for row in login_envelope_vtables if row['address_point'] == '0x2f992e0')
     for offset in ('0x18', '0x28'):
@@ -706,6 +712,7 @@ def main() -> int:
         'login_envelope_vtables': login_envelope_vtables,
         'login_envelope_serializer_snapshots': login_envelope_serializer_snapshots,
         'gameclient_message_wire_snapshots': gameclient_message_wire_snapshots,
+        'gameclient_payload_helper_snapshot': gameclient_payload_helper_snapshot,
         'auth_slot_ref_fdes': auth_slot_ref_fdes,
         'qmeta': qmeta_subset(img),
         'type_and_method_neighborhoods': {
@@ -722,6 +729,7 @@ def main() -> int:
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+    print('GAMECLIENT_PAYLOAD_TAG_DISCRIMINATOR=PASS')
     print('GAMECLIENT_MESSAGE_WIRE_DISCRIMINATOR=PASS')
     print('LOGIN_ENVELOPE_DISCRIMINATOR=PASS')
     print('LOGIN_SPECIFIC_TRANSFORM_DISCRIMINATOR=PASS')

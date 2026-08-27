@@ -105,4 +105,10 @@ for required in (
 ):
     assert required in src, required
 
+for required in (
+    'gameclient_payload_helper_snapshot',
+    'GAMECLIENT_PAYLOAD_TAG_DISCRIMINATOR',
+):
+    assert required in src, required
+
 print('CURRENT_GAME_LOGIN_AUTHINFO_WRITER_CONTRACT=PASS')

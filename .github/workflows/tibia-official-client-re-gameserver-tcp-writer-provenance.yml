@@ -1,4 +1,4 @@
-name: Track A current typed character-login signal provenance
+name: Track A current game-login field provenance
 
 on:
   workflow_dispatch:
@@ -22,18 +22,18 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Validate signal probe
+      - name: Validate bounded provenance probe
         shell: bash
         run: |
           set -Eeuo pipefail
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends curl python3-capstone python3-pyelftools
-          python3 -m py_compile tools/tibia_re_login_field_provenance/probe_qmeta.py
-          python3 -m py_compile tools/tibia_re_login_field_provenance/probe_signal.py
-          grep -F "'runtime_access': 'none'" tools/tibia_re_login_field_provenance/probe_signal.py >/dev/null
-          grep -F "'login_performed': False" tools/tibia_re_login_field_provenance/probe_signal.py >/dev/null
-          grep -F "'secret_access': False" tools/tibia_re_login_field_provenance/probe_signal.py >/dev/null
-          grep -F "'raw_client_uploaded': False" tools/tibia_re_login_field_provenance/probe_signal.py >/dev/null
+          python3 -m py_compile tools/tibia_re_login_field_provenance/probe.py
+          python3 tools/tibia_re_login_field_provenance/test_probe.py
+          grep -F "'runtime_access': 'none'" tools/tibia_re_login_field_provenance/probe.py >/dev/null
+          grep -F "'login_performed': False" tools/tibia_re_login_field_provenance/probe.py >/dev/null
+          grep -F "'secret_access': False" tools/tibia_re_login_field_provenance/probe.py >/dev/null
+          grep -F "'raw_client_uploaded': False" tools/tibia_re_login_field_provenance/probe.py >/dev/null
 
       - name: Prepare exact public client package through WARP
         shell: bash
@@ -87,14 +87,12 @@ jobs:
           with open(sys.argv[2],'a',encoding='utf-8') as h:
             for key,value in values.items(): h.write(f'{key}={value}\n')
           print('CURRENT_LOGIN_FIELD_PROVENANCE_EXACT_FENCE=PASS')
-          print('CURRENT_CLIENT_VERSION='+values['PROV_VERSION'])
-          print('CURRENT_CLIENT_UNPACKED_SHA256='+values['PROV_UNPACKED_SHA'])
           PY
           echo "PROV_ROOT=$r" >> "$GITHUB_ENV"
           echo "PROV_BASE=$base" >> "$GITHUB_ENV"
           trap - EXIT
 
-      - name: Materialize transient exact client and trace typed signal
+      - name: Materialize transient exact client and recover bounded provenance
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -112,20 +110,23 @@ jobs:
           if len(raw)!=int(expected_size): raise SystemExit('unpacked size mismatch')
           if hashlib.sha256(raw).hexdigest()!=expected_sha: raise SystemExit('unpacked hash mismatch')
           pathlib.Path(dst).write_bytes(raw)
-          print('CURRENT_LOGIN_FIELD_PROVENANCE_MATERIALIZATION=PASS')
           PY
           mkdir -p artifacts/current-game-login-field-provenance
-          PYTHONPATH=tools/tibia_re_login_field_provenance python3 tools/tibia_re_login_field_provenance/probe_signal.py \
+          python3 tools/tibia_re_login_field_provenance/probe.py \
             --client "$PROV_ROOT/pkg/client" \
-            --output artifacts/current-game-login-field-provenance/signal.json
+            --version "$PROV_VERSION" \
+            --packed-sha256 "$PROV_PACKED_SHA" \
+            --unpacked-sha256 "$PROV_UNPACKED_SHA" \
+            --unpacked-size "$PROV_UNPACKED_SIZE" \
+            --output artifacts/current-game-login-field-provenance/result.json
           rm -f "$PROV_ROOT/pkg/client" "$PROV_ROOT/pkg/client.lzma"
           echo RAW_CLIENT_RETAINED=false
-          echo CURRENT_CHARACTER_LOGIN_SIGNAL_PROVENANCE=PASS
+          echo CURRENT_GAME_LOGIN_FIELD_PROVENANCE=PASS
 
-      - name: Upload sanitized signal provenance only
+      - name: Upload sanitized bounded provenance only
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: current-character-login-signal-${{ github.sha }}
-          path: artifacts/current-game-login-field-provenance/signal.json
+          name: current-game-login-field-provenance-${{ github.sha }}
+          path: artifacts/current-game-login-field-provenance/result.json
           if-no-files-found: error
           retention-days: 3

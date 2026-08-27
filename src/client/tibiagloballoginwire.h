@@ -45,6 +45,18 @@ inline void appendMessageField(std::vector<uint8_t>& out, const uint32_t fieldNu
 }
 } // namespace detail
 
+inline std::array<uint8_t, 16> xteaKeyBytes(const std::array<uint32_t, 4>& words)
+{
+    std::array<uint8_t, 16> bytes{};
+    for (std::size_t wordIndex = 0; wordIndex < words.size(); ++wordIndex) {
+        for (std::size_t byteIndex = 0; byteIndex < sizeof(uint32_t); ++byteIndex) {
+            bytes[wordIndex * sizeof(uint32_t) + byteIndex] =
+                static_cast<uint8_t>((words[wordIndex] >> (byteIndex * 8)) & 0xffu);
+        }
+    }
+    return bytes;
+}
+
 inline std::vector<uint8_t> encodeLogin(
     const uint32_t challengeTimestamp,
     const uint32_t challengeRandom,

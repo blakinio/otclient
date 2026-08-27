@@ -7,7 +7,7 @@ import json
 import re
 from pathlib import Path
 
-from capstone.x86_const import X86_OP_IMM
+from capstone.x86_const import X86_OP_IMM, X86_OP_MEM, X86_REG_RIP
 
 import probe_deep as deep
 import probe_owner as owner
@@ -49,6 +49,24 @@ def argument_slice(img: core.Image, site: int, before: int = 80) -> list[dict]:
     return rows
 
 
+def devirtualized_guard(img: core.Image, fde: tuple[int, int]) -> dict:
+    expected_targets = []
+    virtual_slots = []
+    for ins in img.md.disasm(img.bytes(fde[0], fde[1] - fde[0]), fde[0]):
+        if ins.mnemonic == 'lea' and len(ins.operands) >= 2:
+            op = ins.operands[1]
+            if op.type == X86_OP_MEM and op.mem.base == X86_REG_RIP:
+                expected_targets.append(ins.address + ins.size + int(op.mem.disp))
+        if ins.mnemonic == 'mov' and len(ins.operands) >= 2:
+            op = ins.operands[1]
+            if op.type == X86_OP_MEM and op.mem.disp >= 0x100:
+                virtual_slots.append(int(op.mem.disp))
+    expected = expected_targets[0] if expected_targets else None
+    slot = virtual_slots[0] if virtual_slots else None
+    return {'expected_target': hx(expected) if expected is not None else None,
+            'virtual_slot': hex(slot) if slot is not None else None}
+
+
 def qmeta_subset(img: core.Image) -> dict:
     names = (
         'requestCharacterLogin',
@@ -73,6 +91,8 @@ def main() -> int:
     handler = core.exact_vtable(
         img, 'TLoginProtocolMessageHandler',
         'tibia::authentication::TLoginProtocolMessageHandler')
+    game_client = core.exact_vtable(
+        img, 'TGameClient', 'tibia::client::TGameClient')
     auth_targets = {
         row['offset']: int(row['target'], 16)
         for row in auth['slots'] if row['executable']
@@ -113,6 +133,16 @@ def main() -> int:
     if not caller_fde:
         raise SystemExit('AUTHINFO_POPULATION_CALLER_FDE_UNKNOWN')
 
+    guard = devirtualized_guard(img, caller_fde)
+    guard_target = int(guard['expected_target'], 16) if guard['expected_target'] else None
+    guard_slot = int(guard['virtual_slot'], 16) if guard['virtual_slot'] else None
+    if guard_target is None or guard_slot is None:
+        raise SystemExit('CALLER_DEVIRTUALIZATION_GUARD_UNKNOWN')
+    game_client_ap = int(game_client['address_point'], 16)
+    game_client_slot_target = img.qword(game_client_ap + guard_slot)
+    devirtualized_owner_candidates = owner.vtable_owners_for_target(img, guard_target, max_slot=0x800)
+    caller_object_tgameclient_slot_match = game_client_slot_target == guard_target
+
     caller_parents = sorted(site for site, target in scan['direct_calls'] if target == caller_fde[0])
     caller_owners = owner.vtable_owners_for_target(img, caller_fde[0])
     population_snapshot = deep.snapshot_fde(img, population_fde)
@@ -143,11 +173,27 @@ def main() -> int:
         'population': {
             'derived_candidate_score': list(top_score),
             'fde': [hx(v) for v in population_fde],
+            'auth_slot_sites': top[0]['slot_sites'],
+            'auth_slot_contexts': {
+                slot: [
+                    {'site': site, 'context': core.context(img, int(site, 16), 14, 14)}
+                    for site in sites
+                ]
+                for slot, sites in top[0]['slot_sites'].items()
+            },
             'snapshot': population_snapshot,
             'direct_calls': calls_in_fde(img, population_fde),
         },
         'population_caller': {
             'call_site': hx(caller_site),
+            'devirtualization_guard': guard,
+            'tgameclient': {
+                'rtti': game_client['rtti'],
+                'address_point': game_client['address_point'],
+                'guard_slot_target': hx(game_client_slot_target),
+                'caller_object_tgameclient_slot_match': caller_object_tgameclient_slot_match,
+            },
+            'devirtualized_owner_candidates': devirtualized_owner_candidates,
             'fde': [hx(v) for v in caller_fde],
             'snapshot': caller_snapshot,
             'argument_slice': argument_slice(img, caller_site),
@@ -167,6 +213,7 @@ def main() -> int:
         'classification': {
             'population_function': 'PROVEN_STRUCTURALLY',
             'population_caller': 'PROVEN_STRUCTURALLY',
+            'caller_object_tgameclient_slot_match': caller_object_tgameclient_slot_match,
             'source_semantics': 'DISCOVERY_ONLY',
             'password_session_to_rsa_field_mapping': 'UNKNOWN',
         },

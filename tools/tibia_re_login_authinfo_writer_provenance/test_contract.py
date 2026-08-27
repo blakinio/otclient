@@ -34,4 +34,12 @@ for required in (
 # helpers are imported/reused by probe_trace, not executed as separate full scans.
 assert 'python3 tools/tibia_re_login_authinfo_writer_provenance/probe_deep.py \\' not in wf
 assert 'python3 tools/tibia_re_login_authinfo_writer_provenance/probe_owner.py \\' not in wf
+for required in (
+    'TGameClient',
+    'auth_slot_sites',
+    'devirtualized_owner_candidates',
+    'caller_object_tgameclient_slot_match',
+):
+    assert required in src, required
+
 print('CURRENT_GAME_LOGIN_AUTHINFO_WRITER_CONTRACT=PASS')

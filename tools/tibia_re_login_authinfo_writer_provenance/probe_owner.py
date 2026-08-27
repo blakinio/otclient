@@ -34,12 +34,12 @@ def rtti_name(img: core.Image, rtti: int) -> str | None:
     return core.safe_cstr(img, name_va, 512)
 
 
-def vtable_owners_for_target(img: core.Image, target: int) -> list[dict]:
+def vtable_owners_for_target(img: core.Image, target: int, max_slot: int = 0x300) -> list[dict]:
     rows = []
     for slot_addr, addend in img.rel.items():
         if addend != target:
             continue
-        for off in range(0, 0x300, 8):
+        for off in range(0, max_slot, 8):
             ap = slot_addr - off
             if not img.mapped(ap - 16, 24):
                 continue

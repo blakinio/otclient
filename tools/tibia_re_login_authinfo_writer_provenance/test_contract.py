@@ -92,4 +92,11 @@ for required in (
 ):
     assert required in src, required
 
+for required in (
+    'login_envelope_vtables',
+    'login_envelope_serializer_snapshots',
+    'LOGIN_ENVELOPE_DISCRIMINATOR',
+):
+    assert required in src, required
+
 print('CURRENT_GAME_LOGIN_AUTHINFO_WRITER_CONTRACT=PASS')

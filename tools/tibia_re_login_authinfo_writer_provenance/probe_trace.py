@@ -332,6 +332,22 @@ def main() -> int:
         'gameclient_message_login': 0x2f9ee90,
         'login_rsa_encrypted_block': 0x2f9ee50,
     }
+    login_envelope_aps = (0x2f99320, 0x2f992e0)
+    login_envelope_vtables = []
+    for ap_value in login_envelope_aps:
+        rtti = img.qword(ap_value - 8)
+        name_va = img.qword(rtti + 8) if rtti else 0
+        name = core.safe_cstr(img, name_va, 512) if name_va else None
+        slots = []
+        for off in range(0, 0x90, 8):
+            target = img.qword(ap_value + off)
+            slots.append({
+                'offset': hex(off), 'target': hx(target),
+                'executable': img.executable(target), 'fde': fde_key(img, target),
+            })
+        login_envelope_vtables.append({
+            'address_point': hx(ap_value), 'rtti': hx(rtti), 'rtti_name': name, 'slots': slots,
+        })
     scan = deep.scan_executable(
         img, auth_targets, int(auth['address_point'], 16),
         int(handler['address_point'], 16),
@@ -578,6 +594,15 @@ def main() -> int:
         ][:120]
         for name, target in generated_serializers.items()
     }
+    login_envelope_serializer_snapshots = {}
+    for envelope in login_envelope_vtables:
+        slot10 = next((row for row in envelope['slots'] if row['offset'] == '0x10' and row['executable']), None)
+        if slot10:
+            target = int(slot10['target'], 16)
+            fde = img.fde(target)
+            if fde:
+                login_envelope_serializer_snapshots[envelope['address_point']] = deep.snapshot_fde(img, fde)
+
     generated_serializer_vtable_refs = {
         name: [
             {'site': hx(site), 'fde': fde_key(img, site), 'context': core.context(img, site, 14, 20)}
@@ -668,6 +693,8 @@ def main() -> int:
         'login_adapter_helper_snapshots': login_adapter_helper_snapshots,
         'generated_serializer_callers': generated_serializer_callers,
         'generated_serializer_vtable_refs': generated_serializer_vtable_refs,
+        'login_envelope_vtables': login_envelope_vtables,
+        'login_envelope_serializer_snapshots': login_envelope_serializer_snapshots,
         'auth_slot_ref_fdes': auth_slot_ref_fdes,
         'qmeta': qmeta_subset(img),
         'type_and_method_neighborhoods': {
@@ -684,6 +711,7 @@ def main() -> int:
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+    print('LOGIN_ENVELOPE_DISCRIMINATOR=PASS')
     print('LOGIN_SPECIFIC_TRANSFORM_DISCRIMINATOR=PASS')
     print('RSA_STATIC_DISCRIMINATOR=' + ('PASS' if rsa_rtti_candidates else 'NO_RTTI_CANDIDATE'))
     print('CURRENT_GAME_LOGIN_AUTHINFO_WRITER_TRACE=PASS')

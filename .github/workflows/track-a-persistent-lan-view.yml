@@ -18,6 +18,7 @@ jobs:
     timeout-minutes: 5
     env:
       TARGET_CONTAINER: otclient-track-a-kasmvnc
+      STATIC_CONTAINER: otclient-kasm-static-probe
       EXPECTED_MAIN: 96d1fadac4c25c2d2ceb679cb21722f46f7688b6
     steps:
       - name: Checkout diagnostic branch
@@ -34,37 +35,44 @@ jobs:
           test "$(docker exec "$TARGET_CONTAINER" pgrep -x client | wc -l)" -eq 1
           echo READ_ONLY_RUNTIME_INVENTORY=PASS
 
-      - name: Inspect container launch and published ports
+      - name: Start ephemeral static sidecar
         shell: bash
         run: |
           set -Eeuo pipefail
-          echo '=== CONTAINER_CONFIG ==='
-          docker inspect -f 'Image={{.Config.Image}} Entrypoint={{json .Config.Entrypoint}} Cmd={{json .Config.Cmd}}' "$TARGET_CONTAINER"
-          echo '=== PORTS ==='
-          docker inspect -f '{{json .NetworkSettings.Ports}}' "$TARGET_CONTAINER"
-          echo '=== ENV_NAMES ==='
-          docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$TARGET_CONTAINER" | sed -E 's/=.*$/=<redacted>/' | sort
+          image="$(docker inspect -f '{{.Config.Image}}' "$TARGET_CONTAINER")"
+          docker rm -f "$STATIC_CONTAINER" >/dev/null 2>&1 || true
+          docker run -d --name "$STATIC_CONTAINER" --network host \
+            --entrypoint python3 "$image" -m http.server 16084 --bind 127.0.0.1 \
+            --directory /usr/share/kasmvnc/www >/dev/null
+          for _ in $(seq 1 20); do
+            if docker exec "$STATIC_CONTAINER" python3 -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:16084/', timeout=2).read()"; then
+              echo STATIC_SIDECAR_READY=true
+              exit 0
+            fi
+            sleep 0.25
+          done
+          exit 1
 
-      - name: Inspect Kasm processes listeners and config
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          echo '=== PROCESSES ==='
-          docker exec "$TARGET_CONTAINER" sh -lc 'ps -ef | grep -Ei "kasm|vnc|websock|nginx|client" | grep -v grep || true'
-          echo '=== LISTENERS ==='
-          docker exec "$TARGET_CONTAINER" sh -lc 'ss -ltnp 2>/dev/null || netstat -ltnp 2>/dev/null || cat /proc/net/tcp /proc/net/tcp6'
-          echo '=== KASM_CONFIG_CANDIDATES ==='
-          docker exec "$TARGET_CONTAINER" sh -lc 'find /etc /home/kasm-user -maxdepth 4 -type f \( -iname "*kasm*" -o -iname "*vnc*" -o -name "*.yaml" -o -name "*.yml" \) 2>/dev/null | sort | head -100'
-          echo '=== SAFE_CONFIG_EXCERPTS ==='
-          docker exec "$TARGET_CONTAINER" sh -lc 'for f in /etc/kasmvnc/kasmvnc.yaml /home/kasm-user/.vnc/kasmvnc.yaml /home/kasm-user/.config/kasmvnc/kasmvnc.yaml; do if [ -f "$f" ]; then echo "--- $f"; grep -Ei "^(network|websocket|websocket_port|port|ssl|interface|listen|auth|require_ssl|http|https|path|server:|  (interface|websocket_port|ssl|auth|require_ssl|port|path):)" "$f" 2>/dev/null || true; fi; done'
-
-      - name: Probe local HTTP paths without credentials
+      - name: Stress static sidecar
         shell: bash
         run: |
           set -Eeuo pipefail
           image="$(docker inspect -f '{{.Config.Image}}' otclient-synology-runner)"
-          for path in / /vnc.html /websockify /websockify/ /websocket /ws; do
-            code="$(docker run --rm --network host --entrypoint sh "$image" -lc "curl -sk -o /dev/null -w '%{http_code}' https://127.0.0.1:6901'$path' || true")"
-            echo "HTTP_PATH $path $code"
-          done
-          echo INSPECTION_COMPLETE=true
+          docker run --rm --network host --entrypoint python3 "$image" - <<'PY'
+          import concurrent.futures, urllib.request
+          paths=['/','/main.bundle.js','/assets/webutil-DUkojxeL.js','/assets/webutil-Dix4qgyj.css']
+          def one(p):
+              with urllib.request.urlopen('http://127.0.0.1:16084'+p, timeout=10) as r:
+                  data=r.read(); expected=int(r.headers.get('Content-Length','-1'))
+                  return p,r.status,len(data),expected,len(data)==expected
+          with concurrent.futures.ThreadPoolExecutor(max_workers=16) as ex:
+              results=list(ex.map(one, paths*16))
+          for row in results: print(row)
+          assert all(row[-1] for row in results), results
+          print('STATIC_SIDECAR_64_OF_64=PASS')
+          PY
+
+      - name: Cleanup ephemeral sidecar
+        if: always()
+        shell: bash
+        run: docker rm -f "$STATIC_CONTAINER" >/dev/null 2>&1 || true

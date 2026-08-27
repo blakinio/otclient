@@ -52,7 +52,7 @@ void ProtocolGame::onConnect()
     const bool currentTibiaGlobalLoginTransport =
         g_game.getClientVersion() == 1532 &&
         g_game.getProtocolVersion() == 1532 &&
-        g_game.getFeature(Otc::GameChallengeOnLogin) &&
+        g_game.getFeature(Otc::GameSessionKey) &&
         g_game.getFeature(Otc::GameSequencedPackets);
 
     if (currentTibiaGlobalLoginTransport)

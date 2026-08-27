@@ -129,15 +129,12 @@ jobs:
           with open(sys.argv[2],'w',encoding='utf-8') as f:
               for row in out: f.write('\t'.join(row)+'\n')
           PY
-          chosen_ip=''; chosen_port=''; scheme=''
-          while IFS=$'\t' read -r host_ip host_port _; do
-            [[ -n "$host_port" ]] || continue
-            probe_ip="$host_ip"
-            [[ "$probe_ip" == '0.0.0.0' || "$probe_ip" == '::' ]] && probe_ip='127.0.0.1'
-            code="$(curl --max-time 2 -sS -o /dev/null -w '%{http_code}' "http://$probe_ip:$host_port/" || true)"
-            if [[ "$code" =~ ^(200|301|302|401|403)$ ]]; then chosen_ip="$probe_ip"; chosen_port="$host_port"; scheme='http'; break; fi
-            code="$(curl -k --max-time 2 -sS -o /dev/null -w '%{http_code}' "https://$probe_ip:$host_port/" || true)"
-            if [[ "$code" =~ ^(200|301|302|401|403)$ ]]; then chosen_ip="$probe_ip"; chosen_port="$host_port"; scheme='https'; break; fi
+          chosen_ip='127.0.0.1'; chosen_port=''; scheme='https'
+          while IFS=$'\t' read -r _ host_port container_port; do
+            [[ "$container_port" == '6901/tcp' ]] || continue
+            [[ "$host_port" =~ ^[0-9]+$ ]] || continue
+            chosen_port="$host_port"
+            break
           done < "$RUNNER_TEMP/view-candidates.tsv"
           if [[ -z "$chosen_port" ]]; then
             echo VIEW_ENDPOINT_DISCOVERY=FAIL >&2

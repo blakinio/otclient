@@ -116,7 +116,6 @@ jobs:
           PY
 
       - name: Publish live runner noVNC to Synology LAN
-        id: publish
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -133,29 +132,36 @@ jobs:
           image="$(docker inspect -f '{{.Config.Image}}' "$CONTROL_CONTAINER")"; test -n "$image"
           docker rm -f "$VIEW_CONTAINER" >/dev/null 2>&1 || true
           proxy_b64="$(base64 -w0 <<'PY'
-          import os,select,socket,threading
+          import os,socket,threading
           bind=('0.0.0.0',int(os.environ['BIND_PORT']))
           target=(os.environ['TARGET_HOST'],int(os.environ['TARGET_PORT']))
+          def pump(src,dst):
+              try:
+                  while True:
+                      data=src.recv(65536)
+                      if not data:
+                          try: dst.shutdown(socket.SHUT_WR)
+                          except OSError: pass
+                          return
+                      dst.sendall(data)
+              except OSError:
+                  try: dst.shutdown(socket.SHUT_WR)
+                  except OSError: pass
           def handle(c):
               s=None
               try:
                   s=socket.create_connection(target,timeout=10)
-                  c.setblocking(False); s.setblocking(False)
-                  while True:
-                      r,_,_=select.select([c,s],[],[],30)
-                      if not r: continue
-                      for src in r:
-                          try: data=src.recv(65536)
-                          except BlockingIOError: continue
-                          if not data: return
-                          (s if src is c else c).sendall(data)
+                  s.settimeout(None)
+                  a=threading.Thread(target=pump,args=(c,s),daemon=True)
+                  b=threading.Thread(target=pump,args=(s,c),daemon=True)
+                  a.start(); b.start(); a.join(); b.join()
               finally:
                   for x in (s,c):
                       if x:
                           try: x.close()
-                          except Exception: pass
+                          except OSError: pass
           ls=socket.socket(); ls.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
-          ls.bind(bind); ls.listen(32)
+          ls.bind(bind); ls.listen(64)
           while True:
               c,_=ls.accept(); threading.Thread(target=handle,args=(c,),daemon=True).start()
           PY
@@ -168,15 +174,24 @@ jobs:
           docker inspect -f '{{.State.Running}} {{.HostConfig.RestartPolicy.Name}}' "$VIEW_CONTAINER" | grep -Fx 'true unless-stopped'
           echo HISTORICAL_NOVNC_LAN_PROXY=RUNNING
 
-      - name: Verify host-facing noVNC
+      - name: Stress and verify host-facing noVNC
         shell: bash
         run: |
           set -Eeuo pipefail
           python3 - <<'PY'
-          import base64,os,socket,urllib.request
+          import base64,concurrent.futures,os,socket,urllib.request
           base='http://192.168.1.21:16085'
-          with urllib.request.urlopen(base+'/',timeout=5) as r:
-              body=r.read(); assert r.status==200 and b'location.replace' in body
+          paths=['/','/vnc.html','/app/ui.js','/app/styles/base.css','/core/rfb.js']
+          def one(p):
+              with urllib.request.urlopen(base+p,timeout=10) as r:
+                  data=r.read(); expected=r.headers.get('Content-Length')
+                  ok=r.status==200 and (expected is None or len(data)==int(expected))
+                  return p,r.status,len(data),expected,ok
+          with concurrent.futures.ThreadPoolExecutor(max_workers=16) as ex:
+              rows=list(ex.map(one,paths*16))
+          bad=[r for r in rows if not r[-1]]
+          assert not bad,bad
+          print('HISTORICAL_NOVNC_HOST_STATIC_80_OF_80=PASS')
           key=base64.b64encode(os.urandom(16)).decode()
           req=(
               'GET /websockify HTTP/1.1\r\nHost: 192.168.1.21:16085\r\n'
@@ -184,8 +199,7 @@ jobs:
               f'Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n\r\n'
           ).encode()
           s=socket.create_connection(('192.168.1.21',16085),5); s.sendall(req); data=s.recv(4096); s.close()
-          assert b' 101 ' in data.split(b'\r\n',1)[0], data[:200]
-          print('HISTORICAL_NOVNC_HOST_HTTP=PASS')
+          assert b' 101 ' in data.split(b'\r\n',1)[0],data[:200]
           print('HISTORICAL_NOVNC_HOST_WEBSOCKET=PASS')
           PY
           echo HISTORICAL_NOVNC_URL=http://192.168.1.21:16085/

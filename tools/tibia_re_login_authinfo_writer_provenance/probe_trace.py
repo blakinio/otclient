@@ -328,10 +328,17 @@ def main() -> int:
         raise SystemExit(f'SESSIONKEY_LITERAL_AMBIGUOUS={len(literal_targets["sessionkey"])}')
 
     print('TRACE_PHASE=ELF_SCAN_BEGIN', flush=True)
+    generated_login_vtables = {
+        'gameclient_message_login': 0x2f9ee90,
+        'login_rsa_encrypted_block': 0x2f9ee50,
+    }
     scan = deep.scan_executable(
         img, auth_targets, int(auth['address_point'], 16),
         int(handler['address_point'], 16),
-        extra_vtables={'gameserver_session': int(game_session['address_point'], 16), **rsa_vtables},
+        extra_vtables={
+            'gameserver_session': int(game_session['address_point'], 16),
+            **rsa_vtables, **generated_login_vtables,
+        },
         extra_literal_targets=literal_targets)
     print('TRACE_PHASE=ELF_SCAN_DONE', flush=True)
     candidates = deep.candidate_population_fdes(
@@ -553,6 +560,31 @@ def main() -> int:
         'send_login_adapter': deep.snapshot_fde(img, img.fde(0xbd3050)),
         'client_message_processor': deep.snapshot_fde(img, img.fde(0xc29350)),
     }
+    login_adapter_helpers = (0x1a9d850, 0x1aed7f0, 0x1786380, 0x1a8fb40, 0x17b9d90)
+    login_adapter_helper_snapshots = {
+        hx(target): deep.snapshot_fde(img, img.fde(target))
+        for target in login_adapter_helpers if img.fde(target)
+    }
+    generated_serializers = {
+        'GameclientMessageLogin.InternalSerialize': 0x177a7e0,
+        'LoginRSAEncryptedBlock.InternalSerialize': 0x1770200,
+        'GameclientMessageLogin.ByteSizeLong': 0x17728a0,
+        'LoginRSAEncryptedBlock.ByteSizeLong': 0x1772740,
+    }
+    generated_serializer_callers = {
+        name: [
+            {'site': hx(site), 'fde': fde_key(img, site), 'context': core.context(img, site, 14, 20)}
+            for site, called in scan['direct_calls'] if called == target
+        ][:120]
+        for name, target in generated_serializers.items()
+    }
+    generated_serializer_vtable_refs = {
+        name: [
+            {'site': hx(site), 'fde': fde_key(img, site), 'context': core.context(img, site, 14, 20)}
+            for site in scan['extra_vtable_refs'].get(name, [])[:120]
+        ]
+        for name in generated_login_vtables
+    }
 
     terms = (
         'TPlaySessionData',
@@ -633,6 +665,9 @@ def main() -> int:
         'rsa_vtable_refs': rsa_vtable_refs,
         'rsa_slot_callers': rsa_slot_callers,
         'rsa_chain_snapshots': rsa_chain_snapshots,
+        'login_adapter_helper_snapshots': login_adapter_helper_snapshots,
+        'generated_serializer_callers': generated_serializer_callers,
+        'generated_serializer_vtable_refs': generated_serializer_vtable_refs,
         'auth_slot_ref_fdes': auth_slot_ref_fdes,
         'qmeta': qmeta_subset(img),
         'type_and_method_neighborhoods': {
@@ -649,6 +684,7 @@ def main() -> int:
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+    print('LOGIN_SPECIFIC_TRANSFORM_DISCRIMINATOR=PASS')
     print('RSA_STATIC_DISCRIMINATOR=' + ('PASS' if rsa_rtti_candidates else 'NO_RTTI_CANDIDATE'))
     print('CURRENT_GAME_LOGIN_AUTHINFO_WRITER_TRACE=PASS')
     print('AUTHINFO_POPULATION_FDE=' + '..'.join(hx(v) for v in population_fde))

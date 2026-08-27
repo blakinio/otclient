@@ -84,4 +84,12 @@ for required in (
 ):
     assert required in src, required
 
+for required in (
+    'login_adapter_helper_snapshots',
+    'generated_serializer_callers',
+    'generated_serializer_vtable_refs',
+    'LOGIN_SPECIFIC_TRANSFORM_DISCRIMINATOR',
+):
+    assert required in src, required
+
 print('CURRENT_GAME_LOGIN_AUTHINFO_WRITER_CONTRACT=PASS')

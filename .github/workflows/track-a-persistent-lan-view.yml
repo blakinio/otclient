@@ -18,8 +18,7 @@ jobs:
     timeout-minutes: 5
     env:
       TARGET_CONTAINER: otclient-track-a-kasmvnc
-      STATIC_CONTAINER: otclient-kasm-static-probe
-      EXPECTED_MAIN: 96d1fadac4c25c2d2ceb679cb21722f46f7688b6
+      EXPECTED_MAIN: 462320593ce3efc764af443c23c51ac725e1759a
     steps:
       - name: Checkout diagnostic branch
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
@@ -35,44 +34,22 @@ jobs:
           test "$(docker exec "$TARGET_CONTAINER" pgrep -x client | wc -l)" -eq 1
           echo READ_ONLY_RUNTIME_INVENTORY=PASS
 
-      - name: Start ephemeral static sidecar
+      - name: Inspect current VNC connections
         shell: bash
         run: |
           set -Eeuo pipefail
-          image="$(docker inspect -f '{{.Config.Image}}' "$TARGET_CONTAINER")"
-          docker rm -f "$STATIC_CONTAINER" >/dev/null 2>&1 || true
-          docker run -d --name "$STATIC_CONTAINER" --network host \
-            --entrypoint python3 "$image" -m http.server 16084 --bind 127.0.0.1 \
-            --directory /usr/share/kasmvnc/www >/dev/null
-          for _ in $(seq 1 20); do
-            if docker exec "$STATIC_CONTAINER" python3 -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:16084/', timeout=2).read()"; then
-              echo STATIC_SIDECAR_READY=true
-              exit 0
-            fi
-            sleep 0.25
-          done
-          exit 1
+          docker exec "$TARGET_CONTAINER" sh -lc 'ss -tnp 2>/dev/null | grep -E ":(5901|6901)[[:space:]]" || true'
 
-      - name: Stress static sidecar
+      - name: Inspect Xvnc log tail
         shell: bash
         run: |
           set -Eeuo pipefail
-          image="$(docker inspect -f '{{.Config.Image}}' otclient-synology-runner)"
-          docker run --rm --network host --entrypoint python3 "$image" - <<'PY'
-          import concurrent.futures, urllib.request
-          paths=['/','/main.bundle.js','/assets/webutil-DUkojxeL.js','/assets/webutil-Dix4qgyj.css']
-          def one(p):
-              with urllib.request.urlopen('http://127.0.0.1:16084'+p, timeout=10) as r:
-                  data=r.read(); expected=int(r.headers.get('Content-Length','-1'))
-                  return p,r.status,len(data),expected,len(data)==expected
-          with concurrent.futures.ThreadPoolExecutor(max_workers=16) as ex:
-              results=list(ex.map(one, paths*16))
-          for row in results: print(row)
-          assert all(row[-1] for row in results), results
-          print('STATIC_SIDECAR_64_OF_64=PASS')
-          PY
-
-      - name: Cleanup ephemeral sidecar
-        if: always()
-        shell: bash
-        run: docker rm -f "$STATIC_CONTAINER" >/dev/null 2>&1 || true
+          docker exec "$TARGET_CONTAINER" sh -lc '
+            f=$(ls -1t /home/kasm-user/.vnc/*.log 2>/dev/null | head -1)
+            test -n "$f"
+            echo LOG_FILE=$f
+            echo === RELEVANT ===
+            tail -n 500 "$f" | grep -Ei "connection|rfb|websocket|security|disconnect|client|protocol|auth|accepted|rejected|closed|error|read|write" | tail -n 250 || true
+            echo === RAW_TAIL ===
+            tail -n 120 "$f"
+          '

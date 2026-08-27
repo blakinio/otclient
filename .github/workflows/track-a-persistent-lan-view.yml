@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       authorization:
-        description: Type DEPLOY_HISTORICAL_NOVNC_VIEW
+        description: Type PROBE_X11VNC_TRANSPLANT
         required: true
         type: string
 
@@ -12,25 +12,20 @@ permissions:
   contents: read
 
 jobs:
-  deploy:
-    if: github.actor == 'blakinio' && inputs.authorization == 'DEPLOY_HISTORICAL_NOVNC_VIEW'
+  probe:
+    if: github.actor == 'blakinio' && inputs.authorization == 'PROBE_X11VNC_TRANSPLANT'
     runs-on: [otclient, synology]
     timeout-minutes: 5
     env:
       TARGET_CONTAINER: otclient-track-a-kasmvnc
-      VIEW_CONTAINER: otclient-track-a-legacy-novnc
-      CONTROL_CONTAINER: otclient-synology-runner
       EXPECTED_MAIN: 462320593ce3efc764af443c23c51ac725e1759a
-      VNC_PORT: '5902'
-      NOVNC_PORT: '16085'
     steps:
       - name: Checkout diagnostic branch
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
 
-      - name: Prove current runtime without mutation
-        id: target
+      - name: Prove current runtime
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -38,58 +33,38 @@ jobs:
           docker inspect -f '{{.State.Running}}' "$TARGET_CONTAINER" | grep -Fx true >/dev/null
           test "$(docker exec "$TARGET_CONTAINER" pgrep -x client | wc -l)" -eq 1
           docker exec "$TARGET_CONTAINER" test -S /tmp/.X11-unix/X1
-          docker exec "$TARGET_CONTAINER" test -f /home/kasm-user/.Xauthority
-          host_pid="$(docker inspect -f '{{.State.Pid}}' "$TARGET_CONTAINER")"
-          [[ "$host_pid" =~ ^[0-9]+$ && "$host_pid" -gt 1 ]]
-          test -S "/proc/$host_pid/root/tmp/.X11-unix/X1"
-          test -f "/proc/$host_pid/root/home/kasm-user/.Xauthority"
-          echo "host_pid=$host_pid" >> "$GITHUB_OUTPUT"
+          docker exec -u kasm-user -e DISPLAY=:1 "$TARGET_CONTAINER" xdpyinfo >/dev/null
           echo TARGET_RUNTIME=PROVEN
 
-      - name: Deploy historical x11vnc plus noVNC helper
+      - name: Inspect target network and X listener
         shell: bash
-        env:
-          TARGET_HOST_PID: ${{ steps.target.outputs.host_pid }}
         run: |
           set -Eeuo pipefail
-          image="$(docker inspect -f '{{.Config.Image}}' "$CONTROL_CONTAINER")"
-          docker rm -f "$VIEW_CONTAINER" >/dev/null 2>&1 || true
-          docker run -d --name "$VIEW_CONTAINER" --restart unless-stopped --network host --user 0:0 \
-            -v "/proc/$TARGET_HOST_PID/root/tmp/.X11-unix:/tmp/.X11-unix:ro" \
-            -v "/proc/$TARGET_HOST_PID/root/home/kasm-user/.Xauthority:/tmp/target.Xauthority:ro" \
-            -e VNC_PORT="$VNC_PORT" -e NOVNC_PORT="$NOVNC_PORT" \
-            --entrypoint sh "$image" -lc '
-              set -eu
-              x11vnc -display :1 -auth /tmp/target.Xauthority -rfbport "$VNC_PORT" -localhost \
-                -forever -shared -nopw -xkb -repeat -wait 10 -defer 10 -deferupdate 20 \
-                -threads -noxrecord -noxfixes -o /tmp/x11vnc.log >/dev/null 2>&1 &
-              exec websockify --web /usr/share/novnc "$NOVNC_PORT" 127.0.0.1:"$VNC_PORT"
-            ' >/dev/null
-          sleep 2
-          docker inspect -f '{{.State.Running}} {{.HostConfig.RestartPolicy.Name}}' "$VIEW_CONTAINER" | grep -Fx 'true unless-stopped'
-          docker exec "$VIEW_CONTAINER" pgrep -x x11vnc >/dev/null
-          echo HISTORICAL_NOVNC_HELPER=RUNNING
+          echo '=== TARGET_NETWORKS ==='
+          docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{println $k $v.IPAddress}}{{end}}' "$TARGET_CONTAINER"
+          echo '=== TARGET_X_LISTENERS ==='
+          docker exec "$TARGET_CONTAINER" sh -lc 'ss -ltnp 2>/dev/null | grep -E ":(5901|6001)[[:space:]]" || true'
 
-      - name: Verify RFB HTTP and WebSocket
+      - name: Transplant x11vnc binary for compatibility probe
         shell: bash
         run: |
           set -Eeuo pipefail
-          python3 - <<'PY'
-          import base64, os, socket, urllib.request
-          s=socket.create_connection(('127.0.0.1',5902),5)
-          banner=s.recv(12); s.close(); assert banner.startswith(b'RFB '), banner
-          with urllib.request.urlopen('http://127.0.0.1:16085/vnc.html', timeout=5) as r:
-              body=r.read(); assert r.status == 200 and b'noVNC' in body
-          key=base64.b64encode(os.urandom(16)).decode()
-          req=(
-              'GET /websockify HTTP/1.1\r\nHost: 127.0.0.1:16085\r\n'
-              'Upgrade: websocket\r\nConnection: Upgrade\r\n'
-              f'Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n\r\n'
-          ).encode()
-          s=socket.create_connection(('127.0.0.1',16085),5); s.sendall(req); data=s.recv(4096); s.close()
-          assert b' 101 ' in data.split(b'\r\n',1)[0], data[:200]
-          print('HISTORICAL_NOVNC_RFB=PASS')
-          print('HISTORICAL_NOVNC_HTTP=PASS')
-          print('HISTORICAL_NOVNC_WEBSOCKET=PASS')
-          PY
-          echo HISTORICAL_NOVNC_URL="http://192.168.1.21:$NOVNC_PORT/vnc.html?autoconnect=1&resize=scale&quality=5&compression=3&show_dot=true&path=websockify"
+          x11vnc="$(command -v x11vnc)"
+          test -x "$x11vnc"
+          echo '=== RUNNER_LDD ==='
+          ldd "$x11vnc"
+          docker exec "$TARGET_CONTAINER" rm -rf /tmp/oteryn-view-probe
+          docker exec "$TARGET_CONTAINER" mkdir -p /tmp/oteryn-view-probe/lib
+          docker cp "$x11vnc" "$TARGET_CONTAINER:/tmp/oteryn-view-probe/x11vnc"
+          docker exec "$TARGET_CONTAINER" chmod 755 /tmp/oteryn-view-probe/x11vnc
+          echo '=== TARGET_LDD ==='
+          docker exec "$TARGET_CONTAINER" ldd /tmp/oteryn-view-probe/x11vnc || true
+          echo '=== TARGET_MISSING ==='
+          docker exec "$TARGET_CONTAINER" sh -lc "ldd /tmp/oteryn-view-probe/x11vnc 2>&1 | grep 'not found' || true"
+
+      - name: Probe transplanted x11vnc executable only
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          docker exec "$TARGET_CONTAINER" /tmp/oteryn-view-probe/x11vnc -version 2>&1 | head -30
+          echo X11VNC_BINARY_PROBE=PASS

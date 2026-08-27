@@ -56,6 +56,10 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
 
+      - name: Validate ephemeral runner/package contract
+        shell: bash
+        run: python3 tools/tibia-global-login-lab/tests/ephemeral_runner_contract.py
+
       - name: Validate current-login send integration source contract
         shell: bash
         run: python3 tools/tibia-global-login-lab/tests/current_login_send_contract.py

@@ -1,19 +1,18 @@
 name: Track A persistent LAN view
 
 on:
-  workflow_dispatch:
-    inputs:
-      authorization:
-        description: Type PROBE_X11VNC_TRANSPLANT
-        required: true
-        type: string
+  push:
+    branches:
+      - research/OTC-20260827-kasm-endpoint-inventory
+    paths:
+      - .github/workflows/track-a-persistent-lan-view.yml
 
 permissions:
   contents: read
 
 jobs:
   probe:
-    if: github.actor == 'blakinio' && inputs.authorization == 'PROBE_X11VNC_TRANSPLANT'
+    if: github.actor == 'blakinio'
     runs-on: [otclient, synology]
     timeout-minutes: 5
     env:

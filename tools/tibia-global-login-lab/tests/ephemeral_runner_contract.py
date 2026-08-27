@@ -7,6 +7,7 @@ prepare = (root / 'tools/tibia-global-login-lab/scripts/prepare-ephemeral-runtim
 clear_pid = (root / 'tools/tibia-global-login-lab/scripts/clear-stale-wireproxy-pid.sh').read_text(encoding='utf-8')
 stage_package = (root / 'tools/tibia-global-login-lab/scripts/stage-current-package-manifest.sh').read_text(encoding='utf-8')
 refresh = (root / 'tools/tibia-global-login-lab/scripts/refresh-current-assets.sh').read_text(encoding='utf-8')
+world_probe = (root / 'tools/tibia-global-login-lab/scripts/world-entry-probe.sh').read_text(encoding='utf-8')
 wrapper = (root / 'tools/tibia-global-login-lab/scripts/world-entry-probe-1532.sh').read_text(encoding='utf-8')
 
 probe = workflow.index('  probe:')
@@ -65,5 +66,15 @@ assert 'LAB_LOGIN_MINIMAL_ASSETS_READY=true' in wrapper
 assert "-name 'appearances-*.dat'" in wrapper
 assert "-name 'staticdata-*.dat'" in wrapper
 assert 'expected exactly one historical full-asset gate' in wrapper
+
+# Terminal proof is stronger than a callback: after GAME_START, require the
+# client to be online with a local player whose position has numeric x/y/z.
+assert "mark('GAME_START=true')" in world_probe
+assert 'g_game.isOnline()' in world_probe
+assert 'g_game.getLocalPlayer()' in world_probe
+assert 'player:getPosition()' in world_probe
+assert "mark('IN_GAME=true')" in world_probe
+assert "grep -q '\\[TIBIA_GLOBAL_LAB\\] IN_GAME=true'" in world_probe
+assert 'TIBIA_GLOBAL_LAB_IN_GAME_PROVEN=true' in world_probe
 
 print('EPHEMERAL_RUNNER_CONTRACT=PASS')

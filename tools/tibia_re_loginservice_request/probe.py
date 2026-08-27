@@ -27,6 +27,23 @@ ENDPOINT_TERMS = (
     'clientservices/loginservice.php',
 )
 
+# Exact 15.32.75d4a0 QString storage identities independently derived from the
+# first hosted literal/init artifact. They are version-fenced and re-scanned
+# only to follow references into the actual request builder; they are never
+# promoted to another client build.
+STORAGE_TARGETS = {
+    'type': 0x31BA520,
+    'email': 0x31BA700,
+    'password': 0x31BA6E0,
+    'stayloggedin': 0x31BA5E0,
+    'devicecookie': 0x31BA5C0,
+    'clienttype': 0x31BA5A0,
+    'clientversion': 0x31BA580,
+    'assetversion': 0x31BA560,
+    'isreturner': 0x31BA160,
+    'showrewardnews': 0x31BA140,
+}
+
 
 def hx(value):
     return f'0x{value:x}' if value is not None else None
@@ -103,27 +120,28 @@ def parse_instruction_line(line):
     if body.endswith('>:'):
         return None
     parts = body.split(None, 1)
-    if not parts:
+    if not parts or not parts[0] or not parts[0][0].isalpha():
         return None
-    mnemonic = parts[0]
-    if not mnemonic or not mnemonic[0].isalpha():
-        return None
+    address = int(match.group(1), 16)
     return {
-        'address': int(match.group(1), 16),
-        'at': hx(int(match.group(1), 16)),
-        'mnemonic': mnemonic,
+        'address': address,
+        'at': hx(address),
+        'mnemonic': parts[0],
         'operand': parts[1] if len(parts) > 1 else '',
-        'raw': line.strip(),
     }
 
 
-def stream_xrefs(client, target_to_terms, fdes):
-    command = ['objdump', '-d', '-Mintel', '--no-show-raw-insn', str(client)]
-    proc = subprocess.Popen(command, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+def stream_xrefs(client, target_to_terms, term_names, fdes):
+    proc = subprocess.Popen(
+        ['objdump', '-d', '-Mintel', '--no-show-raw-insn', str(client)],
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
     if proc.stdout is None:
         raise SystemExit('OBJDUMP_STDOUT_MISSING')
 
-    refs = {term: [] for term in (*KEYS, *ENDPOINT_TERMS)}
+    refs = {term: [] for term in term_names}
     grouped = {}
     previous = collections.deque(maxlen=8)
     comment_target = re.compile(r'#\s*([0-9a-fA-F]+)\b')
@@ -132,11 +150,10 @@ def stream_xrefs(client, target_to_terms, fdes):
         parsed = parse_instruction_line(line)
         if not parsed:
             continue
-        match = comment_target.search(parsed['operand'])
         matched_terms = set()
+        match = comment_target.search(parsed['operand'])
         if match:
-            target = int(match.group(1), 16)
-            matched_terms.update(target_to_terms.get(target, ()))
+            matched_terms.update(target_to_terms.get(int(match.group(1), 16), ()))
         if matched_terms:
             fde = fde_for(fdes, parsed['address'])
             fde_key = f'{hx(fde[0])}..{hx(fde[1])}' if fde else 'UNKNOWN'
@@ -156,7 +173,7 @@ def stream_xrefs(client, target_to_terms, fdes):
     return refs, grouped
 
 
-def bounded_snapshot(client, start, end, limit=320):
+def bounded_snapshot(client, start, end, limit=420):
     proc = subprocess.run(
         [
             'objdump', '-d', '-Mintel', '--no-show-raw-insn',
@@ -180,6 +197,31 @@ def bounded_snapshot(client, start, end, limit=320):
     ] + rows[-half:]
 
 
+def candidate_rows(grouped, allowed_terms):
+    rows = []
+    allowed = set(allowed_terms)
+    for fde_key, terms in grouped.items():
+        matched = sorted(set(terms) & allowed)
+        rows.append({'fde': fde_key, 'terms': matched, 'term_count': len(matched)})
+    rows.sort(key=lambda item: item['term_count'], reverse=True)
+    return rows
+
+
+def snapshot_candidates(client, candidates, key_name='terms'):
+    snapshots = []
+    for candidate in candidates[:12]:
+        match = re.fullmatch(r'0x([0-9a-f]+)\.\.0x([0-9a-f]+)', candidate['fde'])
+        if not match:
+            continue
+        start, end = int(match.group(1), 16), int(match.group(2), 16)
+        snapshots.append({
+            'fde': candidate['fde'],
+            key_name: candidate.get(key_name, candidate.get('terms', [])),
+            'snapshot': bounded_snapshot(client, start, end),
+        })
+    return snapshots
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--client', required=True)
@@ -192,56 +234,35 @@ def main():
     with client.open('rb') as handle:
         elf = ELFFile(handle)
         sections = [
-            {
-                'offset': int(sec['sh_offset']),
-                'size': int(sec['sh_size']),
-                'addr': int(sec['sh_addr']),
-            }
-            for sec in elf.iter_sections()
-            if int(sec['sh_size']) > 0
+            {'offset': int(sec['sh_offset']), 'size': int(sec['sh_size']), 'addr': int(sec['sh_addr'])}
+            for sec in elf.iter_sections() if int(sec['sh_size']) > 0
         ]
 
     fdes = parse_fdes(client)
     literals = {}
-    target_to_terms = {}
-    for term in (*KEYS, *ENDPOINT_TERMS):
+    literal_target_to_terms = {}
+    literal_terms = (*KEYS, *ENDPOINT_TERMS)
+    for term in literal_terms:
         occurrences = find_literal_occurrences(blob, sections, term)
         literals[term] = [
             {'encoding': item['encoding'], 'file_offset': item['file_offset'], 'va': hx(item['va'])}
             for item in occurrences
         ]
         for item in occurrences:
-            target_to_terms.setdefault(item['va'], set()).add(term)
+            literal_target_to_terms.setdefault(item['va'], set()).add(term)
 
-    refs, grouped = stream_xrefs(client, target_to_terms, fdes)
+    refs, grouped = stream_xrefs(client, literal_target_to_terms, literal_terms, fdes)
+    literal_candidates = candidate_rows(grouped, KEYS)
 
-    candidate_rows = []
-    for fde_key, terms in grouped.items():
-        key_terms = sorted(set(terms) & set(KEYS))
-        endpoint_terms = sorted(set(terms) & set(ENDPOINT_TERMS))
-        candidate_rows.append({
-            'fde': fde_key,
-            'distinct_request_keys': key_terms,
-            'request_key_count': len(key_terms),
-            'endpoint_terms': endpoint_terms,
-        })
-    candidate_rows.sort(key=lambda item: (item['request_key_count'], len(item['endpoint_terms'])), reverse=True)
-
-    snapshots = []
-    for candidate in candidate_rows[:12]:
-        match = re.fullmatch(r'0x([0-9a-f]+)\.\.0x([0-9a-f]+)', candidate['fde'])
-        if not match:
-            continue
-        start, end = int(match.group(1), 16), int(match.group(2), 16)
-        snapshots.append({
-            'fde': candidate['fde'],
-            'distinct_request_keys': candidate['distinct_request_keys'],
-            'endpoint_terms': candidate['endpoint_terms'],
-            'snapshot': bounded_snapshot(client, start, end),
-        })
+    storage_target_to_terms = {}
+    for term, target in STORAGE_TARGETS.items():
+        storage_target_to_terms.setdefault(target, set()).add(term)
+    storage_refs, storage_grouped = stream_xrefs(
+        client, storage_target_to_terms, tuple(STORAGE_TARGETS), fdes)
+    storage_candidates = candidate_rows(storage_grouped, tuple(STORAGE_TARGETS))
 
     result = {
-        'schema': 'otclient.track-a.current-loginservice-request.discovery.v2',
+        'schema': 'otclient.track-a.current-loginservice-request.discovery.v3',
         'exact_client': {
             'version': '15.32.75d4a0',
             'packed_sha256': '075810c54af2d6912000eab062763db29563f5a1f4bf1d984154b2d07fd5729f',
@@ -255,16 +276,23 @@ def main():
         'request_keys': list(KEYS),
         'literal_occurrences': literals,
         'references': refs,
-        'candidate_fdes': candidate_rows[:40],
-        'candidate_snapshots': snapshots,
+        'candidate_fdes': literal_candidates[:40],
+        'candidate_snapshots': snapshot_candidates(client, literal_candidates),
+        'storage_targets_exact_build': {key: hx(value) for key, value in STORAGE_TARGETS.items()},
+        'storage_references': storage_refs,
+        'storage_candidate_fdes': storage_candidates[:40],
+        'storage_candidate_snapshots': snapshot_candidates(client, storage_candidates),
     }
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(result, indent=2, sort_keys=True), encoding='utf-8')
     print('CURRENT_LOGINSERVICE_REQUEST_STATIC_PROBE=PASS')
     print('CURRENT_LOGINSERVICE_REQUEST_KEYS_PRESENT=' + str(sum(bool(literals[key]) for key in KEYS)))
-    if candidate_rows:
-        print('CURRENT_LOGINSERVICE_TOP_FDE=' + candidate_rows[0]['fde'])
-        print('CURRENT_LOGINSERVICE_TOP_KEY_COUNT=' + str(candidate_rows[0]['request_key_count']))
+    if literal_candidates:
+        print('CURRENT_LOGINSERVICE_LITERAL_TOP_FDE=' + literal_candidates[0]['fde'])
+        print('CURRENT_LOGINSERVICE_LITERAL_TOP_KEY_COUNT=' + str(literal_candidates[0]['term_count']))
+    if storage_candidates:
+        print('CURRENT_LOGINSERVICE_STORAGE_TOP_FDE=' + storage_candidates[0]['fde'])
+        print('CURRENT_LOGINSERVICE_STORAGE_TOP_KEY_COUNT=' + str(storage_candidates[0]['term_count']))
 
 
 if __name__ == '__main__':

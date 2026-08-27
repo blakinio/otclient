@@ -128,10 +128,19 @@ def recover_qmeta_jump_table(img: core.Image, static_metacall: int, method_count
         except Exception:
             continue
         if all(img.executable(target) for target in targets):
-            candidates.append((table, targets))
-    uniq = {(table, tuple(targets)) for table, targets in candidates}
+            bounded = False
+            for prev in ins[max(0, pos - 8):pos]:
+                if prev.mnemonic != 'cmp' or len(prev.operands) < 2:
+                    continue
+                left, right = prev.operands[0], prev.operands[1]
+                if left.type != 1 or right.type != X86_OP_IMM:
+                    continue
+                if img.md.reg_name(left.reg) == 'edx' and int(right.imm) == method_count - 1:
+                    bounded = True
+            candidates.append((bounded, table, targets))
+    uniq = {(table, tuple(targets)) for bounded, table, targets in candidates if bounded}
     if len(uniq) != 1:
-        raise RuntimeError(f'QMETA_JUMP_TABLE_AMBIGUOUS:{len(uniq)}')
+        raise RuntimeError(f'QMETA_BOUNDED_JUMP_TABLE_AMBIGUOUS:{len(uniq)}:all={len(candidates)}')
     table, targets = next(iter(uniq))
     return {'table': hx(table), 'targets': [hx(target) for target in targets]}
 

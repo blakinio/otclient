@@ -8,6 +8,7 @@ on:
     paths:
       - '.github/workflows/tibia-global-login-lab.yml'
       - 'tools/tibia-global-login-lab/**'
+      - 'src/client/tibiagloballoginwire.h'
 
 permissions:
   contents: read
@@ -18,6 +19,25 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  wire-contract:
+    name: Current login wire contract
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact branch head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Compile and run focused current-login contract
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          g++ -std=c++20 -Wall -Wextra -Werror -Isrc \
+            tools/tibia-global-login-lab/tests/tibia_global_login_wire_contract.cpp \
+            -o "${RUNNER_TEMP}/tibia-global-login-wire-contract"
+          "${RUNNER_TEMP}/tibia-global-login-wire-contract"
+
   build-linux:
     name: Build exact native Linux OTClient
     # The canonical Track B PR uses the encrypted one-shot producer. Keep the
@@ -39,7 +59,7 @@ jobs:
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c  # v4.2.0
 
       - name: Build exact native Linux rootfs
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a  # v7.3.0
+        uses: docker/build-push-action@53b7df96c91f9d12dcc8a07bcb9ccacbed38856a  # v7.3.0
         with:
           context: .
           file: Dockerfile

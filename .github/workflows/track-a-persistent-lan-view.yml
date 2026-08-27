@@ -18,6 +18,7 @@ jobs:
     env:
       TARGET_CONTAINER: otclient-track-a-kasmvnc
       EXPECTED_MAIN: 462320593ce3efc764af443c23c51ac725e1759a
+      VNC_PORT: '5902'
     steps:
       - name: Checkout diagnostic branch
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
@@ -25,6 +26,7 @@ jobs:
           persist-credentials: false
 
       - name: Prove current runtime
+        id: target
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -33,37 +35,65 @@ jobs:
           test "$(docker exec "$TARGET_CONTAINER" pgrep -x client | wc -l)" -eq 1
           docker exec "$TARGET_CONTAINER" test -S /tmp/.X11-unix/X1
           docker exec -u kasm-user -e DISPLAY=:1 "$TARGET_CONTAINER" xdpyinfo >/dev/null
+          ip="$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$TARGET_CONTAINER")"
+          [[ "$ip" =~ ^172\.[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          echo "ip=$ip" >> "$GITHUB_OUTPUT"
           echo TARGET_RUNTIME=PROVEN
 
-      - name: Inspect target network and X listener
+      - name: Install minimal x11vnc transplant
         shell: bash
         run: |
           set -Eeuo pipefail
-          echo '=== TARGET_NETWORKS ==='
-          docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{println $k $v.IPAddress}}{{end}}' "$TARGET_CONTAINER"
-          echo '=== TARGET_X_LISTENERS ==='
-          docker exec "$TARGET_CONTAINER" sh -lc 'ss -ltnp 2>/dev/null | grep -E ":(5901|6001)[[:space:]]" || true'
-
-      - name: Transplant x11vnc binary for compatibility probe
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          x11vnc="$(command -v x11vnc)"
-          test -x "$x11vnc"
-          echo '=== RUNNER_LDD ==='
-          ldd "$x11vnc"
+          x11vnc="$(command -v x11vnc)"; test -x "$x11vnc"
+          lib="$(ldd "$x11vnc" | awk '$1=="libvncserver.so.1" {print $3}')"
+          lib="$(readlink -f "$lib")"; test -f "$lib"
           docker exec -u 0 "$TARGET_CONTAINER" rm -rf /tmp/oteryn-view-probe
           docker exec -u 0 "$TARGET_CONTAINER" mkdir -p /tmp/oteryn-view-probe/lib
           docker cp "$x11vnc" "$TARGET_CONTAINER:/tmp/oteryn-view-probe/x11vnc"
+          docker cp "$lib" "$TARGET_CONTAINER:/tmp/oteryn-view-probe/lib/libvncserver.so.1"
           docker exec -u 0 "$TARGET_CONTAINER" chmod 755 /tmp/oteryn-view-probe/x11vnc
-          echo '=== TARGET_LDD ==='
-          docker exec -u 0 "$TARGET_CONTAINER" ldd /tmp/oteryn-view-probe/x11vnc || true
-          echo '=== TARGET_MISSING ==='
-          docker exec -u 0 "$TARGET_CONTAINER" sh -lc "ldd /tmp/oteryn-view-probe/x11vnc 2>&1 | grep 'not found' || true"
+          docker exec -u 0 "$TARGET_CONTAINER" chmod 644 /tmp/oteryn-view-probe/lib/libvncserver.so.1
+          missing="$(docker exec -u 0 -e LD_LIBRARY_PATH=/tmp/oteryn-view-probe/lib "$TARGET_CONTAINER" sh -lc "ldd /tmp/oteryn-view-probe/x11vnc 2>&1 | grep 'not found' || true")"
+          test -z "$missing" || { printf '%s\n' "$missing"; exit 1; }
+          docker exec -u kasm-user -e LD_LIBRARY_PATH=/tmp/oteryn-view-probe/lib "$TARGET_CONTAINER" /tmp/oteryn-view-probe/x11vnc -version 2>&1 | head -20
+          echo X11VNC_BINARY_PROBE=PASS
 
-      - name: Probe transplanted x11vnc executable only
+      - name: Start dedicated read-only x11vnc on display one
         shell: bash
         run: |
           set -Eeuo pipefail
-          docker exec -u kasm-user "$TARGET_CONTAINER" /tmp/oteryn-view-probe/x11vnc -version 2>&1 | head -30
-          echo X11VNC_BINARY_PROBE=PASS
+          test -z "$(docker exec "$TARGET_CONTAINER" pgrep -x x11vnc || true)"
+          docker exec "$TARGET_CONTAINER" sh -lc "! ss -ltn 2>/dev/null | grep -q ':$VNC_PORT '"
+          docker exec -d -u kasm-user \
+            -e DISPLAY=:1 -e LD_LIBRARY_PATH=/tmp/oteryn-view-probe/lib \
+            "$TARGET_CONTAINER" /tmp/oteryn-view-probe/x11vnc \
+            -display :1 -auth /home/kasm-user/.Xauthority -rfbport "$VNC_PORT" \
+            -listen 0.0.0.0 -forever -shared -nopw -xkb -repeat \
+            -wait 10 -defer 10 -deferupdate 20 -threads -noxrecord -noxfixes \
+            -o /tmp/oteryn-view-probe/x11vnc.log
+          for _ in $(seq 1 20); do
+            pid="$(docker exec "$TARGET_CONTAINER" pgrep -x x11vnc || true)"
+            if [[ -n "$pid" ]] && docker exec "$TARGET_CONTAINER" sh -lc "ss -ltn 2>/dev/null | grep -q ':$VNC_PORT '"; then
+              echo X11VNC_PID="$pid"
+              exit 0
+            fi
+            sleep .25
+          done
+          docker exec "$TARGET_CONTAINER" cat /tmp/oteryn-view-probe/x11vnc.log || true
+          exit 1
+
+      - name: Verify RFB from runner namespace
+        shell: bash
+        env:
+          TARGET_IP: ${{ steps.target.outputs.ip }}
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          import os,socket
+          ip=os.environ['TARGET_IP']; port=5902
+          s=socket.create_connection((ip,port),5)
+          banner=s.recv(12); s.close()
+          assert banner.startswith(b'RFB '), banner
+          print('HISTORICAL_X11VNC_RFB=PASS')
+          print('TARGET_IP='+ip)
+          PY

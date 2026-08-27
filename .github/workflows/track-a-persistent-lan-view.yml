@@ -1,4 +1,4 @@
-name: Track A native Synology Tibia runtime inventory
+name: Track A Synology host Tibia Kasm inventory
 
 on:
   push:
@@ -21,45 +21,53 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Inventory native Synology processes
+      - name: Inspect actual Synology host namespace read-only
         shell: bash
         run: |
           set -Eeuo pipefail
-          echo '=== HOST ==='
-          hostname
-          uname -a
-          echo '=== PROCESS MATCHES ==='
-          ps -eo pid,ppid,user,lstart,args | grep -Ei '/bin/client|Tibia|Xvnc|kasm|x11vnc|websockify|Xorg|Xvfb' | grep -v grep || true
-          echo '=== NATIVE CLIENT EXES ==='
-          python3 - <<'PY'
+          control=otclient-synology-runner
+          image="$(docker inspect -f '{{.Config.Image}}' "$control")"
+          test -n "$image"
+          docker run --rm --pid=host --network=host --user 0:0 -v /:/host:ro \
+            --entrypoint sh "$image" -lc '
+              set -eu
+              echo "=== HOST PID/NAMESPACE ==="
+              ps -eo pid,ppid,user,lstart,args | grep -Ei "/bin/client|Tibia|Xvnc|kasm|x11vnc|websockify|Xorg|Xvfb" | grep -v grep || true
+              echo "=== CLIENT EXES ==="
+              python3 - <<"PY"
           import hashlib, os, pathlib
           rows=[]
-          for p in pathlib.Path('/proc').iterdir():
+          for p in pathlib.Path("/proc").iterdir():
               if not p.name.isdigit():
                   continue
               try:
-                  exe=os.path.realpath(p/'exe')
-              except OSError:
+                  comm=(p/"comm").read_text(errors="replace").strip()
+                  cmd=(p/"cmdline").read_bytes().replace(b"\0",b" ").decode("utf-8","replace")
+              except Exception:
                   continue
-              if not exe or (os.path.basename(exe) != 'client' and 'Tibia' not in exe):
+              if comm != "client" and "Tibia" not in cmd and "/bin/client" not in cmd:
                   continue
               try:
-                  st=os.stat(exe)
+                  st=os.stat(p/"exe")
                   h=hashlib.sha256()
-                  with open(exe,'rb') as f:
-                      for chunk in iter(lambda:f.read(1024*1024),b''):
+                  with open(p/"exe","rb") as f:
+                      for chunk in iter(lambda:f.read(1024*1024),b""):
                           h.update(chunk)
-                  cmd=(p/'cmdline').read_bytes().replace(b'\0',b' ').decode('utf-8','replace')
-                  rows.append((int(p.name),exe,st.st_size,h.hexdigest(),cmd))
+                  exe=os.readlink(p/"exe")
+                  rows.append((int(p.name),comm,exe,st.st_size,h.hexdigest(),cmd))
               except Exception as exc:
-                  rows.append((int(p.name),exe,'ERR',type(exc).__name__,''))
+                  rows.append((int(p.name),comm,"ERR",0,type(exc).__name__,cmd))
           for row in sorted(rows):
-              print('PID=%s\nEXE=%s\nSIZE=%s\nSHA256=%s\nCMD=%s\n---' % row)
-          print('NATIVE_CLIENT_COUNT='+str(len(rows)))
+              print("PID=%s\nCOMM=%s\nEXE=%s\nSIZE=%s\nSHA256=%s\nCMD=%s\n---" % row)
+          print("HOST_CLIENT_COUNT="+str(len(rows)))
           PY
-          echo '=== X SOCKETS ==='
-          ls -l /tmp/.X11-unix 2>/dev/null || true
-          echo '=== LISTENERS ==='
-          ss -ltnp 2>/dev/null | grep -E ':(590[0-9]|608[0-9]|6901|844[0-9]|1608[0-9])[[:space:]]' || true
-          echo '=== RUNTIME STATE ==='
-          find /work/_otclient_tibia_re_state /home/runner/_work/_otclient_tibia_re_state -maxdepth 3 -type f \( -name '*.json' -o -name '*.pid' \) -print 2>/dev/null | sort | head -200 || true
+              echo "=== HOST X SOCKETS ==="
+              ls -l /host/tmp/.X11-unix 2>/dev/null || true
+              echo "=== HOST LISTENERS ==="
+              ss -ltnp 2>/dev/null | grep -E ":(590[0-9]|608[0-9]|6901|844[0-9]|1608[0-9])[[:space:]]" || true
+              echo "=== HISTORICAL RUNTIME PIDS ==="
+              for f in /host/work/_otclient_tibia_re_state/runtime/*.pid /host/home/runner/_work/_otclient_tibia_re_state/runtime/*.pid; do
+                [ -f "$f" ] || continue
+                printf "%s=" "$f"; cat "$f"; printf "\n"
+              done
+            '

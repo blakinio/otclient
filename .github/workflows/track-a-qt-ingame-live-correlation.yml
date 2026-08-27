@@ -259,7 +259,10 @@ jobs:
           rx_re=re.compile(r'bytes_received:(\d+)'); tx_re=re.compile(r'bytes_acked:(\d+)')
           def net():
               if not ss:return {'source':'unavailable','established':None,'tx_acked':None,'rx':None}
-              cp=subprocess.run([ss,'-tinp'],text=True,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=1)
+              try:
+                  cp=subprocess.run([ss,'-tinp'],text=True,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=1)
+              except (subprocess.TimeoutExpired, OSError):
+                  return {'source':'unavailable','established':None,'tx_acked':None,'rx':None}
               lines=cp.stdout.splitlines(); est=0; tx=0; rx=0
               for i,line in enumerate(lines):
                   if f'pid={pid},' not in line: continue

@@ -52,18 +52,18 @@ jobs:
           test -x "$x11vnc"
           echo '=== RUNNER_LDD ==='
           ldd "$x11vnc"
-          docker exec "$TARGET_CONTAINER" rm -rf /tmp/oteryn-view-probe
-          docker exec "$TARGET_CONTAINER" mkdir -p /tmp/oteryn-view-probe/lib
+          docker exec -u 0 "$TARGET_CONTAINER" rm -rf /tmp/oteryn-view-probe
+          docker exec -u 0 "$TARGET_CONTAINER" mkdir -p /tmp/oteryn-view-probe/lib
           docker cp "$x11vnc" "$TARGET_CONTAINER:/tmp/oteryn-view-probe/x11vnc"
-          docker exec "$TARGET_CONTAINER" chmod 755 /tmp/oteryn-view-probe/x11vnc
+          docker exec -u 0 "$TARGET_CONTAINER" chmod 755 /tmp/oteryn-view-probe/x11vnc
           echo '=== TARGET_LDD ==='
-          docker exec "$TARGET_CONTAINER" ldd /tmp/oteryn-view-probe/x11vnc || true
+          docker exec -u 0 "$TARGET_CONTAINER" ldd /tmp/oteryn-view-probe/x11vnc || true
           echo '=== TARGET_MISSING ==='
-          docker exec "$TARGET_CONTAINER" sh -lc "ldd /tmp/oteryn-view-probe/x11vnc 2>&1 | grep 'not found' || true"
+          docker exec -u 0 "$TARGET_CONTAINER" sh -lc "ldd /tmp/oteryn-view-probe/x11vnc 2>&1 | grep 'not found' || true"
 
       - name: Probe transplanted x11vnc executable only
         shell: bash
         run: |
           set -Eeuo pipefail
-          docker exec "$TARGET_CONTAINER" /tmp/oteryn-view-probe/x11vnc -version 2>&1 | head -30
+          docker exec -u kasm-user "$TARGET_CONTAINER" /tmp/oteryn-view-probe/x11vnc -version 2>&1 | head -30
           echo X11VNC_BINARY_PROBE=PASS

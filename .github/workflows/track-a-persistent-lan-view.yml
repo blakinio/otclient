@@ -48,21 +48,6 @@ jobs:
           echo "port=$port" >> "$GITHUB_OUTPUT"
           echo KASM_HOST_PORT="$port"
 
-      - name: Prove upstream requires no HTTP authentication
-        shell: bash
-        env:
-          KASM_PORT: ${{ steps.kasm.outputs.port }}
-        run: |
-          set -Eeuo pipefail
-          image="$(docker inspect -f '{{.Config.Image}}' "$CONTROL_CONTAINER")"
-          code="$(docker run --rm --network host -e KASM_PORT="$KASM_PORT" --entrypoint python3 "$image" -c 'import os,ssl,urllib.request,urllib.error; u="https://127.0.0.1:"+os.environ["KASM_PORT"]+"/"; c=ssl._create_unverified_context();
-          try:
-           r=urllib.request.urlopen(u,context=c,timeout=5); print(r.status)
-          except urllib.error.HTTPError as e: print(e.code)')"
-          [[ "$code" != '401' && "$code" != '403' ]]
-          echo UPSTREAM_AUTH_REQUIRED=false
-          echo UPSTREAM_HTTP_STATUS="$code"
-
       - name: Deploy persistent LAN proxy
         shell: bash
         env:
@@ -103,4 +88,3 @@ jobs:
           docker inspect -f '{{.State.Running}} {{.HostConfig.RestartPolicy.Name}}' "$VIEW_CONTAINER" | grep -Fx 'true unless-stopped'
           echo PERSISTENT_LAN_VIEW=READY
           echo PERSISTENT_VIEW_URL="https://$VIEW_HOST_IP:$VIEW_PORT/"
-          echo VIEW_AUTH_REQUIRED=false

@@ -21,6 +21,31 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  e2e-scope:
+    name: Exact E2E scope gate
+    runs-on: ubuntu-24.04
+    outputs:
+      run_e2e: ${{ steps.scope.outputs.run_e2e }}
+    steps:
+      - name: Checkout exact branch head for scope gate
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Gate one-shot current typed E2E
+        id: scope
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          marker='tools/tibia-global-login-lab/.run-current-typed-e2e'
+          if [[ -f "$marker" ]]; then
+            run_e2e=true
+          else
+            run_e2e=false
+          fi
+          echo "run_e2e=$run_e2e" >> "$GITHUB_OUTPUT"
+          echo "CURRENT_TYPED_LOGIN_E2E_SCOPE=$run_e2e"
+
   wire-contract:
     name: Current login wire contract
     runs-on: ubuntu-24.04
@@ -46,9 +71,8 @@ jobs:
 
   build-linux:
     name: Build exact native Linux OTClient
-    # The canonical Track B PR uses the encrypted one-shot producer. Keep the
-    # legacy secret-bearing full lab manual-only for that source branch.
-    if: github.event_name != 'pull_request' || github.head_ref != 'feat/OTC-20260813-tibia-global-login-lab'
+    needs: e2e-scope
+    if: github.event_name != 'pull_request' || github.head_ref != 'feat/OTC-20260813-tibia-global-login-lab' || needs.e2e-scope.outputs.run_e2e == 'true'
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout exact branch head
@@ -83,7 +107,7 @@ jobs:
 
   probe:
     name: Tibia Global login/world-entry probe
-    needs: build-linux
+    needs: [e2e-scope, build-linux]
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:

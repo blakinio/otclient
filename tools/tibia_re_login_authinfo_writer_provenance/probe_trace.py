@@ -243,11 +243,13 @@ def main() -> int:
     if len(literal_targets['sessionkey']) != 1:
         raise SystemExit(f'SESSIONKEY_LITERAL_AMBIGUOUS={len(literal_targets["sessionkey"])}')
 
+    print('TRACE_PHASE=ELF_SCAN_BEGIN', flush=True)
     scan = deep.scan_executable(
         img, auth_targets, int(auth['address_point'], 16),
         int(handler['address_point'], 16),
         extra_vtables={'gameserver_session': int(game_session['address_point'], 16)},
         extra_literal_targets=literal_targets)
+    print('TRACE_PHASE=ELF_SCAN_DONE', flush=True)
     candidates = deep.candidate_population_fdes(
         img, scan['slot_rip_refs'], producer_fde)
 
@@ -329,6 +331,7 @@ def main() -> int:
         if len(keys) >= 2
     ]
 
+    print('TRACE_PHASE=QMETA_BEGIN', flush=True)
     exact_qmeta_classes = {
         'TLoginRequestUploader': exact_qmeta_class(
             img, 'tibia::authentication::TLoginRequestUploader', ('loginSuccessful',)),
@@ -340,6 +343,7 @@ def main() -> int:
             ('connectClientToGameserverWithExistingCredentials', 'onConnectClientToGameserver')),
     }
 
+    print('TRACE_PHASE=QMETA_DONE', flush=True)
     terms = (
         'TPlaySessionData',
         'TCharacterLoginData',
@@ -435,4 +439,9 @@ def main() -> int:
 
 
 if __name__ == '__main__':
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except Exception as exc:
+        print('AUTHINFO_TRACE_EXCEPTION_TYPE=' + type(exc).__name__, flush=True)
+        print('AUTHINFO_TRACE_EXCEPTION=' + str(exc).replace('\n', ' ')[:500], flush=True)
+        raise SystemExit(2)

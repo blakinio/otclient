@@ -78,17 +78,21 @@ if not version.startswith('15.32'):
 files = doc.get('files')
 if not isinstance(files, list) or not files:
     raise SystemExit('current package file list missing')
-rows = [row for row in files if isinstance(row, dict) and isinstance(row.get('localfile'), str)]
-localfiles = {row['localfile'] for row in rows}
-if 'assets/catalog-content.json' not in localfiles:
-    raise SystemExit('current package catalog-content entry missing')
-if not any(path.startswith('assets/appearances-') and path.endswith('.dat') for path in localfiles):
-    raise SystemExit('current package appearances entry missing')
-if not any(path.startswith('assets/staticdata-') and path.endswith('.dat') for path in localfiles):
-    raise SystemExit('current package staticdata entry missing')
+rows = [row for row in files if isinstance(row, dict)]
+client_rows = [row for row in rows if row.get('localfile') == 'bin/client']
+if len(client_rows) != 1:
+    raise SystemExit('current package bin/client row missing or ambiguous')
+client = client_rows[0]
+if not isinstance(client.get('url'), str) or not client['url']:
+    raise SystemExit('current package bin/client URL missing')
+for key in ('packedhash', 'unpackedhash'):
+    value = str(client.get(key) or '')
+    if len(value) != 64 or any(ch not in '0123456789abcdefABCDEF' for ch in value):
+        raise SystemExit(f'current package bin/client {key} invalid')
 out.chmod(0o600)
 print('LAB_CURRENT_PACKAGE_VERSION_FAMILY_15_32=true')
 print('LAB_CURRENT_PACKAGE_FILE_COUNT=' + str(len(rows)))
+print('LAB_CURRENT_PACKAGE_CLIENT_ROW=true')
 print('LAB_CURRENT_PACKAGE_MANIFEST_STAGED=true')
 PY
 

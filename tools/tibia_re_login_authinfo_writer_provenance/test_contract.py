@@ -111,4 +111,12 @@ for required in (
 ):
     assert required in src, required
 
+for required in (
+    'xtea_helper_vtable',
+    'xtea_key_setter_snapshot',
+    'authinfo_slot_0x10_snapshot',
+    'XTEA_KEY_FIELD_DISCRIMINATOR',
+):
+    assert required in src, required
+
 print('CURRENT_GAME_LOGIN_AUTHINFO_WRITER_CONTRACT=PASS')

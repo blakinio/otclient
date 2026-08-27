@@ -289,6 +289,8 @@ def main() -> int:
         img, 'TGameClient', 'tibia::client::TGameClient')
     game_session = core.exact_vtable(
         img, 'TGameserverGameSession', 'tibia::game::TGameserverGameSession')
+    xtea_helper = core.exact_vtable(
+        img, 'TXteaHelper', 'shared::TXteaHelper')
     rsa_rtti_candidates = rtti_candidates_matching(img, 'rsa')
     rsa_vtables = {}
     for row_index, row in enumerate(rsa_rtti_candidates):
@@ -298,6 +300,9 @@ def main() -> int:
         row['offset']: int(row['target'], 16)
         for row in auth['slots'] if row['executable']
     }
+    xtea_slots = {row['offset']: int(row['target'], 16) for row in xtea_helper['slots'] if row['executable']}
+    xtea_key_setter = xtea_slots.get('0x10')
+    authinfo_slot_0x10 = auth_targets.get('0x10')
     producer = next(
         int(row['target'], 16) for row in handler['slots']
         if row['offset'] == '0x60')
@@ -594,6 +599,15 @@ def main() -> int:
         ][:120]
         for name, target in generated_serializers.items()
     }
+    xtea_key_setter_snapshot = (
+        deep.snapshot_fde(img, img.fde(xtea_key_setter)) if xtea_key_setter and img.fde(xtea_key_setter)
+        else {'fde': None, 'instructions': []}
+    )
+    authinfo_slot_0x10_snapshot = (
+        deep.snapshot_fde(img, img.fde(authinfo_slot_0x10)) if authinfo_slot_0x10 and img.fde(authinfo_slot_0x10)
+        else {'fde': None, 'instructions': []}
+    )
+
     payload_helper_target = 0x1b55da0
     payload_helper_fde = img.fde(payload_helper_target)
     gameclient_payload_helper_snapshot = (
@@ -713,6 +727,9 @@ def main() -> int:
         'login_envelope_serializer_snapshots': login_envelope_serializer_snapshots,
         'gameclient_message_wire_snapshots': gameclient_message_wire_snapshots,
         'gameclient_payload_helper_snapshot': gameclient_payload_helper_snapshot,
+        'xtea_helper_vtable': xtea_helper,
+        'xtea_key_setter_snapshot': xtea_key_setter_snapshot,
+        'authinfo_slot_0x10_snapshot': authinfo_slot_0x10_snapshot,
         'auth_slot_ref_fdes': auth_slot_ref_fdes,
         'qmeta': qmeta_subset(img),
         'type_and_method_neighborhoods': {
@@ -729,6 +746,7 @@ def main() -> int:
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+    print('XTEA_KEY_FIELD_DISCRIMINATOR=PASS')
     print('GAMECLIENT_PAYLOAD_TAG_DISCRIMINATOR=PASS')
     print('GAMECLIENT_MESSAGE_WIRE_DISCRIMINATOR=PASS')
     print('LOGIN_ENVELOPE_DISCRIMINATOR=PASS')

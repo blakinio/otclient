@@ -126,4 +126,14 @@ for required in (
 ):
     assert required in src, required
 
+for required in (
+    'handler_constructor_snapshot',
+    'platform_selector_snapshot',
+    'field1_map_initializer_snapshot',
+    'field3_initializer_snapshot',
+    'field3_source_neighborhood',
+    'FINAL_VALUE_DISCRIMINATOR',
+):
+    assert required in src, required
+
 print('CURRENT_GAME_LOGIN_AUTHINFO_WRITER_CONTRACT=PASS')

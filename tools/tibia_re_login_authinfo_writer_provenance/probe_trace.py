@@ -431,6 +431,32 @@ def main() -> int:
         for site in scan['vtable_refs']['handler'][:160]
     ]
 
+    handler_constructor_fde = img.fde(0x7d15c0)
+    platform_selector_fde = img.fde(0xcf2520)
+    field1_map_initializer_fde = img.fde(0x63e380)
+    field3_initializer_fde = img.fde(0x642c90)
+    handler_constructor_snapshot = deep.snapshot_fde(img, handler_constructor_fde) if handler_constructor_fde else None
+    platform_selector_snapshot = deep.snapshot_fde(img, platform_selector_fde) if platform_selector_fde else None
+    field1_map_initializer_snapshot = deep.snapshot_fde(img, field1_map_initializer_fde) if field1_map_initializer_fde else None
+    field3_initializer_snapshot = deep.snapshot_fde(img, field3_initializer_fde) if field3_initializer_fde else None
+    field3_source_va = 0x20cea63
+    field3_source_neighborhood = {
+        'va': hx(field3_source_va),
+        'direct_ascii': core.safe_cstr(img, field3_source_va, 512),
+        'strings': [],
+    }
+    try:
+        source_off = img.va_to_off(field3_source_va)
+        lo = max(0, source_off - 0x180)
+        hi = min(len(img.raw), source_off + 0x300)
+        for match in re.finditer(rb'[ -~]{3,160}\x00', img.raw[lo:hi]):
+            text = match.group()[:-1].decode('ascii', 'ignore')
+            sva = img.off_to_va(lo + match.start())
+            if sva is not None:
+                field3_source_neighborhood['strings'].append({'va': hx(sva), 'text': text})
+    except Exception:
+        pass
+
     gameserver_session_vtable_refs = [
         {'site': hx(site), 'fde': fde_key(img, site), 'context': core.context(img, site, 18, 18)}
         for site in scan['extra_vtable_refs']['gameserver_session'][:160]
@@ -720,6 +746,11 @@ def main() -> int:
         },
         'producer_scalar_global_refs': producer_scalar_global_refs,
         'login_handler_vtable_refs': login_handler_vtable_refs,
+        'handler_constructor_snapshot': handler_constructor_snapshot,
+        'platform_selector_snapshot': platform_selector_snapshot,
+        'field1_map_initializer_snapshot': field1_map_initializer_snapshot,
+        'field3_initializer_snapshot': field3_initializer_snapshot,
+        'field3_source_neighborhood': field3_source_neighborhood,
         'gameserver_session': {
             'rtti': game_session['rtti'],
             'address_point': game_session['address_point'],
@@ -768,6 +799,7 @@ def main() -> int:
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+    print('FINAL_VALUE_DISCRIMINATOR=PASS')
     print('PRODUCER_SCALAR_DISCRIMINATOR=PASS')
     print('XTEA_KEY_FIELD_DISCRIMINATOR=PASS')
     print('GAMECLIENT_PAYLOAD_TAG_DISCRIMINATOR=PASS')

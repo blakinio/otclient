@@ -1,0 +1,123 @@
+name: Track A Qt in-game detached correlation research
+
+on:
+  push:
+    branches:
+      - research/OTC-20260827-kasm-endpoint-inventory
+    paths:
+      - .github/workflows/track-a-qt-ingame-detached-correlation-research.yml
+
+permissions:
+  contents: read
+
+jobs:
+  start-logger:
+    if: github.actor == 'blakinio'
+    runs-on: [otclient, synology]
+    timeout-minutes: 5
+    env:
+      CONTAINER: otclient-track-a-kasmvnc
+      DISPLAY_NAME: ':1'
+      EXPECTED_MAIN: 462320593ce3efc764af443c23c51ac725e1759a
+      EXPECTED_SIZE: '52109920'
+      EXPECTED_SHA: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
+      LOGGER_SCRIPT: /tmp/oteryn-qt-ingame-detached-logger.py
+      LOGGER_LOG: /tmp/oteryn-qt-ingame-correlation.jsonl
+      LOGGER_ERR: /tmp/oteryn-qt-ingame-correlation.stderr
+      LOGGER_PIDFILE: /tmp/oteryn-qt-ingame-detached-logger.pid
+      DURATION: '900'
+    steps:
+      - name: Checkout diagnostic branch
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Validate secret-free logger source
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 -m py_compile .github/scripts/track-a-qt-ingame-detached-logger.py
+          ! grep -Eiq 'password|credential[^s_]|packet.payload|payload_data|clipboard' .github/scripts/track-a-qt-ingame-detached-logger.py
+          grep -F 'credentials_retained' .github/scripts/track-a-qt-ingame-detached-logger.py >/dev/null
+          grep -F 'packet_payloads_retained' .github/scripts/track-a-qt-ingame-detached-logger.py >/dev/null
+          echo SECRET_FREE_LOGGER_SOURCE=PASS
+
+      - name: Prove exact trusted runtime target
+        id: target
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$(git ls-remote origin refs/heads/main | awk '{print $1}')" = "$EXPECTED_MAIN"
+          docker inspect -f '{{.State.Running}}' "$CONTAINER" | grep -Fx true >/dev/null
+          mapfile -t pids < <(docker exec "$CONTAINER" pgrep -x client)
+          test "${#pids[@]}" -eq 1
+          pid="${pids[0]}"; [[ "$pid" =~ ^[0-9]+$ ]]
+          test "$(docker exec "$CONTAINER" stat -Lc %s "/proc/$pid/exe")" = "$EXPECTED_SIZE"
+          test "$(docker exec "$CONTAINER" sha256sum "/proc/$pid/exe" | awk '{print $1}')" = "$EXPECTED_SHA"
+          start="$(docker exec -i "$CONTAINER" python3 - "$pid" <<'PY'
+          import pathlib,sys
+          raw=pathlib.Path('/proc/'+sys.argv[1]+'/stat').read_text(encoding='ascii')
+          print(raw[raw.rfind(')')+2:].split()[19])
+          PY
+          )"
+          [[ "$start" =~ ^[0-9]+$ ]]
+          matching=0
+          while IFS= read -r xid; do
+            [[ "$xid" =~ ^[0-9]+$ ]] || continue
+            owner="$(docker exec -u kasm-user -e DISPLAY="$DISPLAY_NAME" "$CONTAINER" xprop -id "$xid" _NET_WM_PID 2>/dev/null | sed -nE 's/.*= *([0-9]+).*/\1/p')"
+            [[ "$owner" == "$pid" ]] && matching=$((matching+1))
+          done < <(docker exec -u kasm-user -e DISPLAY="$DISPLAY_NAME" "$CONTAINER" xdotool search --onlyvisible --name '^Tibia' 2>/dev/null || true)
+          test "$matching" -eq 1
+          echo "pid=$pid" >> "$GITHUB_OUTPUT"
+          echo "start=$start" >> "$GITHUB_OUTPUT"
+          echo TARGET_UNIQUENESS=PROVEN
+          echo TARGET_PID="$pid"
+
+      - name: Install and start detached read-only logger
+        shell: bash
+        env:
+          TARGET_PID: ${{ steps.target.outputs.pid }}
+          TARGET_START: ${{ steps.target.outputs.start }}
+        run: |
+          set -Eeuo pipefail
+          docker cp .github/scripts/track-a-qt-ingame-detached-logger.py "$CONTAINER:$LOGGER_SCRIPT"
+          docker exec -u 0 "$CONTAINER" chown kasm-user:kasm-user "$LOGGER_SCRIPT"
+          docker exec -u 0 "$CONTAINER" chmod 500 "$LOGGER_SCRIPT"
+          docker exec "$CONTAINER" sh -lc '
+            set -eu
+            if [ -f "$1" ]; then
+              old=$(cat "$1" 2>/dev/null || true)
+              if echo "$old" | grep -Eq "^[0-9]+$" && kill -0 "$old" 2>/dev/null; then
+                cmd=$(tr "\0" " " </proc/"$old"/cmdline 2>/dev/null || true)
+                case "$cmd" in *oteryn-qt-ingame-detached-logger.py*) kill "$old" ;; *) echo UNEXPECTED_EXISTING_LOGGER_PID="$old" >&2; exit 1 ;; esac
+                for i in $(seq 1 30); do kill -0 "$old" 2>/dev/null || break; sleep .1; done
+              fi
+            fi
+            rm -f "$1" "$2" "$3"
+          ' sh "$LOGGER_PIDFILE" "$LOGGER_LOG" "$LOGGER_ERR"
+          logger_pid="$(docker exec -u kasm-user "$CONTAINER" sh -lc '
+            nohup python3 "$1" "$2" "$3" "$4" "$5" "$6" "$7" >"$8" 2>&1 </dev/null &
+            echo $!
+          ' sh "$LOGGER_SCRIPT" "$TARGET_PID" "$TARGET_START" "$EXPECTED_SIZE" "$EXPECTED_SHA" "$DURATION" "$LOGGER_LOG" "$LOGGER_ERR")"
+          [[ "$logger_pid" =~ ^[0-9]+$ ]]
+          docker exec -u kasm-user "$CONTAINER" sh -lc 'printf "%s\n" "$1" >"$2"' sh "$logger_pid" "$LOGGER_PIDFILE"
+          echo LOGGER_PID="$logger_pid"
+          for _ in $(seq 1 180); do
+            if docker exec "$CONTAINER" grep -q '"event":"LOGGER_READY"' "$LOGGER_LOG" 2>/dev/null; then
+              break
+            fi
+            if ! docker exec "$CONTAINER" kill -0 "$logger_pid" 2>/dev/null; then
+              echo LOGGER_EXITED_BEFORE_READY=true >&2
+              docker exec "$CONTAINER" cat "$LOGGER_ERR" >&2 || true
+              docker exec "$CONTAINER" cat "$LOGGER_LOG" >&2 || true
+              exit 1
+            fi
+            sleep 1
+          done
+          docker exec "$CONTAINER" grep -q '"event":"LOGGER_READY"' "$LOGGER_LOG"
+          docker exec "$CONTAINER" tail -n 5 "$LOGGER_LOG"
+          echo LOGGER_READY=true
+          echo LOGGER_DURATION_SECONDS="$DURATION"
+          echo CREDENTIAL_ACCESS=false
+          echo PACKET_PAYLOAD_CAPTURE=false
+          echo RAW_WINDOW_TITLES_RETAINED=false

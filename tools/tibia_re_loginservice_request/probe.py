@@ -44,6 +44,30 @@ STORAGE_TARGETS = {
     'showrewardnews': 0x31BA140,
 }
 
+# Every QString storage referenced by the exact current request builder
+# 0xe1e780..0xe1eb21. Names are deliberately not assigned until the bounded
+# static initializer below proves the literal behind each storage.
+BUILDER_STORAGE_ADDRESSES = (
+    0x31BA740,
+    0x31BA720,
+    0x31BA700,
+    0x31BA6E0,
+    0x31BA6C0,
+    0x31BA6A0,
+    0x31BA680,
+    0x31BA660,
+    0x31BA640,
+    0x31BA620,
+    0x31BA600,
+    0x31BA5E0,
+    0x31BA5C0,
+    0x31BA5A0,
+    0x31BA580,
+    0x31BA560,
+)
+INITIALIZER_FDE = (0x6130C0, 0x613B27)
+QSTRING_FROM_UTF8_CTOR = 0x6A7200
+
 
 def hx(value):
     return f'0x{value:x}' if value is not None else None
@@ -93,6 +117,32 @@ def file_offset_to_va(sections, offset):
     return None
 
 
+def va_to_file_offset(sections, address):
+    for section in sections:
+        start = section['addr']
+        end = start + section['size']
+        if start <= address < end:
+            return section['offset'] + (address - start)
+    return None
+
+
+def read_cstring_at_va(blob, sections, address, max_len=160):
+    offset = va_to_file_offset(sections, address)
+    if offset is None or offset >= len(blob):
+        return None
+    end = blob.find(b'\0', offset, min(len(blob), offset + max_len))
+    if end < 0 or end == offset:
+        return None
+    raw = blob[offset:end]
+    try:
+        text = raw.decode('utf-8')
+    except UnicodeDecodeError:
+        return None
+    if any(ord(ch) < 0x20 and ch not in '\t\r\n' for ch in text):
+        return None
+    return text
+
+
 def find_literal_occurrences(blob, sections, literal):
     variants = {
         'ascii': literal.encode('utf-8') + b'\0',
@@ -131,6 +181,88 @@ def parse_instruction_line(line):
     }
 
 
+def objdump_rows(client, start=None, end=None):
+    command = ['objdump', '-d', '-Mintel', '--no-show-raw-insn']
+    if start is not None:
+        command.append(f'--start-address={start}')
+    if end is not None:
+        command.append(f'--stop-address={end}')
+    command.append(str(client))
+    proc = subprocess.run(
+        command,
+        check=True,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    return [
+        parsed for line in proc.stdout.splitlines()
+        if (parsed := parse_instruction_line(line)) is not None
+    ]
+
+
+def comment_target(operand):
+    match = re.search(r'#\s*([0-9a-fA-F]+)\b', operand)
+    return int(match.group(1), 16) if match else None
+
+
+def decode_builder_storage_literals(client, blob, sections):
+    rows = objdump_rows(client, *INITIALIZER_FDE)
+    storage_set = set(BUILDER_STORAGE_ADDRESSES)
+    register_targets = {}
+    decoded = []
+
+    register_name = re.compile(r'^[a-z][a-z0-9]*$')
+    for row in rows:
+        mnemonic = row['mnemonic']
+        operands = [part.strip() for part in row['operand'].split(',', 1)]
+        if mnemonic == 'lea' and len(operands) == 2:
+            dest = operands[0]
+            target = comment_target(row['operand'])
+            if register_name.fullmatch(dest) and target is not None:
+                register_targets[dest] = target
+        elif mnemonic == 'mov' and len(operands) == 2:
+            dest, src = operands
+            if register_name.fullmatch(dest) and register_name.fullmatch(src):
+                if src in register_targets:
+                    register_targets[dest] = register_targets[src]
+                else:
+                    register_targets.pop(dest, None)
+        elif mnemonic == 'call':
+            call_match = re.match(r'^([0-9a-fA-F]+)\b', row['operand'])
+            call_target = int(call_match.group(1), 16) if call_match else None
+            if call_target == QSTRING_FROM_UTF8_CTOR:
+                storage = register_targets.get('rdi')
+                literal_va = register_targets.get('rsi')
+                if storage in storage_set and literal_va is not None:
+                    decoded.append({
+                        'storage': hx(storage),
+                        'literal_va': hx(literal_va),
+                        'literal': read_cstring_at_va(blob, sections, literal_va),
+                        'constructor_site': row['at'],
+                    })
+            # SysV caller-clobbered registers must not leak across a call.
+            for register in ('rax', 'rcx', 'rdx', 'rsi', 'rdi', 'r8', 'r9', 'r10', 'r11'):
+                register_targets.pop(register, None)
+
+    by_storage = {}
+    for item in decoded:
+        by_storage.setdefault(item['storage'], []).append(item)
+    return {
+        'initializer_fde': f'{hx(INITIALIZER_FDE[0])}..{hx(INITIALIZER_FDE[1])}',
+        'requested_storages': [hx(value) for value in BUILDER_STORAGE_ADDRESSES],
+        'decoded': decoded,
+        'unique_by_storage': {
+            storage: rows[0] if len(rows) == 1 else rows
+            for storage, rows in sorted(by_storage.items())
+        },
+        'missing_storages': [
+            hx(value) for value in BUILDER_STORAGE_ADDRESSES
+            if hx(value) not in by_storage
+        ],
+    }
+
+
 def stream_xrefs(client, target_to_terms, term_names, fdes):
     proc = subprocess.Popen(
         ['objdump', '-d', '-Mintel', '--no-show-raw-insn', str(client)],
@@ -144,14 +276,14 @@ def stream_xrefs(client, target_to_terms, term_names, fdes):
     refs = {term: [] for term in term_names}
     grouped = {}
     previous = collections.deque(maxlen=8)
-    comment_target = re.compile(r'#\s*([0-9a-fA-F]+)\b')
+    target_pattern = re.compile(r'#\s*([0-9a-fA-F]+)\b')
 
     for line in proc.stdout:
         parsed = parse_instruction_line(line)
         if not parsed:
             continue
         matched_terms = set()
-        match = comment_target.search(parsed['operand'])
+        match = target_pattern.search(parsed['operand'])
         if match:
             matched_terms.update(target_to_terms.get(int(match.group(1), 16), ()))
         if matched_terms:
@@ -174,27 +306,17 @@ def stream_xrefs(client, target_to_terms, term_names, fdes):
 
 
 def bounded_snapshot(client, start, end, limit=420):
-    proc = subprocess.run(
-        [
-            'objdump', '-d', '-Mintel', '--no-show-raw-insn',
-            f'--start-address={start}', f'--stop-address={end}', str(client),
-        ],
-        check=True,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
-    rows = []
-    for line in proc.stdout.splitlines():
-        parsed = parse_instruction_line(line)
-        if parsed:
-            rows.append({'at': parsed['at'], 'mnemonic': parsed['mnemonic'], 'operand': parsed['operand']})
-    if len(rows) <= limit:
-        return rows
+    rows = objdump_rows(client, start, end)
+    output = [
+        {'at': row['at'], 'mnemonic': row['mnemonic'], 'operand': row['operand']}
+        for row in rows
+    ]
+    if len(output) <= limit:
+        return output
     half = limit // 2
-    return rows[:half] + [
-        {'at': 'TRUNCATED', 'mnemonic': '...', 'operand': f'{len(rows)-2*half} instructions'}
-    ] + rows[-half:]
+    return output[:half] + [
+        {'at': 'TRUNCATED', 'mnemonic': '...', 'operand': f'{len(output)-2*half} instructions'}
+    ] + output[-half:]
 
 
 def candidate_rows(grouped, allowed_terms):
@@ -260,9 +382,10 @@ def main():
     storage_refs, storage_grouped = stream_xrefs(
         client, storage_target_to_terms, tuple(STORAGE_TARGETS), fdes)
     storage_candidates = candidate_rows(storage_grouped, tuple(STORAGE_TARGETS))
+    initializer_literals = decode_builder_storage_literals(client, blob, sections)
 
     result = {
-        'schema': 'otclient.track-a.current-loginservice-request.discovery.v3',
+        'schema': 'otclient.track-a.current-loginservice-request.discovery.v4',
         'exact_client': {
             'version': '15.32.75d4a0',
             'packed_sha256': '075810c54af2d6912000eab062763db29563f5a1f4bf1d984154b2d07fd5729f',
@@ -282,11 +405,14 @@ def main():
         'storage_references': storage_refs,
         'storage_candidate_fdes': storage_candidates[:40],
         'storage_candidate_snapshots': snapshot_candidates(client, storage_candidates),
+        'request_builder_storage_literals': initializer_literals,
     }
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(result, indent=2, sort_keys=True), encoding='utf-8')
     print('CURRENT_LOGINSERVICE_REQUEST_STATIC_PROBE=PASS')
     print('CURRENT_LOGINSERVICE_REQUEST_KEYS_PRESENT=' + str(sum(bool(literals[key]) for key in KEYS)))
+    print('CURRENT_LOGINSERVICE_BUILDER_STORAGE_LITERALS=' + str(len(initializer_literals['decoded'])))
+    print('CURRENT_LOGINSERVICE_BUILDER_STORAGE_MISSING=' + str(len(initializer_literals['missing_storages'])))
     if literal_candidates:
         print('CURRENT_LOGINSERVICE_LITERAL_TOP_FDE=' + literal_candidates[0]['fde'])
         print('CURRENT_LOGINSERVICE_LITERAL_TOP_KEY_COUNT=' + str(literal_candidates[0]['term_count']))

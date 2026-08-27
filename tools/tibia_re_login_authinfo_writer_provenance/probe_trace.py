@@ -246,6 +246,32 @@ def qmeta_subset(img: core.Image) -> dict:
     return {name: valid_qmeta_records(img, name) for name in names}
 
 
+def rtti_candidates_matching(img: core.Image, term: str) -> list[dict]:
+    reverse = collections.defaultdict(list)
+    for where, value in img.rel.items():
+        reverse[value].append(where)
+    rows = []
+    for rtti in sorted(reverse):
+        name_va = img.rel.get(rtti + 8)
+        name = core.safe_cstr(img, name_va, 512) if name_va is not None else None
+        if not name or term.lower() not in name.lower():
+            continue
+        aps = []
+        for type_slot in reverse.get(rtti, []):
+            ap = type_slot + 8
+            if not img.mapped(ap - 16, 24):
+                continue
+            slots = []
+            for off in range(0, 0x180, 8):
+                target = img.qword(ap + off)
+                if img.executable(target):
+                    slots.append({'offset': hex(off), 'target': hx(target), 'fde': fde_key(img, target)})
+            if slots:
+                aps.append({'address_point': hx(ap), 'offset_to_top': hx(img.u64(ap - 16)), 'slots': slots})
+        if aps:
+            rows.append({'rtti': hx(rtti), 'rtti_name': name, 'address_points': aps})
+    return rows
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument('--client', type=Path, required=True)
@@ -263,6 +289,11 @@ def main() -> int:
         img, 'TGameClient', 'tibia::client::TGameClient')
     game_session = core.exact_vtable(
         img, 'TGameserverGameSession', 'tibia::game::TGameserverGameSession')
+    rsa_rtti_candidates = rtti_candidates_matching(img, 'rsa')
+    rsa_vtables = {}
+    for row_index, row in enumerate(rsa_rtti_candidates):
+        for ap_index, ap in enumerate(row['address_points']):
+            rsa_vtables[f'rsa_{row_index}_{ap_index}'] = int(ap['address_point'], 16)
     auth_targets = {
         row['offset']: int(row['target'], 16)
         for row in auth['slots'] if row['executable']
@@ -300,7 +331,7 @@ def main() -> int:
     scan = deep.scan_executable(
         img, auth_targets, int(auth['address_point'], 16),
         int(handler['address_point'], 16),
-        extra_vtables={'gameserver_session': int(game_session['address_point'], 16)},
+        extra_vtables={'gameserver_session': int(game_session['address_point'], 16), **rsa_vtables},
         extra_literal_targets=literal_targets)
     print('TRACE_PHASE=ELF_SCAN_DONE', flush=True)
     candidates = deep.candidate_population_fdes(
@@ -498,6 +529,31 @@ def main() -> int:
         if (fde := img.fde(target_va)) is not None
     }
 
+    rsa_vtable_refs = {
+        name: [
+            {'site': hx(site), 'fde': fde_key(img, site), 'context': core.context(img, site, 14, 20)}
+            for site in scan['extra_vtable_refs'].get(name, [])[:120]
+        ]
+        for name in rsa_vtables
+    }
+    rsa_slot_callers = []
+    for row in rsa_rtti_candidates:
+        for ap in row['address_points']:
+            for slot in ap['slots']:
+                target = int(slot['target'], 16)
+                callers_for_slot = [site for site, called in scan['direct_calls'] if called == target]
+                if callers_for_slot:
+                    rsa_slot_callers.append({
+                        'rtti_name': row['rtti_name'], 'address_point': ap['address_point'],
+                        'slot': slot['offset'], 'target': slot['target'],
+                        'callers': [{'site': hx(site), 'fde': fde_key(img, site),
+                                     'context': core.context(img, site, 12, 18)} for site in callers_for_slot[:80]],
+                    })
+    rsa_chain_snapshots = {
+        'send_login_adapter': deep.snapshot_fde(img, img.fde(0xbd3050)),
+        'client_message_processor': deep.snapshot_fde(img, img.fde(0xc29350)),
+    }
+
     terms = (
         'TPlaySessionData',
         'TCharacterLoginData',
@@ -573,6 +629,10 @@ def main() -> int:
         'semantic_targets': {name: hx(target) for name, target in semantic_targets.items()},
         'semantic_edge_callers': semantic_edge_callers,
         'targeted_semantic_snapshots': targeted_semantic_snapshots,
+        'rsa_rtti_candidates': rsa_rtti_candidates,
+        'rsa_vtable_refs': rsa_vtable_refs,
+        'rsa_slot_callers': rsa_slot_callers,
+        'rsa_chain_snapshots': rsa_chain_snapshots,
         'auth_slot_ref_fdes': auth_slot_ref_fdes,
         'qmeta': qmeta_subset(img),
         'type_and_method_neighborhoods': {
@@ -589,6 +649,7 @@ def main() -> int:
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+    print('RSA_STATIC_DISCRIMINATOR=' + ('PASS' if rsa_rtti_candidates else 'NO_RTTI_CANDIDATE'))
     print('CURRENT_GAME_LOGIN_AUTHINFO_WRITER_TRACE=PASS')
     print('AUTHINFO_POPULATION_FDE=' + '..'.join(hx(v) for v in population_fde))
     print('AUTHINFO_POPULATION_CALLER=' + hx(caller_site))

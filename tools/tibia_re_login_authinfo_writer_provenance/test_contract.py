@@ -76,4 +76,12 @@ for required in (
 ):
     assert required in src, required
 
+for required in (
+    'rsa_rtti_candidates',
+    'rsa_slot_callers',
+    'rsa_vtable_refs',
+    'RSA_STATIC_DISCRIMINATOR',
+):
+    assert required in src, required
+
 print('CURRENT_GAME_LOGIN_AUTHINFO_WRITER_CONTRACT=PASS')

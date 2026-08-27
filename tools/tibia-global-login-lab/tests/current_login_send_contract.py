@@ -14,18 +14,21 @@ assert 'void ProtocolGame::sendApplyWheelPoints(' in senders
 # generic transport layer, without changing the legacy builder for other modes.
 assert '#include "client/tibiagloballoginwire.h"' in output
 assert 'transcodeLegacy1532' in output
+assert 'g_game.getFeature(Otc::GameChallengeOnLogin)' in output
 assert 'CURRENT_TIBIA_GLOBAL_LOGIN_TRANSCODE' in output
 assert 'g_crypt.rsaEncrypt' in output
 
-# Exact current 15.32 is challenge-driven and uses sequence framing from the
-# connection start, so the first server challenge and first typed login share
-# the same framing mode. Legacy modes keep their checksum behavior.
+# Durable Track B evidence disproved server-first challenge behavior for the
+# selected endpoint. Exact 15.32 retained-session mode therefore starts sequence
+# framing at connect and remains client-first when GameChallengeOnLogin is off.
 assert 'currentTibiaGlobalLoginTransport' in protocol_game
 assert 'g_game.getClientVersion() == 1532' in protocol_game
 assert 'g_game.getProtocolVersion() == 1532' in protocol_game
-assert 'g_game.getFeature(Otc::GameChallengeOnLogin)' in protocol_game
+assert 'g_game.getFeature(Otc::GameSessionKey)' in protocol_game
 assert 'g_game.getFeature(Otc::GameSequencedPackets)' in protocol_game
 assert 'enabledSequencedPackets();' in protocol_game
 assert 'else if (g_game.getFeature(Otc::GameProtocolChecksum))' in protocol_game
+assert 'if (!g_game.getFeature(Otc::GameChallengeOnLogin))' in protocol_game
+assert 'sendLoginPacket(0, 0);' in protocol_game
 
 print('CURRENT_TIBIA_LOGIN_SEND_INTEGRATION_CONTRACT=PASS')

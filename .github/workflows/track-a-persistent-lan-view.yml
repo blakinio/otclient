@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       authorization:
-        description: Type ENABLE_PERSISTENT_LAN_VIEW
+        description: Type INSPECT_KASM_ENDPOINTS
         required: true
         type: string
 
@@ -12,79 +12,60 @@ permissions:
   contents: read
 
 jobs:
-  deploy:
-    if: github.actor == 'blakinio' && inputs.authorization == 'ENABLE_PERSISTENT_LAN_VIEW'
+  inspect:
+    if: github.actor == 'blakinio' && inputs.authorization == 'INSPECT_KASM_ENDPOINTS'
     runs-on: [otclient, synology]
     timeout-minutes: 5
     env:
       TARGET_CONTAINER: otclient-track-a-kasmvnc
-      CONTROL_CONTAINER: otclient-synology-runner
-      VIEW_CONTAINER: otclient-track-a-lan-view
-      VIEW_HOST_IP: 192.168.1.21
-      VIEW_PORT: '16083'
     steps:
-      - name: Checkout exact trusted main
+      - name: Checkout diagnostic branch
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
-          ref: main
 
-      - name: Prove trusted source and existing client
+      - name: Prove branch is based on current trusted main
         shell: bash
         run: |
           set -Eeuo pipefail
-          test "$(git rev-parse HEAD)" = "$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          main="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          git fetch --no-tags --depth=1 origin "$main"
+          test "$(git rev-parse HEAD^)" = "$main"
           docker inspect -f '{{.State.Running}}' "$TARGET_CONTAINER" | grep -Fx true >/dev/null
           test "$(docker exec "$TARGET_CONTAINER" pgrep -x client | wc -l)" -eq 1
-          echo TARGET_RUNTIME=PROVEN
+          echo READ_ONLY_RUNTIME_INVENTORY=PASS
 
-      - name: Discover Kasm host-loopback endpoint
-        id: kasm
+      - name: Inspect container launch and published ports
         shell: bash
         run: |
           set -Eeuo pipefail
-          port="$(docker inspect -f '{{(index (index .NetworkSettings.Ports "6901/tcp") 0).HostPort}}' "$TARGET_CONTAINER")"
-          [[ "$port" =~ ^[0-9]+$ ]]
-          echo "port=$port" >> "$GITHUB_OUTPUT"
-          echo KASM_HOST_PORT="$port"
+          echo '=== CONTAINER_CONFIG ==='
+          docker inspect -f 'Image={{.Config.Image}} Entrypoint={{json .Config.Entrypoint}} Cmd={{json .Config.Cmd}}' "$TARGET_CONTAINER"
+          echo '=== PORTS ==='
+          docker inspect -f '{{json .NetworkSettings.Ports}}' "$TARGET_CONTAINER"
+          echo '=== ENV_NAMES ==='
+          docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$TARGET_CONTAINER" | sed -E 's/=.*$/=<redacted>/' | sort
 
-      - name: Deploy persistent LAN proxy
+      - name: Inspect Kasm processes listeners and config
         shell: bash
-        env:
-          KASM_PORT: ${{ steps.kasm.outputs.port }}
         run: |
           set -Eeuo pipefail
-          docker rm -f "$VIEW_CONTAINER" >/dev/null 2>&1 || true
-          proxy_b64="$(base64 -w0 <<'PY'
-          import os,select,socket,threading
-          bind=('0.0.0.0',int(os.environ['BIND_PORT']))
-          target=('127.0.0.1',int(os.environ['TARGET_PORT']))
-          def handle(c):
-              s=socket.create_connection(target,timeout=10); c.setblocking(False); s.setblocking(False)
-              try:
-                  while True:
-                      r,_,_=select.select([c,s],[],[],30)
-                      if not r: continue
-                      for src in r:
-                          try: data=src.recv(65536)
-                          except BlockingIOError: continue
-                          if not data: return
-                          (s if src is c else c).sendall(data)
-              finally:
-                  try: s.close()
-                  except Exception: pass
-                  try: c.close()
-                  except Exception: pass
-          ls=socket.socket(); ls.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1); ls.bind(bind); ls.listen(32)
-          while True:
-              c,_=ls.accept(); threading.Thread(target=handle,args=(c,),daemon=True).start()
-          PY
-          )"
-          image="$(docker inspect -f '{{.Config.Image}}' "$CONTROL_CONTAINER")"
-          docker run -d --name "$VIEW_CONTAINER" --restart unless-stopped --network host \
-            -e SCRIPT_B64="$proxy_b64" -e BIND_PORT="$VIEW_PORT" -e TARGET_PORT="$KASM_PORT" \
-            --entrypoint sh "$image" -c 'echo "$SCRIPT_B64" | base64 -d >/tmp/proxy.py; exec python3 /tmp/proxy.py' >/dev/null
-          sleep 1
-          docker inspect -f '{{.State.Running}} {{.HostConfig.RestartPolicy.Name}}' "$VIEW_CONTAINER" | grep -Fx 'true unless-stopped'
-          echo PERSISTENT_LAN_VIEW=READY
-          echo PERSISTENT_VIEW_URL="https://$VIEW_HOST_IP:$VIEW_PORT/"
+          echo '=== PROCESSES ==='
+          docker exec "$TARGET_CONTAINER" sh -lc 'ps -ef | grep -Ei "kasm|vnc|websock|nginx|client" | grep -v grep || true'
+          echo '=== LISTENERS ==='
+          docker exec "$TARGET_CONTAINER" sh -lc 'ss -ltnp 2>/dev/null || netstat -ltnp 2>/dev/null || cat /proc/net/tcp /proc/net/tcp6'
+          echo '=== KASM_CONFIG_CANDIDATES ==='
+          docker exec "$TARGET_CONTAINER" sh -lc 'find /etc /home/kasm-user -maxdepth 4 -type f \( -iname "*kasm*" -o -iname "*vnc*" -o -name "*.yaml" -o -name "*.yml" \) 2>/dev/null | sort | head -100'
+          echo '=== SAFE_CONFIG_EXCERPTS ==='
+          docker exec "$TARGET_CONTAINER" sh -lc 'for f in /etc/kasmvnc/kasmvnc.yaml /home/kasm-user/.vnc/kasmvnc.yaml /home/kasm-user/.config/kasmvnc/kasmvnc.yaml; do if [ -f "$f" ]; then echo "--- $f"; grep -Ei "^(network|websocket|websocket_port|port|ssl|interface|listen|auth|require_ssl|http|https|path|server:|  (interface|websocket_port|ssl|auth|require_ssl|port|path):)" "$f" 2>/dev/null || true; fi; done'
+
+      - name: Probe local HTTP paths without credentials
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          image="$(docker inspect -f '{{.Config.Image}}' otclient-synology-runner)"
+          for path in / /vnc.html /websockify /websockify/ /websocket /ws; do
+            code="$(docker run --rm --network host --entrypoint sh "$image" -lc "curl -sk -o /dev/null -w '%{http_code}' https://127.0.0.1:6901'$path' || true")"
+            echo "HTTP_PATH $path $code"
+          done
+          echo INSPECTION_COMPLETE=true

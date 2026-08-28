@@ -124,9 +124,9 @@ lease_generation: <current validated controller generation>
 boot_id_sha256: <current boot identity hash>
 pid: <current pid>
 process_start_ticks: <current /proc starttime>
-client_version: 15.32
-client_size: 52109920
-client_sha256: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
+client_version: 15.32.75d4a0
+client_size: 52105824
+client_sha256: d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a
 display: <current proven canonical X11 display>
 window_identity: <current official-client window evidence>
 remote_view_endpoint: <endpoint or null>
@@ -163,9 +163,9 @@ This ADR does not itself authorize any live bootstrap, rebind or recovery execut
 The accepted Track A official-client fence is exactly:
 
 ```yaml
-version: 15.32
-size: 52109920
-sha256: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
+version: 15.32.75d4a0
+size: 52105824
+sha256: d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a
 platform: official_native_linux_only
 ```
 
@@ -230,6 +230,6 @@ Track B never shares Track A's canonical live runtime, authority namespace, regi
 
 ## 2026-08-19 current-client fence provenance boundary
 
-The current public native-Linux package is fenced by size `52109920` and SHA-256 `ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8`; `15.32` is an embedded version-family token, not a claim of a more specific suffix. The superseded `15.32.df7b29 / 51965216 / e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe` binary remains admissible only as explicitly historical build-fenced evidence. Historical addresses, offsets, QMeta/vptr assumptions, serializers, helper binaries and runtime-bridge profiles are **not** promoted to the current binary by this identity update.
+The current public native-Linux package is fenced exactly as `15.32.75d4a0 / 52105824 / d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a`. The superseded `15.32.df7b29 / 51965216 / e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe` binary remains admissible only as explicitly historical build-fenced evidence. Historical addresses, offsets, QMeta/vptr assumptions, serializers, helper binaries and runtime-bridge profiles are **not** promoted to the current binary by this identity update.
 
 This fence change grants no login, credential, GUI input, gameplay, process-control, transaction or mutation authority. All ordinary ownership/admission/lease/Gate A/rebind/recovery/Gate B/bootstrap requirements remain unchanged.

@@ -21,9 +21,9 @@ REG = STATE / 'runtime-registration.json'
 GUARD_PATH = Path(__file__).with_name('tibia-official-client-re-canonical-live-guard.py')
 INPUT_LOCK_PATH = Path(__file__).with_name('tibia-official-client-re-input-lock.py')
 RID = 'track-a-canonical-live'
-VER = '15.32'
-SIZE = 52109920
-SHA = 'ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8'
+VER = '15.32.75d4a0'
+SIZE = 52105824
+SHA = 'd1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a'
 STATES = {'LOGIN', 'CHARACTER_SELECT', 'IN_GAME', 'DISCONNECTED', 'UNKNOWN'}
 FIELDS = {
     'schema_version', 'runtime_id', 'registration_generation', 'lease_generation',

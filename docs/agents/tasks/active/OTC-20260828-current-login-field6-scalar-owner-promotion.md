@@ -9,6 +9,7 @@ track_id: official-client-re
 task_kind: integration
 phase: validate
 branch: docs/OTC-20260828-current-login-field6-scalar-owner-promotion
+related_pr: 752
 base_branch: main
 base_main: 7a7a7cc4d09dee08ea07f8c91144d8ac869111b7
 created: 2026-08-28T15:25:00+02:00
@@ -69,4 +70,4 @@ Promote only independently revalidated exact-current facts from source Draft PR 
 7. Require exact-head CI, Track A governance, fresh artifact audit and zero review blockers before merge.
 8. After merge, close source #751 unmerged as consumed and archive promotion lifecycle before opening the runtime successor.
 
-next_action: open the clean promotion PR, bind its number, require exact-head CI/governance and independent artifact audit, merge, close #751 unmerged as consumed, archive this promotion, then start the governed read-only runtime scalar-observation successor.
+next_action: require PR #752 exact-head CI/governance and independent artifact audit, merge, close #751 unmerged as consumed, archive this promotion, then start the governed read-only runtime scalar-observation successor.

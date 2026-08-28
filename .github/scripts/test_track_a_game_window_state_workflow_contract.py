@@ -26,9 +26,13 @@ required = (
     "grep -Fqx 'gate_a: NOT_APPLICABLE' \"$task\"",
     "grep -Fqx 'generation_rebind: NOT_APPLICABLE' \"$task\"",
     "grep -Fqx 'gate_b: NOT_APPLICABLE' \"$task\"",
-    "grep -Fqx 'target_uniqueness: PROVEN' \"$task\"",
+    "grep -Fqx 'target_uniqueness: UNKNOWN' \"$task\"",
     'READ_ONLY_CANONICAL_GATES=NOT_APPLICABLE',
-    'TARGET_UNIQUENESS_REQUIRED=PROVEN',
+    'TRACK_A_RUNTIME_ACCESS=read_only',
+    'TRACK_A_RUNTIME_OWNER_TASK=$TASK_ID',
+    'TRACK_A_RUNTIME_NAMESPACE=track-a-game-window-state-validation',
+    'TRACK_A_TARGET_UNIQUENESS=PROVEN',
+    'TRACK_A_MUTATION_AUTHORIZED=false',
     'python3 .github/scripts/test_track_a_canonical_current_client_fence.py',
     'EXPECTED_SIZE: 52105824',
     'EXPECTED_SHA: d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a',
@@ -53,7 +57,7 @@ for needle in (
     'gate_a: NOT_APPLICABLE',
     'generation_rebind: NOT_APPLICABLE',
     'gate_b: NOT_APPLICABLE',
-    'target_uniqueness: PROVEN',
+    'target_uniqueness: UNKNOWN',
     'mutation_authorized: false',
 ):
     assert needle in task_text, f'TASK_READ_ONLY_ADMISSION_MISSING:{needle}'
@@ -62,6 +66,7 @@ for forbidden in (
     'GATE_A_REQUIRED=PASS',
     'GENERATION_REBIND_REQUIRED=PASS_OR_NOT_REQUIRED',
     'GATE_B_REQUIRED=PASS',
+    "grep -Fqx 'target_uniqueness: PROVEN' \"$task\"",
     'xdotool', 'xprop', 'xwininfo', 'wmctrl', 'screenshot',
     'TIBIA_TEST_EMAIL', 'TIBIA_TEST_PASSWORD', 'docker cp', '/proc/$pid/environ',
 ):

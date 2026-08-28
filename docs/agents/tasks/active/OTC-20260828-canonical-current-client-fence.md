@@ -7,7 +7,7 @@ project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: infrastructure
-phase: tdd_red
+phase: verification
 branch: fix/OTC-20260828-canonical-current-client-fence
 base_branch: main
 base_main: 785d888e8392e32c8ba852d6db7c8de03db9d8be
@@ -79,17 +79,26 @@ This task is repository-only. It must not bootstrap, execute, authenticate, obse
 
 # Root-cause boundary
 
-The stale fence is not isolated to one launcher. Trusted `main` binds the superseded cut in the canonical session worker, canonical transition/Gate-B controller, Kasm existing-runtime adoption probe, mandatory Track A runtime-admission contract, normative Track A/ADR/bootstrap governance, canonical-live governance audit, and deterministic Track A agent governance audit. Updating only a subset would create a split-brain canonical identity contract and is forbidden.
+The stale fence was not isolated to one launcher. Trusted `main` bound the superseded cut in the canonical session worker, canonical transition/Gate-B controller, Kasm existing-runtime adoption probe, mandatory Track A runtime-admission contract, normative Track A/ADR/bootstrap governance, canonical-live governance audit, and deterministic Track A agent governance audit. Updating only a subset would create a split-brain canonical identity contract and is forbidden.
+
+# TDD / verification evidence
+
+- Mandatory runtime-admission RED: head `fc1b944ea6ce92da7f8fbe9164047458592f5ecb`, run `33182303064`, job `98886326388`, failure `runtime admission contract: current build version missing`.
+- Component repair proof: run `33182582810`, job `98887274050`, focused fence/session/transition/adoption validation and `git diff --check` PASS before its non-workflow repair commit was pushed.
+- Stale exact-version provenance RED: head `93eb752ebebd143156b50adc78f3fc4a6f47475f`, run `33183051046`, job `98888001935`, failure `runtime admission contract: stale version-family provenance remains`.
+- Independent deterministic Track A governance RED: run `33183051039`, job `98888893067`, proving its own old `ed5469...` current-fence constants also had to be updated.
+- Exact-current governance constants are now synchronized to `15.32.75d4a0 / 52105824 / d1a168...` and all temporary write-capable workflow jobs have been removed.
+- Read-only verification head `e04043e306c933697757a47d6208b84f2757ebaf`: focused canonical current-client fence run `33183712961` SUCCESS; Track A agent runtime governance run `33183712944` SUCCESS; canonical live governance run `33183712982` SUCCESS. CI was still running when this task checkpoint was written, so no terminal merge claim is made here.
 
 # Acceptance
 
-1. Hosted RED proves current trusted main still binds the canonical worker/governance contract to the superseded client; the focused contract explicitly falsifies mandatory runtime admission, and the Track A governance job independently falsifies its stale exact-fence constants.
-2. Update worker, transition controller, adoption probe, runtime-admission contract, deterministic Track A governance test, canonical-live governance fence and normative current-client references as one coherent exact-client contract; do not preserve competing current fences.
-3. Historical evidence may retain historical client hashes only when explicitly historical.
-4. Existing canonical session/transition/lease/adoption tests remain GREEN.
+1. Hosted RED proves trusted main bound stale current authority and independently falsifies all discovered split-brain consumers.
+2. Worker, transition controller, adoption probe, runtime-admission contract, deterministic Track A governance test, canonical-live governance fence and normative current-client references use one exact current identity.
+3. Historical evidence may retain historical hashes only when explicitly historical.
+4. Existing canonical session/transition/adoption tests remain GREEN.
 5. Fresh exact-current promotion evidence on trusted main is provenance; no client download/execution is required for this repository repair.
 6. Exact-head CI, Track A agent governance, canonical-live governance and focused fence workflow must pass.
 7. Fresh post-implementation exact-scope audit must find zero material issues before merge.
 8. No runtime, credentials, login, process memory, packet access, GUI input or process control from this PR.
 
-next_action: update the deterministic Track A governance exact-fence constants from the independently promoted current client, then remove all temporary write-capable workflow machinery and perform final exact-head verification.
+next_action: obtain a fresh all-green exact-head run after this verification checkpoint, review exact changed scope and unresolved threads, re-check protected main immediately before merge, then squash-merge only if every gate remains PASS.

@@ -29,3 +29,4 @@ jobs:
         run: |
           set -Eeuo pipefail
           python3 .github/scripts/test_track_a_game_window_state_qualification.py
+          python3 .github/scripts/test_track_a_game_window_state_workflow_contract.py

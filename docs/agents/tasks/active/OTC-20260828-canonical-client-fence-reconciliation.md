@@ -1,33 +1,33 @@
 ---
 task_id: OTC-20260828-canonical-client-fence-reconciliation
-status: implementing_current_identity_reconciliation
+status: live_admission_pending_current_identity_reconciliation
 agent: ChatGPT
 session_role: implementer
 project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: infrastructure
-phase: implementation_repair
-branch: fix/OTC-20260828-current-identity-reconciliation
+phase: live_admission
+branch: docs/OTC-20260828-current-identity-reconciliation-readmit
 base_branch: main
-base_main: 20185ccc95962322f8ea46c1661cc17538897ac6
+base_main: d013efbc3a2df0becca59488a5bb6f4f89cc7bd4
 created: 2026-08-28T22:00:00+02:00
 risk: high
-execution_class: github_hosted
-execution_mode: chat_github
-runtime_access: none
-runtime_owner_task: NOT_APPLICABLE
-runtime_namespace: NOT_APPLICABLE
-canonical_registration: NOT_APPLICABLE
-canonical_lease_generation: NOT_APPLICABLE
-registration_lease_generation: NOT_APPLICABLE
-gate_a: NOT_APPLICABLE
+execution_class: self_hosted
+execution_mode: github_actions_metadata_reconciliation
+runtime_access: canonical_recovery
+runtime_owner_task: OTC-20260828-canonical-client-fence-reconciliation
+runtime_namespace: canonical-live-runtime
+canonical_registration: PRESENT
+canonical_lease_generation: UNKNOWN
+registration_lease_generation: UNKNOWN
+gate_a: REQUIRED_NOT_PROVEN
 generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
-target_uniqueness: NOT_APPLICABLE
+target_uniqueness: UNKNOWN
 mutation_authorized: false
-recovery_mode: NOT_APPLICABLE
+recovery_mode: client_fence_reconciliation_v1
 client_fence_reconciliation_contract: TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_V1
 credentials_allowed: false
 login_allowed: false
@@ -71,9 +71,9 @@ blocks:
 
 # Objective
 
-Close the temporary canonical client-fence recovery authority after a successful trusted-main, metadata-only reconciliation, leaving the canonical registration exact-current and fail-closed before the downstream gameWindowState preflight is retried.
+Admit exactly one fresh trusted-main metadata-only canonical reconciliation that refreshes the stale exact-current container/PID/start identity proven by gameWindowState preflight run `33204467524` without changing the exact client fence or semantic state.
 
-This closeout checkpoint returns repository authority to `runtime_access: none`. It performs no live action and intentionally leaves no reusable `canonical_recovery` admission behind.
+This checkpoint grants only temporary `canonical_recovery` metadata authority. It grants no client mutation, process-memory observation, GUI/input, login, credential, character-selection, gameplay, process-control, payload-capture or semantic-promotion authority. Live execution still requires a new exact owner trigger after this admission is GREEN and merged to protected `main`.
 
 # Terminal live reconciliation
 
@@ -118,30 +118,35 @@ The prior failed run `33200286357 / 98947751420` remains historical fail-closed 
 
 The live workflow twice verified that `main` remained exactly `763806fecc7a0cc1b56fe785dfcadb62ad2dfb9a` before reconciliation authority was exercised. After the workflow completed, unrelated field6 PRs #769 and #771 advanced protected main to `32146659213cba71910cbe8d46aa4c2f6ded607c`. Those later changes do not touch canonical registration/reconciliation owned paths and do not invalidate the already completed guarded live transaction.
 
-# Release boundary
+# Fresh current-identity recovery admission
 
-This PR itself is repository-only and changes the task back to:
+The fresh gameWindowState preflight recorded by PR #774 proved the canonical registration fence and ownership were valid, and then proved exactly one exact-fenced official-client target existed but did not match the registered container/PID/start identity (`REGISTERED_TARGET_NOT_CURRENT_UNIQUE_CANDIDATE`). PR #776 merged the TDD repair that routes an exact-current registration through the same cancellation-safe guarded reconciliation transaction.
+
+This admission is intentionally pre-runtime and bounded:
 
 ```yaml
-runtime_access: none
-runtime_owner_task: NOT_APPLICABLE
-runtime_namespace: NOT_APPLICABLE
-canonical_registration: NOT_APPLICABLE
-canonical_lease_generation: NOT_APPLICABLE
-registration_lease_generation: NOT_APPLICABLE
-gate_a: NOT_APPLICABLE
+runtime_access: canonical_recovery
+runtime_owner_task: OTC-20260828-canonical-client-fence-reconciliation
+runtime_namespace: canonical-live-runtime
+canonical_registration: PRESENT
+canonical_lease_generation: UNKNOWN
+registration_lease_generation: UNKNOWN
+gate_a: REQUIRED_NOT_PROVEN
 generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
-target_uniqueness: NOT_APPLICABLE
+target_uniqueness: UNKNOWN
 mutation_authorized: false
-recovery_mode: NOT_APPLICABLE
+recovery_mode: client_fence_reconciliation_v1
+client_fence_reconciliation_contract: TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_V1
 ```
 
-No live reconciliation trigger is authorized by this implementation checkpoint. A separate repository admission is required after this repair is merged and exact-head verified.
+The UNKNOWN generations and target uniqueness grant no write authority. The trusted-main workflow must freshly acquire the canonical lease, prove a controller generation newer than the source registration binding, re-prove the exact-current singleton identity three times under the canonical `guard-run`, atomically refresh only canonical registration metadata, verify `state: UNKNOWN`, and release the lease. Any ambiguity fails closed.
+
+The old successful trigger `5456537158` is consumed and must not be replayed. A new owner comment with exact body `RECONCILE_CANONICAL_CLIENT_FENCE` on merged PR #760 is required only after this admission PR is merged and fresh `main` is revalidated.
 
 # Downstream next action
 
-After this implementation repair is exact-head GREEN and merged to protected `main`, create and merge a separate fresh `canonical_recovery` admission for one metadata-only current-identity reconciliation. Only after that live reconciliation succeeds and its temporary authority is released may the memory-free `PREFLIGHT_GAME_WINDOW_STATE_QUALIFICATION` be rerun. That preflight must freshly resolve the exact-current registration and global singleton target without process-memory observation. Only if it emits logger readiness may the owner be asked to manually perform `LOGIN_SCREEN -> CHARACTER_SELECT -> WORLD -> WORLD_EXIT` while one continuous read-only logger runs.
+After one successful same-fence identity reconciliation, persist sanitized durable PASS evidence and return this task to `runtime_access: none` in a separate repository-only closeout PR. Then rerun a new memory-free `PREFLIGHT_GAME_WINDOW_STATE_QUALIFICATION`. Owner UI remains unauthorized unless that preflight explicitly emits `GAME_WINDOW_STATE_LOGGER_PREFLIGHT=READY`.
 
-next_action: merge this repository-only implementation repair after fresh governance/CI; then use a separate fresh canonical-recovery admission to reconcile the exact-current stale runtime identity, release it, and rerun a new memory-free preflight.
+next_action: merge this admission after exact-head governance/CI, issue one fresh owner reconciliation trigger on PR #760, verify three-probe exact-current identity refresh and lease release, then close recovery authority before retrying gameWindowState preflight.

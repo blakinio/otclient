@@ -300,6 +300,26 @@ def main(argv: list[str]) -> int:
             game_window_state_read = {"state": "NOT_PROVEN", "reason": str(exc), "property": property_meta}
     elif len(game_window_state_properties) != 1:
         game_window_state_read = {"state": "NOT_PROVEN", "reason": f"GAME_WINDOW_STATE_PROPERTY_NOT_UNIQUE:{len(game_window_state_properties)}"}
+    game_window_dispatch_targets = recover_dispatch_targets(raw, sections, game_window_meta)
+    game_window_methods_by_name = {str(method["name"]): method for method in game_window_meta["methods"]}
+    game_window_state_method_traces: dict[str, object] = {}
+    for writer_name in ("goToLogin", "goToCreateNewAccount", "loginPressed", "onAuthenticatedChanged", "onGameWindowClosed"):
+        writer = game_window_methods_by_name.get(writer_name)
+        if writer is None:
+            game_window_state_method_traces[writer_name] = {"state": "MISSING"}
+            continue
+        writer_index = int(writer["index"])
+        writer_case = game_window_dispatch_targets[writer_index]
+        writer_resolution = resolve_generated_slot_body(raw, sections, writer_case)
+        writer_body = writer_resolution.get("body_target_va")
+        game_window_state_method_traces[writer_name] = {
+            "index": writer_index,
+            "case_target_va": writer_case,
+            "body_target_va": writer_body,
+            "resolution": writer_resolution["resolution"],
+            "trace": None if writer_body is None else extract_bounded_case_trace(raw, sections, int(writer_body)),
+        }
+
     dispatch_targets = recover_dispatch_targets(raw, sections, meta)
 
     methods_by_name = {str(method["name"]): method for method in meta["methods"]}
@@ -359,6 +379,7 @@ def main(argv: list[str]) -> int:
             "properties": game_window_meta["properties"],
             "world_semantic_properties": game_window_semantic_properties,
             "game_window_state_read": game_window_state_read,
+            "game_window_state_method_traces": game_window_state_method_traces,
         },
         "controller": {
             "class_name": meta["class_name"],

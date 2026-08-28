@@ -1,33 +1,33 @@
 ---
 task_id: OTC-20260828-canonical-client-fence-reconciliation
-status: live_admission_pending
+status: live_reconciliation_pass_release_pending
 agent: ChatGPT
 session_role: implementer
 project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: infrastructure
-phase: live_admission
-branch: docs/OTC-20260828-canonical-client-fence-reconciliation-readmit
+phase: closeout
+branch: docs/OTC-20260828-canonical-client-fence-reconciliation-closeout
 base_branch: main
-base_main: 65ec156124458e595ddbc808930116dd89c3c973
+base_main: 32146659213cba71910cbe8d46aa4c2f6ded607c
 created: 2026-08-28T22:00:00+02:00
 risk: high
-execution_class: self_hosted
-execution_mode: github_actions_metadata_reconciliation
-runtime_access: canonical_recovery
-runtime_owner_task: OTC-20260828-canonical-client-fence-reconciliation
-runtime_namespace: canonical-live-runtime
-canonical_registration: PRESENT
-canonical_lease_generation: UNKNOWN
-registration_lease_generation: UNKNOWN
-gate_a: REQUIRED_NOT_PROVEN
+execution_class: github_hosted
+execution_mode: chat_github
+runtime_access: none
+runtime_owner_task: NOT_APPLICABLE
+runtime_namespace: NOT_APPLICABLE
+canonical_registration: NOT_APPLICABLE
+canonical_lease_generation: NOT_APPLICABLE
+registration_lease_generation: NOT_APPLICABLE
+gate_a: NOT_APPLICABLE
 generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
-target_uniqueness: UNKNOWN
+target_uniqueness: NOT_APPLICABLE
 mutation_authorized: false
-recovery_mode: client_fence_reconciliation_v1
+recovery_mode: NOT_APPLICABLE
 client_fence_reconciliation_contract: TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_V1
 credentials_allowed: false
 login_allowed: false
@@ -63,70 +63,83 @@ reuses:
   - PR #763 merged client-fence reconciliation implementation
   - PR #766 first recovery admission
   - PR #767 merged UNKNOWN remote-mapping repair
-blocks:
-  - LIVE_GAME_WINDOW_STATE_CAUSAL_VALIDATION
+  - PR #770 repaired recovery re-admission
+blocks: []
 ---
 
 # Objective
 
-Re-admit exactly one reviewed, metadata-only canonical registration reconciliation after the fail-closed first attempt exposed and PR #767 repaired the `remote_view_mapping: UNKNOWN` source-schema overconstraint.
+Close the temporary canonical client-fence recovery authority after a successful trusted-main, metadata-only reconciliation, leaving the canonical registration exact-current and fail-closed before the downstream gameWindowState preflight is retried.
 
-This checkpoint changes only repository admission state. It performs no live action by itself and grants no client mutation, process-memory, GUI/input, login, credential, gameplay, process-control or payload-capture authority.
+This closeout checkpoint returns repository authority to `runtime_access: none`. It performs no live action and intentionally leaves no reusable `canonical_recovery` admission behind.
 
-# Prior live attempt and material repair
+# Terminal live reconciliation
 
-The first admitted live attempt was run `33200286357`, job `98947751420`, on trusted main. It passed pre-runtime admission, bounded `RECONCILE`, lease validation and Gate A, then failed before any registration commit with:
+Fresh owner trigger comment `5456537158` on merged PR #760 created trusted-main workflow run `33201699408`, job `98952477418`, on `synology-otclient-01` at exact head `763806fecc7a0cc1b56fe785dfcadb62ad2dfb9a`.
+
+The live run proved:
 
 ```text
-TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_ERROR=source_registration_remote_mapping_invalid
+TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_PENDING_ADMISSION=PASS
+TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_PRERUNTIME=PASS
+TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_DECISION=RECONCILE
+TRACK_A_CANONICAL_LEASE_GENERATION=41
+TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_GATE_A=PASS
+TRACK_A_KASM_EXISTING_RUNTIME_PROBE=PASS  # three independent guarded probes
+TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_CANONICAL_LEASE_GENERATION=41
+TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_REGISTRATION_LEASE_GENERATION=35
+TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_TARGET_UNIQUENESS=PROVEN
+TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_MUTATION_AUTHORIZED=false
+TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION=PASS
+TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_REGISTRATION_STATE=UNKNOWN
+TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_CLIENT_PROCESS_MUTATION=false
+TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_PROCESS_MEMORY_OBSERVATION=false
+TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_SEMANTIC_PROMOTION=false
+TRACK_A_CANONICAL_LEASE_GUARD_COMMAND_RC=0
+TRACK_A_CANONICAL_LEASE_RELEASE=true
+TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_RELEASE=PASS
+TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_REGISTRATION_CURRENT=PASS
 ```
 
-PR #767 proved this was an implementation-only overconstraint. The canonical transition schema, historical predecessor Kasm adoption probe and current exact Kasm adoption probe all allow/use a stable `remote_view_mapping: UNKNOWN`; the v1 contract requires equality/continuity rather than `PROVEN` specifically.
+The final verification required the canonical registration to be an owner-owned mode-0600 regular file, exact-fenced to:
 
-TDD repair evidence:
+- version `15.32.75d4a0`;
+- size `52105824`;
+- SHA-256 `d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a`;
+- `state: UNKNOWN`.
 
-- RED `9c0505ce184ebca402e94d0e6caef2bb7036974a`, run/job `33200847818 / 98949632562`: exactly the stable UNKNOWN regression failed with the live error code;
-- minimal production change accepts only canonical `{PROVEN, UNKNOWN}` while the existing source/fresh equality check still rejects mapping drift;
-- final restacked repair head `1cf1e302baed42c6a8522e6f2b8e089eb64eb9b6` passed reconciliation run `33201399426`, both governance audits `33201399384`, and CI run `33201399606` including `CI / Required` job `98951644968`;
-- PR #767 squash-merged as `65ec156124458e595ddbc808930116dd89c3c973`.
+No client process mutation, process-memory observation, GUI/input, login, credential access, gameplay, payload capture or semantic promotion occurred.
 
-Durable repair evidence is `docs/agents/evidence/OTC-20260828-canonical-client-fence-reconciliation/20260828-unknown-remote-mapping-repair.md`.
+The prior failed run `33200286357 / 98947751420` remains historical fail-closed evidence only; it was not replayed. The successful run consumed the new post-repair trigger after #767 and #770.
 
-# Pending live admission
+# Main movement after live PASS
 
-This is the same narrow pre-Gate-A admission shape already reviewed and tested:
+The live workflow twice verified that `main` remained exactly `763806fecc7a0cc1b56fe785dfcadb62ad2dfb9a` before reconciliation authority was exercised. After the workflow completed, unrelated field6 PRs #769 and #771 advanced protected main to `32146659213cba71910cbe8d46aa4c2f6ded607c`. Those later changes do not touch canonical registration/reconciliation owned paths and do not invalidate the already completed guarded live transaction.
+
+# Release boundary
+
+This PR itself is repository-only and changes the task back to:
 
 ```yaml
-runtime_access: canonical_recovery
-recovery_mode: client_fence_reconciliation_v1
-client_fence_reconciliation_contract: TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_V1
-canonical_registration: PRESENT
-canonical_lease_generation: UNKNOWN
-registration_lease_generation: UNKNOWN
-gate_a: REQUIRED_NOT_PROVEN
+runtime_access: none
+runtime_owner_task: NOT_APPLICABLE
+runtime_namespace: NOT_APPLICABLE
+canonical_registration: NOT_APPLICABLE
+canonical_lease_generation: NOT_APPLICABLE
+registration_lease_generation: NOT_APPLICABLE
+gate_a: NOT_APPLICABLE
 generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
-target_uniqueness: UNKNOWN
+target_uniqueness: NOT_APPLICABLE
 mutation_authorized: false
+recovery_mode: NOT_APPLICABLE
 ```
 
-The UNKNOWN generations and target uniqueness grant no write authority. The trusted-main live workflow must freshly acquire and validate the canonical lease, prove a controller generation newer than the source binding, validate the closed predecessor fence, prove the exact-current singleton target three times under the canonical guard, and only then atomically reconcile metadata.
+No further canonical client-fence reconciliation trigger is authorized or needed from this task.
 
-# Safety and retry rule
+# Downstream next action
 
-The failed trigger from run `33200286357` is consumed and must not be replayed. This admission PR itself must keep the live workflow skipped. Only after this exact checkpoint is GREEN and merged to protected `main` may one **new** repository-owner comment `RECONCILE_CANONICAL_CLIENT_FENCE` be posted on merged PR #760.
+After this closeout is exact-head GREEN and merged to protected `main`, rerun the memory-free `PREFLIGHT_GAME_WINDOW_STATE_QUALIFICATION`. That preflight must freshly resolve the exact-current registration and global singleton target without process-memory observation. Only if it emits logger readiness may the owner be asked to manually perform `LOGIN_SCREEN -> CHARACTER_SELECT -> WORLD -> WORLD_EXIT` while one continuous read-only logger runs.
 
-The next live run must accept only:
-
-- `ALREADY_CURRENT` with exact-current fail-closed registration verification;
-- complete approved predecessor reconciliation PASS; or
-- a new precise fail-closed blocker.
-
-No manual editing of `runtime-registration.json` is permitted.
-
-# Downstream boundary
-
-After successful exact-current registration verification, this recovery authority must be released back to `runtime_access: none`. Then rerun `PREFLIGHT_GAME_WINDOW_STATE_QUALIFICATION`. No owner login, character selection, world entry or other GUI action is requested until that memory-free preflight explicitly reports logger readiness.
-
-next_action: obtain fresh exact-head reconciliation/governance/CI GREEN for this single-file re-admission, verify protected-main freshness, safe-squash-merge it, then post one fresh exact `RECONCILE_CANONICAL_CLIENT_FENCE` trigger on #760 and classify the trusted-main result.
+next_action: merge this repository-only authority-release checkpoint after fresh governance/CI, then run one fresh `PREFLIGHT_GAME_WINDOW_STATE_QUALIFICATION`; do not request owner UI interaction unless that preflight explicitly reports READY.

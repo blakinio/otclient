@@ -1,4 +1,4 @@
-name: Track A normal Tibia launcher update
+name: Track A verify Tibia launcher visibility
 on:
   push:
     branches: [research/OTC-20260827-kasm-endpoint-inventory]
@@ -6,43 +6,48 @@ on:
 permissions:
   contents: read
 jobs:
-  launch:
+  verify:
     if: github.actor == 'blakinio'
     runs-on: [otclient, synology]
-    timeout-minutes: 8
+    timeout-minutes: 5
     steps:
-      - name: Launch official updater normally in existing Kasm
+      - name: Inspect persistent launcher and visible desktop
         shell: bash
         run: |
           set -Eeuo pipefail
           c=otclient-track-a-kasmvnc
           docker inspect -f '{{.State.Running}}' "$c" | grep -Fx true
           docker exec -u kasm-user -e DISPLAY=:1 "$c" xdpyinfo >/dev/null
-          archive=/home/kasm-user/Downloads/tibia.x64.tar.gz
-          root=/home/kasm-user/Tibia
-          docker exec "$c" test -s "$archive"
-          if ! docker exec "$c" test -x "$root/Tibia"; then
-            docker exec -u kasm-user "$c" sh -lc 'cd /home/kasm-user && tar -xzf Downloads/tibia.x64.tar.gz'
+          echo '=== PROCESSES ==='
+          docker exec "$c" sh -lc "ps -eo pid,ppid,etime,args | grep -E '(/home/kasm-user/Tibia/Tibia|/packages/.*/bin/client|[T]ibia)' | head -80 || true"
+          echo '=== WINDOWS ==='
+          docker exec -u kasm-user -e DISPLAY=:1 "$c" sh -lc "xwininfo -root -tree 2>/dev/null | head -120"
+          echo '=== LAUNCHER LOG ==='
+          docker exec "$c" sh -lc "tail -n 160 /tmp/tibia-normal-launcher.log 2>/dev/null || true"
+          echo '=== RECENT CIPSOFT FILES ==='
+          docker exec "$c" sh -lc "find '/home/kasm-user/.local/share/CipSoft GmbH' '/home/kasm-user/.cache/CipSoft GmbH' -type f -mmin -15 -printf '%TY-%Tm-%Td %TH:%TM:%TS %s %p\n' 2>/dev/null | head -120 || true"
+          echo '=== SCREENSHOT TOOLS ==='
+          docker exec "$c" sh -lc 'command -v import || true; command -v scrot || true; command -v xwd || true'
+      - name: Capture actual Kasm desktop
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          c=otclient-track-a-kasmvnc
+          out="$RUNNER_TEMP/tibia-kasm-root.png"
+          if docker exec "$c" command -v import >/dev/null 2>&1; then
+            docker exec -u kasm-user -e DISPLAY=:1 "$c" import -window root /tmp/tibia-kasm-root.png
+            docker cp "$c:/tmp/tibia-kasm-root.png" "$out"
+          elif docker exec "$c" command -v scrot >/dev/null 2>&1; then
+            docker exec -u kasm-user -e DISPLAY=:1 "$c" scrot /tmp/tibia-kasm-root.png
+            docker cp "$c:/tmp/tibia-kasm-root.png" "$out"
+          else
+            echo SCREENSHOT_UNAVAILABLE=true
+            exit 0
           fi
-          docker exec "$c" test -x "$root/Tibia"
-          echo NORMAL_LAUNCHER_PATH="$root/Tibia"
-          echo BEFORE_CLIENTS="$(docker exec "$c" pgrep -a -x client 2>/dev/null || true)"
-          echo BEFORE_LAUNCHERS="$(docker exec "$c" pgrep -af '/home/kasm-user/Tibia/Tibia' 2>/dev/null || true)"
-          if ! docker exec "$c" pgrep -f '^/home/kasm-user/Tibia/Tibia$' >/dev/null 2>&1; then
-            docker exec -d -u kasm-user -e DISPLAY=:1 -e HOME=/home/kasm-user -e LD_LIBRARY_PATH=/home/kasm-user/Tibia/lib -w "$root" "$c" sh -lc 'exec ./Tibia >/tmp/tibia-normal-launcher.log 2>&1'
-          fi
-          for _ in $(seq 1 80); do
-            if docker exec "$c" pgrep -f '^/home/kasm-user/Tibia/Tibia$' >/dev/null 2>&1 || docker exec -u kasm-user -e DISPLAY=:1 "$c" sh -lc 'xwininfo -root -tree 2>/dev/null | grep -Ei "Tibia|launcher|update"' >/dev/null; then
-              echo NORMAL_TIBIA_LAUNCHER_STARTED=true
-              docker exec "$c" pgrep -af '(/home/kasm-user/Tibia/Tibia|/packages/.*/bin/client)' || true
-              docker exec -u kasm-user -e DISPLAY=:1 "$c" sh -lc 'xwininfo -root -tree 2>/dev/null | grep -Ei "Tibia|launcher|update" | head -20' || true
-              exit 0
-            fi
-            sleep .25
-          done
-          echo NORMAL_TIBIA_LAUNCHER_STARTED=false
-          echo LAUNCHER_LOG_BEGIN=true
-          docker exec "$c" sh -lc 'tail -n 120 /tmp/tibia-normal-launcher.log 2>/dev/null || true'
-          echo LAUNCHER_LOG_END=true
-          exit 1
-
+          file "$out"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tibia-kasm-visible-desktop
+          path: ${{ runner.temp }}/tibia-kasm-root.png
+          if-no-files-found: ignore

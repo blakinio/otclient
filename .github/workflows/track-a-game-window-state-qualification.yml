@@ -239,20 +239,24 @@ jobs:
               echo OFFICIAL_CLIENT_INVENTORY_INCOMPLETE >&2
               exit 2
             fi
-            while IFS=$'\t' read -r pid start size sha; do
+            mapfile -t candidate_rows < "$tmp"
+            rm -f "$tmp"
+            for row in "${candidate_rows[@]}"; do
+              IFS=$'\t' read -r pid start size sha <<<"$row"
               [ -n "$pid" ] || continue
               [[ "$pid" =~ ^[0-9]+$ && "$start" =~ ^[0-9]+$ && "$size" =~ ^[0-9]+$ && "$sha" =~ ^[0-9a-f]{64}$ ]] || {
-                rm -f "$tmp"; echo OFFICIAL_CLIENT_CANDIDATE_UNVERIFIABLE >&2; exit 2;
+                echo OFFICIAL_CLIENT_CANDIDATE_UNVERIFIABLE >&2
+                exit 2
               }
-              test "$size" = "$EXPECTED_SIZE" && test "$sha" = "$EXPECTED_SHA" || {
-                rm -f "$tmp"; echo OFFICIAL_CLIENT_CANDIDATE_FENCE_MISMATCH >&2; exit 2;
-              }
+              if [ "$size" != "$EXPECTED_SIZE" ] || [ "$sha" != "$EXPECTED_SHA" ]; then
+                echo OFFICIAL_CLIENT_CANDIDATE_FENCE_MISMATCH >&2
+                exit 2
+              fi
               candidate_count=$((candidate_count + 1))
               if [ "$cid" = "$CONTAINER" ] && [ "$pid" = "$TARGET_PID" ] && [ "$start" = "$TARGET_START" ]; then
                 matched=$((matched + 1))
               fi
-            done <"$tmp"
-            rm -f "$tmp"
+            done
           done
           test "$candidate_count" -eq 1 || { echo "OFFICIAL_CLIENT_CANDIDATE_COUNT=$candidate_count" >&2; exit 2; }
           test "$matched" -eq 1 || { echo REGISTERED_TARGET_NOT_CURRENT_UNIQUE_CANDIDATE >&2; exit 2; }
@@ -316,8 +320,8 @@ jobs:
           PY
           echo "path=$admission" >> "$GITHUB_OUTPUT"
           echo TRACK_A_RUNTIME_ACCESS=read_only
-          echo TRACK_A_RUNTIME_OWNER_TASK=$TASK_ID
-          echo TRACK_A_RUNTIME_NAMESPACE=$RUNTIME_NAMESPACE
+          echo "TRACK_A_RUNTIME_OWNER_TASK=$TASK_ID"
+          echo "TRACK_A_RUNTIME_NAMESPACE=$RUNTIME_NAMESPACE"
           echo TRACK_A_CANONICAL_REGISTRATION=PRESENT
           echo TRACK_A_GATE_A=NOT_APPLICABLE
           echo TRACK_A_GENERATION_REBIND=NOT_APPLICABLE

@@ -33,7 +33,8 @@ jobs:
             tools/tibia_re_current_login_field6_callsite_owner/handler_qmeta.py \
             tools/tibia_re_current_login_field6_callsite_owner/producer_dependency.py \
             tools/tibia_re_current_login_field6_callsite_owner/dependency_accessor.py \
-            tools/tibia_re_current_login_field6_callsite_owner/queue_sendlogin.py
+            tools/tibia_re_current_login_field6_callsite_owner/queue_sendlogin.py \
+            tools/tibia_re_current_login_field6_callsite_owner/gameserver_login_route.py
           bash -n tools/tibia_re_current_login_field6_callsite_owner/prepare_warp.sh
 
       - name: Prepare exact public client through bounded WARP fallback
@@ -73,7 +74,7 @@ jobs:
           print('CURRENT_LOGIN_FIELD6_OWNER_EXACT_FENCE=PASS')
           PY
 
-      - name: Resolve exact field6 queue, caller owner and edx value
+      - name: Resolve exact field6 gameserver route, queue, caller owner and edx value
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -96,6 +97,7 @@ jobs:
           python3 tools/tibia_re_current_login_field6_callsite_owner/producer_dependency.py --client "$RE_ROOT/pkg/client" --output artifacts/current-login-field6-callsite-owner/result.json
           python3 tools/tibia_re_current_login_field6_callsite_owner/dependency_accessor.py --client "$RE_ROOT/pkg/client" --output artifacts/current-login-field6-callsite-owner/result.json
           python3 tools/tibia_re_current_login_field6_callsite_owner/queue_sendlogin.py --client "$RE_ROOT/pkg/client" --output artifacts/current-login-field6-callsite-owner/result.json
+          python3 tools/tibia_re_current_login_field6_callsite_owner/gameserver_login_route.py --client "$RE_ROOT/pkg/client" --output artifacts/current-login-field6-callsite-owner/result.json
           rm -f "$RE_ROOT/pkg/client" "$RE_ROOT/pkg/client.lzma"
           echo RAW_CLIENT_RETAINED=false
 
@@ -120,11 +122,12 @@ jobs:
           assert d['producer_dependency_guard']['unique_target_owner']['type_name']=='tibia::authentication::TAuthenticationAndEncryptionInfo'
           assert d['dependency_accessor_provenance']['classification']=='DEPENDENCY_ACCESSOR_PROVENANCE'
           assert d['queue_sendlogin_provenance']['classification']=='QUEUE_SENDLOGIN_PROVENANCE'
-          assert d['queue_sendlogin_provenance']['scope_markers']['PARAMETER_TYPES'] is True
-          assert d['queue_sendlogin_provenance']['scope_markers']['PARAMETER_NAMES'] is True
-          assert d['queue_sendlogin_provenance']['scope_markers']['SLOT_0X60_EDGE'] is True
-          assert d['queue_sendlogin_provenance']['scope_markers']['FIELD6_EDX_REACHING_VALUE'] is True
-          assert d['queue_sendlogin_provenance']['scope_markers']['NO_SEMANTIC_GUESSING'] is True
+          assert d['gameserver_login_route_provenance']['classification']=='GAMESERVER_LOGIN_ROUTE_PROVENANCE'
+          assert d['gameserver_login_route_provenance']['class_name']=='tibia::authentication::TAuthenticationProcessController'
+          assert d['gameserver_login_route_provenance']['scope_markers']['INTERPROCEDURAL_RDX_PROPAGATION'] is True
+          assert d['gameserver_login_route_provenance']['scope_markers']['SLOT_0X60_EDGE'] is True
+          assert d['gameserver_login_route_provenance']['scope_markers']['FIELD6_EDX_REACHING_VALUE'] is True
+          assert d['gameserver_login_route_provenance']['scope_markers']['NO_SEMANTIC_GUESSING'] is True
           assert d['classification'] in ('FIELD6_VALUE_PROVEN','FIELD6_VALUE_UNKNOWN')
           print('CURRENT_LOGIN_FIELD6_OWNER_SANITIZED_RESULT=PASS')
           PY

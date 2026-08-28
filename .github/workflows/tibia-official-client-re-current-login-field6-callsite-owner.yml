@@ -28,7 +28,8 @@ jobs:
           python3 tools/tibia_re_current_login_field6_callsite_owner/test_contract.py
           python3 -m py_compile \
             tools/tibia_re_current_login_field6_callsite_owner/probe.py \
-            tools/tibia_re_current_login_field6_callsite_owner/member_provenance.py
+            tools/tibia_re_current_login_field6_callsite_owner/member_provenance.py \
+            tools/tibia_re_current_login_field6_callsite_owner/focused_member_provenance.py
           bash -n tools/tibia_re_current_login_field6_callsite_owner/prepare_warp.sh
 
       - name: Prepare exact public client through bounded WARP fallback
@@ -86,7 +87,7 @@ jobs:
           PY
           mkdir -p artifacts/current-login-field6-callsite-owner
           python3 tools/tibia_re_current_login_field6_callsite_owner/probe.py --client "$RE_ROOT/pkg/client" --output artifacts/current-login-field6-callsite-owner/result.json
-          python3 tools/tibia_re_current_login_field6_callsite_owner/member_provenance.py --client "$RE_ROOT/pkg/client" --output artifacts/current-login-field6-callsite-owner/result.json
+          python3 tools/tibia_re_current_login_field6_callsite_owner/focused_member_provenance.py --client "$RE_ROOT/pkg/client" --output artifacts/current-login-field6-callsite-owner/result.json
           rm -f "$RE_ROOT/pkg/client" "$RE_ROOT/pkg/client.lzma"
           echo RAW_CLIENT_RETAINED=false
 
@@ -106,6 +107,8 @@ jobs:
           assert d['promoted_target']['handler_vtable_address_point']=='0x30b6700'
           assert d['promoted_target']['slot_0x60_target']=='0xe25620'
           assert d['interprocedural_member_provenance']['classification']=='INTERPROCEDURAL_MEMBER_PROVENANCE'
+          assert d['interprocedural_member_provenance']['scope_markers']['CALLSITE_FDE_SCOPE'] is True
+          assert d['interprocedural_member_provenance']['scope_markers']['VTABLE_RIP_CONSTRUCTOR_SCOPE'] is True
           assert d['classification'] in ('FIELD6_VALUE_PROVEN','FIELD6_VALUE_UNKNOWN')
           print('CURRENT_LOGIN_FIELD6_OWNER_SANITIZED_RESULT=PASS')
           PY

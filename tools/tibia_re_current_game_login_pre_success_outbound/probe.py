@@ -327,9 +327,15 @@ def producer_stack_object_base(img: Image, instructions, vtable_ap: int) -> tupl
             if dst.type == X86_OP_MEM and dst.mem.base == X86_REG_RSP and src.type == X86_OP_REG and src.reg == reg:
                 candidates.append((ins.address, int(dst.mem.disp)))
                 break
-    if len(candidates) != 1:
-        raise RuntimeError(f'LOGIN_STACK_OBJECT_AMBIGUOUS:{len(candidates)}:{candidates}')
-    return candidates[0]
+    if not candidates:
+        raise RuntimeError('LOGIN_STACK_OBJECT_MISSING')
+    bases = {base for _, base in candidates}
+    if len(bases) != 1:
+        raise RuntimeError(f'LOGIN_STACK_OBJECT_BASE_AMBIGUOUS:{len(candidates)}:{candidates}')
+    # The same stack object can receive its generated vtable again during cleanup.
+    # The earliest reference is the construction boundary; later same-base references
+    # are teardown/reset and do not create a second login object.
+    return min(candidates, key=lambda row: row[0])
 
 
 def writes_overlapping(instructions, start_at: int, stack_offset: int, width: int = 4) -> list[dict]:

@@ -1,21 +1,24 @@
 ---
 task_id: OTC-20260828-current-login-field6-runtime
-status: implementing
+status: validating
 agent: ChatGPT
+session_id: chatgpt-20260828-2255-field6-v4
 session_role: implementer
+policy_version: 2
 project_lane: otclient
 lane: RUNTIME_RESEARCH
 track_id: official-client-re
 task_kind: reverse_engineering_runtime
-phase: materializer_repair
-branch: fix/OTC-20260828-field6-materializer-parallel
+phase: validate
+branch: docs/OTC-20260828-field6-v4-continuation-checkpoint
 base_branch: main
-base_main: 7edf5bc44c08b762be7ac34104e840b391747fd6
+base_main: b61f70e73575582d10af3789d2cfb7cb01087b6d
 created: 2026-08-28T19:00:00+02:00
-updated: 2026-08-28T22:09:00+02:00
+updated: 2026-08-28T23:00:00+02:00
 risk: high
 execution_class: github_hosted
-execution_mode: github_actions_static
+execution_mode: chat_github
+execution_reason: persist exact post-repair continuation after separate canonical recovery authority was released
 runtime_access: none
 runtime_owner_task: NOT_APPLICABLE
 runtime_namespace: NOT_APPLICABLE
@@ -42,6 +45,30 @@ physical_action_count: 0
 implementation_authorized: true
 live_runtime_authorization_source: NOT_APPLICABLE
 related_pr: 775
+continuation_checkpoint_pr: 781
+context_pressure: medium
+context_growth: stable
+context_score: 9
+estimate_confidence: medium
+decomposition_decision: phased
+decomposition_reason: field6 proof is one sequential evidence chain; Track B remains a separate consumer phase after promotion
+validation_level: exact_head
+last_completed_step: closed stale V3 checkpoint PR #773 and reached exact-head GREEN on continuation checkpoint before final refresh
+session_rotation_count: 1
+heavy_validation_runs: 0
+stale_takeover_count: 0
+human_interruptions: 0
+invocation_started_at: 2026-08-28T22:50:00+02:00
+last_progress_at: 2026-08-28T23:00:00+02:00
+ci_checks_for_current_head: 0
+ci_check_generation: draft
+terminal_ci_wait_started_at: null
+terminal_ci_checks_for_current_generation: 0
+unchanged_state_checks: 0
+identical_failure_retries: 0
+repair_cycles_for_current_gate: 0
+context_reconstruction_attempts: 1
+stall_warnings: 0
 owned_paths:
   - .github/scripts/test_track_a_current_client_package_parallel.py
   - .github/scripts/track_a_current_client_package_materialize.py
@@ -67,6 +94,8 @@ depends_on:
   - merged PR #769 direct task-owned package source repair
   - merged PR #771 one-shot V3 live admission
   - cancelled pre-action V3 run 33202129157 / job 98953921602
+  - merged PR #775 bounded exact-current package materialization repair
+  - merged PR #780 canonical identity reconciliation retry closeout
 blocks:
   - OTCLIENT-TIBIA-GLOBAL-LOGIN-FINAL-CONTINUE
 ---
@@ -89,9 +118,9 @@ FIELD6_VALUE=UNKNOWN
 
 V1, V2, and V3 triggers are consumed historical evidence and must not be rerun or replayed. Detailed terminal evidence is `docs/agents/evidence/OTC-20260828-current-login-field6-runtime/20260828-v3-terminal-pre-action-timeout.md`.
 
-# Current static-safe repair
+# Merged materializer repair
 
-The exact V3 materializer processes manifest rows serially. PR #775 adds bounded deterministic parallel file acquisition while preserving:
+PR #775 was squash-merged as `5e9293f78e1757eafb88ca0b21cec8bf3d1d246a`. It replaces cumulative serial package acquisition with bounded deterministic concurrency while preserving:
 
 - complete official package materialization;
 - every packed size/hash and unpacked size/hash check;
@@ -101,7 +130,23 @@ The exact V3 materializer processes manifest rows serially. PR #775 adds bounded
 - no global or legacy CipSoft package fallback;
 - fail-closed partial/cancelled cleanup.
 
-This task is now `runtime_access: none`. This repair has no credentials, login, GUI/input, process-control, character selection, world entry, gameplay, or network-payload authority.
+The existing 18-minute live observer deadline remains unchanged; the repair addressed the proven cumulative serial bottleneck rather than masking it with an arbitrary timeout increase.
+
+# Fresh continuation checkpoint — 2026-08-28 23:00 CEST
+
+GitHub live state was reconstructed and this checkpoint is based on protected `main@b61f70e73575582d10af3789d2cfb7cb01087b6d`.
+
+Repository/runtime facts at this checkpoint:
+
+- PR #778 is merged and had returned the first exact-current identity reconciliation authority to `runtime_access: none`.
+- A later memory-free gameWindowState preflight observed fresh runtime identity drift, so PR #779 re-admitted only the separate task `OTC-20260828-canonical-client-fence-reconciliation` with `runtime_access: canonical_recovery`.
+- That separate metadata-only recovery run `33210019599` completed `success` on exact `main@fd7a47308581dceda6fd6aa3613f0614a816d150`.
+- PR #780 merged as `main@b61f70e73575582d10af3789d2cfb7cb01087b6d` and returned that separate recovery task to `runtime_access: none`, `runtime_owner_task: NOT_APPLICABLE`, `physical_action_budget: 0`.
+- No client mutation, process-memory observation, GUI/input, credentials, login, character selection, gameplay, or payload capture was authorized or performed by that recovery path.
+- This field6 task remains `runtime_access: none`, `physical_action_budget: 0`, `physical_action_count: 0`. No V4 admission or V4 trigger has been created by this checkpoint.
+- Draft PR #773 was closed unmerged as superseded. Its V3-in-progress snapshot is replaced by terminal V3 evidence already merged through PR #775; no unique runtime/code change was lost.
+
+This checkpoint did not modify or claim the separate canonical-recovery task.
 
 # Exact client and observer locator
 
@@ -116,6 +161,10 @@ The last promoted fence remains a locator pending fresh V4 verification:
 
 Any current-fence movement must fail closed and requires a new exact-current binding. No value may be guessed.
 
+# Validation before merge
+
+Exact-head checks are required after this final checkpoint refresh: field6 runtime static contract, package materializer contract, Track A governance, and CI. Independent documentation review must report zero material findings. This PR performs no live action.
+
 # Next action
 
-Complete RED/GREEN/REFACTOR and squash-merge the static repair after exact-head hosted checks and independent review. Then create a separate docs-only V4 admission with `physical_action_budget: 1`, `physical_action_count: 0`, no relog/restart/character selection/gameplay/payload capture, and a new distinct owner trigger. The repair branch itself must never execute a live login.
+After this checkpoint PR is exact-head GREEN, independently reviewed, and merged, prepare the separate static-safe V4 observer-generation PR from fresh `main`; do not issue any live V4 trigger from this checkpoint branch.

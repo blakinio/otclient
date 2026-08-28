@@ -12,6 +12,7 @@ WGCF_SHA='2ff97f2201972ce582a424455d50a3719a380eef0cd1f3144f7779348e122a2c'
 WIREPROXY_VER='1.1.3'
 WIREPROXY_TAR_SHA='e88c1d090740373fc606c1bafd81d9a5eadc642cce5667616e20e9d7a444f51c'
 WARP_PORT='25442'
+FILE_WORKERS='8'
 BASE='/home/runner/_work/_otclient_tibia_re_state'
 TASK_BASE="$BASE/tasks/$TASK_ID"
 RUN_ID="${GITHUB_RUN_ID:-manual-unknown}"
@@ -222,6 +223,7 @@ prepare() {
     --manifest-url 'https://static.tibia.com/launcher/tibiaclient-linux-current/package.json' \
     --base-url 'https://static.tibia.com/launcher/tibiaclient-linux-current' \
     --socks-port "$WARP_PORT" \
+    --file-workers "$FILE_WORKERS" \
     --output "$SOURCE"
 
   [[ -x "$SOURCE/bin/client" && ! -L "$SOURCE/bin/client" ]] || fail materialized_client_invalid

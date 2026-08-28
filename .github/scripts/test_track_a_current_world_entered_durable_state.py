@@ -96,18 +96,23 @@ class QMetaPropertyParsingTests(unittest.TestCase):
 class PropertyDispatchSelectionTests(unittest.TestCase):
     def test_selects_read_property_full_range_candidate(self):
         candidates = [
-            {"selector": 0, "full_range": True, "table": 0x1000},
-            {"selector": 1, "full_range": True, "table": 0x2000},
-            {"selector": 2, "full_range": True, "table": 0x3000},
+            {"selector_values": [0], "full_range": True, "table": 0x1000},
+            {"selector_values": [1], "full_range": True, "table": 0x2000},
+            {"selector_values": [2], "full_range": True, "table": 0x3000},
         ]
         result = module.select_unique_property_dispatch_candidate(candidates, 1)
         self.assertEqual(0x2000, result["table"])
 
     def test_rejects_ambiguous_read_property_tables(self):
         candidates = [
-            {"selector": 1, "full_range": True, "table": 0x2000},
-            {"selector": 1, "full_range": True, "table": 0x2100},
+            {"selector_values": [1], "full_range": True, "table": 0x2000},
+            {"selector_values": [1], "full_range": True, "table": 0x2100},
         ]
+        with self.assertRaisesRegex(module.DurableStateError, "READ_PROPERTY_DISPATCH_NOT_UNIQUE"):
+            module.select_unique_property_dispatch_candidate(candidates, 1)
+
+    def test_rejects_selector_context_polluted_by_other_calls(self):
+        candidates = [{"selector_values": [0, 1], "full_range": True, "table": 0x2000}]
         with self.assertRaisesRegex(module.DurableStateError, "READ_PROPERTY_DISPATCH_NOT_UNIQUE"):
             module.select_unique_property_dispatch_candidate(candidates, 1)
 

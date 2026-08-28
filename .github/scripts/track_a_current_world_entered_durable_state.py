@@ -437,9 +437,14 @@ def select_world_semantic_properties(properties: list[dict[str, object]]) -> lis
     return selected
 
 def select_unique_property_dispatch_candidate(candidates: list[dict[str, object]], selector: int) -> dict[str, object]:
-    matches = [candidate for candidate in candidates if candidate.get("full_range") is True and int(candidate.get("selector", -1)) == selector]
+    matches = [
+        candidate for candidate in candidates
+        if candidate.get("full_range") is True
+        and {int(value) for value in candidate.get("selector_values", [])} == {selector}
+    ]
     if len(matches) != 1:
-        raise DurableStateError(f"READ_PROPERTY_DISPATCH_NOT_UNIQUE:{[(c.get('selector'), c.get('table')) for c in matches]}")
+        details = [(candidate.get("selector_values"), candidate.get("table")) for candidate in matches]
+        raise DurableStateError(f"READ_PROPERTY_DISPATCH_NOT_UNIQUE:{details}")
     return matches[0]
 
 
@@ -493,13 +498,21 @@ def recover_property_dispatch_case(raw: bytes, sections, meta: dict[str, object]
             left, right = item.operands
             if left.type == X86_OP_REG and left.reg == X86_REG_ESI and right.type == X86_OP_IMM:
                 selector_values.add(int(right.imm))
-        for selector_value in selector_values:
-            candidates.append({"selector": selector_value, "full_range": full_range, "table": table, "lea": ins.address, "targets": targets})
+        candidates.append({
+            "selector_values": sorted(selector_values),
+            "full_range": full_range,
+            "table": table,
+            "lea": ins.address,
+            "targets": targets,
+            "context": [f"{item.mnemonic} {item.op_str}" for item in context],
+        })
     selected = select_unique_property_dispatch_candidate(candidates, selector)
     target = [int(value) for value in selected["targets"]][property_index]
     return {
         "state": "PROVEN_STATIC_READ_PROPERTY_CASE",
         "selector": selector,
+        "selector_context_values": selected["selector_values"],
+        "selector_context": selected["context"],
         "property_index": property_index,
         "dispatch_lea_va": int(selected["lea"]),
         "dispatch_table_va": int(selected["table"]),

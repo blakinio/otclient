@@ -11,6 +11,7 @@ on:
       - .github/scripts/test_tibia_official_client_re_canonical_live_transition.py
       - .github/scripts/tibia-official-client-re-kasm-existing-runtime-probe.py
       - .github/scripts/test_tibia_official_client_re_kasm_existing_runtime_probe.py
+      - .github/scripts/test_track_a_agent_runtime_governance.py
       - .github/scripts/test_track_a_canonical_current_client_fence.py
       - .github/workflows/track-a-canonical-current-client-fence.yml
       - .github/workflows/track-a-canonical-live-governance.yml
@@ -62,10 +63,10 @@ jobs:
           grep -Fq 'process_control_authorized: false' "$task"
           grep -Fq 'physical_action_budget: 0' "$task"
 
-  apply-provenance-cleanup:
-    name: Apply exact provenance cleanup
+  apply-governance-fence-repair:
+    name: Apply deterministic governance fence repair
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 6
     permissions:
       contents: write
     steps:
@@ -75,48 +76,58 @@ jobs:
           ref: fix/OTC-20260828-canonical-current-client-fence
           fetch-depth: 0
           persist-credentials: true
-      - name: Replace only the proven stale provenance sentence
+      - name: Replace only stale deterministic governance constants
         shell: bash
         run: |
           set -Eeuo pipefail
           python3 - <<'PY'
           from pathlib import Path
-          old = ('The current public native-Linux package is fenced by size `52105824` and SHA-256 '
-                 '`d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a`; '
-                 '`15.32` is an embedded version-family token, not a claim of a more specific suffix.')
-          new = ('The current public native-Linux package is fenced exactly as '
-                 '`15.32.75d4a0 / 52105824 / d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a`.')
-          paths = (
-              Path('docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md'),
-              Path('docs/agents/decisions/ADR-0001-track-a-canonical-live-runtime.md'),
-              Path('docs/agents/contracts/TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md'),
+          path = Path('.github/scripts/test_track_a_agent_runtime_governance.py')
+          text = path.read_text(encoding='utf-8')
+          old_sha = 'ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8'
+          new_sha = 'd1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a'
+          replacements = (
+              ('    exact_fence = "' + old_sha + '"', '    exact_fence = "' + new_sha + '"'),
+              ('    exact_size = "52109920"', '    exact_size = "52105824"'),
+              ('    exact_version = "15.32"', '    exact_version = "15.32.75d4a0"'),
+              ('require("current canonical transition fence", transition, ("VER = \'15.32\'", "SIZE = 52109920", "SHA = \'" + old_sha + "\'"))',
+               'require("current canonical transition fence", transition, ("VER = \'15.32.75d4a0\'", "SIZE = 52105824", "SHA = \'" + new_sha + "\'"))'),
+              ('require("current canonical live-session fence", session, ("SIZE=52109920", "SHA=' + old_sha + '"))',
+               'require("current canonical live-session fence", session, ("SIZE=52105824", "SHA=' + new_sha + '"))'),
           )
-          for path in paths:
-              text = path.read_text(encoding='utf-8')
-              count = text.count(old)
-              if count == 1:
-                  path.write_text(text.replace(old, new), encoding='utf-8')
-              elif count == 0 and new in text:
+          changed = False
+          for old, new in replacements:
+              old_count = text.count(old)
+              new_count = text.count(new)
+              if old_count == 1:
+                  text = text.replace(old, new)
+                  changed = True
+              elif old_count == 0 and new_count == 1:
                   pass
               else:
-                  raise SystemExit(f'{path}: stale/current provenance count invalid: old={count}, new={text.count(new)}')
+                  raise SystemExit(f'governance replacement ambiguity: old={old_count} new={new_count} marker={old[:80]!r}')
+          if old_sha in text or 'exact_size = "52109920"' in text or 'exact_version = "15.32"' in text:
+              raise SystemExit('stale current fence survived deterministic governance repair')
+          if changed:
+              path.write_text(text, encoding='utf-8')
           PY
+          python3 -m py_compile .github/scripts/test_track_a_agent_runtime_governance.py
+          python3 .github/scripts/test_track_a_agent_runtime_governance.py \
+            --changed-from origin/main \
+            --expected-branch fix/OTC-20260828-canonical-current-client-fence
           python3 .github/scripts/test_track_a_canonical_current_client_fence.py
           git diff --check
-      - name: Commit provenance cleanup when needed
+      - name: Commit deterministic governance repair when needed
         shell: bash
         run: |
           set -Eeuo pipefail
-          if test -z "$(git status --porcelain -- docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md docs/agents/decisions/ADR-0001-track-a-canonical-live-runtime.md docs/agents/contracts/TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md)"; then
-            echo PROVENANCE_CLEANUP_ALREADY_APPLIED=true
+          if git diff --quiet -- .github/scripts/test_track_a_agent_runtime_governance.py; then
+            echo GOVERNANCE_FENCE_REPAIR_ALREADY_APPLIED=true
             exit 0
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add \
-            docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md \
-            docs/agents/decisions/ADR-0001-track-a-canonical-live-runtime.md \
-            docs/agents/contracts/TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md
+          git add .github/scripts/test_track_a_agent_runtime_governance.py
           git diff --cached --check
-          git commit -m 'docs(track-a): align exact-client provenance'
+          git commit -m 'test(track-a): advance deterministic governance fence'
           git push origin HEAD:fix/OTC-20260828-canonical-current-client-fence

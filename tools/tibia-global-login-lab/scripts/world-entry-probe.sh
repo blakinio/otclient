@@ -253,10 +253,84 @@ if os.getenv('OTCLIENT_TIBIA_GLOBAL_LAB') == '1' then
   local function mark(s) g_logger.info('[TIBIA_GLOBAL_LAB] ' .. s) end
 
   local originalProtocolGameOnOpcode=ProtocolGame.onOpcode
+  local firstServerPayloadProbed=false
+
+  local function readProtoVarint(bytes, pos)
+    local value=0
+    local scale=1
+    for _=1,10 do
+      local byte=bytes[pos]
+      if byte==nil then return nil,pos end
+      pos=pos+1
+      value=value+(byte%128)*scale
+      if byte<128 then return value,pos end
+      scale=scale*128
+    end
+    return nil,pos
+  end
+
+  local function classifyProtoFields(bytes)
+    local pos=1
+    local count=0
+    while pos<=#bytes do
+      local key
+      key,pos=readProtoVarint(bytes,pos)
+      if not key or key==0 then return false,count end
+      local wire=key%8
+      local field=math.floor(key/8)
+      if field<=0 then return false,count end
+      count=count+1
+      if count<=4 then
+        mark('GAME_SERVER_PROTOBUF_FIELD_'..tostring(field)..'_WIRE_'..tostring(wire)..'=true')
+      end
+      if wire==0 then
+        local ignored
+        ignored,pos=readProtoVarint(bytes,pos)
+        if ignored==nil then return false,count end
+      elseif wire==1 then
+        if pos+7>#bytes then return false,count end
+        pos=pos+8
+      elseif wire==2 then
+        local length
+        length,pos=readProtoVarint(bytes,pos)
+        if length==nil or length<0 or pos+length-1>#bytes then return false,count end
+        pos=pos+length
+      elseif wire==5 then
+        if pos+3>#bytes then return false,count end
+        pos=pos+4
+      else
+        return false,count
+      end
+    end
+    return true,count
+  end
+
   function ProtocolGame:onOpcode(opcode, msg)
     mark('GAME_SERVER_OPCODE_'..tostring(tonumber(opcode) or -1)..'=true')
-    if originalProtocolGameOnOpcode then return originalProtocolGameOnOpcode(self, opcode, msg) end
-    return false
+    local handled=false
+    if originalProtocolGameOnOpcode then handled=originalProtocolGameOnOpcode(self, opcode, msg) and true or false end
+    if not handled and not firstServerPayloadProbed then
+      firstServerPayloadProbed=true
+      local unread=msg:getUnreadSize()
+      local capture=math.min(unread,63)
+      local bytes={tonumber(opcode) or 0}
+      mark('GAME_SERVER_FIRST_PAYLOAD_LENGTH='..tostring(unread+1))
+      for _=1,capture do bytes[#bytes+1]=msg:getU8() end
+      if capture~=unread then
+        mark('GAME_SERVER_FIRST_PAYLOAD_CAPTURE_TRUNCATED=true')
+      else
+        mark('GAME_SERVER_FIRST_PAYLOAD_CAPTURE_COMPLETE=true')
+        local valid,count=classifyProtoFields(bytes)
+        mark('GAME_SERVER_PROTOBUF_FIELD_COUNT='..tostring(count))
+        if valid then
+          mark('GAME_SERVER_PROTOBUF_STRUCTURAL_VALID=true')
+        else
+          mark('GAME_SERVER_PROTOBUF_STRUCTURAL_INVALID=true')
+        end
+      end
+      bytes=nil
+    end
+    return handled
   end
 
   connect(g_game, {
@@ -395,7 +469,7 @@ for _ in $(seq 1 300); do
 done
 
 docker exec "$CONTAINER" bash -lc "grep -o '\[TIBIA_GLOBAL_LAB\] [A-Z0-9_-]*=true' /lab/runtime/otclient.stdout.log | sort -u || true"
-docker exec "$CONTAINER" bash -lc "grep -oE '\[TIBIA_GLOBAL_LAB\] (CLIENT_VERSION_VALUE|PROTOCOL_VERSION_VALUE|GAME_LOGIN_ERROR_TEXT_LENGTH)=[0-9]+' /lab/runtime/otclient.stdout.log | sort -u || true"
+docker exec "$CONTAINER" bash -lc "grep -oE '\[TIBIA_GLOBAL_LAB\] (CLIENT_VERSION_VALUE|PROTOCOL_VERSION_VALUE|GAME_LOGIN_ERROR_TEXT_LENGTH|GAME_SERVER_FIRST_PAYLOAD_LENGTH|GAME_SERVER_PROTOBUF_FIELD_COUNT)=[0-9]+' /lab/runtime/otclient.stdout.log | sort -u || true"
 client_exit_status=$(docker exec "$CONTAINER" sh -c 'cat /lab/runtime/otclient.exit-status 2>/dev/null || true')
 if [[ "$client_exit_status" =~ ^[0-9]+$ ]]; then
   if (( client_exit_status >= 128 )); then

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 import json
+import re
 from pathlib import Path
 import sys
 
@@ -747,11 +748,68 @@ def scan_qmeta_signal_activation_sites(raw: bytes, sections, static_metaobject: 
                         "branch_kind": ins.mnemonic,
                         "edx_values": sorted(edx_values),
                         "static_meta_refs": sorted(ref for ref in rip_refs if ref == static_metaobject),
-                        "context": [f"{item.mnemonic} {item.op_str}" for item in sequence],
+                        "context": [
+                            {"address": int(item.address), "size": int(item.size), "mnemonic": item.mnemonic, "op_str": item.op_str}
+                            for item in sequence
+                        ],
                     })
             if ins.mnemonic in ("ret", "jmp"):
                 sequence = []
     unique = {(site["sequence_start_va"], site["branch_site_va"]): site for site in sites}
+    return [unique[key] for key in sorted(unique)]
+
+
+def _parse_hex_displacement(op_str: str, base_register: str) -> int | None:
+    compact = op_str.replace(" ", "")
+    match = re.search(rf"\[{re.escape(base_register)}([+-]0x[0-9a-fA-F]+)?\]", compact)
+    if not match:
+        return None
+    token = match.group(1)
+    if not token:
+        return 0
+    sign = -1 if token.startswith("-") else 1
+    return sign * int(token[1:], 16)
+
+
+def extract_qstring_member_assignment_sources(sites: list[dict[str, object]], member_offset: int) -> list[dict[str, int]]:
+    results: list[dict[str, int]] = []
+    for site in sites:
+        context = list(site.get("context", []))
+        for index, item in enumerate(context):
+            if item.get("mnemonic") != "lea":
+                continue
+            op_str = str(item.get("op_str", ""))
+            if not op_str.replace(" ", "").startswith("rdi,[rbx"):
+                continue
+            if _parse_hex_displacement(op_str.split(",", 1)[1], "rbx") != member_offset:
+                continue
+            source = None
+            helper_target = None
+            for previous in reversed(context[max(0, index - 5):index]):
+                if previous.get("mnemonic") != "lea":
+                    continue
+                previous_op = str(previous.get("op_str", ""))
+                if not previous_op.replace(" ", "").startswith("rsi,[rip"):
+                    continue
+                disp = _parse_hex_displacement(previous_op.split(",", 1)[1], "rip")
+                if disp is not None:
+                    source = int(previous["address"]) + int(previous["size"]) + disp
+                    break
+            for following in context[index + 1:index + 5]:
+                if following.get("mnemonic") != "call":
+                    continue
+                target = str(following.get("op_str", ""))
+                if re.fullmatch(r"0x[0-9a-fA-F]+", target):
+                    helper_target = int(target, 16)
+                    break
+            if source is not None and helper_target is not None:
+                results.append({
+                    "site_va": int(site.get("sequence_start_va", 0)),
+                    "source_va": source,
+                    "member_offset": member_offset,
+                    "helper_target_va": helper_target,
+                })
+    unique = {(item["site_va"], item["source_va"], item["helper_target_va"]): item for item in results}
     return [unique[key] for key in sorted(unique)]
 
 

@@ -198,6 +198,8 @@ class QMetaSignalEmitterScanTests(unittest.TestCase):
         self.assertEqual(0x100e, sites[0]["branch_site_va"])
         self.assertEqual([24], sites[0]["edx_values"])
         self.assertEqual([0x1100], sites[0]["static_meta_refs"])
+        self.assertEqual(0x1000, sites[0]["context"][0]["address"])
+        self.assertEqual(2, sites[0]["context"][0]["size"])
 
     def test_rejects_wrong_signal_index(self):
         raw = bytearray(0x300)
@@ -205,6 +207,27 @@ class QMetaSignalEmitterScanTests(unittest.TestCase):
         sections = [(0x1000,0,0x80,0x6),(0x1100,0x100,0x40,0x2),(0x1200,0x200,0x40,0x6)]
         sites = module.scan_qmeta_signal_activation_sites(bytes(raw), sections, 0x1100, 24, 0x1200)
         self.assertEqual([], sites)
+
+
+class QStringStateAssignmentSourceTests(unittest.TestCase):
+    def test_extracts_rip_source_for_backing_member_assignment(self):
+        sites = [{"sequence_start_va": 0x2000, "context": [
+            {"address": 0x2000, "size": 7, "mnemonic": "lea", "op_str": "rsi, [rip + 0xf9]"},
+            {"address": 0x2007, "size": 7, "mnemonic": "lea", "op_str": "rdi, [rbx + 0x60]"},
+            {"address": 0x200e, "size": 5, "mnemonic": "call", "op_str": "0x3000"},
+        ]}]
+        result = module.extract_qstring_member_assignment_sources(sites, 0x60)
+        self.assertEqual(1, len(result))
+        self.assertEqual(0x2100, result[0]["source_va"])
+        self.assertEqual(0x3000, result[0]["helper_target_va"])
+
+    def test_ignores_other_member_offsets(self):
+        sites = [{"sequence_start_va": 0x2000, "context": [
+            {"address": 0x2000, "size": 7, "mnemonic": "lea", "op_str": "rsi, [rip + 0xf9]"},
+            {"address": 0x2007, "size": 7, "mnemonic": "lea", "op_str": "rdi, [rbx + 0x80]"},
+            {"address": 0x200e, "size": 5, "mnemonic": "call", "op_str": "0x3000"},
+        ]}]
+        self.assertEqual([], module.extract_qstring_member_assignment_sources(sites, 0x60))
 
 
 if __name__ == "__main__":

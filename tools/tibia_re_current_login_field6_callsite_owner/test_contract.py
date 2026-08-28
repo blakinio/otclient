@@ -4,10 +4,13 @@ from pathlib import Path
 root = Path(__file__).resolve().parents[2]
 probe = root / 'tools/tibia_re_current_login_field6_callsite_owner/probe.py'
 member = root / 'tools/tibia_re_current_login_field6_callsite_owner/member_provenance.py'
+warp = root / 'tools/tibia_re_current_login_field6_callsite_owner/prepare_warp.sh'
 assert probe.exists(), 'field6 callsite owner probe not implemented'
 assert member.exists(), 'interprocedural member provenance not implemented'
+assert warp.exists(), 'bounded WARP bootstrap fallback not implemented'
 text = probe.read_text(encoding='utf-8')
 member_text = member.read_text(encoding='utf-8')
+warp_text = warp.read_text(encoding='utf-8')
 for required in (
     "'runtime_access': 'none'",
     "'official_client_executed': False",
@@ -27,7 +30,11 @@ for required in (
     'NO_HEURISTIC_RANKING',
 ):
     assert required in member_text, required
-combined = (text + member_text).lower()
+assert 'WARP_PROFILE_ATTEMPTS=2' in warp_text
+assert 'WARP_BOOTSTRAP_FALLBACK=PASS' in warp_text
+assert '25346' in warp_text and '25347' in warp_text
+assert 'rm -rf' not in warp_text
+combined = (text + member_text + warp_text).lower()
 for forbidden in ('subprocess', 'ptrace', 'process_vm_readv'):
     assert forbidden not in combined, forbidden
 print('CURRENT_LOGIN_FIELD6_CALLSITE_OWNER_CONTRACT=PASS')

@@ -5,12 +5,15 @@ root=Path(__file__).resolve().parents[2]
 base=root/'tools/tibia_re_current_login_field6_config_type_flow'
 probe=base/'probe.py'
 diag=base/'constructor_diag.py'
+layout=base/'embedded_handler_layout.py'
 warp=base/'prepare_warp.sh'
 assert probe.exists(), 'config-type probe not implemented'
 assert diag.exists(), 'constructor diagnostics not implemented'
+assert layout.exists(), 'embedded handler layout proof not implemented'
 assert warp.exists(), 'bounded WARP bootstrap not implemented'
 text=probe.read_text(encoding='utf-8')
 diag_text=diag.read_text(encoding='utf-8')
+layout_text=layout.read_text(encoding='utf-8')
 warp_text=warp.read_text(encoding='utf-8')
 compact=text.replace(' ','')
 assert "'runtime_access':'none'" in compact
@@ -23,9 +26,12 @@ for required in (
     assert required.lower() in text.lower(), required
 assert 'CONFIG_TYPE_CONSTRUCTOR_DIAGNOSTICS' in diag_text
 assert "result['config_type_constructor_diagnostics']" in diag_text
+for required in ('CONFIG_RTTI_RAW_NAME','CONFIG_EMBEDDED_HANDLER_LAYOUT','0x10','0x20','0x30','0x9c0','0x9c8'):
+    assert required in layout_text, required
+assert "result['config_embedded_handler_layout']" in layout_text
 assert 'WARP_PROFILE_ATTEMPTS=2' in warp_text
 assert 'WARP_BOOTSTRAP_FALLBACK=PASS' in warp_text
-combined=(text+diag_text+warp_text).lower()
+combined=(text+diag_text+layout_text+warp_text).lower()
 for forbidden in ('subprocess','ptrace','process_vm_readv'):
     assert forbidden not in combined, forbidden
 print('CURRENT_LOGIN_FIELD6_CONFIG_TYPE_FLOW_CONTRACT=PASS')

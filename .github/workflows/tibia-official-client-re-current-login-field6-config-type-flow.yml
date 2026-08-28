@@ -25,7 +25,9 @@ jobs:
         run: |
           set -Eeuo pipefail
           python3 tools/tibia_re_current_login_field6_config_type_flow/test_contract.py
-          python3 -m py_compile tools/tibia_re_current_login_field6_config_type_flow/probe.py
+          python3 -m py_compile \
+            tools/tibia_re_current_login_field6_config_type_flow/probe.py \
+            tools/tibia_re_current_login_field6_config_type_flow/constructor_diag.py
           bash -n tools/tibia_re_current_login_field6_config_type_flow/prepare_warp.sh
       - name: Prepare exact public client through bounded WARP fallback
         shell: bash
@@ -81,6 +83,7 @@ jobs:
           PY
           mkdir -p artifacts/current-login-field6-config-type-flow
           python3 tools/tibia_re_current_login_field6_config_type_flow/probe.py --client "$RE_ROOT/pkg/client" --output artifacts/current-login-field6-config-type-flow/result.json
+          python3 tools/tibia_re_current_login_field6_config_type_flow/constructor_diag.py --client "$RE_ROOT/pkg/client" --output artifacts/current-login-field6-config-type-flow/result.json
           rm -f "$RE_ROOT/pkg/client" "$RE_ROOT/pkg/client.lzma"
           echo RAW_CLIENT_RETAINED=false
       - name: Validate sanitized config-type result
@@ -97,6 +100,7 @@ jobs:
           assert d['exact_client']['sha256']=='d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a'
           assert d['config_type_identity']['classification'] in ('CONFIG_TYPE_IDENTITY','CONFIG_TYPE_UNKNOWN')
           assert d['config_owned_method_flow']['classification'] in ('CONFIG_OWNED_METHOD_FLOW','CONFIG_OWNED_METHOD_FLOW_UNKNOWN')
+          assert d['config_type_constructor_diagnostics']['classification']=='CONFIG_TYPE_CONSTRUCTOR_DIAGNOSTICS'
           assert d['classification'] in ('FIELD6_VALUE_PROVEN','FIELD6_VALUE_UNKNOWN')
           assert d['scope_markers']['NO_HEURISTIC_RANKING'] is True
           assert d['scope_markers']['NO_SEMANTIC_GUESSING'] is True

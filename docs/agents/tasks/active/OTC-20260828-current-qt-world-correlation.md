@@ -87,8 +87,15 @@ world_entered_activation_artifact: 9683917257
 world_entered_activation_result_sha256: b0ad58787424f62c6ea4ed19e0d83227c51cc820ac64ef21190ac9bf26fc05fa
 world_entered_qmeta_activate_target: 0x4d7dc0
 world_entered_activation_state: PROVEN
-current_blocker: DURABLE_WORLD_STATE_FOR_READ_ONLY_POLLING_NOT_PROVEN
-next_action: recover the exact-current receiver and/or durable field changed by worldEntered and reset on world exit; design only a non-invasive read-only polling observer after that state is proven; preserve IN_GAME_CLAIMED=false until causal live validation and independent review
+simple_durable_field_run: 33168156681
+simple_durable_field_artifact: 9684443359
+simple_durable_field_result_sha256: a1f4f6bf492fb0b8fcbeb9de89a7db80ad921a97da22d1e818ec8ec64f3b71d3
+simple_durable_field_result: REJECTED_DURABLE_FIELD_NOT_FOUND
+offset_0xeb_as_in_game: REJECTED
+offset_0x1b8_as_in_game: REJECTED
+game_window_property_census: PENDING_EXACT_CURRENT_RUN
+current_blocker: GAME_WINDOW_PROPERTY_OR_WORLD_ENTERED_RECEIVER_NOT_PROVEN
+next_action: run exact-current TGameWindowController property census and recover worldEntered connection receivers; promote only a durable state that can be polled without instrumentation; preserve IN_GAME_CLAIMED=false until causal live validation and independent review
 ---
 
 # Current Qt world correlation

@@ -63,6 +63,7 @@ def select_durable_field_candidate(observations: dict[str, list[dict[str, int]]]
 
 
 TARGET_CLASS = "tibia::gamewindow::TGameSessionDisconnectReactionController"
+GAME_WINDOW_CLASS = "tibia::gamewindow::TGameWindowController"
 INTERESTING_METHODS = (
     "onWorldEntered",
     "onGameSessionDisconnected",
@@ -94,6 +95,7 @@ def recover_qmeta_class(raw: bytes, sections, relocs: dict[int, int], class_name
             try:
                 header = [base._u32(raw, sections, metadata + i * 4) for i in range(14)]
                 method_count, method_data, signal_count = header[4], header[5], header[13]
+                property_count, property_data = header[6], header[7]
                 if not (0 < method_count <= 4096 and 0 <= signal_count <= method_count):
                     continue
                 methods = []
@@ -107,6 +109,7 @@ def recover_qmeta_class(raw: bytes, sections, relocs: dict[int, int], class_name
                         "flags": row[4],
                         "is_signal": index < signal_count,
                     })
+                properties = parse_qmeta_properties(raw, sections, stringdata, metadata, property_count, property_data)
             except base.AnchorError:
                 continue
             candidates.append({
@@ -117,6 +120,8 @@ def recover_qmeta_class(raw: bytes, sections, relocs: dict[int, int], class_name
                 "static_metacall_va": static_metacall,
                 "method_count": method_count,
                 "signal_count": signal_count,
+                "property_count": property_count,
+                "properties": properties,
                 "methods": methods,
             })
     unique = {(c["static_metaobject_va"], c["metadata_va"], c["static_metacall_va"]): c for c in candidates}
@@ -268,6 +273,8 @@ def main(argv: list[str]) -> int:
         raise DurableStateError(f"EXACT_CLIENT_FENCE_MISMATCH:{len(raw)}:{digest}")
     sections, relocs = base.parse_elf_layout(raw)
     meta = recover_qmeta_class(raw, sections, relocs, TARGET_CLASS)
+    game_window_meta = recover_qmeta_class(raw, sections, relocs, GAME_WINDOW_CLASS)
+    game_window_semantic_properties = select_world_semantic_properties(game_window_meta["properties"])
     dispatch_targets = recover_dispatch_targets(raw, sections, meta)
 
     methods_by_name = {str(method["name"]): method for method in meta["methods"]}
@@ -311,6 +318,16 @@ def main(argv: list[str]) -> int:
         "schema": "otclient.track-a.current-world-entered-durable-state.v1",
         "classification": "STATIC_DURABLE_STATE_CANDIDATE_NOT_RUNTIME_PROMOTED",
         "exact_client": {"version": "15.32.75d4a0", "size": base.EXPECTED_SIZE, "sha256": base.EXPECTED_SHA256},
+        "game_window_property_census": {
+            "class_name": game_window_meta["class_name"],
+            "static_metaobject_va": game_window_meta["static_metaobject_va"],
+            "static_metacall_va": game_window_meta["static_metacall_va"],
+            "method_count": game_window_meta["method_count"],
+            "signal_count": game_window_meta["signal_count"],
+            "property_count": game_window_meta["property_count"],
+            "properties": game_window_meta["properties"],
+            "world_semantic_properties": game_window_semantic_properties,
+        },
         "controller": {
             "class_name": meta["class_name"],
             "static_metaobject_va": meta["static_metaobject_va"],
@@ -336,12 +353,72 @@ def main(argv: list[str]) -> int:
     output.write_text(json.dumps(document, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print("WORLD_ENTERED_DURABLE_STATE_STATIC_ANALYSIS=PASS")
     print(f"WORLD_ENTERED_DURABLE_STATE_CANDIDATE={candidate_state}")
+    print(f"GAME_WINDOW_PROPERTY_COUNT={game_window_meta['property_count']}")
+    print("GAME_WINDOW_WORLD_SEMANTIC_PROPERTIES=" + ",".join(str(p["name"]) for p in game_window_semantic_properties))
     if candidate_reason:
         print(f"WORLD_ENTERED_DURABLE_STATE_REASON={candidate_reason}")
     print("IN_GAME_CLAIMED=false")
     print("SEMANTIC_PROMOTION_PERFORMED=false")
     return 0
 
+
+
+
+_QT_BUILTIN_TYPES = {
+    1: "bool",
+    2: "int",
+    3: "uint",
+    4: "qlonglong",
+    5: "qulonglong",
+    6: "double",
+    7: "QChar",
+    8: "QVariantMap",
+    9: "QVariantList",
+    10: "QString",
+    11: "QStringList",
+    12: "QByteArray",
+    43: "void",
+}
+
+
+def parse_qmeta_properties(raw: bytes, sections, stringdata: int, metadata: int,
+                           property_count: int, property_data: int) -> list[dict[str, object]]:
+    import track_a_current_world_entered_anchor as base
+
+    properties: list[dict[str, object]] = []
+    for index in range(property_count):
+        row_va = metadata + (property_data + index * 5) * 4
+        row = [base._u32(raw, sections, row_va + field * 4) for field in range(5)]
+        name_index, raw_type, flags, notify_index, revision = row
+        name = base._qstring(raw, sections, stringdata, name_index)
+        if raw_type & 0x80000000:
+            type_name = base._qstring(raw, sections, stringdata, raw_type & 0x7FFFFFFF)
+        else:
+            type_name = _QT_BUILTIN_TYPES.get(raw_type, f"metatype:{raw_type}")
+        properties.append({
+            "index": index,
+            "name": name,
+            "raw_type": raw_type,
+            "type_name": type_name,
+            "flags": flags,
+            "notify_index": notify_index,
+            "revision": revision,
+        })
+    return properties
+
+
+def select_world_semantic_properties(properties: list[dict[str, object]]) -> list[dict[str, object]]:
+    selected: list[dict[str, object]] = []
+    game_state_terms = ("visible", "state", "active", "session", "ready", "connected", "online", "running")
+    for prop in properties:
+        name = str(prop.get("name", ""))
+        lower = name.lower()
+        if lower.startswith("world") or lower.startswith("session"):
+            selected.append(prop)
+            continue
+        if lower.startswith("game") and any(term in lower for term in game_state_terms):
+            selected.append(prop)
+    return selected
 
 if __name__ == "__main__":
     raise SystemExit(main(sys.argv))

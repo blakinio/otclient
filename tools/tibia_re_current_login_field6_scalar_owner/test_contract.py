@@ -60,12 +60,14 @@ for required in (
     'FOCUSED_QMETA_OWNER',
     'FOCUSED_OWNER_CONSTRUCTOR_BINDING',
     'NO_FULL_SCALAR_CENSUS',
+    'def raw_occurrences(',
     'FIELD6_VALUE_PROVEN',
     'FIELD6_VALUE_UNKNOWN',
     'NO_HEURISTIC_RANKING',
     'NO_SEMANTIC_GUESSING',
 ):
     assert required in focused_text, required
+assert 'img.occurrences(' not in focused_text
 for forbidden in ('recover_vtables(', 'enumerate_slot_calls(', 'SCALAR_CALLSITE_CENSUS'):
     assert forbidden not in focused_text, forbidden
 focused_command = 'python3 tools/tibia_re_current_login_field6_scalar_owner/focused_qmeta_owner.py --client'

@@ -1,0 +1,179 @@
+name: Track A current login field6 runtime observation
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+    paths:
+      - .github/scripts/test_track_a_current_login_field6_runtime.py
+      - .github/scripts/track_a_current_login_field6_runtime.sh
+      - .github/scripts/track_a_current_login_field6_runtime_secret_wrapper.sh
+      - .github/workflows/track-a-current-login-field6-runtime.yml
+      - docs/agents/tasks/active/OTC-20260828-current-login-field6-runtime.md
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+
+env:
+  TASK_ID: OTC-20260828-current-login-field6-runtime
+  EXPECTED_VERSION: 15.32.75d4a0
+  EXPECTED_SIZE: '52105824'
+  EXPECTED_SHA: d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a
+  TASK_STATE: /home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260828-current-login-field6-runtime
+
+jobs:
+  contract:
+    if: github.event_name == 'pull_request'
+    name: Current login field6 runtime contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+      - name: Validate implementation and static admission
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 .github/scripts/test_track_a_current_login_field6_runtime.py
+          bash -n .github/scripts/track_a_current_login_field6_runtime.sh
+          bash -n .github/scripts/track_a_current_login_field6_runtime_secret_wrapper.sh
+          python3 .github/scripts/test_track_a_agent_runtime_governance.py \
+            --changed-from HEAD^1 \
+            --expected-branch "$GITHUB_HEAD_REF"
+          git diff --check HEAD^1 HEAD
+          echo TRACK_A_CURRENT_LOGIN_FIELD6_RUNTIME_CONTRACT=PASS
+
+  live-observation:
+    if: >-
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request &&
+      github.event.issue.number == 758 &&
+      github.event.comment.user.login == github.repository_owner &&
+      github.event.comment.body == 'AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V1 once=true'
+    name: One-shot isolated field6 observation
+    runs-on: [otclient, synology]
+    timeout-minutes: 12
+    concurrency:
+      group: official-client-re-current-login-field6-runtime
+      cancel-in-progress: false
+    steps:
+      - name: Checkout exact trusted main
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          ref: main
+          fetch-depth: 2
+
+      - name: Prove trusted-main live admission and immutable boundaries
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$(git rev-parse HEAD)" = "$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          task="docs/agents/tasks/active/$TASK_ID.md"
+          test -f "$task"
+          grep -Fqx 'runtime_access: ephemeral_isolated' "$task"
+          grep -Fqx "runtime_owner_task: $TASK_ID" "$task"
+          grep -Fqx 'target_uniqueness: PROVEN' "$task"
+          grep -Fqx 'mutation_authorized: true' "$task"
+          grep -Fqx 'credentials_allowed: true' "$task"
+          grep -Fqx 'login_allowed: true' "$task"
+          grep -Fqx 'relogin_allowed: false' "$task"
+          grep -Fqx 'restart_allowed: false' "$task"
+          grep -Fqx 'character_selection_allowed: false' "$task"
+          grep -Fqx 'gameplay_allowed: false' "$task"
+          grep -Fqx 'network_payload_capture_allowed: false' "$task"
+          grep -Fqx 'physical_action_budget: 1' "$task"
+          grep -Fqx 'physical_action_count: 0' "$task"
+          grep -Fqx 'gate_a: NOT_APPLICABLE' "$task"
+          grep -Fqx 'generation_rebind: NOT_APPLICABLE' "$task"
+          grep -Fqx 'gate_b: NOT_APPLICABLE' "$task"
+          grep -Fqx 'bootstrap: NOT_APPLICABLE' "$task"
+          grep -Fq 'AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V1 once=true' "$task"
+          python3 .github/scripts/test_track_a_agent_runtime_governance.py
+          python3 .github/scripts/test_track_a_current_login_field6_runtime.py
+          bash -n .github/scripts/track_a_current_login_field6_runtime.sh
+          bash -n .github/scripts/track_a_current_login_field6_runtime_secret_wrapper.sh
+          echo TRACK_A_FIELD6_LIVE_ADMISSION=PASS
+
+      - name: Consume exact owner authorization once
+        shell: bash
+        env:
+          COMMENT_ID: ${{ github.event.comment.id }}
+        run: |
+          set -Eeuo pipefail
+          [[ "$COMMENT_ID" =~ ^[1-9][0-9]*$ ]]
+          dir="$TASK_STATE/authorizations"
+          mkdir -p "$dir"
+          chmod 700 "$TASK_STATE" "$dir" 2>/dev/null || true
+          python3 - "$dir/$COMMENT_ID.used" "$GITHUB_RUN_ID" <<'PY'
+          import os,sys
+          path,run_id=sys.argv[1:]
+          try:
+              fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
+          except FileExistsError:
+              raise SystemExit('OWNER_AUTHORIZATION_ALREADY_CONSUMED')
+          with os.fdopen(fd,'w',encoding='ascii') as f:
+              f.write(run_id+'\n')
+              f.flush(); os.fsync(f.fileno())
+          print('OWNER_AUTHORIZATION_CONSUMED_ONCE=true')
+          PY
+
+      - name: Capture field6 with protected login inputs
+        shell: bash
+        env:
+          TIBIA_TEST_EMAIL: ${{ secrets.TIBIA_TEST_EMAIL }}
+          TIBIA_TEST_PASSWORD: ${{ secrets.TIBIA_TEST_PASSWORD }}
+        run: |
+          set +x
+          test -n "$TIBIA_TEST_EMAIL"
+          test -n "$TIBIA_TEST_PASSWORD"
+          bash .github/scripts/track_a_current_login_field6_runtime_secret_wrapper.sh \
+            run "$RUNNER_TEMP/current-login-field6-runtime.json"
+
+      - name: Validate scalar-only evidence
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          artifact="$RUNNER_TEMP/current-login-field6-runtime.json"
+          test -s "$artifact"
+          python3 - "$artifact" <<'PY'
+          import json,sys
+          d=json.load(open(sys.argv[1],encoding='utf-8'))
+          required={
+            'schema','track_id','task_id','client_version','client_size','client_sha256',
+            'producer_offset','capture_source','pid','process_start_ticks','pie_base',
+            'field6_value','field6_value_proven','login_submit_count',
+            'character_selection_performed','world_entry_performed','gameplay_performed',
+            'network_payload_capture_performed','credentials_retained','packet_payloads_retained',
+            'process_environment_retained','raw_memory_retained'
+          }
+          if set(d)!=required: raise SystemExit('FIELD6_ARTIFACT_SCHEMA_KEYS_INVALID')
+          if d['schema']!='otclient.track-a.current-login-field6-runtime.v1': raise SystemExit('FIELD6_ARTIFACT_SCHEMA_INVALID')
+          if d['track_id']!='official-client-re' or d['task_id']!='OTC-20260828-current-login-field6-runtime': raise SystemExit('FIELD6_ARTIFACT_OWNER_INVALID')
+          if d['client_version']!='15.32.75d4a0' or d['client_size']!=52105824 or d['client_sha256']!='d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a': raise SystemExit('FIELD6_ARTIFACT_FENCE_INVALID')
+          if d['producer_offset']!='0xe25620' or d['capture_source']!='gdb_parent_breakpoint_edx': raise SystemExit('FIELD6_ARTIFACT_SOURCE_INVALID')
+          if d['field6_value_proven'] is not True or not isinstance(d['field6_value'],int) or not 0 <= d['field6_value'] <= 0xffffffff: raise SystemExit('FIELD6_VALUE_INVALID')
+          if d['login_submit_count']!=1: raise SystemExit('LOGIN_SUBMIT_COUNT_INVALID')
+          for key in ('character_selection_performed','world_entry_performed','gameplay_performed','network_payload_capture_performed','credentials_retained','packet_payloads_retained','process_environment_retained','raw_memory_retained'):
+              if d[key] is not False: raise SystemExit(key.upper()+'_INVALID')
+          if not isinstance(d['pid'],int) or d['pid']<2 or not isinstance(d['process_start_ticks'],int) or d['process_start_ticks']<1: raise SystemExit('PROCESS_IDENTITY_INVALID')
+          if not isinstance(d['pie_base'],str) or not d['pie_base'].startswith('0x'): raise SystemExit('PIE_BASE_INVALID')
+          print('TRACK_A_FIELD6_RUNTIME_CAPTURED=true')
+          print('FIELD6_VALUE_PROVEN=true')
+          print('FIELD6_VALUE='+str(d['field6_value']))
+          print('TRACK_A_FIELD6_CHARACTER_SELECTION=false')
+          print('TRACK_A_FIELD6_WORLD_ENTRY=false')
+          PY
+
+      - name: Upload sanitized field6 evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: track-a-current-login-field6-runtime-${{ github.run_id }}
+          path: ${{ runner.temp }}/current-login-field6-runtime.json
+          if-no-files-found: error
+          retention-days: 3

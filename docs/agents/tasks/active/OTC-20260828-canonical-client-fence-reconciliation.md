@@ -1,32 +1,34 @@
 ---
 task_id: OTC-20260828-canonical-client-fence-reconciliation
-status: review_pending_final_restack
+status: live_admission_pending
 agent: ChatGPT
 session_role: implementer
 project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: infrastructure
-phase: review
-branch: fix/OTC-20260828-canonical-client-fence-reconciliation
+phase: live_admission
+branch: docs/OTC-20260828-canonical-client-fence-reconciliation-admission
 base_branch: main
-base_main: 009c148a8ba7406acf07c5ce7f95a8f95f69b992
+base_main: 911ba621923513b061ba71f19a2ea281f806cdee
 created: 2026-08-28T22:00:00+02:00
 risk: high
-execution_class: github_hosted
-execution_mode: chat_github
-runtime_access: none
-runtime_owner_task: NOT_APPLICABLE
-runtime_namespace: NOT_APPLICABLE
-canonical_registration: NOT_APPLICABLE
-canonical_lease_generation: NOT_APPLICABLE
-registration_lease_generation: NOT_APPLICABLE
-gate_a: NOT_APPLICABLE
+execution_class: self_hosted
+execution_mode: github_actions_metadata_reconciliation
+runtime_access: canonical_recovery
+runtime_owner_task: OTC-20260828-canonical-client-fence-reconciliation
+runtime_namespace: canonical-live-runtime
+canonical_registration: PRESENT
+canonical_lease_generation: UNKNOWN
+registration_lease_generation: UNKNOWN
+gate_a: REQUIRED_NOT_PROVEN
 generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
-target_uniqueness: NOT_APPLICABLE
+target_uniqueness: UNKNOWN
 mutation_authorized: false
+recovery_mode: client_fence_reconciliation_v1
+client_fence_reconciliation_contract: TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_V1
 credentials_allowed: false
 login_allowed: false
 relogin_allowed: false
@@ -58,15 +60,16 @@ reuses:
   - merged current Kasm existing-runtime adoption probe
   - PR #754 trusted exact-current client fence
   - PR #760 gameWindowState preflight blocker evidence
+  - PR #763 merged client-fence reconciliation implementation
 blocks:
   - LIVE_GAME_WINDOW_STATE_CAUSAL_VALIDATION
 ---
 
 # Objective
 
-Implement a narrow, reviewed, metadata-only canonical registration recovery for the exact predecessor fence left behind after the repository current-client authority advanced in PR #754.
+Admit exactly one reviewed, metadata-only canonical registration reconciliation for the exact predecessor fence left behind after repository current-client authority advanced in PR #754.
 
-The repository implementation phase is strictly `runtime_access: none`. It must not inspect or mutate the live official client or canonical registration. The implementation becomes eligible for live use only after squash merge to trusted protected `main` and a separate trusted-main recovery-admission checkpoint.
+The implementation was squash-merged in PR #763 as `911ba621923513b061ba71f19a2ea281f806cdee`. This checkpoint changes only repository admission state. It performs no live action by itself and grants no client mutation, login, GUI/input, process-memory, process-control, credential, gameplay or network-payload authority.
 
 # Root cause
 
@@ -76,7 +79,7 @@ Current transition `_read()` correctly rejects any registration outside the curr
 
 # Design boundary
 
-The implementation must follow `TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_V1.md` and ADR-0002:
+The live reconciliation must follow `TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_V1.md` and ADR-0002:
 
 - exact source fence only: `15.32 / 52109920 / ed5469b9...`;
 - exact target fence only: `15.32.75d4a0 / 52105824 / d1a16819...`;
@@ -89,15 +92,21 @@ The implementation must follow `TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_V1
 - execution only as a finite child under reviewed canonical lease `guard-run`;
 - no client launch/stop/signal/restart/attach/injection/input/login/credentials/gameplay/process-memory observation.
 
-# TDD
+# TDD and implementation evidence
 
-Primary implementation RED is captured at exact test/design-only head `95a49119f8f8866c9761bcb587ca62719f416dc1`, workflow run `33195284267`, job `98930734507`. The focused step failed because every test reached the intentional pre-implementation assertion `canonical client-fence reconciliation implementation missing`; the trusted-main live job was skipped.
+Primary implementation RED was captured at `95a49119f8f8866c9761bcb587ca62719f416dc1`, run `33195284267`, job `98930734507`.
 
-Primary implementation GREEN was established at `fe998516ecfd816fb053e0b56158d6aa7f9466e1`, run `33195900581`, job `98932830802`, with the focused contract, existing canonical transition, Kasm adoption probe and Track A governance green. Same-head Track A governance run `33195900573` passed jobs `98932830815` and `98932831016`.
+Primary implementation GREEN was established at `fe998516ecfd816fb053e0b56158d6aa7f9466e1`, run `33195900581`, job `98932830802`; same-head Track A governance run `33195900573` passed jobs `98932830815` and `98932831016`.
 
-Independent merge review then found that a future live workflow must not rely on an implementation task that still says `runtime_access: none`. A second test-first admission RED was captured at `e45da7114663d9276ce9225889ae1aa4ae746dea`, run `33196302067`, job `98934193806`: the new explicitly named pre-Gate-A client-fence recovery fixture was rejected solely because the global validator required `registration_lease_generation` to be a positive integer instead of allowing fresh under-lock discovery. The companion legacy recovery test still rejected the same UNKNOWN generation checkpoint, proving that a narrow mode-specific rule can be added without weakening old recovery.
+A separate admission-review RED was captured at `e45da7114663d9276ce9225889ae1aa4ae746dea`, run `33196302067`, job `98934193806`, proving that UNKNOWN generation discovery needed a narrowly named pre-Gate-A recovery mode rather than a global relaxation.
 
-The governance fix now reserves UNKNOWN generation discovery only for:
+The exact mode-specific governance GREEN was then captured at `3bc47b1442723a9f7e60a5cc5e9c2526ad9550c0`, run `33196798715`, job `98935886243`; legacy canonical recovery remained fail-closed.
+
+Final implementation head `f68c35d5894f254e01dbeda50251a58db3dbd9e5` passed reconciliation, current-client-fence, Track A admission/governance, canonical-live governance and CI Required before PR #763 was squash-merged as `911ba621923513b061ba71f19a2ea281f806cdee`.
+
+# Pending live admission
+
+This checkpoint intentionally uses the only pre-Gate-A admission shape allowed for this reviewed migration:
 
 ```yaml
 runtime_access: canonical_recovery
@@ -114,29 +123,29 @@ target_uniqueness: UNKNOWN
 mutation_authorized: false
 ```
 
-That checkpoint grants no registration write. The helper must acquire current authority, prove a strictly newer controller generation, prove the exact approved predecessor and stable exact-current singleton target under the canonical guard, and emit concrete under-lock Gate-A/target-uniqueness evidence before atomic commit.
-
-# Concurrent-main reconciliation
-
-Protected `main` advanced during implementation through independent current-login-field6 work (#758 and #762). Those changes are task-owned `ephemeral_isolated` work and do not overlap canonical registration/lease authority.
-
-Fresh exact-head verification after the first restack exposed a stale branch-name assumption in the pre-existing `Track A canonical current-client fence` workflow: run `33199411721`, job `98944789902` passed its focused fence/runtime component tests but rejected this PR because the governance invocation was still hard-coded to the historical #754 branch. The one-line repository-only repair was independently verified and squash-merged as #765, advancing protected `main` to `009c148a8ba7406acf07c5ce7f95a8f95f69b992`. The reconciliation branch must be restacked on that exact main and all exact-head checks rerun before merge.
+The UNKNOWN generations are deliberate. They are not write authority. The trusted-main live workflow must freshly acquire the canonical lease, prove a strictly newer current controller generation, validate the approved predecessor registration, prove the exact-current singleton target and target uniqueness under the canonical guard, and only then may the reviewed helper atomically reconcile registration metadata.
 
 # Live-use rule
 
-The workflow exposes a post-merge owner-authored exact issue-comment trigger for the one metadata reconciliation, but it refuses to proceed unless trusted `main` contains the explicit pending `client_fence_reconciliation_v1` admission above and the global admission validator accepts that task state.
+This admission PR itself must not execute the live reconciliation. Only after this exact admission is merged green to protected `main` may the repository owner post the exact trigger `RECONCILE_CANONICAL_CLIENT_FENCE` on #760.
 
-This implementation PR itself stays `runtime_access: none` and must never invoke the live trigger. After this PR merges, a **separate repository-only admission PR** must switch this task to the exact pending recovery admission; that PR must itself merge green before the live trigger is used. Dynamic generation values remain UNKNOWN until the guarded live worker freshly proves them.
+The live workflow must accept only:
+
+- `ALREADY_CURRENT`, if the registration is already exact-current and fail-closed;
+- a complete approved predecessor reconciliation PASS; or
+- a precise fail-closed blocker.
+
+No owner login/character/world action is requested during reconciliation. After an exact-current `state: UNKNOWN` registration is verified, this recovery authority must be released and the memory-free `PREFLIGHT_GAME_WINDOW_STATE_QUALIFICATION` must be rerun before any owner UI interaction.
 
 # Acceptance
 
-1. Correct implementation RED is captured before production helper exists.
-2. Explicit recovery-admission RED is captured before global governance is changed.
-3. Focused reconciliation tests pass on the final exact implementation head, including the legacy no-weakening check and exact contract binding.
-4. Existing canonical transition, Kasm adoption and Track A agent runtime governance tests remain green.
-5. The helper contains no process-control, memory-observation, input, login or credential primitive.
-6. Exact changed scope is reviewed and protected-main freshness is checked immediately before squash merge.
-7. Live reconciliation runs only after merge plus a separately merged trusted-main recovery-admission checkpoint and produces a precise PASS or fail-closed blocker.
-8. The gameWindowState memory-free preflight is rerun after successful reconciliation; owner UI interaction remains forbidden until that preflight reports READY.
+1. This PR changes only the active admission task.
+2. Track A runtime governance accepts the exact named recovery mode and exact contract binding.
+3. Both generation values remain UNKNOWN before Gate A and target uniqueness remains UNKNOWN.
+4. Mutation, login, process control, process memory, GUI/input, gameplay and payload capture remain unauthorized.
+5. PR-event live reconciliation stays skipped.
+6. Protected-main freshness and exact-head checks are verified before squash merge.
+7. After merge, one fresh exact owner-authored reconciliation trigger is consumed and classified.
+8. Recovery authority is released after terminal reconciliation result before downstream gameWindowState observation.
 
-next_action: clean-restack this implementation onto protected `main@009c148a8ba7406acf07c5ce7f95a8f95f69b992`, obtain fresh exact-head GREEN for reconciliation/current-fence/governance/CI, then safe-squash-merge PR #763. After merge create and merge the separate pending live-admission checkpoint before any reconciliation trigger.
+next_action: merge this repository-only admission after fresh exact-head governance/CI, then post one fresh exact `RECONCILE_CANONICAL_CLIENT_FENCE` trigger on #760 and classify the trusted-main live result without manually editing canonical registration.

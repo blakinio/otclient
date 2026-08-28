@@ -5,6 +5,7 @@ import hashlib
 import importlib.util
 from pathlib import Path
 import struct
+import sys
 import unittest
 
 SCRIPT = Path(__file__).with_name('track_a_game_window_state_qualification.py')
@@ -13,6 +14,7 @@ if not SCRIPT.is_file():
 spec = importlib.util.spec_from_file_location('game_window_state_qualification', SCRIPT)
 assert spec and spec.loader
 module = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = module
 spec.loader.exec_module(module)
 
 

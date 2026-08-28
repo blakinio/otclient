@@ -384,14 +384,26 @@ def main(argv: list[str]) -> int:
         game_window_state_assignment_sources.append(item)
     source_targets = {int(item["source_va"]) for item in game_window_state_assignment_sources}
     raw_initializer_xrefs = scan_rip_target_xrefs(raw, sections, source_targets) if source_targets else {}
-    game_window_state_initializer_xrefs = {
-        f"0x{target:x}": {
+    game_window_state_initializer_xrefs: dict[str, object] = {}
+    for target in sorted(source_targets):
+        xrefs = raw_initializer_xrefs.get(target, [])
+        literal_calls = extract_global_qstring_initializer_literals(xrefs)
+        decoded_literal_calls: list[dict[str, object]] = []
+        for call in literal_calls:
+            item = dict(call)
+            try:
+                item["literal_candidates"] = decode_bounded_static_literal_candidates(raw, sections, int(call["literal_va"]))
+                item["decode_state"] = "CANDIDATES_AVAILABLE" if item["literal_candidates"] else "NO_PRINTABLE_CANDIDATE"
+            except DurableStateError as exc:
+                item["decode_state"] = "NOT_PROVEN"
+                item["decode_reason"] = str(exc)
+            decoded_literal_calls.append(item)
+        game_window_state_initializer_xrefs[f"0x{target:x}"] = {
             "source_va": target,
-            "xref_count": len(raw_initializer_xrefs.get(target, [])),
-            "xrefs": raw_initializer_xrefs.get(target, []),
+            "xref_count": len(xrefs),
+            "xrefs": xrefs,
+            "initializer_literal_calls": decoded_literal_calls,
         }
-        for target in sorted(source_targets)
-    }
     game_window_state_method_traces: dict[str, object] = {}
     for writer_name in ("goToLogin", "goToCreateNewAccount", "loginPressed", "onAuthenticatedChanged", "onGameWindowClosed"):
         writer = game_window_methods_by_name.get(writer_name)
@@ -1020,6 +1032,81 @@ def scan_direct_branch_target_xrefs(raw: bytes, sections, target_vas: set[int], 
         unique = {int(site["branch_va"]): site for site in result[target]}
         result[target] = [unique[key] for key in sorted(unique)]
     return result
+
+
+def extract_global_qstring_initializer_literals(xrefs: list[dict[str, object]]) -> list[dict[str, int]]:
+    results: list[dict[str, int]] = []
+    for xref in xrefs:
+        reference = dict(xref.get("reference", {}))
+        if reference.get("mnemonic") != "lea":
+            continue
+        ref_op = str(reference.get("op_str", ""))
+        if "," not in ref_op:
+            continue
+        destination_register = ref_op.split(",", 1)[0].strip()
+        context = list(xref.get("context", []))
+        ref_index = next((idx for idx, item in enumerate(context) if int(item.get("address", -1)) == int(xref.get("reference_va", -2))), None)
+        if ref_index is None:
+            continue
+        literal_va = None
+        destination_bound = False
+        for item in context[ref_index + 1:ref_index + 10]:
+            mnemonic = str(item.get("mnemonic", ""))
+            op_str = str(item.get("op_str", ""))
+            compact = op_str.replace(" ", "")
+            if mnemonic == "lea" and compact.startswith("rsi,[rip"):
+                disp = _parse_hex_displacement(op_str.split(",", 1)[1], "rip")
+                if disp is not None:
+                    literal_va = int(item["address"]) + int(item["size"]) + disp
+                continue
+            if mnemonic == "mov" and compact == f"rdi,{destination_register}":
+                destination_bound = True
+                continue
+            if mnemonic == "call" and literal_va is not None and destination_bound:
+                target = op_str.strip()
+                if re.fullmatch(r"0x[0-9a-fA-F]+", target):
+                    results.append({
+                        "source_reference_va": int(xref["reference_va"]),
+                        "literal_va": literal_va,
+                        "helper_target_va": int(target, 16),
+                    })
+                    break
+    unique = {(item["source_reference_va"], item["literal_va"], item["helper_target_va"]): item for item in results}
+    return [unique[key] for key in sorted(unique)]
+
+
+def _printable_literal(value: str) -> bool:
+    return bool(value) and all(ch.isprintable() or ch in "\t\r\n" for ch in value)
+
+
+def decode_bounded_static_literal_candidates(raw: bytes, sections, literal_va: int, *, max_chars: int = 128) -> list[dict[str, object]]:
+    offset = _static_va_to_offset(sections, literal_va)
+    available = raw[offset:min(len(raw), offset + max_chars * 2 + 2)]
+    candidates: list[dict[str, object]] = []
+    nul = available.find(b"\x00")
+    if 0 < nul <= max_chars:
+        payload = available[:nul]
+        try:
+            value = payload.decode("utf-8", "strict")
+        except UnicodeDecodeError:
+            value = ""
+        if _printable_literal(value):
+            candidates.append({"encoding": "utf-8", "length": len(value), "value": value})
+    utf16_end = None
+    for index in range(0, min(len(available) - 1, max_chars * 2), 2):
+        if available[index:index + 2] == b"\x00\x00":
+            utf16_end = index
+            break
+    if utf16_end is not None and utf16_end > 0:
+        payload = available[:utf16_end]
+        try:
+            value = payload.decode("utf-16-le", "strict")
+        except UnicodeDecodeError:
+            value = ""
+        if _printable_literal(value):
+            candidates.append({"encoding": "utf-16-le", "length": len(value), "value": value})
+    unique = {(item["encoding"], item["value"]): item for item in candidates}
+    return sorted(unique.values(), key=lambda item: (-int(item["length"]), str(item["encoding"])))
 
 
 if __name__ == "__main__":

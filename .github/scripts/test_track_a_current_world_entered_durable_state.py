@@ -303,5 +303,44 @@ class DirectBranchTargetXrefTests(unittest.TestCase):
         self.assertEqual({0x1200: []}, result)
 
 
+class GlobalQStringInitializerLiteralTests(unittest.TestCase):
+    def test_extracts_literal_constructor_pattern(self):
+        xrefs = [{
+            "reference_va": 0x2000,
+            "reference": {"address": 0x2000, "size": 7, "mnemonic": "lea", "op_str": "rbp, [rip + 0xf9]"},
+            "context": [
+                {"address": 0x2000, "size": 7, "mnemonic": "lea", "op_str": "rbp, [rip + 0xf9]"},
+                {"address": 0x2007, "size": 7, "mnemonic": "lea", "op_str": "rsi, [rip + 0x1f2]"},
+                {"address": 0x200e, "size": 3, "mnemonic": "mov", "op_str": "rdi, rbp"},
+                {"address": 0x2011, "size": 5, "mnemonic": "call", "op_str": "0x3000"},
+            ],
+        }]
+        result = module.extract_global_qstring_initializer_literals(xrefs)
+        self.assertEqual(1, len(result))
+        self.assertEqual(0x2200, result[0]["literal_va"])
+        self.assertEqual(0x3000, result[0]["helper_target_va"])
+
+    def test_decodes_bounded_utf16_literal_candidate(self):
+        raw = bytearray(0x400)
+        sections = [(0x1000, 0x100, 0x300, 2)]
+        text = "GameScreen"
+        payload = text.encode("utf-16-le") + b"\x00\x00"
+        raw[0x180:0x180 + len(payload)] = payload
+        result = module.decode_bounded_static_literal_candidates(bytes(raw), sections, 0x1080)
+        values = {(item["encoding"], item["value"]) for item in result}
+        self.assertIn(("utf-16-le", "GameScreen"), values)
+
+    def test_rejects_missing_initializer_literal_pattern(self):
+        xrefs = [{
+            "reference_va": 0x2000,
+            "reference": {"address": 0x2000, "size": 7, "mnemonic": "lea", "op_str": "rbp, [rip + 0xf9]"},
+            "context": [
+                {"address": 0x2000, "size": 7, "mnemonic": "lea", "op_str": "rbp, [rip + 0xf9]"},
+                {"address": 0x2007, "size": 5, "mnemonic": "call", "op_str": "0x3000"},
+            ],
+        }]
+        self.assertEqual([], module.extract_global_qstring_initializer_literals(xrefs))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -40,6 +40,7 @@ checks = {
     'state literal decode': 'game_window_state_assignment_sources' in d and 'decode_static_qstring_source' in d,
     'state initializer xrefs': 'game_window_state_initializer_xrefs' in d and 'scan_rip_target_xrefs' in d,
     'display signal callers': 'game_window_display_signal_callers' in d and 'scan_direct_branch_target_xrefs' in d,
+    'initializer literal decode': 'initializer_literal_calls' in d and 'decode_bounded_static_literal_candidates' in d,
     'durable fail closed': 'PROVEN_STATIC_SIMPLE_FIELD_CANDIDATE' in d and 'NOT_PROVEN' in d,
     'no historical address reuse': 'historical_address_reuse' in s and 'False' in s and 'historical_address_reuse' in d,
     'no ingame claim': 'in_game_claimed' in s and 'False' in s and 'in_game_claimed' in d,

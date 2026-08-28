@@ -86,7 +86,9 @@ for producer_name, producer in (
 ):
     payload = login_payload_block(producer)
     assert 'operatingsystem' in payload, f'{producer_name}: missing mandatory operatingsystem'
-    assert 'TIBIA_OPERATING_SYSTEM' in payload, f'{producer_name}: operatingsystem must come from runtime-derived value'
+    assert 'qsysinfo_pretty_product_name()' in payload, f'{producer_name}: operatingsystem must come from runtime-derived value'
+    assert 'platform.freedesktop_os_release()' in producer, f'{producer_name}: missing Linux os-release derivation'
+    assert 'os.uname()' in producer, f'{producer_name}: missing QSysInfo-compatible uname fallback'
     for field in conditional_login_fields:
         assert f"'{field}'" not in payload and f'\"{field}\"' not in payload, (
             f'{producer_name}: synthesized conditional login field {field}'

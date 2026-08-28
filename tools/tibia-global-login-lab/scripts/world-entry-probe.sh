@@ -98,7 +98,19 @@ docker exec -i \
   "$CONTAINER" python3 - <<'PY'
 import json
 import os
+import platform
 from pathlib import Path
+
+
+def qsysinfo_pretty_product_name():
+    try:
+        pretty_name = platform.freedesktop_os_release().get('PRETTY_NAME', '')
+    except OSError:
+        pretty_name = ''
+    if pretty_name:
+        return pretty_name
+    uname = os.uname()
+    return f'{uname.sysname} {uname.release}'
 
 payload = {
     "email": os.environ["TIBIA_TEST_EMAIL"],
@@ -108,6 +120,7 @@ payload = {
     "clientversion": os.environ["TIBIA_CLIENT_VERSION_STRING"],
     "clienttype": 2,
     "assetversion": os.environ["TIBIA_ASSET_VERSION"],
+    "operatingsystem": qsysinfo_pretty_product_name(),
 }
 path = Path('/lab/secrets/login-request.json')
 path.write_text(json.dumps(payload, separators=(',', ':')), encoding='utf-8')

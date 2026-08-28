@@ -835,3 +835,15 @@ Current state:
 - no promoted final queue/TCP game-login writer evidence exists in trusted repo state for current build `15.32.75d4a0`; historical PR #589 evidence is explicitly older-build and does not prove final TCP serialization.
 
 Exact next action: `BLOCKED_REQUIRED_CURRENT_BUILD_GAME_LOGIN_WIRE_WRITER_EVIDENCE`. Do not resend the current packet and do not guess feature toggles. Resume only after current-build final `TProtocolMessageQueue` queue/TCP writer evidence is promoted, compare it against `ProtocolGame::sendLoginPacket()`, then permit at most one evidence-derived E2E.
+
+## 2026-08-28 final-continuation loginservice OS checkpoint
+
+Durable evidence: `docs/agents/evidence/OTC-20260813-tibia-global-login-lab/20260828-loginservice-operatingsystem-contract.md`
+
+Fresh trusted main is `470d5bd285e29f9d3f24f70ff3fc5370e2990e2a`. PR #284 started this continuation at `5a0b0879c43acbbf2d6e5d83b78ee4ceab62a044` and was returned to draft while implementation is active.
+
+TDD RED is proven on hosted run `33145320209`, job `98764948909`, exact test-only head `b5e458043c5181f50a15e1f00e9ae690c03fe494`: the focused contract failed only because the encrypted handoff login payload lacked mandatory `operatingsystem`; prepare, secret-bearing emit and upload were skipped.
+
+The minimal repair adds runtime-derived `operatingsystem` to the encrypted producer, HTTP preflight and world-entry producer, while forbidding synthesized conditional token/code fields. Local focused contract, shell syntax, QSysInfo-compatible Linux derivation check and `git diff --check` pass. The game E2E marker remains absent.
+
+`next_action`: push the GREEN implementation head and consume exactly one automatic encrypted-handoff HTTP-only validation; if session/playdata is valid, authorize the single typed game E2E, otherwise checkpoint the redacted rejection and do not retry identically.

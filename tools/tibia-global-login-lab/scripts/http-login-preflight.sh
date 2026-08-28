@@ -50,8 +50,20 @@ printf "%s" "$assetversion" >/tmp/tibia-assetversion
 
 docker exec -i -e TIBIA_TEST_EMAIL -e TIBIA_TEST_PASSWORD "$CONTAINER" python3 - <<'PY'
 import json, os
+import platform
 from pathlib import Path
 assetversion = Path('/tmp/tibia-assetversion').read_text().strip()
+
+def qsysinfo_pretty_product_name():
+    try:
+        pretty_name = platform.freedesktop_os_release().get('PRETTY_NAME', '')
+    except OSError:
+        pretty_name = ''
+    if pretty_name:
+        return pretty_name
+    uname = os.uname()
+    return f'{uname.sysname} {uname.release}'
+
 payload = {
     "email": os.environ["TIBIA_TEST_EMAIL"],
     "password": os.environ["TIBIA_TEST_PASSWORD"],
@@ -60,6 +72,7 @@ payload = {
     "clientversion": "15.32.bf29ac",
     "clienttype": 2,
     "assetversion": assetversion,
+    "operatingsystem": qsysinfo_pretty_product_name(),
 }
 Path('/tmp/tibia-login-request.json').write_text(json.dumps(payload, separators=(',', ':')), encoding='utf-8')
 print('LAB_HTTP_PREFLIGHT_ASSET_VERSION_LENGTH=' + str(len(assetversion)))

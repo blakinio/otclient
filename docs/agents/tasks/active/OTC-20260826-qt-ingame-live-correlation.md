@@ -1,7 +1,7 @@
 ---
 task_id: OTC-20260826-qt-ingame-live-correlation
-status: active
-phase: runtime_preparation
+status: waiting
+phase: waiting_owner_manual_login
 agent: ChatGPT
 session_role: owner
 project_lane: otclient
@@ -9,7 +9,7 @@ lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: experiment
 policy_version: 2
-branch: runtime/OTC-20260826-qt-ingame-live-correlation
+branch: docs/OTC-20260826-qt-ingame-live-correlation-checkpoint
 base_branch: main
 base_sha: 8c7bc507aa5c1118aca0b8252dc422675add1be0
 risk: high
@@ -51,8 +51,34 @@ preflight_pid: 646
 preflight_process_start_ticks: 1394843
 preflight_auth_state_machine_running: false
 preflight_player_position_available: true
-current_blocker: NONE_LOGGER_INSTALL_PENDING
-next_action: install a trusted-main owner-gated read-only live correlation workflow, then run it while the owner manually authenticates and selects a character
+logger_pr: 718
+logger_merge_commit: e621a1407d124a71dc9437912e1676aa8929cc11
+view_proxy_fix_pr: 720
+view_proxy_fix_merge_commit: ce0884d5ef2d69a11bab3189f62ed4fef22b0ff6
+owner_comment_trigger_pr: 723
+owner_comment_trigger_merge_commit: faf3018d520f58ad7841cf3819b16ef159f27148
+network_probe_fix_pr: 726
+network_probe_fix_merge_commit: e81c1c67d33adfa541d4e4222d796cc2c1198ad3
+persistent_lan_view_pr: 727
+persistent_lan_view_merge_commit: 39f46d3c64c28e2f02366ca9fac5c58e743b8bf0
+persistent_lan_frontend: http://192.168.1.21:16084/
+persistent_lan_websocket: https://192.168.1.21:16083/websockify
+persistent_lan_endpoint_probe: PASS_HTTP_200_AND_WEBSOCKET_101_RFB_003_008
+correlation_workflow_ready: true
+correlation_dispatch_pending: true
+owner_comment_trigger_attempt_comment: 5450054574
+owner_comment_trigger_attempt_run: 33154083180
+owner_comment_trigger_attempt_result: PASS
+correlation_dispatch_attempt_run: 33154087797
+correlation_dispatch_attempt_result: SKIPPED_PRE_RUNTIME
+correlation_dispatch_attempt_actor: github-actions[bot]
+trigger_repair_root_cause: GITHUB_TOKEN_WORKFLOW_DISPATCH_LOSES_OWNER_ACTOR
+trigger_repair_tdd_red: PASS_EXPECTED_FAILURE
+trigger_repair_tdd_green: PASS
+trigger_repair_scope: actor-preserving reusable workflow_call plus deterministic source contract
+last_progress_at: 2026-08-28T10:05:33+02:00
+current_blocker: WAITING_OWNER_MANUAL_LOGIN_CAPABILITY
+next_action: when the owner is ready to authenticate manually, dispatch exactly one trusted-main ONE_SHOT_QT_INGAME_CORRELATION run and capture the login -> character selection -> world transition; the agent performs zero GUI input/login/character selection/gameplay and does not promote semantics from an incomplete observation
 ---
 
 # Qt in-game live correlation

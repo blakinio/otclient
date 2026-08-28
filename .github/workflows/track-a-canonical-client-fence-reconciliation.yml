@@ -167,21 +167,21 @@ jobs:
           if fence==old:
               print('RECONCILE')
           elif fence==current:
-              print('ALREADY_CURRENT')
+              print('RECONCILE_CURRENT_IDENTITY')
           else:
               print('BLOCK:UNAPPROVED_REGISTRATION_FENCE')
           PY
           )"
           printf 'TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_DECISION=%s\n' "$decision"
           case "$decision" in
-            RECONCILE|ALREADY_CURRENT) ;;
+            RECONCILE|RECONCILE_CURRENT_IDENTITY) ;;
             BLOCK:*) exit 61 ;;
             *) exit 62 ;;
           esac
           echo "decision=$decision" >> "$GITHUB_OUTPUT"
 
-      - name: Reconcile approved predecessor under canonical guard
-        if: ${{ steps.decision.outputs.decision == 'RECONCILE' }}
+      - name: Reconcile approved source under canonical guard
+        if: ${{ steps.decision.outputs.decision == 'RECONCILE' || steps.decision.outputs.decision == 'RECONCILE_CURRENT_IDENTITY' }}
         shell: bash
         env:
           TRUSTED_MAIN: ${{ steps.trust.outputs.trusted_main }}

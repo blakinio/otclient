@@ -26,7 +26,9 @@ jobs:
         run: |
           set -Eeuo pipefail
           python3 tools/tibia_re_current_login_field6_scalar_owner/test_contract.py
-          python3 -m py_compile tools/tibia_re_current_login_field6_scalar_owner/probe.py
+          python3 -m py_compile \
+            tools/tibia_re_current_login_field6_scalar_owner/probe.py \
+            tools/tibia_re_current_login_field6_scalar_owner/qmeta_owner.py
           bash -n tools/tibia_re_current_login_field6_scalar_owner/prepare_warp.sh
 
       - name: Prepare exact public client through bounded WARP fallback
@@ -66,7 +68,7 @@ jobs:
           print('CURRENT_LOGIN_FIELD6_SCALAR_OWNER_EXACT_FENCE=PASS')
           PY
 
-      - name: Resolve exact scalar caller ownership and handler binding
+      - name: Resolve exact scalar caller QMeta owner and handler binding
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -84,6 +86,7 @@ jobs:
           PY
           mkdir -p artifacts/current-login-field6-scalar-owner
           python3 tools/tibia_re_current_login_field6_scalar_owner/probe.py --client "$RE_ROOT/pkg/client" --output artifacts/current-login-field6-scalar-owner/result.json
+          python3 tools/tibia_re_current_login_field6_scalar_owner/qmeta_owner.py --client "$RE_ROOT/pkg/client" --output artifacts/current-login-field6-scalar-owner/result.json
           rm -f "$RE_ROOT/pkg/client" "$RE_ROOT/pkg/client.lzma"
           echo RAW_CLIENT_RETAINED=false
 
@@ -107,6 +110,14 @@ jobs:
           assert d['scalar_callsite_census']['scope_markers']['PARENT_MEMBER_HANDLER_BINDING'] is True
           assert d['scalar_callsite_census']['scope_markers']['NO_HEURISTIC_RANKING'] is True
           assert d['scalar_callsite_census']['scope_markers']['NO_SEMANTIC_GUESSING'] is True
+          assert d['qmeta_caller_owner']['classification']=='QMETA_CALLER_OWNER'
+          assert d['qmeta_caller_owner']['scope_markers']['TARGET_SCALAR_PARENT_THIS'] is True
+          assert d['qmeta_caller_owner']['scope_markers']['STATIC_METAOBJECT_TRIPLE'] is True
+          assert d['qmeta_caller_owner']['scope_markers']['METHOD_CASE_DIRECT_EDGE'] is True
+          assert d['qmeta_caller_owner']['scope_markers']['OWNER_QMETA_CLASS'] is True
+          assert d['qmeta_caller_owner']['scope_markers']['PARENT_MEMBER_HANDLER_BINDING'] is True
+          assert d['qmeta_caller_owner']['scope_markers']['NO_HEURISTIC_RANKING'] is True
+          assert d['qmeta_caller_owner']['scope_markers']['NO_SEMANTIC_GUESSING'] is True
           assert d['classification'] in ('FIELD6_VALUE_PROVEN','FIELD6_VALUE_UNKNOWN')
           print('CURRENT_LOGIN_FIELD6_SCALAR_OWNER_SANITIZED_RESULT=PASS')
           PY

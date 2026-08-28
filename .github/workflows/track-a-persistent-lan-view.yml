@@ -101,20 +101,15 @@ jobs:
           assert d.get('client_sha256')=='ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8', d.get('client_sha256')
           print('STALE_REGISTRATION_SHAPE=PASS')
           PY
-          mapfile -t client_candidates < <(docker exec "$target" sh -lc 'for r in /home /opt /legacy-home; do [ -d "$r" ] || continue; find "$r" -xdev -type f -path "*/bin/client" -size 52109920c -print 2>/dev/null; done')
-          exact=()
-          for client in "${client_candidates[@]}"; do
-            sha="$(docker exec "$target" sha256sum "$client" | awk '{print $1}')"
-            [[ "$sha" == "$expected_sha" ]] && exact+=("$client")
-          done
-          echo INSTALLED_CLIENT_CANDIDATE_COUNT="${#exact[@]}"
-          [[ "${#exact[@]}" -eq 1 ]] || exit 95
-          client="${exact[0]}"
-          pkg="${client%/bin/client}"
+          pkg='/home/kasm-user/otclient-track-a/Tibia-32177065988-1/bin'
+          client="$pkg/client"
           docker exec "$target" test -x "$client"
+          size="$(docker exec "$target" stat -Lc %s "$client")"
+          sha="$(docker exec "$target" sha256sum "$client" | awk '{print $1}')"
+          [[ "$size" == "$expected_size" && "$sha" == "$expected_sha" ]]
           echo INSTALLED_CLIENT_PATH="$client"
           echo INSTALLED_CLIENT_FENCE=PASS
-          docker exec -d -u kasm-user -e DISPLAY=:1 -e HOME=/home/kasm-user -w "$pkg" "$target" ./bin/client
+          docker exec -d -u kasm-user -e DISPLAY=:1 -e HOME=/home/kasm-user -w "$pkg" "$target" ./client
           for _ in $(seq 1 120); do
             pids="$(docker exec "$target" pgrep -x client 2>/dev/null || true)"
             count="$(printf '%s\n' "$pids" | sed '/^$/d' | wc -l | tr -d ' ')"

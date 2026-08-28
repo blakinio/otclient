@@ -1,4 +1,4 @@
-name: Track A diagnose Tibia launcher singleton
+name: Track A inspect Tibia launcher IPC
 on:
   push:
     branches: [research/OTC-20260827-kasm-endpoint-inventory]
@@ -6,41 +6,28 @@ on:
 permissions:
   contents: read
 jobs:
-  diagnose:
+  inspect:
     if: github.actor == 'blakinio'
     runs-on: [otclient, synology]
     timeout-minutes: 5
     steps:
-      - name: Diagnose stale single-instance state
+      - name: Inspect launcher IPC and singleton primitives
         shell: bash
         run: |
           set -Eeuo pipefail
           c=otclient-track-a-kasmvnc
           docker inspect -f '{{.State.Running}}' "$c" | grep -Fx true
-          docker exec -u kasm-user -e DISPLAY=:1 "$c" xdpyinfo >/dev/null
-          echo '=== BROAD PROCESSES ==='
+          echo '=== TIBIA PROCESSES ==='
           docker exec "$c" sh -lc "ps -eo user,pid,ppid,etime,args | grep -Ei '[t]ibia|[c]ipsoft|[l]auncher|[u]pdat' || true"
-          echo '=== TMP/RUNTIME IPC ==='
-          docker exec "$c" sh -lc "find /tmp /run/user -maxdepth 3 \( -type s -o -type f -o -type p \) -user kasm-user -printf '%TY-%Tm-%Td %TH:%TM:%TS %m %s %p\n' 2>/dev/null | grep -Ei 'tibia|cip|qt|lock|socket|ipc|single|instance' | head -200 || true"
-          echo '=== DEV SHM ==='
-          docker exec "$c" sh -lc "find /dev/shm -maxdepth 2 -printf '%u %m %s %p\n' 2>/dev/null | head -200 || true"
-          echo '=== HOME LOCK CANDIDATES ==='
-          docker exec "$c" sh -lc "find /home/kasm-user/.cache '/home/kasm-user/.local/share/CipSoft GmbH' -maxdepth 8 \( -iname '*lock*' -o -iname '*socket*' -o -iname '*pid*' -o -iname '*instance*' \) -printf '%TY-%Tm-%Td %TH:%TM:%TS %m %s %p\n' 2>/dev/null | head -250 || true"
-          echo '=== LAUNCHER STRINGS ==='
-          docker exec "$c" sh -lc "strings /home/kasm-user/Tibia/Tibia 2>/dev/null | grep -Ei -C 3 'already running|single.instance|lockfile|localserver' | head -120 || true"
-          echo '=== STRACE AVAILABLE ==='
-          docker exec "$c" sh -lc 'command -v strace || true'
-      - name: Trace one normal launcher startup if strace exists
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          c=otclient-track-a-kasmvnc
-          if ! docker exec "$c" command -v strace >/dev/null 2>&1; then
-            echo STRACE_UNAVAILABLE=true
-            exit 0
-          fi
-          docker exec -u kasm-user -e DISPLAY=:1 -e HOME=/home/kasm-user -e LD_LIBRARY_PATH=/home/kasm-user/Tibia/lib -w /home/kasm-user/Tibia "$c" sh -lc "timeout 8 strace -f -s 220 -o /tmp/tibia-launcher-strace.log -e trace=file,network,ipc ./Tibia >/tmp/tibia-launcher-trace-stdout.log 2>&1 || true"
-          echo '=== TRACE RELEVANT ==='
-          docker exec "$c" sh -lc "grep -Ei 'tibia|cipsoft|lock|socket|connect\(|bind\(|listen\(|EADDRINUSE|EEXIST' /tmp/tibia-launcher-strace.log 2>/dev/null | tail -220 || true"
-          echo '=== TRACE STDOUT ==='
-          docker exec "$c" sh -lc 'tail -n 80 /tmp/tibia-launcher-trace-stdout.log 2>/dev/null || true'
+          echo '=== SYSV IPC ==='
+          docker exec "$c" sh -lc 'ipcs -a 2>/dev/null || true'
+          echo '=== PROC SYSVIPC ==='
+          docker exec "$c" sh -lc 'for f in /proc/sysvipc/*; do echo ---$f---; cat "$f" 2>/dev/null || true; done'
+          echo '=== UNIX SOCKETS ==='
+          docker exec "$c" sh -lc "ss -lxap 2>/dev/null | head -300 || cat /proc/net/unix | head -300"
+          echo '=== TMP ALL RECENT ==='
+          docker exec "$c" sh -lc "find /tmp -maxdepth 2 -mmin -1440 -printf '%u %y %m %s %TY-%Tm-%Td_%TH:%TM:%TS %p\n' 2>/dev/null | head -350"
+          echo '=== LAUNCHER IPC SYMBOLS ==='
+          docker exec "$c" sh -lc "strings /home/kasm-user/Tibia/Tibia 2>/dev/null | grep -E 'QLocal(Server|Socket)|QSharedMemory|QSystemSemaphore|QLockFile|QSingle|single.?instance|already running' | sort -u | head -200 || true"
+          echo '=== DYNAMIC SYMBOLS ==='
+          docker exec "$c" sh -lc "nm -D /home/kasm-user/Tibia/Tibia 2>/dev/null | grep -E 'QLocal(Server|Socket)|QSharedMemory|QSystemSemaphore|QLockFile' | head -200 || true"

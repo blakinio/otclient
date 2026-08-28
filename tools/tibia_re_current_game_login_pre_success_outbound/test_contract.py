@@ -33,6 +33,10 @@ assert 'CFG_REACHING_DEFINITION' in runner
 assert 'NEAREST_STATIC_REGISTER_DEFINITION' not in runner
 assert 'LOGIN_PRODUCER_CALLSITE_CONTEXTS' in runner
 assert 'VIRTUAL_SLOT_0X60_CENSUS' in runner
+assert 'AUTH_START_GAMESERVER_LOGIN_GRAPH' in runner
+assert 'TAuthenticationProcessController' in runner
+assert 'onStartGameServerLoginStateEntered' in runner
+assert "'auth_start_gameserver_login_graph'" in runner
 assert "'field6_source_context'" in runner
 assert "'field6_backward_source'" in runner
 assert "'nested_source_contexts'" in runner

@@ -6,7 +6,7 @@ on:
     paths:
       - .github/workflows/track-a-canonical-live-governance.yml
       - .github/scripts/tibia-official-client-re-canonical-live-transition.py
-      - .github/scripts/test_tibia_official_client_re_canonical_live_transition.py
+      - .github/scripts/test_tibia_official_client_re_canonical_live-transition.py
       - .github/scripts/tibia-official-client-re-kasm-existing-runtime-probe.py
       - .github/scripts/test_tibia_official_client_re_kasm_existing_runtime_probe.py
       - docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
@@ -90,7 +90,7 @@ jobs:
               if missing:
                   raise SystemExit(f'{label}: missing required invariants: {missing}')
 
-          fence = 'ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8'
+          fence = 'd1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a'
           for label, text in [('tracks', tracks), ('adr', adr), ('bootstrap', bootstrap), ('changelog', changelog)]:
               if fence not in text:
                   raise SystemExit(f'{label}: exact client fence missing')

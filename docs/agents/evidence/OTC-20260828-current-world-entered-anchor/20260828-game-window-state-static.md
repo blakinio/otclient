@@ -97,3 +97,29 @@ mangled N5tibia10gamewindow21TGameWindowControllerE
 That result JSON SHA-256 is `a4886d573e63cc491287548dfbcb1521f059904966dc5e88051afe3342b66e36`. It is sufficient for future exact-current unique-object discovery without reusing historical object addresses.
 
 Source A (`0x31b29b0`) remains semantically unresolved. Its bounded xref window ends before the next use, so the next static step is to extend only that source initializer context.
+
+## Source-A semantic resolution
+
+Exact extended-initializer run `33175923574` / artifact `9687657554` on head `df157928c73af80de0ecb6474408d80a59808304` resolved the remaining BSS source `0x31b29b0`. The bounded constructor path is:
+
+```text
+source object    0x31b29b0
+literal VA       0x28c4e8c
+helper           0x6a7200
+length           6
+UTF-8            INGAME
+payload SHA-256  c2fffc542eee743e8ff96c90698a369f8d0b075fe22bb411fca5b61ba8373d1e
+```
+
+The exact durable-state JSON SHA-256 is `5a3bf25a1d7bc0250b4a4303d4af3f1b7fdce9ed26b65e0311b9c1868494042d`; artifact ZIP digest is `sha256:cb8aff18c477d9b2f5ea69d4e9e573265446975647dd8efee9077000d8599a94`.
+
+Together with the separately proven empty source B, the current static model is now:
+
+```text
+TGameWindowController + 0x60 == gameWindowState : QString
+source A 0x31b29b0               == "INGAME"
+source B 0x31b5940               == ""
+static semantic candidate         == gameWindowState == "INGAME"
+```
+
+This is an exact-current **static semantic candidate**, not a live `IN_GAME` promotion. The remaining requirement is fresh read-only causal validation across login screen, character selection, visible world, and world exit on one admitted exact process.

@@ -109,7 +109,12 @@ start_screen_displayed_emitter: 0xd6acd3
 game_screen_displayed_signal_index: 24
 game_screen_displayed_emitter: 0xd6acf3
 game_window_state_source_a: 0x31b29b0
-game_window_state_source_a_semantics: PENDING_EXTENDED_INITIALIZER_RECOVERY
+game_window_state_source_a_semantics: PROVEN_QSTRING_INGAME
+game_window_state_source_a_run: 33175923574
+game_window_state_source_a_artifact: 9687657554
+game_window_state_source_a_result_sha256: 5a3bf25a1d7bc0250b4a4303d4af3f1b7fdce9ed26b65e0311b9c1868494042d
+game_window_state_source_a_literal_va: 0x28c4e8c
+game_window_state_source_a_payload_sha256: c2fffc542eee743e8ff96c90698a369f8d0b075fe22bb411fca5b61ba8373d1e
 game_window_state_source_b: 0x31b5940
 game_window_state_source_b_semantics: PROVEN_EMPTY_QSTRING
 game_window_state_source_b_payload_run: 33175306133
@@ -120,9 +125,11 @@ game_window_controller_primary_vptr: 0x30c3488
 game_window_controller_rtti_run: 33174987862
 game_window_controller_rtti_artifact: 9687279558
 game_window_controller_rtti_result_sha256: a4886d573e63cc491287548dfbcb1521f059904966dc5e88051afe3342b66e36
-game_window_state_literal_values: SOURCE_B_EMPTY_PROVEN_SOURCE_A_PENDING
-current_blocker: GAME_WINDOW_STATE_SOURCE_A_SEMANTICS_NOT_PROVEN
-next_action: extend only the exact-current source-A 0x31b29b0 initializer/use context to resolve its value; then design a bounded read-only gameWindowState poller using dynamically recovered TGameWindowController vptr and +0x60 backing; preserve IN_GAME_CLAIMED=false until causal live validation and independent review
+game_window_state_literal_values: SOURCE_A_INGAME_SOURCE_B_EMPTY_PROVEN
+static_game_window_state_oracle: PROVEN_CANDIDATE_NOT_RUNTIME_VALIDATED
+static_game_window_state_ingame_value: INGAME
+current_blocker: LIVE_THREE_PHASE_GAME_WINDOW_STATE_VALIDATION_NOT_PERFORMED
+next_action: close the static semantic-anchor PR, then create a successor bounded read-only gameWindowState observer using dynamically recovered TGameWindowController vptr and +0x60 backing; validate LOGIN_SCREEN / CHARACTER_SELECT / WORLD / WORLD_EXIT on one fresh admitted exact process before any IN_GAME semantic promotion
 ---
 
 # Current Qt world correlation
@@ -135,7 +142,7 @@ Durable evidence is retained at `docs/agents/evidence/OTC-20260828-current-qt-wo
 
 Exact-current static runs `33165852596` and `33166836780` recovered `TPlayerProtocolMessageHandler::worldEntered` independently from the `15.32.75d4a0` ELF: current method/signal index `17`, generated dispatch case `0xd28890`, current staticMetaObject `0x30b6ba0`, and a single common `QMetaObject::activate` boundary `0x4d7dc0` across all 22 signal traces. For `worldEntered`, the generated path proves `EDX=17` and the current staticMetaObject reference. Historical QMeta addresses remain background only.
 
-Exact-current run `33173004656` then recovered `TGameWindowController::gameWindowState` as property index `2` (`QString`) and statically bound its backing storage to `TGameWindowController+0x60`. The same QMeta owner exposes unique `startScreenNowDisplayed` and `gameScreenNowDisplayed` signal emitters (indices `23/24`). Direct `gameWindowStateChanged` emitters assign from two global BSS QString objects (`0x31b29b0`, `0x31b5940`). Their literal values are not file-backed and remain unproven until current global initializer recovery completes. Track A `read_only` forbids changing instrumentation state, so no runtime promotion is performed from these static facts alone.
+Exact-current run `33173004656` recovered `TGameWindowController::gameWindowState` as property index `2` (`QString`) and statically bound its backing storage to `TGameWindowController+0x60`. The same QMeta owner exposes unique `startScreenNowDisplayed` and `gameScreenNowDisplayed` signal emitters (indices `23/24`). Direct `gameWindowStateChanged` emitters assign from two global BSS QString objects (`0x31b29b0`, `0x31b5940`). Later exact initializer recovery proved source A equals `"INGAME"` and source B equals the empty QString, yielding the static semantic candidate `gameWindowState == "INGAME"`. This is not yet a live `IN_GAME` promotion. Track A `read_only` forbids changing instrumentation state, so the remaining step is a fresh bounded polling validation on one admitted exact process.
 
 The previous runtime container is no longer present on the Docker host. This is not evidence about client state. Any future live validation requires a fresh canonical runtime admission and exact process identity.
 

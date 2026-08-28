@@ -60,7 +60,6 @@ acquire = need(
         "process_is_zombie()",
         "https://static.tibia.com/launcher/tibiaclient-linux-current/package.json",
         'SOURCE="$ROOT/current-package"',
-        'LEGACY_SOURCE="$BASE/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia"',
         "--socks-port \"$WARP_PORT\"",
         'printf \'%s\\n\' "$WIRE_PID" >"$WIRE_PID_FILE"',
         'if process_is_zombie "$pid"; then',
@@ -72,7 +71,16 @@ acquire = need(
         "TRACK_A_FIELD6_PACKAGE_CLEANUP=PASS",
     ),
 )
-for forbidden in ("set -x", "TIBIA_TEST_EMAIL=", "TIBIA_TEST_PASSWORD=", "exec \"$SOURCE"):
+for forbidden in (
+    "set -x",
+    "TIBIA_TEST_EMAIL=",
+    "TIBIA_TEST_PASSWORD=",
+    "exec \"$SOURCE",
+    "LEGACY_SOURCE=",
+    "legacy_source_collision",
+    "cleanup_source_ownership_refused",
+    "ln -s \"$SOURCE\"",
+):
     if forbidden in acquire:
         raise SystemExit(f"FIELD6_RUNTIME_CONTRACT_RED: forbidden acquisition fragment {forbidden!r}")
 
@@ -86,6 +94,8 @@ helper = need(
         "PRODUCER_OFFSET='0xe25620'",
         "WGCF_SHA='2ff97f2201972ce582a424455d50a3719a380eef0cd1f3144f7779348e122a2c'",
         "WIREPROXY_TAR_SHA='e88c1d090740373fc606c1bafd81d9a5eadc642cce5667616e20e9d7a444f51c'",
+        'package="$TASK_BASE/package-acquisition/$RUN_ID/current-package"',
+        "TRACK_A_FIELD6_DIRECT_PACKAGE_SOURCE=PASS",
         'START_OUT="$ROOT/process-start-ticks.txt"',
         "set disable-randomization off",
         "gdb.parse_and_eval('$edx')",
@@ -105,6 +115,8 @@ for forbidden in (
     "TRACK_A_CHARACTER_ACTIVATION_SENT",
     "tcpdump",
     "dump memory",
+    '"$BASE/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia"',
+    '"/work/_otclient_tibia_re_state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia"',
 ):
     if forbidden in helper:
         raise SystemExit(f"FIELD6_RUNTIME_CONTRACT_RED: forbidden helper fragment {forbidden!r}")
@@ -132,7 +144,7 @@ workflow = need(
         ".github/scripts/track_a_current_client_package_materialize.py",
         ".github/scripts/track_a_current_client_package_acquire.sh",
         "github.event.comment.user.login == github.repository_owner",
-        "AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V2 once=true",
+        "AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V3 once=true",
         "ref: main",
         "secrets.TIBIA_TEST_EMAIL",
         "secrets.TIBIA_TEST_PASSWORD",

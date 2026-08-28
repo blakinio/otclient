@@ -88,18 +88,14 @@ verify_client() {
 }
 
 resolve_source() {
-  local package
-  for package in \
-    "$BASE/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia" \
-    "/work/_otclient_tibia_re_state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia"; do
-    if [[ -x "$package/bin/client" && ! -L "$package/bin/client" \
-      && "$(stat -Lc %s "$package/bin/client" 2>/dev/null || true)" == "$EXPECTED_CLIENT_SIZE" \
-      && "$(sha256sum "$package/bin/client" 2>/dev/null | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]; then
-      printf '%s\n' "$package"
-      return 0
-    fi
-  done
-  return 1
+  local acquisition package
+  acquisition="$TASK_BASE/package-acquisition/$RUN_ID"
+  package="$TASK_BASE/package-acquisition/$RUN_ID/current-package"
+  [[ -d "$acquisition" && ! -L "$acquisition" ]] || return 1
+  [[ -d "$package" && ! -L "$package" ]] || return 1
+  verify_client "$package/bin/client"
+  printf 'TRACK_A_FIELD6_DIRECT_PACKAGE_SOURCE=PASS\n' >&2
+  printf '%s\n' "$package"
 }
 
 toolroot_ok() {

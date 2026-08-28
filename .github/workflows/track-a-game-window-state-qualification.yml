@@ -70,16 +70,19 @@ jobs:
           ref: main
           fetch-depth: 1
 
-      - name: Prove trusted-main read-only authority and current fence
+      - name: Prove trusted-main runtime-none checkpoint and current fence
         shell: bash
         run: |
           set -Eeuo pipefail
           test "$(git rev-parse HEAD)" = "$(git ls-remote origin refs/heads/main | awk '{print $1}')"
           task="docs/agents/tasks/active/OTC-20260828-game-window-state-qualification.md"
           test -f "$task"
-          grep -Fqx 'runtime_access: read_only' "$task"
-          grep -Fqx 'runtime_owner_task: OTC-20260828-game-window-state-qualification' "$task"
-          grep -Fqx 'runtime_namespace: track-a-game-window-state-validation' "$task"
+          grep -Fqx 'runtime_access: none' "$task"
+          grep -Fqx 'runtime_owner_task: NOT_APPLICABLE' "$task"
+          grep -Fqx 'runtime_namespace: NOT_APPLICABLE' "$task"
+          grep -Fqx 'canonical_registration: NOT_APPLICABLE' "$task"
+          grep -Fqx 'canonical_lease_generation: NOT_APPLICABLE' "$task"
+          grep -Fqx 'registration_lease_generation: NOT_APPLICABLE' "$task"
           grep -Fqx 'mutation_authorized: false' "$task"
           grep -Fqx 'login_allowed: false' "$task"
           grep -Fqx 'character_selection_allowed: false' "$task"
@@ -90,10 +93,11 @@ jobs:
           grep -Fqx 'gate_a: NOT_APPLICABLE' "$task"
           grep -Fqx 'generation_rebind: NOT_APPLICABLE' "$task"
           grep -Fqx 'gate_b: NOT_APPLICABLE' "$task"
-          grep -Fqx 'target_uniqueness: UNKNOWN' "$task"
-          echo READ_ONLY_CANONICAL_GATES=NOT_APPLICABLE
+          grep -Fqx 'bootstrap: NOT_APPLICABLE' "$task"
+          grep -Fqx 'target_uniqueness: NOT_APPLICABLE' "$task"
+          echo REPOSITORY_CHECKPOINT_RUNTIME_ACCESS=none
           python3 .github/scripts/test_track_a_canonical_current_client_fence.py
-          echo GAME_WINDOW_STATE_LIVE_AUTHORITY=PASS
+          echo GAME_WINDOW_STATE_TRUSTED_MAIN_CHECKPOINT=PASS
 
       - name: Validate bounded qualification command
         shell: bash
@@ -109,21 +113,37 @@ jobs:
           print('QUALIFICATION_COMMAND=PASS')
           PY
 
-      - name: Resolve canonical registration and ownership
+      - name: Resolve canonical registration and current ownership
         id: target
         shell: bash
         run: |
           set -Eeuo pipefail
           python3 - "$CANONICAL_STATE" "$TASK_ID" "$EXPECTED_VERSION" "$EXPECTED_SIZE" "$EXPECTED_SHA" "$GITHUB_OUTPUT" <<'PY'
-          import json,pathlib,sys,time
+          import json,os,pathlib,stat,sys,time
           root=pathlib.Path(sys.argv[1]); task=sys.argv[2]
           version=sys.argv[3]; size=int(sys.argv[4]); sha=sys.argv[5]; output=pathlib.Path(sys.argv[6])
           now=int(time.time())
+          try:
+              root_st=root.lstat()
+          except OSError as exc:
+              raise SystemExit('CANONICAL_STATE_ROOT_UNAVAILABLE') from exc
+          if stat.S_ISLNK(root_st.st_mode) or not stat.S_ISDIR(root_st.st_mode):
+              raise SystemExit('CANONICAL_STATE_ROOT_UNSAFE')
+          if hasattr(os,'getuid') and root_st.st_uid != os.getuid():
+              raise SystemExit('CANONICAL_STATE_ROOT_OWNER_MISMATCH')
           def load(name, required=False):
               p=root/name
-              if not p.is_file():
+              try:
+                  st=p.lstat()
+              except FileNotFoundError:
                   if required: raise SystemExit(name.upper().replace('-','_').replace('.','_')+'_ABSENT')
                   return None
+              except OSError as exc:
+                  raise SystemExit(name.upper().replace('-','_').replace('.','_')+'_UNAVAILABLE') from exc
+              if stat.S_ISLNK(st.st_mode) or not stat.S_ISREG(st.st_mode) or stat.S_IMODE(st.st_mode) != 0o600:
+                  raise SystemExit(name.upper().replace('-','_').replace('.','_')+'_UNSAFE')
+              if hasattr(os,'getuid') and st.st_uid != os.getuid():
+                  raise SystemExit(name.upper().replace('-','_').replace('.','_')+'_OWNER_MISMATCH')
               try:
                   d=json.loads(p.read_text(encoding='utf-8'))
               except Exception as exc:
@@ -132,6 +152,8 @@ jobs:
               return d
           reg=load('runtime-registration.json', required=True)
           lease=load('lease.json')
+          if reg.get('schema_version') != 1 or reg.get('runtime_id') != 'track-a-canonical-live':
+              raise SystemExit('REGISTRATION_SCHEMA_INVALID')
           exact={'client_version':version,'client_size':size,'client_sha256':sha}
           for key,value in exact.items():
               if reg.get(key)!=value: raise SystemExit('REGISTRATION_'+key.upper()+'_MISMATCH')
@@ -144,11 +166,21 @@ jobs:
           if len(parts)!=3 or parts[0]!='docker' or not parts[1] or not parts[2]:
               raise SystemExit('REGISTRATION_RUNTIME_LOCATOR_INVALID')
           container_name,container_id=parts[1],parts[2]
-          if lease is not None and lease.get('status')=='active':
-              expires=lease.get('expires_at')
-              if not isinstance(expires,(int,float)): raise SystemExit('ACTIVE_RUNTIME_OWNER_AMBIGUOUS')
-              if int(expires)>now and lease.get('controller_task') != task:
-                  raise SystemExit('ACTIVE_RUNTIME_OWNER_CONFLICT')
+          if lease is not None:
+              if lease.get('schema_version') != 1 or lease.get('runtime_id') != 'track-a-canonical-live':
+                  raise SystemExit('LEASE_SCHEMA_INVALID')
+              if lease.get('status') not in {'active','released'}:
+                  raise SystemExit('LEASE_STATUS_INVALID')
+              generation=lease.get('generation')
+              if not isinstance(generation,int) or generation < 1:
+                  raise SystemExit('LEASE_GENERATION_INVALID')
+              if lease.get('status') == 'active':
+                  expires=lease.get('expires_at')
+                  owner=lease.get('controller_task')
+                  if not isinstance(expires,int) or not isinstance(owner,str) or not owner:
+                      raise SystemExit('ACTIVE_RUNTIME_OWNER_AMBIGUOUS')
+                  if expires > now and owner != task:
+                      raise SystemExit('ACTIVE_RUNTIME_OWNER_CONFLICT')
           with output.open('a',encoding='utf-8') as f:
               f.write('container='+container_id+'\n')
               f.write('container_name='+container_name+'\n')
@@ -157,7 +189,7 @@ jobs:
           print('CANONICAL_REGISTRATION_TARGET=PASS')
           PY
 
-      - name: Re-prove global unique exact target and emit read-only admission
+      - name: Re-prove global unique exact target
         shell: bash
         env:
           CONTAINER: ${{ steps.target.outputs.container }}
@@ -184,12 +216,22 @@ jobs:
               set -eu
               for d in /proc/[0-9]*; do
                 [ -r "$d/comm" ] || continue
-                [ "$(cat "$d/comm" 2>/dev/null || true)" = client ] || continue
                 pid=${d#/proc/}
-                [ -r "$d/stat" ] || exit 42
-                start=$(awk "{print \$22}" "$d/stat") || exit 42
-                size=$(stat -Lc %s "$d/exe") || exit 42
-                sha=$(sha256sum "$d/exe" | awk "{print \$1}") || exit 42
+                comm=$(cat "$d/comm" 2>/dev/null || true)
+                exe=$(readlink -f "$d/exe" 2>/dev/null || true)
+                hinted=0
+                case "$comm" in client|Tibia*) hinted=1 ;; esac
+                case "$exe" in *"/Tibia/"*|*"/Tibia/packages/Tibia/"*) hinted=1 ;; esac
+                [ "${exe##*/}" = client ] && hinted=1
+                [ "$hinted" -eq 1 ] || continue
+                if [ -z "$exe" ] || [ ! -r "$d/stat" ]; then
+                  printf "%s\tUNREADABLE\tUNREADABLE\tUNREADABLE\n" "$pid"
+                  continue
+                fi
+                start=$(awk "{print \$22}" "$d/stat" 2>/dev/null || echo UNREADABLE)
+                size=$(stat -Lc %s "$d/exe" 2>/dev/null || echo UNREADABLE)
+                sha=$(sha256sum "$d/exe" 2>/dev/null | awk "{print \$1}" || true)
+                [ -n "$sha" ] || sha=UNREADABLE
                 printf "%s\t%s\t%s\t%s\n" "$pid" "$start" "$size" "$sha"
               done
             ' >"$tmp"; then
@@ -216,6 +258,63 @@ jobs:
           test "$matched" -eq 1 || { echo REGISTERED_TARGET_NOT_CURRENT_UNIQUE_CANDIDATE >&2; exit 2; }
           echo OFFICIAL_CLIENT_CANDIDATE_COUNT=1
           echo TARGET_PROCESS_UNIQUENESS=PROVEN
+
+      - name: Persist and validate fresh read-only admission
+        id: admission
+        shell: bash
+        env:
+          TARGET_PID: ${{ steps.target.outputs.pid }}
+          TARGET_START: ${{ steps.target.outputs.start_ticks }}
+        run: |
+          set -Eeuo pipefail
+          admission="$RUNNER_TEMP/game-window-state-readonly-admission.json"
+          python3 - "$admission" "$TASK_ID" "$RUNTIME_NAMESPACE" "$EXPECTED_VERSION" "$EXPECTED_SIZE" "$EXPECTED_SHA" "$TARGET_PID" "$TARGET_START" "$(git rev-parse HEAD)" <<'PY'
+          import json,os,pathlib,stat,sys
+          path=pathlib.Path(sys.argv[1]); task=sys.argv[2]; namespace=sys.argv[3]
+          version=sys.argv[4]; size=int(sys.argv[5]); sha=sys.argv[6]
+          pid=int(sys.argv[7]); start=int(sys.argv[8]); main_sha=sys.argv[9]
+          admission={
+              'track_id':'official-client-re',
+              'runtime_access':'read_only',
+              'runtime_owner_task':task,
+              'runtime_namespace':namespace,
+              'canonical_registration':'PRESENT',
+              'canonical_lease_generation':'UNKNOWN',
+              'registration_lease_generation':'UNKNOWN',
+              'gate_a':'NOT_APPLICABLE',
+              'generation_rebind':'NOT_APPLICABLE',
+              'gate_b':'NOT_APPLICABLE',
+              'bootstrap':'NOT_APPLICABLE',
+              'target_uniqueness':'PROVEN',
+              'mutation_authorized':False,
+              'client_version':version,
+              'client_size':size,
+              'client_sha256':sha,
+              'pid':pid,
+              'process_start_ticks':start,
+              'trusted_main_sha':main_sha,
+          }
+          fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_CLOEXEC,0o600)
+          with os.fdopen(fd,'w',encoding='utf-8',newline='\n') as handle:
+              json.dump(admission,handle,sort_keys=True,separators=(',',':'))
+              handle.write('\n'); handle.flush(); os.fsync(handle.fileno())
+          st=path.lstat()
+          if stat.S_ISLNK(st.st_mode) or not stat.S_ISREG(st.st_mode) or stat.S_IMODE(st.st_mode)!=0o600:
+              raise SystemExit('READ_ONLY_ADMISSION_FILE_UNSAFE')
+          loaded=json.loads(path.read_text(encoding='utf-8'))
+          required={
+              'track_id':'official-client-re','runtime_access':'read_only','runtime_owner_task':task,
+              'runtime_namespace':namespace,'canonical_registration':'PRESENT','gate_a':'NOT_APPLICABLE',
+              'generation_rebind':'NOT_APPLICABLE','gate_b':'NOT_APPLICABLE','bootstrap':'NOT_APPLICABLE',
+              'target_uniqueness':'PROVEN','mutation_authorized':False,'client_version':version,
+              'client_size':size,'client_sha256':sha,'pid':pid,'process_start_ticks':start,
+              'trusted_main_sha':main_sha,
+          }
+          if any(loaded.get(k)!=v for k,v in required.items()):
+              raise SystemExit('READ_ONLY_ADMISSION_RECORD_INVALID')
+          print('READ_ONLY_ADMISSION_RECORD=PASS')
+          PY
+          echo "path=$admission" >> "$GITHUB_OUTPUT"
           echo TRACK_A_RUNTIME_ACCESS=read_only
           echo TRACK_A_RUNTIME_OWNER_TASK=$TASK_ID
           echo TRACK_A_RUNTIME_NAMESPACE=$RUNTIME_NAMESPACE
@@ -225,6 +324,36 @@ jobs:
           echo TRACK_A_GATE_B=NOT_APPLICABLE
           echo TRACK_A_TARGET_UNIQUENESS=PROVEN
           echo TRACK_A_MUTATION_AUTHORIZED=false
+
+      - name: Revalidate admission immediately before process-memory observation
+        shell: bash
+        env:
+          ADMISSION: ${{ steps.admission.outputs.path }}
+          TARGET_PID: ${{ steps.target.outputs.pid }}
+          TARGET_START: ${{ steps.target.outputs.start_ticks }}
+        run: |
+          set -Eeuo pipefail
+          python3 - "$ADMISSION" "$TASK_ID" "$RUNTIME_NAMESPACE" "$EXPECTED_VERSION" "$EXPECTED_SIZE" "$EXPECTED_SHA" "$TARGET_PID" "$TARGET_START" "$(git rev-parse HEAD)" <<'PY'
+          import json,pathlib,stat,sys
+          path=pathlib.Path(sys.argv[1]); task=sys.argv[2]; namespace=sys.argv[3]
+          version=sys.argv[4]; size=int(sys.argv[5]); sha=sys.argv[6]
+          pid=int(sys.argv[7]); start=int(sys.argv[8]); main_sha=sys.argv[9]
+          st=path.lstat()
+          if stat.S_ISLNK(st.st_mode) or not stat.S_ISREG(st.st_mode) or stat.S_IMODE(st.st_mode)!=0o600:
+              raise SystemExit('READ_ONLY_ADMISSION_FILE_UNSAFE')
+          d=json.loads(path.read_text(encoding='utf-8'))
+          checks={
+              'track_id':'official-client-re','runtime_access':'read_only','runtime_owner_task':task,
+              'runtime_namespace':namespace,'canonical_registration':'PRESENT','gate_a':'NOT_APPLICABLE',
+              'generation_rebind':'NOT_APPLICABLE','gate_b':'NOT_APPLICABLE','bootstrap':'NOT_APPLICABLE',
+              'target_uniqueness':'PROVEN','mutation_authorized':False,'client_version':version,
+              'client_size':size,'client_sha256':sha,'pid':pid,'process_start_ticks':start,
+              'trusted_main_sha':main_sha,
+          }
+          if any(d.get(k)!=v for k,v in checks.items()):
+              raise SystemExit('READ_ONLY_ADMISSION_REVALIDATION_FAILED')
+          print('READ_ONLY_ADMISSION_REVALIDATION=PASS')
+          PY
 
       - name: Build in-memory resolver bundle
         id: bundle

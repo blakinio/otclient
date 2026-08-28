@@ -36,6 +36,7 @@ checks = {
     'durable writes': 'extract_this_immediate_writes' in d and 'select_durable_field_candidate' in d,
     'writer case trace': 'writer_case_trace = extract_bounded_case_trace' in d,
     'display signal cases': 'game_window_display_signal_cases' in d and 'gameScreenNowDisplayed' in d and 'startScreenNowDisplayed' in d,
+    'display signal emitters': 'game_window_display_signal_emitters' in d and 'scan_qmeta_signal_activation_sites' in d,
     'durable fail closed': 'PROVEN_STATIC_SIMPLE_FIELD_CANDIDATE' in d and 'NOT_PROVEN' in d,
     'no historical address reuse': 'historical_address_reuse' in s and 'False' in s and 'historical_address_reuse' in d,
     'no ingame claim': 'in_game_claimed' in s and 'False' in s and 'in_game_claimed' in d,

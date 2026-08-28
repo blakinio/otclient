@@ -181,5 +181,31 @@ class QMetaBackingObjectAliasTests(unittest.TestCase):
             module.prove_qmeta_backing_member(entry, shape)
 
 
+class QMetaSignalEmitterScanTests(unittest.TestCase):
+    def test_finds_direct_signal_activation_stub(self):
+        raw = bytearray(0x300)
+        # xor ecx,ecx; mov edx,24; lea rsi,[rip+0xf2] -> 0x1100; jmp 0x1200
+        code = bytes.fromhex("31c9ba18000000488d35f2000000e9ed010000")
+        raw[:len(code)] = code
+        sections = [
+            (0x1000, 0, 0x80, 0x6),
+            (0x1100, 0x100, 0x40, 0x2),
+            (0x1200, 0x200, 0x40, 0x6),
+        ]
+        sites = module.scan_qmeta_signal_activation_sites(bytes(raw), sections, 0x1100, 24, 0x1200)
+        self.assertEqual(1, len(sites))
+        self.assertEqual(0x1000, sites[0]["sequence_start_va"])
+        self.assertEqual(0x100e, sites[0]["branch_site_va"])
+        self.assertEqual([24], sites[0]["edx_values"])
+        self.assertEqual([0x1100], sites[0]["static_meta_refs"])
+
+    def test_rejects_wrong_signal_index(self):
+        raw = bytearray(0x300)
+        raw[:19] = bytes.fromhex("31c9ba17000000488d35f2000000e9ed010000")
+        sections = [(0x1000,0,0x80,0x6),(0x1100,0x100,0x40,0x2),(0x1200,0x200,0x40,0x6)]
+        sites = module.scan_qmeta_signal_activation_sites(bytes(raw), sections, 0x1100, 24, 0x1200)
+        self.assertEqual([], sites)
+
+
 if __name__ == "__main__":
     unittest.main()

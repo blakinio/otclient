@@ -45,3 +45,4 @@ jobs:
           docker exec "$c" sh -lc 'tail -n 120 /tmp/tibia-normal-launcher.log 2>/dev/null || true'
           echo LAUNCHER_LOG_END=true
           exit 1
+

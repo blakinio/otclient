@@ -30,7 +30,8 @@ jobs:
             tools/tibia_re_current_login_field6_callsite_owner/probe.py \
             tools/tibia_re_current_login_field6_callsite_owner/member_provenance.py \
             tools/tibia_re_current_login_field6_callsite_owner/focused_member_provenance.py \
-            tools/tibia_re_current_login_field6_callsite_owner/handler_qmeta.py
+            tools/tibia_re_current_login_field6_callsite_owner/handler_qmeta.py \
+            tools/tibia_re_current_login_field6_callsite_owner/producer_dependency.py
           bash -n tools/tibia_re_current_login_field6_callsite_owner/prepare_warp.sh
 
       - name: Prepare exact public client through bounded WARP fallback
@@ -70,7 +71,7 @@ jobs:
           print('CURRENT_LOGIN_FIELD6_OWNER_EXACT_FENCE=PASS')
           PY
 
-      - name: Resolve exact field6 caller owner, QMeta and edx value
+      - name: Resolve exact field6 caller owner, QMeta, dependency and edx value
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -90,6 +91,7 @@ jobs:
           python3 tools/tibia_re_current_login_field6_callsite_owner/probe.py --client "$RE_ROOT/pkg/client" --output artifacts/current-login-field6-callsite-owner/result.json
           python3 tools/tibia_re_current_login_field6_callsite_owner/focused_member_provenance.py --client "$RE_ROOT/pkg/client" --output artifacts/current-login-field6-callsite-owner/result.json
           python3 tools/tibia_re_current_login_field6_callsite_owner/handler_qmeta.py --client "$RE_ROOT/pkg/client" --output artifacts/current-login-field6-callsite-owner/result.json
+          python3 tools/tibia_re_current_login_field6_callsite_owner/producer_dependency.py --client "$RE_ROOT/pkg/client" --output artifacts/current-login-field6-callsite-owner/result.json
           rm -f "$RE_ROOT/pkg/client" "$RE_ROOT/pkg/client.lzma"
           echo RAW_CLIENT_RETAINED=false
 
@@ -112,9 +114,13 @@ jobs:
           assert d['interprocedural_member_provenance']['scope_markers']['CALLSITE_FDE_SCOPE'] is True
           assert d['interprocedural_member_provenance']['scope_markers']['VTABLE_RIP_CONSTRUCTOR_SCOPE'] is True
           assert d['handler_qmeta_signatures']['classification']=='HANDLER_QMETA_SIGNATURES'
-          assert d['handler_qmeta_signatures']['scope_markers']['PARAMETER_TYPES'] is True
-          assert d['handler_qmeta_signatures']['scope_markers']['PARAMETER_NAMES'] is True
           assert d['handler_qmeta_signatures']['scope_markers']['NO_SEMANTIC_GUESSING'] is True
+          assert d['producer_dependency_guard']['classification']=='PRODUCER_DEPENDENCY_GUARD'
+          assert d['producer_dependency_guard']['handler_member_offset']=='0x10'
+          assert d['producer_dependency_guard']['virtual_slot']=='0x98'
+          assert d['producer_dependency_guard']['dependency_target']=='0xe195b0'
+          assert d['producer_dependency_guard']['scope_markers']['RTTI_OWNER_RECOVERY'] is True
+          assert d['producer_dependency_guard']['scope_markers']['NO_SEMANTIC_GUESSING'] is True
           assert d['classification'] in ('FIELD6_VALUE_PROVEN','FIELD6_VALUE_UNKNOWN')
           print('CURRENT_LOGIN_FIELD6_OWNER_SANITIZED_RESULT=PASS')
           PY

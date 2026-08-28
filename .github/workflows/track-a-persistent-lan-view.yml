@@ -1,4 +1,4 @@
-﻿name: Track A inventory normal Tibia launcher
+﻿name: Track A inspect normal Tibia package launcher
 on:
   push:
     branches: [research/OTC-20260827-kasm-endpoint-inventory]
@@ -11,18 +11,14 @@ jobs:
     runs-on: [otclient, synology]
     timeout-minutes: 5
     steps:
-      - name: Inventory installed launcher without mutation
+      - name: Inspect original package and extracted roots read-only
         shell: bash
         run: |
           set -Eeuo pipefail
           c=otclient-track-a-kasmvnc
-          docker inspect -f '{{.State.Running}}' "$c" | grep -Fx true
-          docker exec -u kasm-user -e DISPLAY=:1 "$c" xdpyinfo >/dev/null
-          echo '=== CLIENT PROCESSES ==='
-          docker exec "$c" pgrep -a -x client || true
-          echo '=== DESKTOP ENTRIES ==='
-          docker exec "$c" sh -lc "find /home/kasm-user /usr/share/applications -maxdepth 6 -type f \( -name '*.desktop' -o -iname '*Tibia*' -o -iname '*launcher*' \) -print 2>/dev/null | head -200"
-          echo '=== EXEC CANDIDATES ==='
-          docker exec "$c" sh -lc "find /home/kasm-user -maxdepth 8 -type f -perm -111 \( -iname 'Tibia' -o -iname '*launcher*' -o -iname '*updater*' \) -printf '%p|%s\n' 2>/dev/null | head -200"
-          echo '=== TIBIA ROOTS ==='
-          docker exec "$c" sh -lc "find /home/kasm-user -maxdepth 6 -type d \( -iname 'Tibia' -o -iname '*CipSoft*' \) -print 2>/dev/null | head -100"
+          echo '=== ARCHIVE TOP ==='
+          docker exec "$c" sh -lc "tar -tf /home/kasm-user/Downloads/tibia.x64.tar.gz 2>/dev/null | head -100"
+          echo '=== SNAPSHOT TOP ==='
+          docker exec "$c" sh -lc "find /home/kasm-user/otclient-track-a/Tibia-32177065988-1 -maxdepth 3 -printf '%y %m %s %p\n' 2>/dev/null | head -250"
+          echo '=== HOME EXEC NAMES ==='
+          docker exec "$c" sh -lc "find /home/kasm-user -maxdepth 10 -type f -perm -111 -printf '%p|%s\n' 2>/dev/null | grep -Ei '/(Tibia|launcher|updater|patch|start)[^/]*$' | head -200 || true"

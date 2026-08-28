@@ -26,6 +26,10 @@ for required in (
 assert 'stringdata_bases_for_literal(img, class_name)' in runner
 assert 'stringdata_bases_for_literal(img, seed)' not in runner
 assert 'core.exact_qmeta_class = exact_qmeta_class' in runner
+assert 'FIELD6_SOURCE_CONTEXT' in runner
+assert 'NESTED_SOURCE_CONTEXTS' in runner
+assert "'field6_source_context'" in runner
+assert "'nested_source_contexts'" in runner
 assert 'subprocess' not in text + runner
 assert 'ptrace' not in (text + runner).lower()
 assert 'process_vm_readv' not in (text + runner).lower()

@@ -11,6 +11,7 @@ task_text = TASK.read_text(encoding='utf-8')
 
 required = (
     'issue_comment:',
+    'PREFLIGHT_GAME_WINDOW_STATE_QUALIFICATION',
     'START_GAME_WINDOW_STATE_QUALIFICATION',
     'github.event.comment.user.login == github.repository_owner',
     'runs-on: [otclient, synology]',
@@ -25,7 +26,7 @@ required = (
     "grep -Fqx 'gate_b: NOT_APPLICABLE' \"$task\"",
     "grep -Fqx 'target_uniqueness: NOT_APPLICABLE' \"$task\"",
     'REPOSITORY_CHECKPOINT_RUNTIME_ACCESS=none',
-    "text != 'START_GAME_WINDOW_STATE_QUALIFICATION'",
+    "text not in {'PREFLIGHT_GAME_WINDOW_STATE_QUALIFICATION', 'START_GAME_WINDOW_STATE_QUALIFICATION'}",
     'runtime_locator',
     "docker ps --no-trunc --format '{{.ID}}'",
     'OFFICIAL_CLIENT_CANDIDATE_COUNT=1',
@@ -44,6 +45,9 @@ required = (
     'TRACK_A_TARGET_UNIQUENESS=PROVEN',
     'TRACK_A_MUTATION_AUTHORIZED=false',
     'READ_ONLY_ADMISSION_RECORD=PASS',
+    'GAME_WINDOW_STATE_LOGGER_PREFLIGHT=READY',
+    'PROCESS_MEMORY_OBSERVATION_PERFORMED=false',
+    "if: github.event.comment.body == 'START_GAME_WINDOW_STATE_QUALIFICATION'",
     'python3 .github/scripts/test_track_a_canonical_current_client_fence.py',
     'EXPECTED_SIZE: 52105824',
     'EXPECTED_SHA: d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a',
@@ -83,11 +87,14 @@ for forbidden in (
     'GATE_B_REQUIRED=PASS',
     "grep -Fqx 'target_uniqueness: PROVEN' \"$task\"",
     'START_GAME_WINDOW_STATE_QUALIFICATION container=',
+    'PREFLIGHT_GAME_WINDOW_STATE_QUALIFICATION container=',
     'xdotool', 'xprop', 'xwininfo', 'wmctrl', 'screenshot',
     'TIBIA_TEST_EMAIL', 'TIBIA_TEST_PASSWORD', 'docker cp', '/proc/$pid/environ',
 ):
     assert forbidden.lower() not in text.lower(), f'WORKFLOW_FORBIDDEN_SURFACE:{forbidden}'
 
+assert text.index('GAME_WINDOW_STATE_LOGGER_PREFLIGHT=READY') < text.index('Build in-memory resolver bundle')
+assert text.count("if: github.event.comment.body == 'START_GAME_WINDOW_STATE_QUALIFICATION'") >= 3
 assert text.count('semantic_promotion_performed') >= 1
 assert text.count('in_game_claimed') >= 1
 print('TRACK_A_GAME_WINDOW_STATE_WORKFLOW_CONTRACT=PASS')

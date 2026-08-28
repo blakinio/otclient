@@ -1,4 +1,4 @@
-name: Track A corrected Synology state logger
+name: Track A Synology launch preflight
 
 on:
   push:
@@ -6,13 +6,12 @@ on:
       - research/OTC-20260827-kasm-endpoint-inventory
     paths:
       - .github/workflows/track-a-persistent-lan-view.yml
-      - .github/scripts/track-a-qt-ingame-detached-logger.py
 
 permissions:
   contents: read
 
 jobs:
-  start:
+  inspect:
     if: github.actor == 'blakinio'
     runs-on: [otclient, synology]
     timeout-minutes: 5
@@ -20,79 +19,79 @@ jobs:
       TARGET_CONTAINER: otclient-track-a-kasmvnc
       EXPECTED_SIZE: '52109920'
       EXPECTED_SHA: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
-      LOGGER_SCRIPT: /tmp/oteryn-qt-ingame-detached-logger.py
-      LOGGER_LOG: /tmp/oteryn-qt-ingame-correlation.jsonl
-      LOGGER_PIDFILE: /tmp/oteryn-qt-ingame-detached-logger.pid
-      LOGGER_STDERR: /tmp/oteryn-qt-ingame-detached-logger.stderr
-      DURATION: '900'
+      STATE_ROOT: /home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime
     steps:
       - name: Checkout diagnostic branch
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
 
-      - name: Prove exact original Synology Kasm target
-        id: target
+      - name: Inspect current runtime read-only
         shell: bash
         run: |
-          set -Eeuo pipefail
-          docker inspect -f '{{.State.Running}}' "$TARGET_CONTAINER" | grep -Fx true >/dev/null
-          mapfile -t pids < <(docker exec "$TARGET_CONTAINER" pgrep -x client)
-          test "${#pids[@]}" -eq 1
-          pid="${pids[0]}"
-          test "$(docker exec "$TARGET_CONTAINER" stat -Lc %s "/proc/$pid/exe")" = "$EXPECTED_SIZE"
-          test "$(docker exec "$TARGET_CONTAINER" sha256sum "/proc/$pid/exe" | awk '{print $1}')" = "$EXPECTED_SHA"
-          docker exec -u kasm-user -e DISPLAY=:1 "$TARGET_CONTAINER" xdpyinfo >/dev/null
-          start="$(docker exec -i "$TARGET_CONTAINER" python3 - "$pid" <<'PY'
+          set -u
+          running="$(docker inspect -f '{{.State.Running}}' "$TARGET_CONTAINER" 2>/dev/null || echo missing)"
+          echo CONTAINER_RUNNING="$running"
+          if [[ "$running" != true ]]; then
+            echo CLIENT_COUNT=UNKNOWN
+            echo DISPLAY_CONNECT=UNKNOWN
+            exit 0
+          fi
+
+          pids="$(docker exec "$TARGET_CONTAINER" pgrep -x client 2>/dev/null || true)"
+          count="$(printf '%s\n' "$pids" | sed '/^$/d' | wc -l | tr -d ' ')"
+          echo CLIENT_COUNT="$count"
+          echo CLIENT_PIDS="$(printf '%s' "$pids" | tr '\n' ',')"
+          for pid in $pids; do
+            echo CLIENT_PID="$pid"
+            exe="$(docker exec "$TARGET_CONTAINER" readlink -f "/proc/$pid/exe" 2>/dev/null || true)"
+            size="$(docker exec "$TARGET_CONTAINER" stat -Lc %s "/proc/$pid/exe" 2>/dev/null || true)"
+            sha="$(docker exec "$TARGET_CONTAINER" sha256sum "/proc/$pid/exe" 2>/dev/null | awk '{print $1}')"
+            start="$(docker exec -i "$TARGET_CONTAINER" python3 - "$pid" <<'PY' 2>/dev/null || true
           import pathlib,sys
           raw=pathlib.Path('/proc/'+sys.argv[1]+'/stat').read_text(encoding='ascii')
           print(raw[raw.rfind(')')+2:].split()[19])
           PY
-          )"
-          echo "pid=$pid" >> "$GITHUB_OUTPUT"
-          echo "start=$start" >> "$GITHUB_OUTPUT"
-          echo ORIGINAL_SYNOLOGY_TARGET=PASS
-
-      - name: Start corrected detached read-only logger
-        shell: bash
-        env:
-          TARGET_PID: ${{ steps.target.outputs.pid }}
-          TARGET_START: ${{ steps.target.outputs.start }}
-        run: |
-          set -Eeuo pipefail
-          python3 -m py_compile .github/scripts/track-a-qt-ingame-detached-logger.py
-          docker cp .github/scripts/track-a-qt-ingame-detached-logger.py "$TARGET_CONTAINER:$LOGGER_SCRIPT"
-          docker exec -u 0 "$TARGET_CONTAINER" chown kasm-user:kasm-user "$LOGGER_SCRIPT"
-          docker exec -u 0 "$TARGET_CONTAINER" chmod 500 "$LOGGER_SCRIPT"
-          if docker exec "$TARGET_CONTAINER" test -f "$LOGGER_PIDFILE"; then
-            old="$(docker exec "$TARGET_CONTAINER" cat "$LOGGER_PIDFILE" 2>/dev/null || true)"
-            if [[ "$old" =~ ^[0-9]+$ ]] && docker exec "$TARGET_CONTAINER" kill -0 "$old" 2>/dev/null; then
-              cmd="$(docker exec "$TARGET_CONTAINER" sh -lc 'tr "\0" " " </proc/'"$old"'/cmdline' 2>/dev/null || true)"
-              if [[ "$cmd" == *'oteryn-qt-ingame-detached-logger.py'* ]]; then
-                docker exec "$TARGET_CONTAINER" kill "$old"
-              fi
-            fi
-          fi
-          docker exec -u kasm-user "$TARGET_CONTAINER" rm -f "$LOGGER_PIDFILE" "$LOGGER_LOG" "$LOGGER_STDERR"
-          logger_pid="$(docker exec -u kasm-user "$TARGET_CONTAINER" sh -lc '
-            nohup python3 "$1" "$2" "$3" "$4" "$5" "$6" "$7" >/dev/null 2>"$8" </dev/null & echo $!
-          ' sh "$LOGGER_SCRIPT" "$TARGET_PID" "$TARGET_START" "$EXPECTED_SIZE" "$EXPECTED_SHA" "$DURATION" "$LOGGER_LOG" "$LOGGER_STDERR")"
-          [[ "$logger_pid" =~ ^[0-9]+$ ]]
-          docker exec -u kasm-user "$TARGET_CONTAINER" sh -lc 'printf "%s\n" "$1" >"$2"' sh "$logger_pid" "$LOGGER_PIDFILE"
-          for _ in $(seq 1 180); do
-            if docker exec "$TARGET_CONTAINER" grep -q '"event":"LOGGER_READY"' "$LOGGER_LOG" 2>/dev/null; then break; fi
-            if ! docker exec "$TARGET_CONTAINER" kill -0 "$logger_pid" 2>/dev/null; then
-              echo LOGGER_EXITED_BEFORE_READY=true >&2
-              docker exec "$TARGET_CONTAINER" cat "$LOGGER_STDERR" >&2 || true
-              exit 1
-            fi
-            sleep 1
+            )"
+            echo CLIENT_EXE="$exe"
+            echo CLIENT_SIZE="$size"
+            echo CLIENT_SHA256="$sha"
+            echo CLIENT_START_TICKS="$start"
+            [[ "$size" == "$EXPECTED_SIZE" && "$sha" == "$EXPECTED_SHA" ]] && echo CLIENT_EXACT_FENCE=PASS || echo CLIENT_EXACT_FENCE=FAIL
           done
-          docker exec "$TARGET_CONTAINER" grep -q '"event":"LOGGER_READY"' "$LOGGER_LOG"
-          docker exec "$TARGET_CONTAINER" tail -n 3 "$LOGGER_LOG"
-          echo LOGGER_PID="$logger_pid"
-          echo LOGGER_READY=true
-          echo LOGGER_DURATION_SECONDS="$DURATION"
-          echo CREDENTIAL_ACCESS=false
-          echo PACKET_PAYLOAD_CAPTURE=false
-          echo RAW_WINDOW_TITLES_RETAINED=false
+
+          if docker exec -u kasm-user -e DISPLAY=:1 "$TARGET_CONTAINER" xdpyinfo >/dev/null 2>&1; then
+            echo DISPLAY_CONNECT=PASS
+            windows="$(docker exec -u kasm-user -e DISPLAY=:1 "$TARGET_CONTAINER" sh -lc 'xwininfo -root -tree 2>/dev/null | grep -Ei "Tibia|client" || true')"
+            if [[ -n "$windows" ]]; then
+              echo TIBIA_WINDOW_PRESENT=true
+              printf '%s\n' "$windows" | sed -E 's/(Tibia - ).*/\1<redacted>/' | head -20
+            else
+              echo TIBIA_WINDOW_PRESENT=false
+            fi
+          else
+            echo DISPLAY_CONNECT=FAIL
+            echo TIBIA_WINDOW_PRESENT=UNKNOWN
+          fi
+
+          if [[ -f "$STATE_ROOT/runtime-registration.json" ]]; then
+            echo REGISTRATION_PRESENT=true
+            python3 - "$STATE_ROOT/runtime-registration.json" <<'PY'
+          import json,sys
+          p=sys.argv[1]
+          try:
+              d=json.load(open(p,encoding='utf-8'))
+          except Exception as e:
+              print('REGISTRATION_READ=FAIL:'+type(e).__name__)
+          else:
+              for k in ('registration_generation','lease_generation','pid','process_start_ticks','display','state','client_size','client_sha256','boot_id_sha256'):
+                  print('REG_'+k.upper()+'='+str(d.get(k)))
+          PY
+          else
+            echo REGISTRATION_PRESENT=false
+          fi
+          if [[ -f "$STATE_ROOT/lease.json" ]]; then
+            echo LEASE_PRESENT=true
+          else
+            echo LEASE_PRESENT=false
+          fi

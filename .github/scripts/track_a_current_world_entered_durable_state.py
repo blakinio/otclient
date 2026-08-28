@@ -4,6 +4,7 @@ from __future__ import annotations
 from collections import defaultdict
 import json
 import re
+import struct
 from pathlib import Path
 import sys
 
@@ -338,6 +339,30 @@ def main(argv: list[str]) -> int:
             "qmeta_activate_target_va": qmeta_activate_target,
             "sites": sites,
         }
+    state_emitter_sites = list(game_window_display_signal_emitters.get("gameWindowStateChanged", {}).get("sites", []))
+    raw_assignments = extract_qstring_member_assignment_sources(state_emitter_sites, 0x60)
+    grouped_assignments: dict[tuple[int, int], dict[str, object]] = {}
+    for assignment in raw_assignments:
+        key = (int(assignment["source_va"]), int(assignment["helper_target_va"]))
+        item = grouped_assignments.setdefault(key, {
+            "source_va": key[0],
+            "helper_target_va": key[1],
+            "member_offset": int(assignment["member_offset"]),
+            "site_vas": [],
+        })
+        item["site_vas"].append(int(assignment["site_va"]))
+    game_window_state_assignment_sources: list[dict[str, object]] = []
+    for key in sorted(grouped_assignments):
+        item = grouped_assignments[key]
+        item["site_vas"] = sorted(set(int(value) for value in item["site_vas"]))
+        try:
+            decoded = decode_static_qstring_source(raw, sections, relocs, int(item["source_va"]))
+            item["decode_state"] = "PROVEN_STATIC_QSTRING_VALUE"
+            item["qstring"] = decoded
+        except DurableStateError as exc:
+            item["decode_state"] = "NOT_PROVEN"
+            item["decode_reason"] = str(exc)
+        game_window_state_assignment_sources.append(item)
     game_window_state_method_traces: dict[str, object] = {}
     for writer_name in ("goToLogin", "goToCreateNewAccount", "loginPressed", "onAuthenticatedChanged", "onGameWindowClosed"):
         writer = game_window_methods_by_name.get(writer_name)
@@ -419,6 +444,7 @@ def main(argv: list[str]) -> int:
             "game_window_state_read": game_window_state_read,
             "game_window_display_signal_cases": game_window_display_signal_cases,
             "game_window_display_signal_emitters": game_window_display_signal_emitters,
+            "game_window_state_assignment_sources": game_window_state_assignment_sources,
             "game_window_state_method_traces": game_window_state_method_traces,
         },
         "controller": {
@@ -811,6 +837,48 @@ def extract_qstring_member_assignment_sources(sites: list[dict[str, object]], me
                 })
     unique = {(item["site_va"], item["source_va"], item["helper_target_va"]): item for item in results}
     return [unique[key] for key in sorted(unique)]
+
+
+def _static_va_to_offset(sections, va: int) -> int:
+    for section_va, file_offset, size, _flags in sections:
+        if int(section_va) <= va < int(section_va) + int(size):
+            return int(file_offset) + va - int(section_va)
+    raise DurableStateError(f"STATIC_QSTRING_VA_NOT_MAPPED:{va:#x}")
+
+
+def _static_pointer(raw: bytes, sections, relocs: dict[int, int], va: int) -> int:
+    if va in relocs:
+        return int(relocs[va])
+    offset = _static_va_to_offset(sections, va)
+    if offset + 8 > len(raw):
+        raise DurableStateError(f"STATIC_QSTRING_POINTER_OUT_OF_RANGE:{va:#x}")
+    return int(struct.unpack_from("<Q", raw, offset)[0])
+
+
+def decode_static_qstring_source(raw: bytes, sections, relocs: dict[int, int], source_va: int) -> dict[str, object]:
+    source_offset = _static_va_to_offset(sections, source_va)
+    if source_offset + 24 > len(raw):
+        raise DurableStateError("STATIC_QSTRING_OBJECT_OUT_OF_RANGE")
+    data_va = _static_pointer(raw, sections, relocs, source_va + 8)
+    length = int(struct.unpack_from("<q", raw, source_offset + 16)[0])
+    if length < 0 or length > 256:
+        raise DurableStateError(f"STATIC_QSTRING_LENGTH_OUT_OF_BOUNDS:{length}")
+    if length == 0:
+        return {"source_va": source_va, "data_va": data_va, "length": 0, "value": ""}
+    if data_va == 0:
+        raise DurableStateError("STATIC_QSTRING_DATA_NULL")
+    data_offset = _static_va_to_offset(sections, data_va)
+    byte_length = length * 2
+    if data_offset + byte_length > len(raw):
+        raise DurableStateError("STATIC_QSTRING_DATA_OUT_OF_RANGE")
+    payload = raw[data_offset:data_offset + byte_length]
+    try:
+        value = payload.decode("utf-16-le", "strict")
+    except UnicodeDecodeError as exc:
+        raise DurableStateError("STATIC_QSTRING_UTF16_INVALID") from exc
+    if any(ord(ch) < 0x20 and ch not in "\t\r\n" for ch in value):
+        raise DurableStateError("STATIC_QSTRING_CONTROL_CHAR_REJECTED")
+    return {"source_va": source_va, "data_va": data_va, "length": length, "value": value}
 
 
 if __name__ == "__main__":

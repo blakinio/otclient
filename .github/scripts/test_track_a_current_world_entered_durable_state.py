@@ -230,5 +230,30 @@ class QStringStateAssignmentSourceTests(unittest.TestCase):
         self.assertEqual([], module.extract_qstring_member_assignment_sources(sites, 0x60))
 
 
+class StaticQStringSourceDecodeTests(unittest.TestCase):
+    def test_decodes_relocation_backed_qstring_source(self):
+        raw = bytearray(0x800)
+        sections = [(0x400, 0x400, 0x400, 2)]
+        source = 0x480
+        data = 0x600
+        text = "GameScreen"
+        struct.pack_into("<q", raw, source + 16, len(text))
+        raw[data:data + len(text.encode("utf-16-le"))] = text.encode("utf-16-le")
+        relocs = {source: 0x500, source + 8: data}
+        result = module.decode_static_qstring_source(bytes(raw), sections, relocs, source)
+        self.assertEqual("GameScreen", result["value"])
+        self.assertEqual(len(text), result["length"])
+        self.assertEqual(data, result["data_va"])
+
+    def test_rejects_unbounded_qstring_source(self):
+        raw = bytearray(0x800)
+        sections = [(0x400, 0x400, 0x400, 2)]
+        source = 0x480
+        struct.pack_into("<q", raw, source + 16, 257)
+        relocs = {source: 0x500, source + 8: 0x600}
+        with self.assertRaisesRegex(module.DurableStateError, "STATIC_QSTRING_LENGTH_OUT_OF_BOUNDS"):
+            module.decode_static_qstring_source(bytes(raw), sections, relocs, source)
+
+
 if __name__ == "__main__":
     unittest.main()

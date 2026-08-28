@@ -1,8 +1,0 @@
-OTCLIENT-TIBIA-CURRENT-TYPED-LOGIN-E2E-V2
-source_evidence_main=470d5bd285e29f9d3f24f70ff3fc5370e2990e2a
-http_repair_head=d5892084699faa7714430e3c24afac0a588e5889
-http_validation_run=33145479965
-http_validation_job=98765434324
-material_delta=current_loginservice_operatingsystem_plus_existing_current_typed_game_login
-terminal_oracle=GAME_START_plus_IN_GAME
-identical_retry=false

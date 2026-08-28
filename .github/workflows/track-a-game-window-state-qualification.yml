@@ -55,7 +55,8 @@ jobs:
       github.event_name == 'issue_comment' &&
       github.event.issue.pull_request &&
       github.event.comment.user.login == github.repository_owner &&
-      github.event.comment.body == 'START_GAME_WINDOW_STATE_QUALIFICATION'
+      (github.event.comment.body == 'PREFLIGHT_GAME_WINDOW_STATE_QUALIFICATION' ||
+       github.event.comment.body == 'START_GAME_WINDOW_STATE_QUALIFICATION')
     name: Continuous read-only gameWindowState qualification
     runs-on: [otclient, synology]
     timeout-minutes: 35
@@ -108,7 +109,7 @@ jobs:
           python3 - <<'PY'
           import os
           text = os.environ['COMMAND'].strip()
-          if text != 'START_GAME_WINDOW_STATE_QUALIFICATION':
+          if text not in {'PREFLIGHT_GAME_WINDOW_STATE_QUALIFICATION', 'START_GAME_WINDOW_STATE_QUALIFICATION'}:
               raise SystemExit('QUALIFICATION_COMMAND_INVALID')
           print('QUALIFICATION_COMMAND=PASS')
           PY
@@ -329,7 +330,7 @@ jobs:
           echo TRACK_A_TARGET_UNIQUENESS=PROVEN
           echo TRACK_A_MUTATION_AUTHORIZED=false
 
-      - name: Revalidate admission immediately before process-memory observation
+      - name: Revalidate admission immediately before any observation
         shell: bash
         env:
           ADMISSION: ${{ steps.admission.outputs.path }}
@@ -359,7 +360,18 @@ jobs:
           print('READ_ONLY_ADMISSION_REVALIDATION=PASS')
           PY
 
+      - name: Report memory-free logger readiness preflight
+        if: github.event.comment.body == 'PREFLIGHT_GAME_WINDOW_STATE_QUALIFICATION'
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          echo GAME_WINDOW_STATE_LOGGER_PREFLIGHT=READY
+          echo PROCESS_MEMORY_OBSERVATION_PERFORMED=false
+          echo IN_GAME_CLAIMED=false
+          echo semantic_promotion_performed=false
+
       - name: Build in-memory resolver bundle
+        if: github.event.comment.body == 'START_GAME_WINDOW_STATE_QUALIFICATION'
         id: bundle
         shell: bash
         run: |
@@ -388,6 +400,7 @@ jobs:
           echo RESOLVER_BUNDLE=PASS
 
       - name: Capture continuous bounded state log
+        if: github.event.comment.body == 'START_GAME_WINDOW_STATE_QUALIFICATION'
         shell: bash
         env:
           CONTAINER: ${{ steps.target.outputs.container }}
@@ -411,7 +424,7 @@ jobs:
           echo QUALIFICATION_CAPTURE=PASS
 
       - name: Validate secret-free qualification artifact
-        if: always()
+        if: github.event.comment.body == 'START_GAME_WINDOW_STATE_QUALIFICATION'
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -441,7 +454,7 @@ jobs:
           PY
 
       - name: Upload secret-free gameWindowState log
-        if: always()
+        if: ${{ always() && github.event.comment.body == 'START_GAME_WINDOW_STATE_QUALIFICATION' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: track-a-game-window-state-qualification-${{ github.run_id }}

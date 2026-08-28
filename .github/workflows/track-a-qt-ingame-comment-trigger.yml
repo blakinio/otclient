@@ -9,6 +9,7 @@ on:
       - ".github/workflows/track-a-qt-ingame-comment-trigger.yml"
       - ".github/workflows/track-a-qt-ingame-live-correlation.yml"
       - ".github/scripts/test_track_a_qt_ingame_comment_trigger_contract.py"
+      - ".github/scripts/test_track_a_qt_ingame_current_client_observer_contract.py"
 
 permissions:
   contents: read
@@ -25,7 +26,9 @@ jobs:
           persist-credentials: false
       - name: Validate owner-comment trigger contract
         shell: bash
-        run: python3 .github/scripts/test_track_a_qt_ingame_comment_trigger_contract.py
+        run: |
+          python3 .github/scripts/test_track_a_qt_ingame_comment_trigger_contract.py
+          python3 .github/scripts/test_track_a_qt_ingame_current_client_observer_contract.py
 
   correlate:
     if: >-

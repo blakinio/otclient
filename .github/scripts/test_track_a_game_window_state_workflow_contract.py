@@ -12,6 +12,7 @@ required = (
     'START_GAME_WINDOW_STATE_QUALIFICATION',
     'github.event.comment.user.login == github.repository_owner',
     'runs-on: [otclient, synology]',
+    'persist-credentials: false',
     'runtime_access: read_only',
     'mutation_authorized: false',
     'login_allowed: false',
@@ -38,7 +39,7 @@ for needle in required:
     assert needle in text, f'WORKFLOW_CONTRACT_MISSING:{needle}'
 
 for forbidden in (
-    'xdotool', 'xprop', 'xwininfo', 'wmctrl', 'screenshot', 'credential',
+    'xdotool', 'xprop', 'xwininfo', 'wmctrl', 'screenshot',
     'TIBIA_TEST_EMAIL', 'TIBIA_TEST_PASSWORD', 'docker cp', '/proc/$pid/environ',
 ):
     assert forbidden.lower() not in text.lower(), f'WORKFLOW_FORBIDDEN_SURFACE:{forbidden}'

@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+from collections import deque
 from pathlib import Path
 
 import probe as core
@@ -87,28 +88,89 @@ def register_family(name: str) -> str:
     return match.group(1) if match else name
 
 
+def writes_register_family(img: core.Image, row, wanted: str) -> bool:
+    try:
+        _reads, writes = row.regs_access()
+    except Exception:
+        return False
+    return wanted in {register_family(img.md.reg_name(reg)) for reg in writes}
+
+
+def instruction_predecessors(instructions) -> dict[int, set[int]]:
+    by_address = {row.address: row for row in instructions}
+    predecessors = {row.address: set() for row in instructions}
+    for index, row in enumerate(instructions):
+        next_address = instructions[index + 1].address if index + 1 < len(instructions) else None
+        successors: set[int] = set()
+        mnemonic = row.mnemonic.lower()
+        if mnemonic.startswith('ret'):
+            pass
+        elif mnemonic == 'jmp':
+            if row.operands and row.operands[0].type == core.X86_OP_IMM:
+                target = int(row.operands[0].imm)
+                if target in by_address:
+                    successors.add(target)
+        elif mnemonic.startswith('j'):
+            if row.operands and row.operands[0].type == core.X86_OP_IMM:
+                target = int(row.operands[0].imm)
+                if target in by_address:
+                    successors.add(target)
+            if next_address is not None:
+                successors.add(next_address)
+        else:
+            if next_address is not None:
+                successors.add(next_address)
+        for successor in successors:
+            predecessors[successor].add(row.address)
+    return predecessors
+
+
 def backward_register_definition(img: core.Image, instructions, site: int, source_name: str) -> dict:
-    indexes = [i for i, row in enumerate(instructions) if row.address == site]
-    if len(indexes) != 1:
-        raise RuntimeError(f'FIELD6_SITE_AMBIGUOUS:{site:#x}:{len(indexes)}')
+    by_address = {row.address: row for row in instructions}
+    if site not in by_address:
+        raise RuntimeError(f'FIELD6_SITE_UNKNOWN:{site:#x}')
     wanted = register_family(source_name)
-    for row in reversed(instructions[:indexes[0]]):
-        try:
-            _reads, writes = row.regs_access()
-        except Exception:
+    predecessors = instruction_predecessors(instructions)
+    queue = deque(predecessors[site])
+    visited: set[int] = set()
+    definitions: dict[int, dict] = {}
+    reaches_entry_without_definition = False
+
+    while queue:
+        address = queue.popleft()
+        if address in visited:
             continue
-        written_families = {register_family(img.md.reg_name(reg)) for reg in writes}
-        if wanted not in written_families:
+        visited.add(address)
+        row = by_address[address]
+        if writes_register_family(img, row, wanted):
+            definitions[address] = {
+                'definition_site': core.hx(address),
+                'mnemonic': row.mnemonic,
+                'operand': row.op_str,
+                'written_register_family': wanted,
+                'instructions': bounded_context(instructions, address, before=14, after=14),
+            }
             continue
-        return {
-            'definition_site': core.hx(row.address),
-            'mnemonic': row.mnemonic,
-            'operand': row.op_str,
-            'written_register_family': wanted,
-            'instructions': bounded_context(instructions, row.address, before=14, after=14),
-            'classification': 'NEAREST_STATIC_REGISTER_DEFINITION',
-        }
-    raise RuntimeError(f'FIELD6_SOURCE_DEFINITION_NOT_FOUND:{source_name}')
+        preds = predecessors.get(address, set())
+        if not preds:
+            reaches_entry_without_definition = True
+        else:
+            queue.extend(preds)
+
+    rows = [definitions[key] for key in sorted(definitions)]
+    if len(rows) == 1 and not reaches_entry_without_definition:
+        classification = 'CFG_REACHING_DEFINITION_UNIQUE'
+    elif rows:
+        classification = 'CFG_REACHING_DEFINITION_MULTIPLE_OR_ENTRY'
+    else:
+        classification = 'CFG_REACHING_DEFINITION_ENTRY_ONLY'
+    return {
+        'classification': classification,
+        'source_register_family': wanted,
+        'definitions': rows,
+        'reaches_entry_without_definition': reaches_entry_without_definition,
+        'visited_instruction_count': len(visited),
+    }
 
 
 def add_source_contexts(client: Path, output: Path) -> None:

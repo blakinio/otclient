@@ -9,9 +9,10 @@ assert probe.exists(), 'config-type probe not implemented'
 assert warp.exists(), 'bounded WARP bootstrap not implemented'
 text=probe.read_text(encoding='utf-8')
 warp_text=warp.read_text(encoding='utf-8')
+compact=text.replace(' ','')
+assert "'runtime_access':'none'" in compact
+assert "'official_client_executed':False" in compact
 for required in (
-    "'runtime_access': 'none'",
-    "'official_client_executed': False",
     '0x30b6700','0xe25620','0x7d15c0','0x7d1a8a','0x9c8','0x30',
     'CONFIG_TYPE_IDENTITY','CONFIG_TYPE_UNKNOWN','CONFIG_OWNED_METHOD_FLOW',
     'FIELD6_VALUE_PROVEN','FIELD6_VALUE_UNKNOWN','NO_HEURISTIC_RANKING','NO_SEMANTIC_GUESSING',

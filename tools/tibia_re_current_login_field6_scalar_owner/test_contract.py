@@ -5,14 +5,17 @@ root = Path(__file__).resolve().parents[2]
 base = root / 'tools/tibia_re_current_login_field6_scalar_owner'
 probe = base / 'probe.py'
 qmeta_owner = base / 'qmeta_owner.py'
+focused = base / 'focused_qmeta_owner.py'
 warp = base / 'prepare_warp.sh'
 
 assert probe.exists(), 'scalar-owner probe not implemented'
 assert qmeta_owner.exists(), 'QMeta caller-owner discriminator not implemented'
+assert focused.exists(), 'focused timeout-recovery owner discriminator not implemented'
 assert warp.exists(), 'bounded WARP bootstrap not implemented'
 
 text = probe.read_text(encoding='utf-8')
 qmeta_text = qmeta_owner.read_text(encoding='utf-8')
+focused_text = focused.read_text(encoding='utf-8')
 warp_text = warp.read_text(encoding='utf-8')
 for required in (
     "'runtime_access': 'none'",
@@ -45,11 +48,28 @@ for required in (
     "result['qmeta_caller_owner']",
 ):
     assert required in qmeta_text, required
+for required in (
+    'FOCUSED_TIMEOUT_RECOVERY',
+    'VIABLE_CALLSITE_0XCEDDCB',
+    'VIABLE_CALLER_FDE_0XCEDD90',
+    'VIABLE_EDX_VALUE_1',
+    'FRESH_EXACT_REASSERTION',
+    'FOCUSED_QMETA_OWNER',
+    'FOCUSED_OWNER_CONSTRUCTOR_BINDING',
+    'NO_FULL_SCALAR_CENSUS',
+    'FIELD6_VALUE_PROVEN',
+    'FIELD6_VALUE_UNKNOWN',
+    'NO_HEURISTIC_RANKING',
+    'NO_SEMANTIC_GUESSING',
+):
+    assert required in focused_text, required
+for forbidden in ('recover_vtables(', 'enumerate_slot_calls(', 'SCALAR_CALLSITE_CENSUS'):
+    assert forbidden not in focused_text, forbidden
 assert 'WARP_PROFILE_ATTEMPTS=2' in warp_text
 assert 'WARP_BOOTSTRAP_FALLBACK=PASS' in warp_text
 assert '25346' in warp_text and '25347' in warp_text
 assert 'rm -rf' not in warp_text
-combined = (text + qmeta_text + warp_text).lower()
+combined = (text + qmeta_text + focused_text + warp_text).lower()
 for forbidden in ('subprocess', 'ptrace', 'process_vm_readv'):
     assert forbidden not in combined, forbidden
 print('CURRENT_LOGIN_FIELD6_SCALAR_OWNER_CONTRACT=PASS')

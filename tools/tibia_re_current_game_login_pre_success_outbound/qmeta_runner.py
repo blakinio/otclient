@@ -173,9 +173,79 @@ def backward_register_definition(img: core.Image, instructions, site: int, sourc
     }
 
 
+def direct_call_refs(img: core.Image, target: int) -> list[int]:
+    refs: list[int] = []
+    for section in img.sections:
+        if not (section.flags & 4):
+            continue
+        blob = img.raw[section.offset:section.offset + section.size]
+        pos = 0
+        while True:
+            pos = blob.find(b'\xe8', pos)
+            if pos < 0:
+                break
+            if pos + 5 <= len(blob):
+                site = section.va + pos
+                disp = int.from_bytes(blob[pos + 1:pos + 5], 'little', signed=True)
+                if site + 5 + disp == target:
+                    refs.append(site)
+            pos += 1
+    return sorted(set(refs))
+
+
+def rip_refs(img: core.Image, target: int) -> list[int]:
+    refs: set[int] = set()
+    for section in img.sections:
+        if not (section.flags & 4):
+            continue
+        blob = img.raw[section.offset:section.offset + section.size]
+        # Common x86-64 RIP-relative LEA/MOV encodings, with or without REX.
+        for pos in range(0, max(0, len(blob) - 7)):
+            if 0x40 <= blob[pos] <= 0x4F and blob[pos + 1] in (0x8D, 0x8B) and (blob[pos + 2] & 0xC7) == 0x05:
+                disp = int.from_bytes(blob[pos + 3:pos + 7], 'little', signed=True)
+                site = section.va + pos
+                if site + 7 + disp == target:
+                    refs.add(site)
+            if blob[pos] in (0x8D, 0x8B) and (blob[pos + 1] & 0xC7) == 0x05:
+                disp = int.from_bytes(blob[pos + 2:pos + 6], 'little', signed=True)
+                site = section.va + pos
+                if site + 6 + disp == target:
+                    refs.add(site)
+    return sorted(refs)
+
+
+def producer_callsite_contexts(img: core.Image, producer: int) -> dict:
+    direct = direct_call_refs(img, producer)
+    rip = rip_refs(img, producer)
+    contexts = []
+    seen_fdes: set[tuple[int, int]] = set()
+    for kind, sites in (('DIRECT_CALL', direct), ('RIP_REFERENCE', rip)):
+        for site in sites:
+            fde = img.fde(site)
+            if not fde:
+                continue
+            instructions = img.instructions(fde)
+            contexts.append({
+                'kind': kind,
+                'site': core.hx(site),
+                'fde': [core.hx(fde[0]), core.hx(fde[1])],
+                'instructions': bounded_context(instructions, site, before=28, after=20),
+            })
+            seen_fdes.add(fde)
+    return {
+        'producer_target': core.hx(producer),
+        'direct_call_refs': [core.hx(x) for x in direct],
+        'rip_refs': [core.hx(x) for x in rip],
+        'candidate_fde_count': len(seen_fdes),
+        'contexts': contexts,
+        'classification': 'BOUNDED_XREF_CONTEXTS',
+    }
+
+
 def add_source_contexts(client: Path, output: Path) -> None:
     result = json.loads(output.read_text(encoding='utf-8'))
     img = core.Image(client)
+    producer = int(result['primary_login_producer']['target'], 16)
     producer_fde = tuple(int(value, 16) for value in result['primary_login_producer']['fde'])
     instructions = img.instructions(producer_fde)
 
@@ -215,10 +285,12 @@ def add_source_contexts(client: Path, output: Path) -> None:
         for slot, sites in nested_sites.items()
         if slot in required_slots
     }
+    result['producer_callsite_contexts'] = producer_callsite_contexts(img, producer)
     output.write_text(json.dumps(result, indent=2, sort_keys=True) + '\n', encoding='utf-8')
     print('FIELD6_SOURCE_CONTEXT=PASS')
     print('FIELD6_BACKWARD_SOURCE=PASS')
     print('NESTED_SOURCE_CONTEXTS=PASS')
+    print('LOGIN_PRODUCER_CALLSITE_CONTEXTS=PASS')
 
 
 if __name__ == '__main__':

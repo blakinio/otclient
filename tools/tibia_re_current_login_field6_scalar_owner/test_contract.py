@@ -7,16 +7,19 @@ probe = base / 'probe.py'
 qmeta_owner = base / 'qmeta_owner.py'
 focused = base / 'focused_qmeta_owner.py'
 warp = base / 'prepare_warp.sh'
+workflow = root / '.github/workflows/tibia-official-client-re-current-login-field6-scalar-owner.yml'
 
 assert probe.exists(), 'scalar-owner probe not implemented'
 assert qmeta_owner.exists(), 'QMeta caller-owner discriminator not implemented'
 assert focused.exists(), 'focused timeout-recovery owner discriminator not implemented'
 assert warp.exists(), 'bounded WARP bootstrap not implemented'
+assert workflow.exists(), 'scalar-owner workflow missing'
 
 text = probe.read_text(encoding='utf-8')
 qmeta_text = qmeta_owner.read_text(encoding='utf-8')
 focused_text = focused.read_text(encoding='utf-8')
 warp_text = warp.read_text(encoding='utf-8')
+workflow_text = workflow.read_text(encoding='utf-8')
 for required in (
     "'runtime_access': 'none'",
     "'official_client_executed': False",
@@ -65,6 +68,9 @@ for required in (
     assert required in focused_text, required
 for forbidden in ('recover_vtables(', 'enumerate_slot_calls(', 'SCALAR_CALLSITE_CENSUS'):
     assert forbidden not in focused_text, forbidden
+assert 'focused_qmeta_owner.py --client' in workflow_text
+assert 'probe.py --client' not in workflow_text
+assert 'qmeta_owner.py --client' not in workflow_text
 assert 'WARP_PROFILE_ATTEMPTS=2' in warp_text
 assert 'WARP_BOOTSTRAP_FALLBACK=PASS' in warp_text
 assert '25346' in warp_text and '25347' in warp_text

@@ -17,6 +17,7 @@ SCRIPT = Path(__file__).with_name(
     "tibia-official-client-re-canonical-client-fence-reconcile.py"
 )
 GOVERNANCE = Path(__file__).with_name("test_track_a_agent_runtime_governance.py")
+WORKFLOW = Path(__file__).parents[1] / "workflows" / "track-a-canonical-client-fence-reconciliation.yml"
 
 
 def load():
@@ -197,6 +198,12 @@ class Tests(unittest.TestCase):
         self.assertEqual(data["source_task"], "OTC-TEST")
         self.assertEqual(data["source_run"], "123")
         self.assertEqual(stat.S_IMODE(self.m.REG.stat().st_mode), 0o600)
+
+    def test_workflow_routes_exact_current_registration_through_guarded_identity_reconciliation(self):
+        text = WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn("print('RECONCILE_CURRENT_IDENTITY')", text)
+        self.assertIn("RECONCILE|RECONCILE_CURRENT_IDENTITY", text)
+        self.assertIn("steps.decision.outputs.decision == 'RECONCILE_CURRENT_IDENTITY'", text)
 
     def test_reconciles_stale_identity_when_source_fence_is_already_current(self):
         current = dict(

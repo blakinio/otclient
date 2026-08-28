@@ -1,0 +1,13 @@
+OTCLIENT-TIBIA-CURRENT-TYPED-LOGIN-E2E-V4
+source_main=470d5bd285e29f9d3f24f70ff3fc5370e2990e2a
+previous_run=33146791878
+previous_probe_job=98770407796
+previous_failure=SEQUENCE_4_BYTES_MISSING_FROM_RECEIVE_HEADER_ACCOUNTING
+previous_client_bytes=102
+previous_server_bytes=14
+previous_observed_legacy_opcodes=177,219
+material_delta=count_outer_sequence_dword_in_receive_header
+contract_green_run=33147668612
+http_session_gate_run=33146791878
+terminal_oracle=GAME_START_plus_IN_GAME
+identical_retry=false

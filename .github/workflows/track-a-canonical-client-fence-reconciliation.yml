@@ -1,0 +1,275 @@
+name: Track A canonical client-fence reconciliation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/scripts/tibia-official-client-re-canonical-client-fence-reconcile.py
+      - .github/scripts/test_tibia_official_client_re_canonical_client_fence_reconcile.py
+      - .github/scripts/test_track_a_agent_runtime_governance.py
+      - .github/workflows/track-a-canonical-client-fence-reconciliation.yml
+      - docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
+      - docs/agents/contracts/TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_V1.md
+      - docs/agents/decisions/ADR-0002-track-a-canonical-client-fence-reconciliation.md
+      - docs/agents/tasks/active/OTC-20260828-canonical-client-fence-reconciliation.md
+      - docs/agents/evidence/OTC-20260828-canonical-client-fence-reconciliation/**
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-canonical-client-fence-reconciliation-${{ github.event_name }}
+  cancel-in-progress: false
+
+jobs:
+  contract:
+    name: Deterministic client-fence reconciliation contract
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Run focused fail-closed contract
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -Eeuo pipefail
+          [[ "$(git rev-parse HEAD)" == "$HEAD_SHA" ]]
+          python3 .github/scripts/test_tibia_official_client_re_canonical_client_fence_reconcile.py -v
+          python3 .github/scripts/test_tibia_official_client_re_canonical_live_transition.py
+          python3 .github/scripts/test_tibia_official_client_re_kasm_existing_runtime_probe.py
+          python3 .github/scripts/test_track_a_agent_runtime_governance.py \
+            --changed-from "$BASE_SHA" --expected-branch "$HEAD_BRANCH"
+          python3 -m py_compile \
+            .github/scripts/tibia-official-client-re-canonical-client-fence-reconcile.py \
+            .github/scripts/test_tibia_official_client_re_canonical_client_fence_reconcile.py \
+            .github/scripts/test_track_a_agent_runtime_governance.py
+          git diff --check "$BASE_SHA"...HEAD
+          contract='docs/agents/contracts/TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_V1.md'
+          grep -Fq 'client_version: 15.32' "$contract"
+          grep -Fq 'client_size: 52109920' "$contract"
+          grep -Fq 'client_sha256: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8' "$contract"
+          grep -Fq 'client_version: 15.32.75d4a0' "$contract"
+          grep -Fq 'client_size: 52105824' "$contract"
+          grep -Fq 'client_sha256: d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a' "$contract"
+          echo 'TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_CONTRACT=PASS'
+
+  live-reconciliation:
+    name: Trusted-main metadata-only client-fence reconciliation
+    if: >-
+      ${{ github.event_name == 'issue_comment' &&
+          github.event.issue.number == 760 &&
+          github.event.comment.user.login == github.repository_owner &&
+          github.event.comment.body == 'RECONCILE_CANONICAL_CLIENT_FENCE' }}
+    runs-on: [otclient, synology]
+    timeout-minutes: 10
+    steps:
+      - name: Checkout current trusted main
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: main
+
+      - name: Deterministic pre-runtime verification
+        id: trust
+        shell: bash
+        run: |
+          set +x
+          set -Eeuo pipefail
+          [[ "$RUNNER_NAME" == 'synology-otclient-01' ]]
+          [[ "$GITHUB_REPOSITORY" == 'blakinio/otclient' ]]
+          trusted_main="$(git rev-parse HEAD)"
+          live_main="$(git ls-remote origin refs/heads/main | awk 'NR==1 {print $1}')"
+          [[ "$trusted_main" == "$live_main" ]] || {
+            echo "TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_REFUSED=LIVE_MAIN_MOVED" >&2
+            exit 60
+          }
+          python3 .github/scripts/test_tibia_official_client_re_canonical_client_fence_reconcile.py -v
+          python3 .github/scripts/test_tibia_official_client_re_canonical_live_transition.py
+          python3 .github/scripts/test_tibia_official_client_re_kasm_existing_runtime_probe.py
+          python3 .github/scripts/test_track_a_agent_runtime_governance.py
+          python3 - <<'PY'
+          import importlib.util
+          import pathlib
+          import sys
+
+          root = pathlib.Path('.')
+          governance_path = root / '.github/scripts/test_track_a_agent_runtime_governance.py'
+          spec = importlib.util.spec_from_file_location('live_reconcile_governance', governance_path)
+          assert spec and spec.loader
+          governance = importlib.util.module_from_spec(spec)
+          sys.modules[spec.name] = governance
+          spec.loader.exec_module(governance)
+          task = root / 'docs/agents/tasks/active/OTC-20260828-canonical-client-fence-reconciliation.md'
+          assert governance.validate_track_a_task(task)
+          values = governance.parse_frontmatter(task)
+          required = {
+              'runtime_access': 'canonical_recovery',
+              'runtime_owner_task': 'OTC-20260828-canonical-client-fence-reconciliation',
+              'runtime_namespace': 'canonical-live-runtime',
+              'canonical_registration': 'PRESENT',
+              'canonical_lease_generation': 'UNKNOWN',
+              'registration_lease_generation': 'UNKNOWN',
+              'gate_a': 'REQUIRED_NOT_PROVEN',
+              'generation_rebind': 'NOT_APPLICABLE',
+              'gate_b': 'NOT_APPLICABLE',
+              'bootstrap': 'NOT_APPLICABLE',
+              'target_uniqueness': 'UNKNOWN',
+              'mutation_authorized': 'false',
+              'recovery_mode': 'client_fence_reconciliation_v1',
+              'client_fence_reconciliation_contract': 'TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_V1',
+          }
+          for field, expected in required.items():
+              actual = values.get(field)
+              if actual != expected:
+                  raise SystemExit(f'LIVE_RECOVERY_ADMISSION_REFUSED:{field}={actual!r}')
+          print('TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_PENDING_ADMISSION=PASS')
+          PY
+          echo "trusted_main=$trusted_main" >> "$GITHUB_OUTPUT"
+          echo 'TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_PRERUNTIME=PASS'
+
+      - name: Resolve bounded registration-fence decision
+        id: decision
+        shell: bash
+        run: |
+          set +x
+          set -Eeuo pipefail
+          reg='/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime/runtime-registration.json'
+          decision="$(python3 - "$reg" <<'PY'
+          import json,os,pathlib,stat,sys
+          path=pathlib.Path(sys.argv[1])
+          try:
+              st=path.lstat()
+          except OSError:
+              print('BLOCK:REGISTRATION_UNAVAILABLE'); raise SystemExit(0)
+          owner=(not hasattr(os,'getuid')) or st.st_uid==os.getuid()
+          if not stat.S_ISREG(st.st_mode) or path.is_symlink() or stat.S_IMODE(st.st_mode)!=0o600 or not owner:
+              print('BLOCK:REGISTRATION_FILE_UNSAFE'); raise SystemExit(0)
+          try:
+              data=json.loads(path.read_text())
+          except Exception:
+              print('BLOCK:REGISTRATION_INVALID_JSON'); raise SystemExit(0)
+          fence=(data.get('client_version'),data.get('client_size'),data.get('client_sha256'))
+          old=('15.32',52109920,'ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8')
+          current=('15.32.75d4a0',52105824,'d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a')
+          if fence==old:
+              print('RECONCILE')
+          elif fence==current:
+              print('ALREADY_CURRENT')
+          else:
+              print('BLOCK:UNAPPROVED_REGISTRATION_FENCE')
+          PY
+          )"
+          printf 'TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_DECISION=%s\n' "$decision"
+          case "$decision" in
+            RECONCILE|ALREADY_CURRENT) ;;
+            BLOCK:*) exit 61 ;;
+            *) exit 62 ;;
+          esac
+          echo "decision=$decision" >> "$GITHUB_OUTPUT"
+
+      - name: Reconcile approved predecessor under canonical guard
+        if: ${{ steps.decision.outputs.decision == 'RECONCILE' }}
+        shell: bash
+        env:
+          TRUSTED_MAIN: ${{ steps.trust.outputs.trusted_main }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          umask 077
+          live_main="$(git ls-remote origin refs/heads/main | awk 'NR==1 {print $1}')"
+          [[ "$live_main" == "$TRUSTED_MAIN" ]] || {
+            echo 'TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_REFUSED=LIVE_MAIN_MOVED' >&2
+            exit 60
+          }
+
+          task='OTC-20260828-canonical-client-fence-reconciliation'
+          session="github-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          token_root="/home/runner/_work/_otclient_tibia_re_state/tasks/$task/runtime"
+          token="$token_root/canonical-lease-token"
+          lease='.github/scripts/tibia-official-client-re-canonical-live-lease'
+          helper='.github/scripts/tibia-official-client-re-canonical-client-fence-reconcile.py'
+          probe='.github/scripts/tibia-official-client-re-kasm-existing-runtime-probe.py'
+          acquired=0
+          released=0
+
+          mkdir -p "$token_root"
+          chmod 700 "/home/runner/_work/_otclient_tibia_re_state/tasks/$task" "$token_root" 2>/dev/null || true
+          rm -f "$token"
+
+          cleanup() {
+            rc=$?
+            if [[ "$acquired" == 1 && "$released" != 1 ]]; then
+              bash "$lease" release --task-id "$task" --session-id "$session" --token-file "$token" >/dev/null 2>&1 || true
+            fi
+            rm -f "$token"
+            exit "$rc"
+          }
+          trap cleanup EXIT
+
+          bash "$lease" acquire \
+            --task-id "$task" \
+            --session-id "$session" \
+            --token-file "$token" \
+            --ttl-seconds 900 \
+            --stale-takeover-reason 'trusted-main exact-client fence reconciliation'
+          acquired=1
+          bash "$lease" validate --task-id "$task" --session-id "$session" --token-file "$token"
+          echo 'TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_GATE_A=PASS'
+
+          live_main="$(git ls-remote origin refs/heads/main | awk 'NR==1 {print $1}')"
+          [[ "$live_main" == "$TRUSTED_MAIN" ]] || {
+            echo 'TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_REFUSED=LIVE_MAIN_MOVED' >&2
+            exit 60
+          }
+
+          TRACK_A_CANONICAL_FENCE_RECONCILE_GUARDED=1 \
+            bash "$lease" guard-run \
+              --task-id "$task" \
+              --session-id "$session" \
+              --token-file "$token" \
+              -- \
+              python3 "$helper" \
+                --task-id "$task" \
+                --session-id "$session" \
+                --probe "$probe"
+
+          bash "$lease" release --task-id "$task" --session-id "$session" --token-file "$token"
+          released=1
+          rm -f "$token"
+          echo 'TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_RELEASE=PASS'
+
+      - name: Verify current exact registration fence without runtime observation
+        shell: bash
+        run: |
+          set +x
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          import json,os,pathlib,stat
+          path=pathlib.Path('/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime/runtime-registration.json')
+          st=path.lstat()
+          owner=(not hasattr(os,'getuid')) or st.st_uid==os.getuid()
+          assert stat.S_ISREG(st.st_mode) and not path.is_symlink()
+          assert stat.S_IMODE(st.st_mode)==0o600 and owner
+          data=json.loads(path.read_text())
+          assert (data.get('client_version'),data.get('client_size'),data.get('client_sha256')) == (
+              '15.32.75d4a0',52105824,'d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a'
+          )
+          assert data.get('state') == 'UNKNOWN'
+          print('TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_REGISTRATION_CURRENT=PASS')
+          print('TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_CLIENT_PROCESS_MUTATION=false')
+          print('TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_PROCESS_MEMORY_OBSERVATION=false')
+          print('TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_SEMANTIC_PROMOTION=false')
+          PY

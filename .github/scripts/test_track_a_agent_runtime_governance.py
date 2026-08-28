@@ -50,6 +50,8 @@ TRACK_A_SENSITIVE_PREFIXES = (
 BOOTSTRAP_TRANSITION = ".github/scripts/tibia-official-client-re-canonical-live-transition.py"
 BOOTSTRAP_ARCHIVE = "docs/agents/tasks/archive/OTC-20260816-track-a-canonical-bootstrap-implementation.md"
 BOOTSTRAP_MERGE = "d16091ca29ff7c9330115e9ce0fdbfb41646e0dc"
+CLIENT_FENCE_RECOVERY_MODE = "client_fence_reconciliation_v1"
+CLIENT_FENCE_RECOVERY_CONTRACT = "TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_V1"
 
 
 def read(path: str) -> str:
@@ -320,15 +322,37 @@ def validate_track_a_task(path: Path) -> bool:
             fail_task(path, "canonical recovery requires current Gate A to be pending or PASS")
         if values["target_uniqueness"] not in {"UNKNOWN", "PROVEN"}:
             fail_task(path, "canonical recovery target uniqueness must remain fail-closed")
-        registration_generation = positive_generation(path, values, "registration_lease_generation")
-        if values["gate_a"] == "PASS":
-            lease_generation = positive_generation(path, values, "canonical_lease_generation")
-            if lease_generation <= registration_generation:
-                fail_task(path, "canonical recovery requires a newer current controller generation")
-        elif values["canonical_lease_generation"] != "UNKNOWN":
-            lease_generation = positive_generation(path, values, "canonical_lease_generation")
-            if lease_generation <= registration_generation:
-                fail_task(path, "known recovery controller generation must be newer than registration")
+
+        recovery_mode = values.get("recovery_mode", "stale_runtime_instance_v1")
+        if recovery_mode == CLIENT_FENCE_RECOVERY_MODE:
+            if values.get("client_fence_reconciliation_contract") != CLIENT_FENCE_RECOVERY_CONTRACT:
+                fail_task(path, "client-fence recovery requires the exact reviewed reconciliation contract")
+            if values["gate_a"] == "REQUIRED_NOT_PROVEN":
+                if values["canonical_lease_generation"] != "UNKNOWN":
+                    fail_task(path, "pending client-fence recovery requires canonical_lease_generation=UNKNOWN")
+                if values["registration_lease_generation"] != "UNKNOWN":
+                    fail_task(path, "pending client-fence recovery requires registration_lease_generation=UNKNOWN")
+                if values["target_uniqueness"] != "UNKNOWN":
+                    fail_task(path, "pending client-fence recovery requires target_uniqueness=UNKNOWN")
+            else:
+                lease_generation = positive_generation(path, values, "canonical_lease_generation")
+                registration_generation = positive_generation(path, values, "registration_lease_generation")
+                if lease_generation <= registration_generation:
+                    fail_task(path, "client-fence recovery requires a newer current controller generation")
+                if values["target_uniqueness"] != "PROVEN":
+                    fail_task(path, "Gate-A-PASS client-fence recovery requires target_uniqueness=PROVEN")
+        elif recovery_mode == "stale_runtime_instance_v1":
+            registration_generation = positive_generation(path, values, "registration_lease_generation")
+            if values["gate_a"] == "PASS":
+                lease_generation = positive_generation(path, values, "canonical_lease_generation")
+                if lease_generation <= registration_generation:
+                    fail_task(path, "canonical recovery requires a newer current controller generation")
+            elif values["canonical_lease_generation"] != "UNKNOWN":
+                lease_generation = positive_generation(path, values, "canonical_lease_generation")
+                if lease_generation <= registration_generation:
+                    fail_task(path, "known recovery controller generation must be newer than registration")
+        else:
+            fail_task(path, f"unsupported canonical recovery_mode={recovery_mode!r}")
 
     elif runtime_access == "canonical_boot_epoch_recovery":
         if mutation != "false":
@@ -476,6 +500,8 @@ def static_policy_audit() -> None:
             "### 6. `canonical_rebind`",
             "### 7. `canonical_recovery`",
             "### 8. `canonical_boot_epoch_recovery`",
+            "client_fence_reconciliation_v1",
+            "TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_V1",
             "prior-boot registration",
             "stale registered PID shortcut",
             "bootstrap: REQUIRED_UNIMPLEMENTED",

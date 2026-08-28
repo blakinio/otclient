@@ -48,6 +48,8 @@ target_uniqueness: PROVEN | UNKNOWN | NOT_APPLICABLE
 mutation_authorized: true | false
 ```
 
+`canonical_recovery` may additionally require a reviewed `recovery_mode` and contract binding as defined in section 7. These conditional fields never create authority by themselves.
+
 `mutation_authorized: true` is legal only for the exact cases defined below. An `UNKNOWN`, `REQUIRED_NOT_PROVEN`, `REQUIRED_UNAVAILABLE`, or `REQUIRED_UNIMPLEMENTED` value on a required gate means **REFUSE the mutation**.
 
 The active task checkpoint is the durable admission record. It MUST NOT fabricate PASS from historical evidence merely to continue.
@@ -146,7 +148,6 @@ mutation_authorized: false
 
 A future implementation must still re-prove registration absence plus the complete all-official-client candidate/session inventory under the continuously held canonical flock immediately before launch, then register and safely detach exactly as the bootstrap contract requires.
 
-
 For `adopt_existing`, the transition itself is not client mutation: it MUST NOT launch, login, stop, signal, attach to, inject into or otherwise alter the client. It must run under the current authoritative lease plus continuously held canonical flock, prove exactly one exact target and zero conflicting/unverifiable candidates, bind the exact Docker runtime locator/candidate fingerprint, repeat stable boot/PID/start/fence/display/window proof around atomic registration commit, and roll back only its own registration on failure. Window title is identity evidence only. The current Kasm bridge `PING` plus one validated player-protocol, game-session and worldmap handler is also structural presence evidence only: a 2026-08-20 exact-peer login-screen regression still produced all three. It MUST NOT promote `IN_GAME`; absent a separately reviewed semantic/causal active-world discriminator the registration state is `UNKNOWN`. A successful adoption still leaves `mutation_authorized: false` for that transaction. Any later GUI/process mutation requires a fresh task checkpoint/re-admission as `canonical_reuse_or_mutation` with Gate B PASS and the final whole-lifetime supervisor.
 
 The current task should record `bootstrap_mode: create_new | adopt_existing` when this distinction applies. The deterministic admission validator intentionally keeps both modes inside `canonical_bootstrap`; adoption is not ordinary reuse and never bypasses Gate B for subsequent mutation.
@@ -168,9 +169,13 @@ Manual edits to `runtime-registration.json` are forbidden as a rebind substitute
 
 ### 7. `canonical_recovery`
 
-Use only when the authoritative registration exists but no longer identifies the current runtime instance: the registered PID **and** process-start ticks are stale, while a fresh reviewed adoption probe proves exactly one current exact-fenced target. Recovery is a distinct metadata reconciliation transaction. It is not generation rebind, bootstrap, adoption, Gate B, or client mutation.
+`canonical_recovery` is reserved for separately reviewed metadata reconciliation transactions. It is not generation rebind, bootstrap, adoption, Gate B, or client mutation. A recovery worker MUST run under current Gate A plus the continuously held canonical `coordination.lock`, reuse the one authoritative registration path, keep `mutation_authorized: false`, and preserve fail-closed semantic state.
 
-Recovery MUST run under current Gate A plus the continuously held canonical `coordination.lock` and MUST reuse the one authoritative registration path. It may replace runtime-instance identity only when all of the following are freshly true:
+#### `stale_runtime_instance_v1`
+
+This is the legacy/default recovery mode for an authoritative registration whose registered PID **and** process-start ticks are stale while a fresh reviewed adoption probe proves exactly one current target on the **same accepted exact-client fence**. Existing task records without an explicit `recovery_mode` are interpreted only as this mode for backward compatibility; absence of the field never grants client-fence migration authority.
+
+It may replace runtime-instance identity only when all of the following are freshly true:
 
 - the old registration is `existing_runtime_adoption_v1`, remains `state: UNKNOWN`, and carries only fail-closed adoption state evidence;
 - the current controller generation is newer than the registration lease generation;
@@ -182,9 +187,34 @@ Recovery MUST run under current Gate A plus the continuously held canonical `coo
 
 Under the same authority boundary, recovery atomically increments `registration_generation`, binds `lease_generation` to the current controller and replaces only the stale runtime-instance/adoption proof fields with the freshly proven values. The recovered state remains `UNKNOWN`; recovery MUST NOT promote `IN_GAME`. A post-commit failure rolls back only when the committed record is still exactly the transaction's own record, otherwise it fails closed without overwriting concurrent state.
 
-Recovery MUST NOT launch, login, stop, signal, attach to, inject into, restart, move, click, type into or otherwise mutate the client. It creates no new state root, registration path, lock, lease, token or authority system. `mutation_authorized` remains `false` for the recovery transaction. Any later reuse or mutation requires a fresh invocation from trusted `main`, current Gate A, any then-required authority transition, and Gate B PASS.
+The reviewed implementation is the `stale-registration-recovery` operation in `.github/scripts/tibia-official-client-re-canonical-live-transition.py`.
 
-The reviewed implementation is the `stale-registration-recovery` operation in `.github/scripts/tibia-official-client-re-canonical-live-transition.py`. An unmerged task cannot use its own implementation or governance edits as runtime authority.
+#### `client_fence_reconciliation_v1`
+
+This is a separate, closed client-fence recovery mode governed by `TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_V1`. It exists only for a trusted-base client-fence advance where the durable canonical registration still carries the one explicitly approved predecessor build and ordinary recovery/rebind cannot legally rewrite it.
+
+The durable pre-Gate-A admission MUST be exactly fail-closed:
+
+```yaml
+runtime_access: canonical_recovery
+recovery_mode: client_fence_reconciliation_v1
+client_fence_reconciliation_contract: TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_V1
+canonical_registration: PRESENT
+canonical_lease_generation: UNKNOWN
+registration_lease_generation: UNKNOWN
+gate_a: REQUIRED_NOT_PROVEN
+generation_rebind: NOT_APPLICABLE
+gate_b: NOT_APPLICABLE
+bootstrap: NOT_APPLICABLE
+target_uniqueness: UNKNOWN
+mutation_authorized: false
+```
+
+`UNKNOWN` generation fields are permitted **only** in this named pre-Gate-A mode because the superseded-fence registration cannot be consumed by the current exact-fence transition reader merely to discover its generation. They are not treated as PASS and grant no registration write. After the authoritative lease is acquired and before any commit, the reviewed reconciliation worker must freshly read and validate the exact approved source registration under the held canonical guard, prove a positive current controller generation strictly newer than the source `registration_lease_generation`, and prove target uniqueness from the reviewed exact-current singleton probe. The effective under-lock recovery state is therefore Gate A PASS with concrete positive generations and `target_uniqueness: PROVEN`; failure to prove any field leaves the registration unchanged.
+
+The only v1 source/target pair and all repeated-probe, continuity, atomic-commit and rollback requirements are defined in `docs/agents/contracts/TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_V1.md`. No other predecessor, mixed tuple, future build, missing registration or arbitrary registration content is covered. A current exact-fence registration is not rewritten by this mode.
+
+Neither recovery mode may launch, login, stop, signal, attach to, inject into, restart, move, click, type into or otherwise mutate the client. Recovery creates no new state root, registration path, lock, lease, token or authority system. Any later reuse, read-only observation or mutation requires a fresh downstream admission after reconciliation. An unmerged task cannot use its own implementation or governance edits as runtime authority.
 
 ### 8. `canonical_boot_epoch_recovery`
 

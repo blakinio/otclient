@@ -310,11 +310,13 @@ def main(argv: list[str]) -> int:
             continue
         writer_index = int(writer["index"])
         writer_case = game_window_dispatch_targets[writer_index]
+        writer_case_trace = extract_bounded_case_trace(raw, sections, writer_case)
         writer_resolution = resolve_generated_slot_body(raw, sections, writer_case)
         writer_body = writer_resolution.get("body_target_va")
         game_window_state_method_traces[writer_name] = {
             "index": writer_index,
             "case_target_va": writer_case,
+            "case_trace": writer_case_trace,
             "body_target_va": writer_body,
             "resolution": writer_resolution["resolution"],
             "trace": None if writer_body is None else extract_bounded_case_trace(raw, sections, int(writer_body)),

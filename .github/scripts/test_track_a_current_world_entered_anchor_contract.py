@@ -34,6 +34,7 @@ checks = {
     'activation arguments': 'SIGNAL_INDEX_ARGUMENT_NOT_PROVEN' in s and 'STATIC_METAOBJECT_ARGUMENT_NOT_PROVEN' in s,
     'durable qmeta': 'recover_qmeta_class' in d and 'TGameSessionDisconnectReactionController' in d,
     'durable writes': 'extract_this_immediate_writes' in d and 'select_durable_field_candidate' in d,
+    'writer case trace': 'writer_case_trace = extract_bounded_case_trace' in d,
     'durable fail closed': 'PROVEN_STATIC_SIMPLE_FIELD_CANDIDATE' in d and 'NOT_PROVEN' in d,
     'no historical address reuse': 'historical_address_reuse' in s and 'False' in s and 'historical_address_reuse' in d,
     'no ingame claim': 'in_game_claimed' in s and 'False' in s and 'in_game_claimed' in d,

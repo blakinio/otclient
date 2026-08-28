@@ -1,24 +1,24 @@
 ---
 task_id: OTC-20260828-current-login-field6-runtime
-status: implementing
+status: live_authorized_pending_trigger
 agent: ChatGPT
 session_role: implementer
 project_lane: otclient
 lane: RUNTIME_RESEARCH
 track_id: official-client-re
 task_kind: reverse_engineering_runtime
-phase: repo_static_green
+phase: live_admission
 branch: work/OTC-20260828-current-login-field6-runtime
 base_branch: main
-base_main: 9b3c9fbd4bcac241082591508002ec766d42a1fa
+base_main: 87a8351f6f6d3faae9869a119f165fc30882ab53
 created: 2026-08-28T19:00:00+02:00
-updated: 2026-08-28T19:22:00+02:00
+updated: 2026-08-28T19:33:00+02:00
 risk: high
-execution_class: github_hosted
-execution_mode: chat_github
-runtime_access: none
-runtime_owner_task: NOT_APPLICABLE
-runtime_namespace: NOT_APPLICABLE
+execution_class: self_hosted
+execution_mode: github_actions_ephemeral_isolated
+runtime_access: ephemeral_isolated
+runtime_owner_task: OTC-20260828-current-login-field6-runtime
+runtime_namespace: field6-runtime-ephemeral-OTC-20260828-display131-port25441
 canonical_registration: NOT_APPLICABLE
 canonical_lease_generation: NOT_APPLICABLE
 registration_lease_generation: NOT_APPLICABLE
@@ -26,20 +26,21 @@ gate_a: NOT_APPLICABLE
 generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
-target_uniqueness: NOT_APPLICABLE
-mutation_authorized: false
-credentials_allowed: false
-login_allowed: false
+target_uniqueness: PROVEN
+mutation_authorized: true
+credentials_allowed: true
+login_allowed: true
 relogin_allowed: false
 restart_allowed: false
 character_selection_allowed: false
 gameplay_allowed: false
-gui_input_authorized: false
-process_control_authorized: false
+gui_input_authorized: true
+process_control_authorized: true
 network_payload_capture_allowed: false
-physical_action_budget: 0
+physical_action_budget: 1
 physical_action_count: 0
 implementation_authorized: true
+live_runtime_authorization_source: PR_758_COMMENT_5455680140
 related_pr: 758
 owned_paths:
   - .github/scripts/test_track_a_current_login_field6_runtime.py
@@ -52,7 +53,9 @@ modules_touched:
   - track-a-ephemeral-runtime-research
 depends_on:
   - merged PR #752 exact-current field6 scalar-owner promotion
-  - exact-current client fence from merged PR #754
+  - merged PR #754 exact-current client fence
+  - merged PR #758 runtime observation implementation
+  - PR #758 owner authorization comment 5455680140
 blocks:
   - OTCLIENT-TIBIA-GLOBAL-LOGIN-FINAL-CONTINUE
 ---
@@ -61,33 +64,44 @@ blocks:
 
 Recover the exact current public scalar value carried in `edx` when official Linux Tibia enters the statically proven `GameclientMessageLogin` producer at `PIE + 0xe25620`, then promote that value as the only admissible Track B field6 input.
 
-# Static implementation checkpoint
+# Live admission
 
-This branch is repository-only. `runtime_access: none`, `mutation_authorized: false`, `credentials_allowed: false`, and `login_allowed: false` are mandatory until the implementation is reviewed, merged to trusted `main`, and a separate live-admission change is reviewed and merged.
+The repository-side observer implementation is trusted on `main` at merge `87a8351f6f6d3faae9869a119f165fc30882ab53`. The owner explicitly authorized one separately admitted isolated login experiment in PR #758 comment `5455680140`.
 
-No live official-client observation, launch, login, GDB execution, X11 input, character selection, world entry, gameplay, or Track B E2E is authorized from PR #758 head.
+This checkpoint reclassifies only this task to `ephemeral_isolated`. It does not grant canonical authority and it does not touch, attach to, reuse, signal, stop, inject into, or clean any canonical Track A or Track B runtime. Canonical registration, lease, Gate A, Gate B, rebind and bootstrap are `NOT_APPLICABLE` by design for this task-owned sandbox.
+
+The namespace is task-owned and non-canonical:
+
+```text
+state root: /home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260828-current-login-field6-runtime/runs/$GITHUB_RUN_ID
+display: :131
+WARP SOCKS port: 25441
+client/process ownership: OTCLIENT_TIBIA_RE_TASK=OTC-20260828-current-login-field6-runtime + exact run id + role
+```
+
+`target_uniqueness: PROVEN` refers to the reviewed task-owned namespace selection and fail-closed ownership model. The trusted helper still refuses execution before login if the run root, display, WARP port, exact client fence, toolroot, window, tracer-child identity, or ownership markers are not uniquely valid at runtime.
 
 # Exact source boundary
 
-Trusted inputs are only:
+Only this exact official native Linux client is admitted:
 
-- official native Linux client `15.32.75d4a0`;
+- version `15.32.75d4a0`;
 - size `52105824`;
 - SHA-256 `d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a`;
 - exact producer entry `0xe25620` promoted by merged PR #752;
-- the promoted bounded-negative static result `FIELD6_VALUE=UNKNOWN`.
+- current authoritative pre-observation result `FIELD6_VALUE=UNKNOWN`.
 
-The historical closed/unmerged PR #303 is discovery input only for the Yama-safe parent-GDB shape. It is not runtime authority and none of its old client hashes, displays, ports, branches, task ownership, or run records are accepted as current evidence.
+The historical closed/unmerged PR #303 remains discovery input only for the Yama-safe parent-GDB shape. None of its old client hashes, displays, ports, branches, tasks or runtime records are authority.
 
-# Intended trusted-main live boundary
+# Mutation and credential boundary
 
-After this implementation is merged, a separate live-admission PR may reclassify this task to `ephemeral_isolated` only. The admitted run must use a task-owned state root, display `:131`, task-owned WARP SOCKS `127.0.0.1:25441`, task-owned process markers, and the exact current client copied into a task-owned HOME.
+The live physical-action budget is exactly one logical account-login form submission. No relog or restart is authorized. Character selection, character activation, world entry and gameplay are explicitly forbidden.
 
-The live action budget is one logical account-login submission. The observer is GDB-as-parent, never attach: ASLR remains enabled, the exact child PIE is resolved after `exec`, and a single breakpoint at `PIE + 0xe25620` retains only `uint32(edx)`. No stack bytes, packet payload, credentials, process environment, unrelated registers, or arbitrary process memory may be retained.
+The observer is GDB-as-parent, never attach. ASLR remains enabled, the exact child PIE is resolved after `exec`, and the one breakpoint at `PIE + 0xe25620` retains only `uint32(edx)`. It may not retain stack bytes, packet payloads, credentials, process environment, unrelated registers, raw memory or unrelated process state.
 
-The protected-step credential environment is removed before any helper preflight child process: a tiny task-owned wrapper de-exports the two secret names, verifies they are absent from `env`, then sources the helper in the same shell so the values remain non-exported shell variables until the single login submit.
+The protected-step credential environment is scrubbed before any helper preflight child process: the task-owned wrapper removes the export attribute from `TIBIA_TEST_EMAIL` and `TIBIA_TEST_PASSWORD`, proves those names are absent from `env`, and only then sources the helper in the same shell. The values remain non-exported shell variables solely until the one login-form submit.
 
-The live experiment must remain bounded by:
+The admitted outcome must preserve:
 
 ```text
 login_submit_count=1
@@ -97,13 +111,15 @@ gameplay_performed=false
 network_payload_capture_performed=false
 ```
 
-A second logged-in Track A experiment is permitted only by a fresh, exact owner comment on PR #758 after live admission is on trusted `main`. The accepted trigger text is:
+# Execution trigger
+
+This live admission PR itself MUST NOT start the official client. After this admission is reviewed, GREEN and merged to trusted `main`, live execution still requires a new top-level owner comment on merged PR #758 whose body is exactly:
 
 ```text
 AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V1 once=true
 ```
 
-The workflow must reject rerunning the same authorization event and must not consume credentials if trusted-main admission, exact fence, namespace uniqueness, toolchain, display, port, or task-owned preflight fails.
+The workflow accepts only that exact repository-owner comment, consumes its GitHub comment id once in task-owned persistent authorization state, checks out fresh `main`, revalidates this live task state and repository governance, then performs at most the one admitted login submit. Replaying the same comment id is refused.
 
 # Completion
 

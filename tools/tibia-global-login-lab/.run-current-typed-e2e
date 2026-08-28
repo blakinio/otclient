@@ -1,0 +1,12 @@
+OTCLIENT-TIBIA-CURRENT-TYPED-LOGIN-E2E-V3
+source_main=470d5bd285e29f9d3f24f70ff3fc5370e2990e2a
+previous_run=33146107629
+previous_probe_job=98767517522
+previous_failure=ENCRYPTED_14_BYTE_RESPONSE_DOUBLE_PADDING_CONSUME
+previous_client_bytes=102
+previous_server_bytes=14
+material_delta=avoid_second_modern_padding_consume_after_xtea_decrypt
+contract_green_run=33146741994
+http_session_gate_run=33146038184
+terminal_oracle=GAME_START_plus_IN_GAME
+identical_retry=false

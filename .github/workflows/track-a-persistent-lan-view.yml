@@ -1,4 +1,4 @@
-name: Track A fresh normal Tibia launcher visual proof
+name: Track A complete Tibia launcher self update
 on:
   push:
     branches: [research/OTC-20260827-kasm-endpoint-inventory]
@@ -6,71 +6,86 @@ on:
 permissions:
   contents: read
 jobs:
-  launch:
+  complete:
     if: github.actor == 'blakinio'
     runs-on: [otclient, synology]
-    timeout-minutes: 8
+    timeout-minutes: 10
     steps:
-      - name: Fresh normal launcher start in existing Kasm
+      - name: Complete normal launcher update and keep visible UI
         shell: bash
         run: |
           set -Eeuo pipefail
           c=otclient-track-a-kasmvnc
+          root=/home/kasm-user/Tibia
           docker inspect -f '{{.State.Running}}' "$c" | grep -Fx true
           docker exec -u kasm-user -e DISPLAY=:1 "$c" xdpyinfo >/dev/null
-          current="$(docker exec "$c" sh -lc "ps -eo pid,args | grep -Ei '[/]home/kasm-user/Tibia/Tibia|[/]packages/.*/bin/client' || true")"
-          echo "BEFORE=$current"
-          if [ -z "$current" ]; then
+          echo BEFORE_SHA="$(docker exec "$c" sha256sum "$root/Tibia" | awk '{print $1}')"
+          echo '=== RECENT LAUNCHER FILES ==='
+          docker exec "$c" sh -lc "find '$root' -maxdepth 3 -type f -mmin -30 -printf '%TY-%Tm-%Td %TH:%TM:%TS %s %p\n' | head -120 || true"
+
+          start_launcher() {
             sess="$(docker exec "$c" pgrep -n xfce4-session)"
             args=(-e HOME=/home/kasm-user -e LD_LIBRARY_PATH=/home/kasm-user/Tibia/lib)
             for key in DISPLAY DBUS_SESSION_BUS_ADDRESS XAUTHORITY XDG_RUNTIME_DIR PATH LANG DESKTOP_SESSION XDG_CURRENT_DESKTOP XDG_SESSION_TYPE; do
               val="$(docker exec "$c" sh -lc "tr '\0' '\n' </proc/$sess/environ | sed -n 's/^${key}=//p' | head -1" || true)"
               if [ -n "$val" ]; then args+=(-e "$key=$val"); fi
             done
-            docker exec -d -u kasm-user "${args[@]}" -w /home/kasm-user/Tibia "$c" sh -lc 'exec ./Tibia >/tmp/tibia-normal-launcher-fresh.log 2>&1'
-          fi
-          visible=false
-          for _ in $(seq 1 120); do
-            windows="$(docker exec -u kasm-user -e DISPLAY=:1 "$c" sh -lc "xwininfo -root -tree 2>/dev/null | grep -E '\"Tibia|Tibia Launcher|Update|Updating' | grep -v 'Qt Selection Owner' || true")"
-            procs="$(docker exec "$c" sh -lc "ps -eo pid,args | grep -Ei '[/]home/kasm-user/Tibia/Tibia|[/]packages/.*/bin/client' || true")"
+            stamp="$(date +%s)"
+            docker exec -d -u kasm-user "${args[@]}" -w "$root" "$c" sh -lc "exec ./Tibia >>/tmp/tibia-normal-launcher-cycle.log 2>&1"
+            echo "LAUNCH_CYCLE_STARTED=$stamp"
+          }
+
+          : > "$RUNNER_TEMP/monitor.txt"
+          docker exec "$c" sh -lc ': >/tmp/tibia-normal-launcher-cycle.log'
+          success=false
+          stable=0
+          starts=0
+          for tick in $(seq 1 240); do
+            windows="$(docker exec -u kasm-user -e DISPLAY=:1 "$c" sh -lc "xwininfo -root -tree 2>/dev/null | grep -E '\"Tibia' | grep -v 'Qt Selection Owner' | grep -v ' 1x1+' || true")"
+            procs="$(docker exec "$c" sh -lc "ps -eo pid,args | grep -Ei '[/]home/kasm-user/Tibia/Tibia|[/]packages/.*/bin/client|[c]ipsoft|[u]pdat' || true")"
+            printf 'tick=%s windows=%q procs=%q\n' "$tick" "$windows" "$procs" >> "$RUNNER_TEMP/monitor.txt"
             if [ -n "$windows" ]; then
-              echo 'VISIBLE_WINDOW=true'
-              echo "$windows"
-              echo "$procs"
-              visible=true
-              break
+              stable=$((stable+1))
+              if [ "$stable" -eq 4 ]; then
+                echo VISIBLE_STABLE_WINDOW=true
+                echo "$windows"
+                docker exec -u kasm-user -e DISPLAY=:1 "$c" xwd -root -silent -out /tmp/tibia-visible.xwd
+                docker exec "$c" ffmpeg -loglevel error -y -i /tmp/tibia-visible.xwd /tmp/tibia-visible.png
+                docker cp "$c:/tmp/tibia-visible.png" "$RUNNER_TEMP/tibia-visible.png"
+              fi
+              if [ "$stable" -ge 12 ]; then
+                success=true
+                break
+              fi
+            else
+              stable=0
+              if [ -z "$procs" ] && [ "$starts" -lt 3 ] && { [ "$tick" -eq 1 ] || [ $((tick % 20)) -eq 0 ]; }; then
+                starts=$((starts+1))
+                start_launcher
+              fi
             fi
             sleep .5
           done
-          echo '=== FRESH LOG ==='
-          docker exec "$c" sh -lc 'tail -n 160 /tmp/tibia-normal-launcher-fresh.log 2>/dev/null || true'
+          echo START_COUNT="$starts"
+          echo AFTER_SHA="$(docker exec "$c" sha256sum "$root/Tibia" | awk '{print $1}')"
+          echo '=== LAUNCHER LOG ==='
+          docker exec "$c" sh -lc 'tail -n 240 /tmp/tibia-normal-launcher-cycle.log 2>/dev/null || true'
           echo '=== FINAL PROCESSES ==='
           docker exec "$c" sh -lc "ps -eo pid,ppid,etime,args | grep -Ei '[/]home/kasm-user/Tibia/Tibia|[/]packages/.*/bin/client|[c]ipsoft|[u]pdat' || true"
           echo '=== FINAL WINDOWS ==='
-          docker exec -u kasm-user -e DISPLAY=:1 "$c" sh -lc "xwininfo -root -tree 2>/dev/null | grep -Ei 'Tibia|launcher|update' | head -60 || true"
-          if [ "$visible" != true ]; then
-            echo 'VISIBLE_WINDOW=false'
+          docker exec -u kasm-user -e DISPLAY=:1 "$c" sh -lc "xwininfo -root -tree 2>/dev/null | grep -Ei 'Tibia|launcher|update' | head -80 || true"
+          cp "$RUNNER_TEMP/monitor.txt" "$RUNNER_TEMP/tibia-launcher-monitor.txt"
+          docker cp "$c:/tmp/tibia-normal-launcher-cycle.log" "$RUNNER_TEMP/tibia-normal-launcher-cycle.log" 2>/dev/null || true
+          if [ "$success" != true ]; then
+            echo VISIBLE_STABLE_WINDOW=false
+            exit 1
           fi
-      - name: Capture actual DISPLAY one screenshot
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          c=otclient-track-a-kasmvnc
-          docker exec -u kasm-user -e DISPLAY=:1 "$c" xwd -root -silent -out /tmp/tibia-display1.xwd
-          if docker exec "$c" command -v ffmpeg >/dev/null 2>&1; then
-            docker exec "$c" ffmpeg -loglevel error -y -i /tmp/tibia-display1.xwd /tmp/tibia-display1.png
-            docker cp "$c:/tmp/tibia-display1.png" "$RUNNER_TEMP/tibia-display1.png"
-            file "$RUNNER_TEMP/tibia-display1.png"
-          else
-            docker cp "$c:/tmp/tibia-display1.xwd" "$RUNNER_TEMP/tibia-display1.xwd"
-          fi
-          docker cp "$c:/tmp/tibia-normal-launcher-fresh.log" "$RUNNER_TEMP/tibia-normal-launcher-fresh.log" 2>/dev/null || true
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: tibia-normal-launcher-visual-proof
+          name: tibia-updated-launcher-visible-proof
           path: |
-            ${{ runner.temp }}/tibia-display1.png
-            ${{ runner.temp }}/tibia-display1.xwd
-            ${{ runner.temp }}/tibia-normal-launcher-fresh.log
+            ${{ runner.temp }}/tibia-visible.png
+            ${{ runner.temp }}/tibia-launcher-monitor.txt
+            ${{ runner.temp }}/tibia-normal-launcher-cycle.log
           if-no-files-found: warn

@@ -22,6 +22,7 @@ require('52109920' not in WORKFLOW, 'superseded client size remains in workflow'
 require('ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8' not in WORKFLOW, 'superseded client SHA remains in workflow')
 for marker in ('GAME_VPTR=', 'AUTH_VPTR=', 'PLAYER_VPTR=', "os.open(f'/proc/{pid}/mem'"):
     require(marker not in WORKFLOW, f'superseded memory-layout observer remains: {marker}')
+require('REGISTRATION_ABSENT' in WORKFLOW, 'observer must fail closed when canonical registration is absent')
 require('LOGGER_READY=true' in WORKFLOW, 'observer does not expose logger-ready boundary')
 require('START_TICKS_CHANGED' in WORKFLOW, 'observer does not continuously fence process start identity')
 require('character_window_context' in WORKFLOW, 'observer does not retain boolean character-window context')

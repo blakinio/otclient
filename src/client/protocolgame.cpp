@@ -87,6 +87,24 @@ void ProtocolGame::onRecv(const InputMessagePtr& inputMessage)
                 return;
             }
         }
+
+        const bool currentTibiaGlobalLoginTransport =
+            g_game.getClientVersion() == 1532 &&
+            g_game.getProtocolVersion() == 1532 &&
+            g_game.getFeature(Otc::GameSessionKey) &&
+            g_game.getFeature(Otc::GameSequencedPackets);
+
+        if (currentTibiaGlobalLoginTransport &&
+            inputMessage->getUnreadSize() > 0 &&
+            inputMessage->peekU8() == 0x34) {
+            // CURRENT_TIBIA_GLOBAL_OPAQUE_FALLBACK_0X34: trusted-main exact
+            // client evidence classifies this first current response as an
+            // UNKNOWN_FALLBACK dispatch with no concrete GameserverMessage
+            // type. Never reinterpret it as the legacy opcode-52 payload.
+            inputMessage->skipBytes(static_cast<uint16_t>(inputMessage->getUnreadSize()));
+            recv();
+            return;
+        }
     }
 
     parseMessage(inputMessage);

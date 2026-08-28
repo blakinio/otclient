@@ -1,7 +1,7 @@
 ---
 task_id: OTC-20260828-current-qt-world-correlation
 status: implementing
-phase: world_entered_signal_member_static_recovery
+phase: world_entered_durable_state_static_recovery
 agent: ChatGPT
 session_role: runtime_observer
 project_lane: otclient
@@ -71,7 +71,7 @@ deep_lifecycle_same_start_ticks: 51652120
 deep_lifecycle_causal_corridor: REPEATABLE_NOT_PROMOTED
 deep_lifecycle_durable_evidence: docs/agents/evidence/OTC-20260828-current-qt-world-correlation
 world_entered_historical_owner_type: tibia::game::TPlayerProtocolMessageHandler
-world_entered_exact_current_anchor: STATIC_QMETA_DISPATCH_RECOVERED_NOT_RUNTIME_VALIDATED
+world_entered_exact_current_anchor: STATIC_QMETA_ACTIVATION_PROVEN_NOT_RUNTIME_VALIDATED
 world_entered_static_run: 33165852596
 world_entered_static_job: 98830952068
 world_entered_static_artifact: 9683536921
@@ -81,8 +81,14 @@ world_entered_static_metacall: 0xd28460
 world_entered_static_dispatch_table: 0x1d941e8
 world_entered_method_index: 17
 world_entered_dispatch_case: 0xd28890
-current_blocker: WORLD_ENTERED_NORMAL_RUNTIME_SIGNAL_MEMBER_NOT_PROVEN
-next_action: follow exact-current generated worldEntered dispatch case to the normal signal member/QMetaObject::activate boundary; only after that design a read-only live event observer; preserve IN_GAME_CLAIMED=false until causal live validation and independent review
+world_entered_activation_run: 33166836780
+world_entered_activation_job: 98834160830
+world_entered_activation_artifact: 9683917257
+world_entered_activation_result_sha256: b0ad58787424f62c6ea4ed19e0d83227c51cc820ac64ef21190ac9bf26fc05fa
+world_entered_qmeta_activate_target: 0x4d7dc0
+world_entered_activation_state: PROVEN
+current_blocker: DURABLE_WORLD_STATE_FOR_READ_ONLY_POLLING_NOT_PROVEN
+next_action: recover the exact-current receiver and/or durable field changed by worldEntered and reset on world exit; design only a non-invasive read-only polling observer after that state is proven; preserve IN_GAME_CLAIMED=false until causal live validation and independent review
 ---
 
 # Current Qt world correlation
@@ -93,7 +99,7 @@ The merged deep lifecycle logger then captured three secret-free same-process ru
 
 Durable evidence is retained at `docs/agents/evidence/OTC-20260828-current-qt-world-correlation/`, including exact JSONL from runs `33159662745`, `33161071475` and `33162761241`, artifact hashes, owner markers, reverse control and the explicit no-promotion verdict.
 
-Exact-current static run `33165852596` recovered `TPlayerProtocolMessageHandler::worldEntered` independently from the `15.32.75d4a0` ELF: current method/signal index `17`, generated dispatch case `0xd28890`, with materially shifted current QMeta addresses. Historical QMeta addresses remain background only. The next frontier is to follow that generated case to the normal signal member / `QMetaObject::activate` emission boundary before any live observer is built.
+Exact-current static runs `33165852596` and `33166836780` recovered `TPlayerProtocolMessageHandler::worldEntered` independently from the `15.32.75d4a0` ELF: current method/signal index `17`, generated dispatch case `0xd28890`, current staticMetaObject `0x30b6ba0`, and a single common `QMetaObject::activate` boundary `0x4d7dc0` across all 22 signal traces. For `worldEntered`, the generated path proves `EDX=17` and the current staticMetaObject reference. Historical QMeta addresses remain background only. Track A `read_only` forbids changing instrumentation state, so the next frontier is a durable receiver/state that can be polled without instrumentation.
 
 The previous runtime container is no longer present on the Docker host. This is not evidence about client state. Any future live validation requires a fresh canonical runtime admission and exact process identity.
 

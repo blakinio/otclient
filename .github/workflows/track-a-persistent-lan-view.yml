@@ -1,4 +1,4 @@
-﻿name: Track A normal Tibia launcher update
+name: Track A normal Tibia launcher update
 on:
   push:
     branches: [research/OTC-20260827-kasm-endpoint-inventory]
@@ -29,7 +29,7 @@ jobs:
           echo BEFORE_CLIENTS="$(docker exec "$c" pgrep -a -x client 2>/dev/null || true)"
           echo BEFORE_LAUNCHERS="$(docker exec "$c" pgrep -af '/home/kasm-user/Tibia/Tibia' 2>/dev/null || true)"
           if ! docker exec "$c" pgrep -f '^/home/kasm-user/Tibia/Tibia$' >/dev/null 2>&1; then
-            docker exec -d -u kasm-user -e DISPLAY=:1 -e HOME=/home/kasm-user -w "$root" "$c" sh -lc 'exec ./Tibia >/tmp/tibia-normal-launcher.log 2>&1'
+            docker exec -d -u kasm-user -e DISPLAY=:1 -e HOME=/home/kasm-user -e LD_LIBRARY_PATH=/home/kasm-user/Tibia/lib -w "$root" "$c" sh -lc 'exec ./Tibia >/tmp/tibia-normal-launcher.log 2>&1'
           fi
           for _ in $(seq 1 80); do
             if docker exec "$c" pgrep -f '^/home/kasm-user/Tibia/Tibia$' >/dev/null 2>&1 || docker exec -u kasm-user -e DISPLAY=:1 "$c" sh -lc 'xwininfo -root -tree 2>/dev/null | grep -Ei "Tibia|launcher|update"' >/dev/null; then

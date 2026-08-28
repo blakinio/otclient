@@ -27,7 +27,8 @@ checks = {
     'no secrets': '"credentials_retained": False' in s and '"session_secrets_retained": False' in s,
     'no payload': '"packet_payloads_retained": False' in s,
     'no ingame claim': '"in_game_claimed": False' in s,
-    'task readonly': 'runtime_access: read_only' in t,
+    'live task mode guard': 'LIVE_TASK_RUNTIME_ACCESS_REQUIRED=read_only' in w and 'LIVE_TASK_MUTATION_AUTHORIZED_REQUIRED=false' in w,
+    'task current static phase allowed': ('runtime_access: none' in t or 'runtime_access: read_only' in t),
     'task no mutation': 'mutation_authorized: false' in t,
 }
 failed = [name for name, ok in checks.items() if not ok]

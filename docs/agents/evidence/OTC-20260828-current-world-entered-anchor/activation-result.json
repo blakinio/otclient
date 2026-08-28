@@ -1,0 +1,101 @@
+{
+  "activation_boundary": {
+    "mode": "DIRECT_FROM_GENERATED_CASE",
+    "qmeta_activate_target_va": 5078464,
+    "signal_trace_count": 22,
+    "state": "PROVEN",
+    "world_activation_entry_va": 13797520,
+    "world_edx_values": [
+      17
+    ],
+    "world_external_branch_targets": [
+      5078464
+    ],
+    "world_rip_refs": [
+      51080096
+    ]
+  },
+  "anchor": {
+    "class_name": "tibia::game::TPlayerProtocolMessageHandler",
+    "dispatch_lea_va": 13796461,
+    "dispatch_table_va": 31015400,
+    "dispatch_targets_va": [
+      13797400,
+      13797352,
+      13797968,
+      13797920,
+      13797728,
+      13797448,
+      13797648,
+      13797600,
+      13797552,
+      13797776,
+      13797872,
+      13797824,
+      13798064,
+      13798016,
+      13797128,
+      13797080,
+      13797176,
+      13797520,
+      13797496,
+      13797696,
+      13797224,
+      13797304
+    ],
+    "metadata_va": 30218688,
+    "method_count": 22,
+    "method_names": [
+      "sendEnterWorld",
+      "sendGoNorth",
+      "sendGoEast",
+      "sendGoSouth",
+      "sendGoWest",
+      "sendStop",
+      "sendCancel",
+      "sendGoNorthEast",
+      "sendGoSouthEast",
+      "sendGoSouthWest",
+      "sendGoNorthWest",
+      "sendGoPath",
+      "sendRotateNorth",
+      "sendRotateEast",
+      "sendRotateSouth",
+      "sendRotateWest",
+      "sendSetTactics",
+      "worldEntered",
+      "showSelectOutfitDialog",
+      "showConfigureCreaturePodiumDialog",
+      "showHirelingNameChangeConfiguration",
+      "publishGameAction"
+    ],
+    "signal_count": 22,
+    "static_metacall_va": 13796448,
+    "static_metaobject_va": 51080096,
+    "stringdata_va": 30219524,
+    "world_entered_argc": 0,
+    "world_entered_dispatch_target_va": 13797520,
+    "world_entered_flags": 262,
+    "world_entered_is_signal": true,
+    "world_entered_method_index": 17,
+    "world_entered_target_window_sha256": "d0267446d758dd324f8fb8417a3eaf013e49beb2c79a3d02322ba83e2980e7b1"
+  },
+  "classification": "STATIC_QMETA_DISPATCH_ANCHOR_NOT_RUNTIME_PROMOTED",
+  "exact_client": {
+    "sha256": "d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a",
+    "size": 52105824,
+    "version": "15.32.75d4a0"
+  },
+  "safety": {
+    "client_executed": false,
+    "credentials_accessed": false,
+    "historical_address_reuse": false,
+    "in_game_claimed": false,
+    "packet_payloads_captured": false,
+    "raw_client_retained": false,
+    "runtime_access": "none",
+    "semantic_promotion_performed": false,
+    "session_secrets_accessed": false
+  },
+  "schema": "otclient.track-a.current-world-entered-anchor.v1"
+}

@@ -32,7 +32,9 @@ checks = {
     'no secrets': 'credentials_retained' in s and 'session_secrets_retained' in s,
     'no payload': 'packet_payloads_retained' in s,
     'no semantic promotion': 'semantic_promotion_performed' in s and 'in_game_claimed' in s,
-    'task branch': 'branch: research/OTC-20260828-qt-lifecycle-transition-logger' in t,
+    'live task mode guard': 'LIVE_TASK_RUNTIME_ACCESS_REQUIRED=read_only' in w and 'LIVE_TASK_MUTATION_AUTHORIZED_REQUIRED=false' in w,
+    'task identity': 'task_id: OTC-20260828-current-qt-world-correlation' in t,
+    'task current static phase allowed': ('runtime_access: none' in t or 'runtime_access: read_only' in t) and 'mutation_authorized: false' in t,
 }
 failed = [name for name, ok in checks.items() if not ok]
 if failed:

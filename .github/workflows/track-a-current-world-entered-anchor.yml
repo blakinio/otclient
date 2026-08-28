@@ -142,6 +142,30 @@ jobs:
           print('WORLD_ENTERED_ANCHOR_JSON=PASS')
           PY
 
+      - name: Recover exact-current durable world-state candidate
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          r="$RUNNER_TEMP/world-entered-anchor"
+          python3 .github/scripts/track_a_current_world_entered_durable_state.py \
+            "$r/client/client" "$r/world-entered-durable-state.json"
+          python3 - "$r/world-entered-durable-state.json" <<'PY'
+          import json
+          from pathlib import Path
+          import sys
+
+          doc = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
+          assert doc['exact_client']['sha256'] == 'd1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a'
+          assert doc['controller']['class_name'] == 'tibia::gamewindow::TGameSessionDisconnectReactionController'
+          assert doc['safety']['runtime_access'] == 'none'
+          assert doc['safety']['client_executed'] is False
+          assert doc['safety']['raw_client_retained'] is False
+          assert doc['safety']['historical_address_reuse'] is False
+          assert doc['safety']['in_game_claimed'] is False
+          assert doc['safety']['semantic_promotion_performed'] is False
+          print('WORLD_ENTERED_DURABLE_STATE_JSON=PASS')
+          PY
+
       - name: Remove proprietary client bytes before artifact upload
         if: always()
         shell: bash
@@ -156,6 +180,8 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: track-a-current-world-entered-anchor-${{ github.run_id }}
-          path: ${{ runner.temp }}/world-entered-anchor/world-entered-anchor.json
+          path: |
+            ${{ runner.temp }}/world-entered-anchor/world-entered-anchor.json
+            ${{ runner.temp }}/world-entered-anchor/world-entered-durable-state.json
           if-no-files-found: error
           retention-days: 3

@@ -17,6 +17,7 @@ SCRIPT = Path(__file__).with_name(
     "tibia-official-client-re-canonical-client-fence-reconcile.py"
 )
 GOVERNANCE = Path(__file__).with_name("test_track_a_agent_runtime_governance.py")
+WORKFLOW = Path(__file__).parents[1] / "workflows" / "track-a-canonical-client-fence-reconciliation.yml"
 
 
 def load():
@@ -197,6 +198,45 @@ class Tests(unittest.TestCase):
         self.assertEqual(data["source_task"], "OTC-TEST")
         self.assertEqual(data["source_run"], "123")
         self.assertEqual(stat.S_IMODE(self.m.REG.stat().st_mode), 0o600)
+
+    def test_workflow_routes_exact_current_registration_through_guarded_identity_reconciliation(self):
+        text = WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn("print('RECONCILE_CURRENT_IDENTITY')", text)
+        self.assertIn("RECONCILE|RECONCILE_CURRENT_IDENTITY", text)
+        self.assertIn("steps.decision.outputs.decision == 'RECONCILE_CURRENT_IDENTITY'", text)
+
+    def test_reconciles_stale_identity_when_source_fence_is_already_current(self):
+        current = dict(
+            self.old,
+            registration_generation=11,
+            lease_generation=40,
+            pid=13947,
+            process_start_ticks=51652120,
+            client_version=self.m.CURRENT_FENCE[0],
+            client_size=self.m.CURRENT_FENCE[1],
+            client_sha256=self.m.CURRENT_FENCE[2],
+            window_identity="x11:0x9:pid:13947:class:client/Tibia:title_sha256:" + "b" * 64,
+            runtime_locator="docker:otclient-track-a-kasmvnc:stale-current-container",
+            state_evidence="NO_STRUCTURAL_BRIDGE",
+        )
+        current["candidate_fingerprint"] = fingerprint(current)
+        self.write_registration(current)
+        self.write_lease(41)
+
+        probe = self.reconcile([dict(self.fresh), dict(self.fresh), dict(self.fresh)])
+        data = json.loads(self.m.REG.read_text())
+
+        self.assertEqual(probe.call_count, 3)
+        self.assertEqual(data["registration_generation"], 12)
+        self.assertEqual(data["lease_generation"], 41)
+        self.assertEqual(data["pid"], self.fresh["pid"])
+        self.assertEqual(data["process_start_ticks"], self.fresh["process_start_ticks"])
+        self.assertEqual(data["runtime_locator"], self.fresh["runtime_locator"])
+        self.assertEqual(
+            (data["client_version"], data["client_size"], data["client_sha256"]),
+            self.m.CURRENT_FENCE,
+        )
+        self.assertEqual(data["state"], "UNKNOWN")
 
     def test_reconciles_when_stable_remote_view_mapping_is_unknown(self):
         old = dict(self.old, remote_view_mapping="UNKNOWN")

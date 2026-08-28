@@ -12,7 +12,7 @@ mutation_authorized: false
 
 ## Purpose
 
-This contract defines one narrow canonical-registration recovery subtype for a governance-driven exact-client fence advance when repository current authority has already moved to a new exact build but the durable canonical registration still contains the immediately superseded exact build.
+This contract defines one narrow canonical-registration recovery subtype for either a governance-driven exact-client fence advance from the immediately superseded approved build or a same-fence runtime-identity refresh when the durable canonical registration is already exact-current but its container/PID/start identity is stale.
 
 It exists to close the fail-closed gap exposed by the gameWindowState memory-free preflight: ordinary rebind cannot repair a changed client fence, same-boot stale-registration recovery and boot-epoch recovery intentionally require the previously accepted exact fence, adoption requires registration absence, and bootstrap must not run while a canonical registration exists.
 
@@ -20,7 +20,7 @@ This contract does **not** weaken those transitions. `rebind`, `stale-registrati
 
 ## Closed source and target fences
 
-Exactly one source-to-target transition is accepted by v1.
+v1 accepts exactly two closed source modes: the approved predecessor-to-current fence transition and an exact-current-to-exact-current runtime-identity refresh. No other source fence is admitted.
 
 Approved superseded source registration:
 
@@ -30,7 +30,7 @@ client_size: 52109920
 client_sha256: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
 ```
 
-Required current target:
+Approved exact-current source for identity refresh, and required current target:
 
 ```yaml
 client_version: 15.32.75d4a0
@@ -54,9 +54,9 @@ Before the registration can be replaced:
 3. the worker must prove the active lease record still names the same task/session and a generation newer than the old registration lease generation;
 4. the authoritative registration file must be a current-UID-owned regular mode-0600 file at the canonical path;
 5. the source record must be schema v1, `runtime_id: track-a-canonical-live`, `proof_kind: existing_runtime_adoption_v1`, `state: UNKNOWN`, and carry only fail-closed adoption state evidence;
-6. the source record must contain the exact approved superseded fence above, complete all-running-Docker inventory evidence, exactly one candidate, a self-consistent candidate fingerprint and an X11 window identity bound to its recorded PID.
+6. the source record must contain either the exact approved superseded fence or the exact approved current fence above, complete all-running-Docker inventory evidence, exactly one candidate, a self-consistent candidate fingerprint and an X11 window identity bound to its recorded PID.
 
-A current exact-fence registration is not rewritten by this transition. An unapproved/mixed/corrupt source fence fails closed and requires separate investigation.
+An exact-current source may be rewritten only by this same guarded transaction to refresh runtime identity from repeated fresh exact-current singleton proof under a strictly newer canonical controller generation. The refresh does not change the client fence or semantic state. An unapproved/mixed/corrupt source fence fails closed and requires separate investigation.
 
 ## Fresh current-target proof
 
@@ -77,13 +77,13 @@ Each fresh probe must prove:
 - the same canonical Docker container **name** as the source registration, while container instance id may differ;
 - the same display, remote-view endpoint and remote-view mapping as the source registration.
 
-Boot identity, PID, process-start ticks and container instance id are replaced from fresh proof and are not treated as continuity anchors across an exact-client build transition. Their old values are historical evidence only. Target authority comes from the repeated fresh exact-current singleton proof, not from numeric PID continuity.
+Boot identity, PID, process-start ticks and container instance id are replaced from fresh proof and are not treated as continuity anchors across either an exact-client build transition or an exact-current identity refresh. Their old values are historical evidence only. Target authority comes from the repeated fresh exact-current singleton proof, not from numeric PID continuity.
 
 ## Transaction
 
 Inside one continuously supervised `guard-run` critical section the worker must:
 
-1. validate the exact approved source registration and current controller generation;
+1. validate the exact approved predecessor-or-current source registration and current controller generation;
 2. perform fresh current-target probe A and validate the full closed contract;
 3. stage a mode-0600 candidate registration derived from probe A;
 4. perform probe B and require the complete fresh adoption signature to equal probe A;
@@ -108,7 +108,7 @@ This transition MUST NOT:
 - access credentials, login, logout, relog or select a character;
 - infer `IN_GAME` from title, bridge presence, stale registration state or historical evidence;
 - delete the registration and fall through to adoption/bootstrap;
-- accept an arbitrary predecessor build;
+- accept an arbitrary predecessor build or any source fence other than the two closed v1 source modes;
 - edit `runtime-registration.json` outside the reviewed atomic transaction.
 
 ## Postcondition

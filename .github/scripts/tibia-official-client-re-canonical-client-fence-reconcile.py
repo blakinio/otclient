@@ -161,7 +161,7 @@ def _read_source() -> dict[str, Any]:
     data = _load_json(REG, 'source_registration_file_unsafe', 'source_registration_invalid_json')
     _base_registration(data)
     fence = (data.get('client_version'), data.get('client_size'), data.get('client_sha256'))
-    if fence != SOURCE_FENCE:
+    if fence not in {SOURCE_FENCE, CURRENT_FENCE}:
         raise ReconcileError('source_fence_not_approved')
     return data
 

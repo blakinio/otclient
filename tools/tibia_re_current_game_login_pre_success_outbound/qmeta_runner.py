@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from pathlib import Path
 
 import probe as core
@@ -69,6 +70,47 @@ def bounded_context(instructions, site: int, before: int = 18, after: int = 20) 
     ]
 
 
+def register_family(name: str) -> str:
+    aliases = {
+        'rax': 'rax', 'eax': 'rax', 'ax': 'rax', 'al': 'rax', 'ah': 'rax',
+        'rbx': 'rbx', 'ebx': 'rbx', 'bx': 'rbx', 'bl': 'rbx', 'bh': 'rbx',
+        'rcx': 'rcx', 'ecx': 'rcx', 'cx': 'rcx', 'cl': 'rcx', 'ch': 'rcx',
+        'rdx': 'rdx', 'edx': 'rdx', 'dx': 'rdx', 'dl': 'rdx', 'dh': 'rdx',
+        'rsi': 'rsi', 'esi': 'rsi', 'si': 'rsi', 'sil': 'rsi',
+        'rdi': 'rdi', 'edi': 'rdi', 'di': 'rdi', 'dil': 'rdi',
+        'rbp': 'rbp', 'ebp': 'rbp', 'bp': 'rbp', 'bpl': 'rbp',
+        'rsp': 'rsp', 'esp': 'rsp', 'sp': 'rsp', 'spl': 'rsp',
+    }
+    if name in aliases:
+        return aliases[name]
+    match = re.fullmatch(r'(r(?:8|9|1[0-5]))(?:d|w|b)?', name)
+    return match.group(1) if match else name
+
+
+def backward_register_definition(img: core.Image, instructions, site: int, source_name: str) -> dict:
+    indexes = [i for i, row in enumerate(instructions) if row.address == site]
+    if len(indexes) != 1:
+        raise RuntimeError(f'FIELD6_SITE_AMBIGUOUS:{site:#x}:{len(indexes)}')
+    wanted = register_family(source_name)
+    for row in reversed(instructions[:indexes[0]]):
+        try:
+            _reads, writes = row.regs_access()
+        except Exception:
+            continue
+        written_families = {register_family(img.md.reg_name(reg)) for reg in writes}
+        if wanted not in written_families:
+            continue
+        return {
+            'definition_site': core.hx(row.address),
+            'mnemonic': row.mnemonic,
+            'operand': row.op_str,
+            'written_register_family': wanted,
+            'instructions': bounded_context(instructions, row.address, before=14, after=14),
+            'classification': 'NEAREST_STATIC_REGISTER_DEFINITION',
+        }
+    raise RuntimeError(f'FIELD6_SOURCE_DEFINITION_NOT_FOUND:{source_name}')
+
+
 def add_source_contexts(client: Path, output: Path) -> None:
     result = json.loads(output.read_text(encoding='utf-8'))
     img = core.Image(client)
@@ -82,6 +124,7 @@ def add_source_contexts(client: Path, output: Path) -> None:
     if len(field6_writes) != 1:
         raise RuntimeError(f'FIELD6_WRITE_AMBIGUOUS:{len(field6_writes)}')
     field6_site = int(field6_writes[0]['at'], 16)
+    field6_source = field6_writes[0]['source']
 
     nested_sites = result['primary_producer_field_presence']['nested_auth_slot_reference_sites']
     required_slots = ('0x30', '0x40', '0x18', '0x50', '0x60')
@@ -91,10 +134,16 @@ def add_source_contexts(client: Path, output: Path) -> None:
 
     result['field6_source_context'] = {
         'write_site': core.hx(field6_site),
-        'write_source': field6_writes[0]['source'],
+        'write_source': field6_source,
         'instructions': bounded_context(instructions, field6_site),
         'classification': 'BOUNDED_INSTRUCTION_CONTEXT_ONLY',
     }
+    result['field6_backward_source'] = backward_register_definition(
+        img,
+        instructions,
+        field6_site,
+        field6_source,
+    )
     result['nested_source_contexts'] = {
         slot: {
             'reference_site': sites[0],
@@ -106,6 +155,7 @@ def add_source_contexts(client: Path, output: Path) -> None:
     }
     output.write_text(json.dumps(result, indent=2, sort_keys=True) + '\n', encoding='utf-8')
     print('FIELD6_SOURCE_CONTEXT=PASS')
+    print('FIELD6_BACKWARD_SOURCE=PASS')
     print('NESTED_SOURCE_CONTEXTS=PASS')
 
 

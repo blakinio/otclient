@@ -31,4 +31,11 @@ assert 'else if (g_game.getFeature(Otc::GameProtocolChecksum))' in protocol_game
 assert 'if (!g_game.getFeature(Otc::GameChallengeOnLogin))' in protocol_game
 assert 'sendLoginPacket(0, 0);' in protocol_game
 
+# Modern XTEA framing consumes the padding-count byte in Protocol::xteaDecrypt.
+# The first ProtocolGame receive must not consume the same byte a second time.
+protocol = (root / 'src/framework/net/protocol.cpp').read_text(encoding='utf-8')
+protocol_h = (root / 'src/framework/net/protocol.h').read_text(encoding='utf-8')
+assert 'const uint8_t paddingSize = inputMessage->getU8();' in protocol
+assert 'bool isXteaEncryptionEnabled() const' in protocol_h
+assert 'if (!isXteaEncryptionEnabled())' in protocol_game
 print('CURRENT_TIBIA_LOGIN_SEND_INTEGRATION_CONTRACT=PASS')

@@ -7,7 +7,7 @@ project_lane: otclient
 lane: RUNTIME_RESEARCH
 track_id: official-client-re
 task_kind: reverse_engineering_runtime
-phase: runtime_admission_ready
+phase: runtime_workflow_prepared
 branch: work/OTC-20260828-game-window-state-readonly-admission
 base_branch: main
 base_main: 76515d605f7a76eebe25af0fd0dd68781f086f88
@@ -15,17 +15,17 @@ created: 2026-08-28T16:20:00+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: chat_github
-runtime_access: read_only
-runtime_owner_task: OTC-20260828-game-window-state-qualification
-runtime_namespace: track-a-game-window-state-validation
-canonical_registration: UNKNOWN
-canonical_lease_generation: UNKNOWN
-registration_lease_generation: UNKNOWN
+runtime_access: none
+runtime_owner_task: NOT_APPLICABLE
+runtime_namespace: NOT_APPLICABLE
+canonical_registration: NOT_APPLICABLE
+canonical_lease_generation: NOT_APPLICABLE
+registration_lease_generation: NOT_APPLICABLE
 gate_a: NOT_APPLICABLE
 generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
-target_uniqueness: UNKNOWN
+target_uniqueness: NOT_APPLICABLE
 mutation_authorized: false
 credentials_allowed: false
 login_allowed: false
@@ -64,7 +64,7 @@ blocks:
 
 Qualify the smallest fail-closed read-only runtime reader for exact-current `tibia::gamewindow::TGameWindowController::gameWindowState`, dynamically resolving the current RTTI/vptr and reading only the statically proven 24-byte `QString` member at `object + 0x60` plus its bounded payload.
 
-This checkpoint authorizes only the `read_only` admission class. It does not prove a current target and does not authorize any client, GUI, input, login, character-selection, gameplay, network-payload, instrumentation or process mutation. `target_uniqueness` intentionally remains `UNKNOWN` until the trusted-main live workflow freshly proves it immediately before observation.
+This repository checkpoint intentionally remains `runtime_access: none`. No current live target is claimed here and no `target_uniqueness: PROVEN` is fabricated from historical evidence. The trusted-main runtime workflow must perform a fresh admission transition and persist/emit a complete `runtime_access: read_only` record with `target_uniqueness: PROVEN` before it opens `/proc/<pid>/mem`.
 
 # Trusted static input
 
@@ -96,19 +96,20 @@ The merged reader provides:
 - no arbitrary `OTHER` text retention;
 - `in_game_claimed=false` and `semantic_promotion_performed=false` unconditionally.
 
-PR #754 advanced the trusted exact-client fence to the same build used by the reader. PR #756 aligns the live workflow with `docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md`: canonical Gate A, generation rebind and Gate B remain `NOT_APPLICABLE` for read-only observation.
+PR #754 advanced the trusted exact-client fence to the same build used by the reader. PR #756 aligns the live workflow with `docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md`: repository state remains `none`; a fresh live invocation must explicitly transition to `read_only`, while canonical Gate A, generation rebind and Gate B remain `NOT_APPLICABLE` for that observation.
 
-# Fresh live admission before observation
+# Fresh live admission before process-memory observation
 
 The trusted-main live workflow must fail closed unless all of the following are freshly true before opening `/proc/<pid>/mem`:
 
-- this task still declares `runtime_access: read_only`, this task as `runtime_owner_task`, the explicit `track-a-game-window-state-validation` namespace, `mutation_authorized: false`, and all canonical control gates `NOT_APPLICABLE`;
+- this repository task checkpoint still declares `runtime_access: none`, no runtime owner/namespace/target claim, `mutation_authorized: false`, and all canonical control gates `NOT_APPLICABLE`;
 - the authoritative canonical registration is present, exact-fenced to `15.32.75d4a0 / 52105824 / d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a`, and provides a valid Docker runtime locator plus exact PID/start identity;
 - no active canonical lease belongs to another task;
 - a fresh bounded inventory across all running Docker containers finds exactly one `client` candidate, exact-fenced to the current build, and it is exactly the registered PID/start/container;
-- the workflow then emits a fresh read-only admission record with `target_uniqueness: PROVEN`; the repository checkpoint itself never fabricates that result.
+- only after that proof the workflow persists and validates a secret-free runtime admission record containing `runtime_access: read_only`, this task as `runtime_owner_task`, explicit namespace `track-a-game-window-state-validation`, canonical control gates `NOT_APPLICABLE`, `target_uniqueness: PROVEN`, and `mutation_authorized: false`;
+- only after that complete admission record validates may the reader open `/proc/<pid>/mem` read-only.
 
-Any missing/ambiguous registration, ownership conflict, stale locator, stale PID/start, mismatched executable, additional candidate or unreadable candidate fails closed before process-memory observation.
+Any missing/ambiguous registration, ownership conflict, stale locator, stale PID/start, mismatched executable, additional candidate, unreadable candidate, or invalid emitted admission fails closed before process-memory observation.
 
 # Runtime acceptance
 
@@ -132,6 +133,6 @@ Only after causal PASS and separate independent exact-head review may a later pr
 
 # Current blocker
 
-No repository/static blocker remains after #754 and #755. Live observation is still refused until #756 is trusted-main GREEN and the live workflow freshly emits `target_uniqueness: PROVEN` for one exact process. Owner interaction is not required until the continuous logger is actually ready to start from `LOGIN_SCREEN`.
+No repository/static prerequisite remains after #754 and #755. Live observation remains refused until #756 is trusted-main GREEN and a live invocation freshly persists/validates the read-only admission record described above. Owner interaction is not required until the continuous logger is actually ready to start from `LOGIN_SCREEN`.
 
-next_action: finish PR #756 exact-head verification and merge if protected-main policy permits; then run fresh read-only admission from trusted main and engage the owner only for the manual LOGIN_SCREEN -> CHARACTER_SELECT -> WORLD -> WORLD_EXIT sequence.
+next_action: finish PR #756 exact-head verification and merge if protected-main policy permits; then perform fresh trusted-main read-only admission and engage the owner only for the manual LOGIN_SCREEN -> CHARACTER_SELECT -> WORLD -> WORLD_EXIT sequence.

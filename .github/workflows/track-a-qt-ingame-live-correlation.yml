@@ -85,6 +85,8 @@ jobs:
                   raise SystemExit(name + '_NOT_OBJECT')
               return d
           lease = load('lease.json'); reg = load('runtime-registration.json')
+          if reg is None:
+              raise SystemExit('REGISTRATION_ABSENT')
           if lease is not None and lease.get('status') == 'active' and isinstance(lease.get('expires_at'), (int, float)) and int(lease['expires_at']) > now:
               if lease.get('controller_task') != task:
                   raise SystemExit('ACTIVE_RUNTIME_OWNER_CONFLICT')

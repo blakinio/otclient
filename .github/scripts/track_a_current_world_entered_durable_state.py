@@ -272,6 +272,12 @@ def main(argv: list[str]) -> int:
     if len(raw) != base.EXPECTED_SIZE or digest != base.EXPECTED_SHA256:
         raise DurableStateError(f"EXACT_CLIENT_FENCE_MISMATCH:{len(raw)}:{digest}")
     sections, relocs = base.parse_elf_layout(raw)
+    player_anchor = base.recover_world_entered_anchor(raw, sections, relocs)
+    player_dispatch = base.recover_dispatch_case(raw, sections, player_anchor)
+    player_activation = base.recover_activation_boundary(raw, sections, player_anchor, player_dispatch)
+    if player_activation.get("state") != "PROVEN" or player_activation.get("qmeta_activate_target_va") is None:
+        raise DurableStateError(f"CURRENT_QMETA_ACTIVATE_TARGET_NOT_PROVEN:{player_activation}")
+    qmeta_activate_target = int(player_activation["qmeta_activate_target_va"])
     meta = recover_qmeta_class(raw, sections, relocs, TARGET_CLASS)
     game_window_meta = recover_qmeta_class(raw, sections, relocs, GAME_WINDOW_CLASS)
     game_window_entry_trace = extract_bounded_case_trace(raw, sections, int(game_window_meta["static_metacall_va"]))
@@ -314,6 +320,22 @@ def main(argv: list[str]) -> int:
             "index": signal_index,
             "case_target_va": signal_case,
             "case_trace": extract_bounded_case_trace(raw, sections, signal_case),
+        }
+    game_window_display_signal_emitters: dict[str, object] = {}
+    for signal_name in ("gameWindowStateChanged", "startScreenNowDisplayed", "gameScreenNowDisplayed"):
+        signal_method = game_window_methods_by_name.get(signal_name)
+        if signal_method is None:
+            game_window_display_signal_emitters[signal_name] = {"state": "MISSING"}
+            continue
+        signal_index = int(signal_method["index"])
+        sites = scan_qmeta_signal_activation_sites(
+            raw, sections, int(game_window_meta["static_metaobject_va"]), signal_index, qmeta_activate_target
+        )
+        game_window_display_signal_emitters[signal_name] = {
+            "state": "FOUND" if sites else "NOT_FOUND",
+            "signal_index": signal_index,
+            "qmeta_activate_target_va": qmeta_activate_target,
+            "sites": sites,
         }
     game_window_state_method_traces: dict[str, object] = {}
     for writer_name in ("goToLogin", "goToCreateNewAccount", "loginPressed", "onAuthenticatedChanged", "onGameWindowClosed"):
@@ -395,6 +417,7 @@ def main(argv: list[str]) -> int:
             "world_semantic_properties": game_window_semantic_properties,
             "game_window_state_read": game_window_state_read,
             "game_window_display_signal_cases": game_window_display_signal_cases,
+            "game_window_display_signal_emitters": game_window_display_signal_emitters,
             "game_window_state_method_traces": game_window_state_method_traces,
         },
         "controller": {
@@ -677,6 +700,59 @@ def prove_qmeta_backing_member(entry_trace: dict[str, object], backing_shape: di
         "member_offset": int(backing_shape["member_offset"]),
         "byte_width": int(backing_shape["byte_width"]),
     }
+
+
+def scan_qmeta_signal_activation_sites(raw: bytes, sections, static_metaobject: int,
+                                       signal_index: int, activation_target: int) -> list[dict[str, object]]:
+    try:
+        from capstone import Cs, CS_ARCH_X86, CS_MODE_64
+        from capstone.x86_const import X86_OP_IMM, X86_OP_MEM, X86_OP_REG, X86_REG_EDX, X86_REG_RDX, X86_REG_RIP
+    except ImportError as exc:
+        raise DurableStateError("CAPSTONE_REQUIRED") from exc
+
+    sites: list[dict[str, object]] = []
+    md = Cs(CS_ARCH_X86, CS_MODE_64)
+    md.detail = True
+    for section_va, file_offset, size, flags in sections:
+        if not (flags & 0x4) or size <= 0:
+            continue
+        sequence = []
+        code = raw[file_offset:file_offset + size]
+        for ins in md.disasm(code, section_va):
+            sequence.append(ins)
+            if len(sequence) > 32:
+                sequence.pop(0)
+            branch_target = None
+            if ins.mnemonic in ("call", "jmp") and ins.operands and ins.operands[0].type == X86_OP_IMM:
+                branch_target = int(ins.operands[0].imm)
+            if branch_target == activation_target:
+                edx_values: set[int] = set()
+                rip_refs: set[int] = set()
+                for item in sequence:
+                    for operand in item.operands:
+                        if operand.type == X86_OP_MEM and operand.mem.base == X86_REG_RIP:
+                            rip_refs.add(int(item.address + item.size + operand.mem.disp))
+                    if item.mnemonic == "mov" and len(item.operands) >= 2:
+                        dst, src = item.operands[0], item.operands[1]
+                        if dst.type == X86_OP_REG and dst.reg in (X86_REG_EDX, X86_REG_RDX) and src.type == X86_OP_IMM:
+                            edx_values.add(int(src.imm) & 0xFFFFFFFF)
+                    if item.mnemonic == "xor" and len(item.operands) >= 2:
+                        left, right = item.operands[0], item.operands[1]
+                        if left.type == X86_OP_REG and right.type == X86_OP_REG and left.reg == right.reg and left.reg in (X86_REG_EDX, X86_REG_RDX):
+                            edx_values.add(0)
+                if signal_index in edx_values and static_metaobject in rip_refs:
+                    sites.append({
+                        "sequence_start_va": int(sequence[0].address),
+                        "branch_site_va": int(ins.address),
+                        "branch_kind": ins.mnemonic,
+                        "edx_values": sorted(edx_values),
+                        "static_meta_refs": sorted(ref for ref in rip_refs if ref == static_metaobject),
+                        "context": [f"{item.mnemonic} {item.op_str}" for item in sequence],
+                    })
+            if ins.mnemonic in ("ret", "jmp"):
+                sequence = []
+    unique = {(site["sequence_start_va"], site["branch_site_va"]): site for site in sites}
+    return [unique[key] for key in sorted(unique)]
 
 
 if __name__ == "__main__":

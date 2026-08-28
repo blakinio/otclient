@@ -302,6 +302,19 @@ def main(argv: list[str]) -> int:
         game_window_state_read = {"state": "NOT_PROVEN", "reason": f"GAME_WINDOW_STATE_PROPERTY_NOT_UNIQUE:{len(game_window_state_properties)}"}
     game_window_dispatch_targets = recover_dispatch_targets(raw, sections, game_window_meta)
     game_window_methods_by_name = {str(method["name"]): method for method in game_window_meta["methods"]}
+    game_window_display_signal_cases: dict[str, object] = {}
+    for signal_name in ("gameWindowStateChanged", "startScreenNowDisplayed", "gameScreenNowDisplayed"):
+        signal_method = game_window_methods_by_name.get(signal_name)
+        if signal_method is None:
+            game_window_display_signal_cases[signal_name] = {"state": "MISSING"}
+            continue
+        signal_index = int(signal_method["index"])
+        signal_case = game_window_dispatch_targets[signal_index]
+        game_window_display_signal_cases[signal_name] = {
+            "index": signal_index,
+            "case_target_va": signal_case,
+            "case_trace": extract_bounded_case_trace(raw, sections, signal_case),
+        }
     game_window_state_method_traces: dict[str, object] = {}
     for writer_name in ("goToLogin", "goToCreateNewAccount", "loginPressed", "onAuthenticatedChanged", "onGameWindowClosed"):
         writer = game_window_methods_by_name.get(writer_name)
@@ -381,6 +394,7 @@ def main(argv: list[str]) -> int:
             "properties": game_window_meta["properties"],
             "world_semantic_properties": game_window_semantic_properties,
             "game_window_state_read": game_window_state_read,
+            "game_window_display_signal_cases": game_window_display_signal_cases,
             "game_window_state_method_traces": game_window_state_method_traces,
         },
         "controller": {

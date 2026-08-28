@@ -30,16 +30,12 @@ concurrency:
 
 env:
   CONTAINER: otclient-track-a-kasmvnc
-  CONTROL_CONTAINER: otclient-synology-runner
   DISPLAY_NAME: ':1'
-  EXPECTED_SIZE: '52109920'
-  EXPECTED_SHA: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
+  EXPECTED_SIZE: '52105824'
+  EXPECTED_SHA: d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a
   CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime
   TASK_ID: OTC-20260826-qt-ingame-live-correlation
-  VIEW_PROXY_NAME: otclient-qt-ingame-view
-  VIEW_PROXY_PORT: '16082'
-  VIEW_HOST_IP: 192.168.1.21
-  VIEW_ALLOWED_IP: 192.168.1.154
+  PERSISTENT_VIEW_URL: 'http://192.168.1.21:16084/?host=192.168.1.21&port=16083&encrypt=true&path=websockify&autoconnect=true'
 
 jobs:
   correlate:
@@ -61,7 +57,9 @@ jobs:
           echo AGENT_CHARACTER_SELECTION=false
           echo GAMEPLAY_ACTIONS=false
           echo CREDENTIAL_ACCESS=false
+          echo PROCESS_MEMORY_ACCESS=false
           echo PACKET_PAYLOAD_CAPTURE=false
+          echo RAW_WINDOW_TITLE_RETENTION=false
 
       - name: Checkout exact trusted main
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
@@ -80,26 +78,32 @@ jobs:
           root = pathlib.Path(sys.argv[1]); task = sys.argv[2]; now = int(time.time())
           def load(name):
               p = root / name
-              if not p.is_file(): return None
+              if not p.is_file():
+                  return None
               d = json.loads(p.read_text(encoding='utf-8'))
-              if not isinstance(d, dict): raise SystemExit(name + '_NOT_OBJECT')
+              if not isinstance(d, dict):
+                  raise SystemExit(name + '_NOT_OBJECT')
               return d
           lease = load('lease.json'); reg = load('runtime-registration.json')
-          if reg is None: raise SystemExit('REGISTRATION_ABSENT')
-          if lease is not None and lease.get('status') == 'active' and isinstance(lease.get('expires_at'), (int,float)) and int(lease['expires_at']) > now:
+          if reg is None:
+              raise SystemExit('REGISTRATION_ABSENT')
+          if lease is not None and lease.get('status') == 'active' and isinstance(lease.get('expires_at'), (int, float)) and int(lease['expires_at']) > now:
               if lease.get('controller_task') != task:
                   raise SystemExit('ACTIVE_RUNTIME_OWNER_CONFLICT')
           print('CONTROL_PLANE_PREFLIGHT=PASS')
-          print('CANONICAL_LEASE_GENERATION=' + str((lease or {}).get('generation','UNKNOWN')))
-          print('REGISTRATION_GENERATION=' + str(reg.get('registration_generation','UNKNOWN')))
+          print('CANONICAL_REGISTRATION_PRESENT=' + str(reg is not None).lower())
+          print('CANONICAL_LEASE_GENERATION=' + str((lease or {}).get('generation', 'UNKNOWN')))
+          print('REGISTRATION_GENERATION=' + str((reg or {}).get('registration_generation', 'UNKNOWN')))
           PY
           docker inspect -f '{{.State.Running}}' "$CONTAINER" | grep -Fx true >/dev/null
           mapfile -t pids < <(docker exec "$CONTAINER" pgrep -x client)
           test "${#pids[@]}" -eq 1
           pid="${pids[0]}"
           [[ "$pid" =~ ^[0-9]+$ ]]
-          test "$(docker exec "$CONTAINER" stat -Lc %s "/proc/$pid/exe")" = "$EXPECTED_SIZE"
-          test "$(docker exec "$CONTAINER" sha256sum "/proc/$pid/exe" | awk '{print $1}')" = "$EXPECTED_SHA"
+          actual_size="$(docker exec "$CONTAINER" stat -Lc %s "/proc/$pid/exe")"
+          actual_sha="$(docker exec "$CONTAINER" sha256sum "/proc/$pid/exe" | awk '{print $1}')"
+          test "$actual_size" = "$EXPECTED_SIZE"
+          test "$actual_sha" = "$EXPECTED_SHA"
           start="$(docker exec -i "$CONTAINER" python3 - "$pid" <<'PY'
           import pathlib,sys
           raw=pathlib.Path('/proc/'+sys.argv[1]+'/stat').read_text(encoding='ascii')
@@ -118,79 +122,11 @@ jobs:
           echo "start=$start" >> "$GITHUB_OUTPUT"
           echo TARGET_UNIQUENESS=PROVEN
           echo TARGET_PID="$pid"
+          echo TARGET_START_TICKS="$start"
+          echo CURRENT_CLIENT_SIZE="$actual_size"
+          echo CURRENT_CLIENT_SHA256="$actual_sha"
 
-      - name: Prepare temporary LAN remote view
-        id: view
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          docker rm -f "$VIEW_PROXY_NAME" >/dev/null 2>&1 || true
-          docker inspect "$CONTAINER" > "$RUNNER_TEMP/container-inspect.json"
-          python3 - "$RUNNER_TEMP/container-inspect.json" "$RUNNER_TEMP/view-candidates.tsv" <<'PY'
-          import json,sys
-          d=json.load(open(sys.argv[1],encoding='utf-8'))[0]
-          out=[]
-          for cport,bindings in (d.get('NetworkSettings',{}).get('Ports') or {}).items():
-              for b in bindings or []:
-                  hp=b.get('HostPort'); hi=b.get('HostIp') or '127.0.0.1'
-                  if hp and hp.isdigit(): out.append((hi,hp,cport))
-          with open(sys.argv[2],'w',encoding='utf-8') as f:
-              for row in out: f.write('\t'.join(row)+'\n')
-          PY
-          chosen_ip='127.0.0.1'; chosen_port=''; scheme='https'
-          while IFS=$'\t' read -r _ host_port container_port; do
-            [[ "$container_port" == '6901/tcp' ]] || continue
-            [[ "$host_port" =~ ^[0-9]+$ ]] || continue
-            chosen_port="$host_port"
-            break
-          done < "$RUNNER_TEMP/view-candidates.tsv"
-          if [[ -z "$chosen_port" ]]; then
-            echo VIEW_ENDPOINT_DISCOVERY=FAIL >&2
-            cat "$RUNNER_TEMP/view-candidates.tsv" >&2
-            exit 2
-          fi
-          proxy_b64="$(base64 -w0 <<'PY'
-          import os,select,socket,threading
-          bind=(os.environ['BIND_IP'],int(os.environ['BIND_PORT']))
-          target=(os.environ['TARGET_IP'],int(os.environ['TARGET_PORT']))
-          def handle(c):
-              s=socket.create_connection(target,timeout=10); c.setblocking(False); s.setblocking(False)
-              try:
-                  while True:
-                      r,_,_=select.select([c,s],[],[],30)
-                      if not r: continue
-                      for src in r:
-                          try: data=src.recv(65536)
-                          except BlockingIOError: continue
-                          if not data: return
-                          (s if src is c else c).sendall(data)
-              finally:
-                  try:s.close()
-                  except:pass
-                  try:c.close()
-                  except:pass
-          ls=socket.socket(); ls.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1); ls.bind(bind); ls.listen(16)
-          allowed=os.environ['ALLOWED_IP']
-          while True:
-              c,addr=ls.accept()
-              if addr[0] != allowed:
-                  c.close(); continue
-              threading.Thread(target=handle,args=(c,),daemon=True).start()
-          PY
-          )"
-          image="$(docker inspect -f '{{.Config.Image}}' "$CONTROL_CONTAINER")"
-          docker run -d --rm --name "$VIEW_PROXY_NAME" --network host \
-            -e SCRIPT_B64="$proxy_b64" -e BIND_IP="$VIEW_HOST_IP" -e BIND_PORT="$VIEW_PROXY_PORT" \
-            -e TARGET_IP="$chosen_ip" -e TARGET_PORT="$chosen_port" -e ALLOWED_IP="$VIEW_ALLOWED_IP" --entrypoint sh "$image" \
-            -c 'echo "$SCRIPT_B64" | base64 -d >/tmp/proxy.py; exec python3 /tmp/proxy.py' >/dev/null
-          sleep 1
-          docker inspect -f '{{.State.Running}}' "$VIEW_PROXY_NAME" | grep -Fx true >/dev/null
-          echo "scheme=$scheme" >> "$GITHUB_OUTPUT"
-          echo "url=$scheme://$VIEW_HOST_IP:$VIEW_PROXY_PORT/" >> "$GITHUB_OUTPUT"
-          echo VIEW_PROXY=READY
-          echo MANUAL_VIEW_URL="$scheme://$VIEW_HOST_IP:$VIEW_PROXY_PORT/"
-
-      - name: Start secret-free live state correlation
+      - name: Observe owner-manual login to character context read-only
         shell: bash
         env:
           TARGET_PID: ${{ steps.target.outputs.pid }}
@@ -198,169 +134,90 @@ jobs:
           DURATION: ${{ inputs.duration_seconds }}
         run: |
           set -Eeuo pipefail
-          memlog="$RUNNER_TEMP/qt-ingame-memory-network.jsonl"
-          winlog="$RUNNER_TEMP/qt-ingame-window.jsonl"
-          docker exec -i "$CONTAINER" python3 - "$TARGET_PID" "$TARGET_START" "$EXPECTED_SIZE" "$EXPECTED_SHA" "$DURATION" >"$memlog" <<'PY' &
-          import hashlib,json,os,pathlib,re,shutil,struct,subprocess,sys,time
-          pid=int(sys.argv[1]); start=int(sys.argv[2]); size=int(sys.argv[3]); sha=sys.argv[4]; duration=int(sys.argv[5])
-          GAME_VPTR=0x30ADCE8; AUTH_VPTR=0x30B5290; AUTH_OFF=0x8D0; QPRIV_OFF=0x8; QSTATE_OFF=0xF0; QRUN=2
-          PLAYER_VPTR=0x30C2738; PRIMARY=(0x2F0,0x2F4,0x2F8); MIRROR=(0x408,0x40C,0x410)
-          QT_SIZE=394824; QT_SHA='26f504ae723fa15c77e0c33a93a964a305c63577f2bed3f136c098b7b06921e8'
-          def ticks():
-              raw=pathlib.Path(f'/proc/{pid}/stat').read_text(encoding='ascii'); return int(raw[raw.rfind(')')+2:].split()[19])
-          def digest(path):
-              h=hashlib.sha256()
-              with open(path,'rb') as f:
-                  for chunk in iter(lambda:f.read(1024*1024),b''): h.update(chunk)
-              return h.hexdigest()
-          if ticks()!=start: raise SystemExit('START_TICKS_MISMATCH')
-          exe=pathlib.Path(os.path.realpath(f'/proc/{pid}/exe'))
-          if exe.stat().st_size!=size or digest(exe)!=sha: raise SystemExit('EXACT_FENCE_MISMATCH')
-          qt=exe.parent/'lib'/'libQt6StateMachine.so.6'
-          if not qt.is_file() or qt.stat().st_size!=QT_SIZE or digest(qt)!=QT_SHA: raise SystemExit('QT_FENCE_MISMATCH')
-          regions=[]
-          for line in pathlib.Path(f'/proc/{pid}/maps').read_text().splitlines():
-              p=line.split(maxsplit=5); b,e=(int(x,16) for x in p[0].split('-')); regions.append((b,e,p[1],int(p[2],16),p[5] if len(p)==6 else ''))
-          bases=[b-off for b,e,perms,off,path in regions if path==str(exe)]
-          if not bases: raise SystemExit('CLIENT_MAPPING_MISSING')
-          base=min(bases); rw=[r for r in regions if r[2].startswith('rw') and 0<r[1]-r[0]<=768*1024*1024]
-          heap=[(b,e) for b,e,perms,off,path in regions if path=='[heap]' and perms.startswith('rw')]
-          if len(heap)!=1: raise SystemExit('HEAP_MAPPING_COUNT')
-          fd=os.open(f'/proc/{pid}/mem',os.O_RDONLY|os.O_CLOEXEC)
-          def scan_ranges(ranges, vptr, private_filter=False):
-              pat=struct.pack('<Q',base+vptr); hits=[]
-              for begin,end in ranges:
-                  cur=begin; tail=b''
-                  while cur<end:
-                      want=min(1024*1024,end-cur)
-                      try:data=os.pread(fd,want,cur)
-                      except OSError:cur+=want;tail=b'';continue
-                      if not data:cur+=want;tail=b'';continue
-                      merged=tail+data; mb=cur-len(tail); pos=0
-                      while True:
-                          i=merged.find(pat,pos)
-                          if i<0:break
-                          obj=mb+i
-                          if obj%8==0:
-                              if not private_filter: hits.append(obj)
-                              else:
-                                  try:pr=struct.unpack('<Q',os.pread(fd,8,obj+8))[0]
-                                  except Exception:pr=0
-                                  if any(b<=pr<e for b,e,*_ in rw): hits.append(obj)
-                          pos=i+1
-                      tail=merged[-7:];cur+=len(data)
-              return sorted(set(hits))
-          game_hits=scan_ranges(heap,GAME_VPTR)
-          if len(game_hits)!=1: raise SystemExit('GAME_CLIENT_OBJECT_COUNT='+str(len(game_hits)))
-          game=game_hits[0]; auth=struct.unpack('<Q',os.pread(fd,8,game+AUTH_OFF))[0]
-          if struct.unpack('<Q',os.pread(fd,8,auth))[0] != base+AUTH_VPTR: raise SystemExit('AUTH_VPTR_MISMATCH')
-          qpriv=struct.unpack('<Q',os.pread(fd,8,auth+QPRIV_OFF))[0]
-          player_hits=scan_ranges([(b,e) for b,e,*_ in rw],PLAYER_VPTR,True)
-          if len(player_hits)!=1: raise SystemExit('PLAYER_OBJECT_COUNT='+str(len(player_hits)))
-          player=player_hits[0]
-          def read_pos():
-              a=tuple(struct.unpack('<i',os.pread(fd,4,player+o))[0] for o in PRIMARY)
-              b=tuple(struct.unpack('<i',os.pread(fd,4,player+o))[0] for o in MIRROR)
-              ok=a==b and 1<=a[0]<=65535 and 1<=a[1]<=65535 and 0<=a[2]<=15
-              return list(a) if ok else None, a==b
-          ss=shutil.which('ss')
-          rx_re=re.compile(r'bytes_received:(\d+)'); tx_re=re.compile(r'bytes_acked:(\d+)')
-          def net():
-              if not ss:return {'source':'unavailable','established':None,'tx_acked':None,'rx':None}
-              try:
-                  cp=subprocess.run([ss,'-tinp'],text=True,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=1)
-              except (subprocess.TimeoutExpired, OSError):
-                  return {'source':'unavailable','established':None,'tx_acked':None,'rx':None}
-              lines=cp.stdout.splitlines(); est=0; tx=0; rx=0
-              for i,line in enumerate(lines):
-                  if f'pid={pid},' not in line: continue
-                  if line.lstrip().startswith('ESTAB'): est+=1
-                  detail=lines[i+1] if i+1<len(lines) else ''
-                  mt=tx_re.search(detail); mr=rx_re.search(detail)
-                  if mt:tx+=int(mt.group(1))
-                  if mr:rx+=int(mr.group(1))
-              return {'source':'ss_tcp_info','established':est,'tx_acked':tx,'rx':rx}
-          start_m=time.monotonic(); last=None; prev_tx=prev_rx=None
-          print(json.dumps({'event':'LOGGER_READY','epoch_ms':time.time_ns()//1_000_000,'pid':pid,'start_ticks':start,'secrets_retained':False,'packet_payloads_retained':False},sort_keys=True),flush=True)
-          try:
-              while time.monotonic()-start_m<duration:
-                  if ticks()!=start: raise SystemExit('START_TICKS_CHANGED')
-                  qraw=struct.unpack('<I',os.pread(fd,4,qpriv+QSTATE_OFF))[0]
-                  pos,mirror=read_pos(); ns=net()
-                  txd=None if prev_tx is None or ns['tx_acked'] is None else ns['tx_acked']-prev_tx
-                  rxd=None if prev_rx is None or ns['rx'] is None else ns['rx']-prev_rx
-                  if ns['tx_acked'] is not None:prev_tx=ns['tx_acked']
-                  if ns['rx'] is not None:prev_rx=ns['rx']
-                  state=(qraw,tuple(pos) if pos else None,mirror,ns['established'],ns['tx_acked'],ns['rx'])
-                  if state!=last:
-                      print(json.dumps({'event':'STATE','epoch_ms':time.time_ns()//1_000_000,'auth_qstate_raw':qraw,'auth_running':qraw==QRUN,'player_position':pos,'position_mirror_consistent':mirror,'tcp':ns,'tcp_tx_delta':txd,'tcp_rx_delta':rxd},sort_keys=True),flush=True); last=state
-                  time.sleep(0.25)
-          finally: os.close(fd)
-          print(json.dumps({'event':'LOGGER_DONE','epoch_ms':time.time_ns()//1_000_000},sort_keys=True),flush=True)
-          PY
-          mempid=$!
-          echo MEMORY_LOGGER_PID="$mempid"
-          echo LOGGER_PREPARING=true
-          for _ in $(seq 1 180); do
-            if grep -q '"event": "LOGGER_READY"' "$memlog" 2>/dev/null; then break; fi
-            kill -0 "$mempid" 2>/dev/null || { cat "$memlog" >&2; exit 2; }
-            sleep 1
-          done
-          grep -q '"event": "LOGGER_READY"' "$memlog"
+          out="$RUNNER_TEMP/qt-ingame-window-context.jsonl"
+          : > "$out"
           echo LOGGER_READY=true
-          echo MANUAL_VIEW_URL='${{ steps.view.outputs.url }}'
+          echo PERSISTENT_VIEW_URL="$PERSISTENT_VIEW_URL"
+          printf '{"epoch_ms":%s,"event":"LOGGER_READY","pid":%s,"start_ticks":%s,"credentials_retained":false,"packet_payloads_retained":false,"raw_title_retained":false,"process_memory_access":false}\n' \
+            "$(date +%s%3N)" "$TARGET_PID" "$TARGET_START" >> "$out"
           end=$(( $(date +%s) + DURATION ))
           last=''
-          while (( $(date +%s) < end )) && kill -0 "$mempid" 2>/dev/null; do
-            xid="$(docker exec -u kasm-user -e DISPLAY="$DISPLAY_NAME" "$CONTAINER" xdotool search --onlyvisible --name '^Tibia' 2>/dev/null | head -n1 || true)"
-            context=false
-            if [[ "$xid" =~ ^[0-9]+$ ]]; then
+          while (( $(date +%s) < end )); do
+            mapfile -t current_pids < <(docker exec "$CONTAINER" pgrep -x client 2>/dev/null || true)
+            test "${#current_pids[@]}" -eq 1 || { echo TARGET_UNIQUENESS_LOST >&2; exit 2; }
+            test "${current_pids[0]}" = "$TARGET_PID" || { echo TARGET_PID_CHANGED >&2; exit 2; }
+            current_start="$(docker exec -i "$CONTAINER" python3 - "$TARGET_PID" <<'PY'
+          import pathlib,sys
+          raw=pathlib.Path('/proc/'+sys.argv[1]+'/stat').read_text(encoding='ascii')
+          print(raw[raw.rfind(')')+2:].split()[19])
+          PY
+            )"
+            test "$current_start" = "$TARGET_START" || { echo START_TICKS_CHANGED >&2; exit 2; }
+            matching=0
+            character_window_context=false
+            while IFS= read -r xid; do
+              [[ "$xid" =~ ^[0-9]+$ ]] || continue
+              owner="$(docker exec -u kasm-user -e DISPLAY="$DISPLAY_NAME" "$CONTAINER" xprop -id "$xid" _NET_WM_PID 2>/dev/null | sed -nE 's/.*= *([0-9]+).*/\1/p')"
+              [[ "$owner" == "$TARGET_PID" ]] || continue
+              matching=$((matching+1))
               title="$(docker exec -u kasm-user -e DISPLAY="$DISPLAY_NAME" "$CONTAINER" xdotool getwindowname "$xid" 2>/dev/null || true)"
-              [[ "$title" == 'Tibia - '* ]] && context=true
+              [[ "$title" == 'Tibia - '* ]] && character_window_context=true
+            done < <(docker exec -u kasm-user -e DISPLAY="$DISPLAY_NAME" "$CONTAINER" xdotool search --onlyvisible --name '^Tibia' 2>/dev/null || true)
+            state="$matching|$character_window_context"
+            if [[ "$state" != "$last" ]]; then
+              printf '{"epoch_ms":%s,"event":"WINDOW_CONTEXT","pid":%s,"start_ticks":%s,"matching_window_count":%s,"character_window_context":%s,"raw_title_retained":false,"credentials_retained":false,"packet_payloads_retained":false,"process_memory_access":false}\n' \
+                "$(date +%s%3N)" "$TARGET_PID" "$TARGET_START" "$matching" "$character_window_context" >> "$out"
+              echo WINDOW_CONTEXT_CHANGED="$character_window_context"
+              last="$state"
             fi
-            if [[ "$context" != "$last" ]]; then
-              printf '{"epoch_ms":%s,"event":"WINDOW_CONTEXT","character_context":%s,"raw_title_retained":false}\n' "$(date +%s%3N)" "$context" >> "$winlog"
-              last="$context"
-            fi
-            sleep 1
+            sleep 0.5
           done
-          wait "$mempid"
+          printf '{"epoch_ms":%s,"event":"LOGGER_DONE","pid":%s,"start_ticks":%s,"credentials_retained":false,"packet_payloads_retained":false,"raw_title_retained":false,"process_memory_access":false}\n' \
+            "$(date +%s%3N)" "$TARGET_PID" "$TARGET_START" >> "$out"
           echo LOGGER_COMPLETED=true
           echo SECRETS_RETAINED=false
           echo RAW_WINDOW_TITLES_RETAINED=false
           echo PACKET_PAYLOADS_RETAINED=false
+          echo PROCESS_MEMORY_ACCESS=false
 
       - name: Summarize correlation without semantic promotion
         if: always()
         shell: bash
         run: |
           set -Eeuo pipefail
-          python3 - "$RUNNER_TEMP/qt-ingame-memory-network.jsonl" "$RUNNER_TEMP/qt-ingame-window.jsonl" "$RUNNER_TEMP/summary.json" <<'PY'
+          python3 - "$RUNNER_TEMP/qt-ingame-window-context.jsonl" "$RUNNER_TEMP/summary.json" <<'PY'
           import json,pathlib,sys
-          mem=pathlib.Path(sys.argv[1]); win=pathlib.Path(sys.argv[2]); out=pathlib.Path(sys.argv[3])
-          rows=[]
-          if mem.is_file():
-              for line in mem.read_text(encoding='utf-8').splitlines():
-                  try:d=json.loads(line)
-                  except json.JSONDecodeError:continue
-                  if d.get('event')=='STATE':rows.append(d)
-          auth_states=sorted({r.get('auth_qstate_raw') for r in rows if isinstance(r.get('auth_qstate_raw'),int)})
-          positions=[]
-          for r in rows:
-              p=r.get('player_position')
-              if isinstance(p,list) and len(p)==3 and p not in positions:positions.append(p)
-          contexts=[]
-          if win.is_file():
-              for line in win.read_text(encoding='utf-8').splitlines():
-                  try:d=json.loads(line)
-                  except json.JSONDecodeError:continue
-                  v=d.get('character_context')
-                  if isinstance(v,bool) and v not in contexts:contexts.append(v)
-          doc={'result':'OBSERVATION_COMPLETE','state_event_count':len(rows),'auth_qstate_values':auth_states,'distinct_player_positions':positions[:20],'window_character_context_values':contexts,'semantic_promotion_performed':False,'credentials_retained':False,'packet_payloads_retained':False,'raw_window_titles_retained':False}
+          src=pathlib.Path(sys.argv[1]); out=pathlib.Path(sys.argv[2]); rows=[]
+          if src.is_file():
+              for line in src.read_text(encoding='utf-8').splitlines():
+                  try: d=json.loads(line)
+                  except json.JSONDecodeError: continue
+                  if d.get('event') == 'WINDOW_CONTEXT': rows.append(d)
+          contexts=[]; counts=[]; pids=[]; starts=[]
+          for row in rows:
+              value=row.get('character_window_context')
+              if isinstance(value,bool) and value not in contexts: contexts.append(value)
+              count=row.get('matching_window_count')
+              if isinstance(count,int) and count not in counts: counts.append(count)
+              pid=row.get('pid')
+              if isinstance(pid,int) and pid not in pids: pids.append(pid)
+              start=row.get('start_ticks')
+              if isinstance(start,int) and start not in starts: starts.append(start)
+          doc={
+              'result':'OBSERVATION_COMPLETE' if rows else 'NO_RUNTIME_OBSERVATIONS',
+              'window_context_event_count':len(rows),
+              'window_character_context_values':contexts,
+              'matching_window_count_values':counts,
+              'observed_pid_values':pids,
+              'observed_start_tick_values':starts,
+              'semantic_promotion_performed':False,
+              'credentials_retained':False,
+              'packet_payloads_retained':False,
+              'raw_window_titles_retained':False,
+              'process_memory_access':False,
+          }
           out.write_text(json.dumps(doc,indent=2,sort_keys=True)+'\n',encoding='utf-8')
-          print('CORRELATION_STATE_EVENTS='+str(len(rows)))
-          print('AUTH_QSTATE_VALUES='+','.join(map(str,auth_states)))
-          print('DISTINCT_PLAYER_POSITIONS='+str(len(positions)))
+          print('WINDOW_CONTEXT_EVENTS='+str(len(rows)))
           print('WINDOW_CONTEXT_VALUES='+','.join(str(v).lower() for v in contexts))
           print('SEMANTIC_PROMOTION_PERFORMED=false')
           PY
@@ -371,13 +228,7 @@ jobs:
         with:
           name: track-a-qt-ingame-correlation-${{ github.run_id }}
           path: |
-            ${{ runner.temp }}/qt-ingame-memory-network.jsonl
-            ${{ runner.temp }}/qt-ingame-window.jsonl
+            ${{ runner.temp }}/qt-ingame-window-context.jsonl
             ${{ runner.temp }}/summary.json
           if-no-files-found: warn
           retention-days: 3
-
-      - name: Remove temporary LAN view proxy
-        if: always()
-        shell: bash
-        run: docker rm -f "$VIEW_PROXY_NAME" >/dev/null 2>&1 || true

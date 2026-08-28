@@ -89,5 +89,31 @@ class WorldEnteredAnchorTests(unittest.TestCase):
             module.recover_world_entered_anchor(raw, sections, relocs)
 
 
+
+# Additional activation-boundary behavioral checks.
+class ActivationBoundaryTests(unittest.TestCase):
+    def test_selects_unique_branch_target_common_to_all_signal_traces(self):
+        traces = [
+            {"branch_targets": [0x5000, 0x7000 + index]}
+            for index in range(3)
+        ]
+        self.assertEqual(0x5000, module.select_unique_common_branch_target(traces))
+
+    def test_rejects_multiple_common_branch_targets(self):
+        traces = [
+            {"branch_targets": [0x5000, 0x6000, 0x7000 + index]}
+            for index in range(3)
+        ]
+        with self.assertRaisesRegex(module.AnchorError, "COMMON_ACTIVATION_TARGET_NOT_UNIQUE"):
+            module.select_unique_common_branch_target(traces)
+
+    def test_requires_world_signal_index_and_static_metaobject_reference(self):
+        trace = {"edx_values": [17], "rip_refs": [0x30B6BA0]}
+        self.assertTrue(module.require_signal_activation_arguments(trace, 17, 0x30B6BA0))
+        with self.assertRaisesRegex(module.AnchorError, "SIGNAL_INDEX_ARGUMENT_NOT_PROVEN"):
+            module.require_signal_activation_arguments(trace, 18, 0x30B6BA0)
+        with self.assertRaisesRegex(module.AnchorError, "STATIC_METAOBJECT_ARGUMENT_NOT_PROVEN"):
+            module.require_signal_activation_arguments(trace, 17, 0x1234)
+
 if __name__ == "__main__":
     unittest.main()

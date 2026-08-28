@@ -262,6 +262,7 @@ def recover_dispatch_case(raw: bytes, sections, anchor: dict[str, object]) -> di
         "dispatch_table_va": table,
         "world_entered_dispatch_target_va": target,
         "world_entered_target_window_sha256": hashlib.sha256(window).hexdigest(),
+        "dispatch_targets_va": targets,
     }
 
 
@@ -278,6 +279,7 @@ def main(argv: list[str]) -> int:
     sections, relocs = parse_elf_layout(raw)
     anchor = recover_world_entered_anchor(raw, sections, relocs)
     dispatch = recover_dispatch_case(raw, sections, anchor)
+    activation = recover_activation_boundary(raw, sections, anchor, dispatch)
     document = {
         "schema": "otclient.track-a.current-world-entered-anchor.v1",
         "classification": "STATIC_QMETA_DISPATCH_ANCHOR_NOT_RUNTIME_PROMOTED",
@@ -287,6 +289,7 @@ def main(argv: list[str]) -> int:
             "sha256": EXPECTED_SHA256,
         },
         "anchor": {**anchor, **dispatch},
+        "activation_boundary": activation,
         "safety": {
             "runtime_access": "none",
             "client_executed": False,
@@ -303,11 +306,173 @@ def main(argv: list[str]) -> int:
     print("WORLD_ENTERED_STATIC_ANCHOR=PASS")
     print(f"WORLD_ENTERED_METHOD_INDEX={anchor['world_entered_method_index']}")
     print(f"WORLD_ENTERED_DISPATCH_TARGET=0x{dispatch['world_entered_dispatch_target_va']:x}")
+    print(f"WORLD_ENTERED_ACTIVATION_STATE={activation['state']}")
+    if activation.get("qmeta_activate_target_va") is not None:
+        print(f"WORLD_ENTERED_QMETA_ACTIVATE_TARGET=0x{activation['qmeta_activate_target_va']:x}")
     print("HISTORICAL_ADDRESS_REUSE=false")
     print("RAW_CLIENT_RETAINED=false")
     print("IN_GAME_CLAIMED=false")
     print("SEMANTIC_PROMOTION_PERFORMED=false")
     return 0
+
+
+
+
+def select_unique_common_branch_target(traces: list[dict[str, object]]) -> int:
+    if not traces:
+        raise AnchorError("COMMON_ACTIVATION_TARGET_NOT_UNIQUE:0")
+    common: set[int] | None = None
+    for trace in traces:
+        targets = {int(value) for value in trace.get("branch_targets", [])}
+        common = targets if common is None else common & targets
+    common = common or set()
+    if len(common) != 1:
+        raise AnchorError(f"COMMON_ACTIVATION_TARGET_NOT_UNIQUE:{sorted(common)}")
+    return next(iter(common))
+
+
+def require_signal_activation_arguments(trace: dict[str, object], signal_index: int, static_metaobject: int) -> bool:
+    edx_values = {int(value) for value in trace.get("edx_values", [])}
+    if signal_index not in edx_values:
+        raise AnchorError(f"SIGNAL_INDEX_ARGUMENT_NOT_PROVEN:{signal_index}")
+    rip_refs = {int(value) for value in trace.get("rip_refs", [])}
+    if static_metaobject not in rip_refs:
+        raise AnchorError(f"STATIC_METAOBJECT_ARGUMENT_NOT_PROVEN:{static_metaobject:#x}")
+    return True
+
+
+def _bounded_structural_trace(raw: bytes, sections, start: int) -> dict[str, object]:
+    try:
+        from capstone import Cs, CS_ARCH_X86, CS_MODE_64
+        from capstone.x86_const import (
+            X86_OP_IMM, X86_OP_MEM, X86_OP_REG,
+            X86_REG_EDX, X86_REG_RDX, X86_REG_RIP,
+        )
+    except ImportError as exc:
+        raise AnchorError("CAPSTONE_REQUIRED_FOR_ACTIVATION_RECOVERY") from exc
+
+    offset = _va_to_offset(sections, start)
+    code = raw[offset : min(len(raw), offset + 0x180)]
+    md = Cs(CS_ARCH_X86, CS_MODE_64)
+    md.detail = True
+    branches = []
+    edx_values = []
+    rip_refs = []
+    instruction_count = 0
+    for inst in md.disasm(code, start):
+        instruction_count += 1
+        for operand in inst.operands:
+            if operand.type == X86_OP_MEM and operand.mem.base == X86_REG_RIP:
+                rip_refs.append(inst.address + inst.size + operand.mem.disp)
+        if inst.mnemonic == "mov" and len(inst.operands) >= 2:
+            dst, src = inst.operands[0], inst.operands[1]
+            if dst.type == X86_OP_REG and dst.reg in (X86_REG_EDX, X86_REG_RDX) and src.type == X86_OP_IMM:
+                edx_values.append(int(src.imm) & 0xFFFFFFFF)
+        if inst.mnemonic == "xor" and len(inst.operands) >= 2:
+            left, right = inst.operands[0], inst.operands[1]
+            if left.type == X86_OP_REG and right.type == X86_OP_REG and left.reg == right.reg and left.reg in (X86_REG_EDX, X86_REG_RDX):
+                edx_values.append(0)
+        if inst.mnemonic in ("call", "jmp") and inst.operands and inst.operands[0].type == X86_OP_IMM:
+            branches.append({"kind": inst.mnemonic, "address": inst.address, "target": int(inst.operands[0].imm)})
+        if inst.mnemonic == "ret":
+            break
+        if inst.mnemonic == "jmp":
+            break
+        if instruction_count >= 96:
+            break
+    return {
+        "entry_va": start,
+        "branch_records": branches,
+        "branch_targets": sorted({int(item["target"]) for item in branches}),
+        "edx_values": sorted(set(edx_values)),
+        "rip_refs": sorted(set(rip_refs)),
+        "instruction_count": instruction_count,
+    }
+
+
+def _externalize_trace(trace: dict[str, object], region_low: int, region_high: int) -> dict[str, object]:
+    records = [
+        item for item in trace["branch_records"]
+        if not (region_low <= int(item["target"]) < region_high)
+    ]
+    return {
+        **trace,
+        "branch_records": records,
+        "branch_targets": sorted({int(item["target"]) for item in records}),
+    }
+
+
+def _select_unique_member_target(trace: dict[str, object]) -> int:
+    records = list(trace.get("branch_records", []))
+    calls = [int(item["target"]) for item in records if item.get("kind") == "call"]
+    if len(set(calls)) == 1:
+        return calls[0]
+    targets = [int(item["target"]) for item in records]
+    if not calls and len(set(targets)) == 1:
+        return targets[0]
+    raise AnchorError(f"SIGNAL_MEMBER_TARGET_NOT_UNIQUE:{records}")
+
+
+def recover_activation_boundary(raw: bytes, sections, anchor: dict[str, object], dispatch: dict[str, object]) -> dict[str, object]:
+    signal_count = int(anchor["signal_count"])
+    world_index = int(anchor["world_entered_method_index"])
+    static_meta = int(anchor["static_metaobject_va"])
+    targets = [int(value) for value in dispatch["dispatch_targets_va"]]
+    signal_targets = targets[:signal_count]
+    region_low = int(anchor["static_metacall_va"])
+    region_high = max(targets) + 0x200
+
+    case_traces = [
+        _externalize_trace(_bounded_structural_trace(raw, sections, target), region_low, region_high)
+        for target in signal_targets
+    ]
+    direct_error = None
+    try:
+        activation_target = select_unique_common_branch_target(case_traces)
+        require_signal_activation_arguments(case_traces[world_index], world_index, static_meta)
+        return {
+            "state": "PROVEN",
+            "mode": "DIRECT_FROM_GENERATED_CASE",
+            "qmeta_activate_target_va": activation_target,
+            "signal_trace_count": len(case_traces),
+            "world_activation_entry_va": int(case_traces[world_index]["entry_va"]),
+            "world_edx_values": case_traces[world_index]["edx_values"],
+            "world_rip_refs": case_traces[world_index]["rip_refs"],
+            "world_external_branch_targets": case_traces[world_index]["branch_targets"],
+        }
+    except AnchorError as exc:
+        direct_error = str(exc)
+    member_error = None
+    try:
+        member_targets = [_select_unique_member_target(trace) for trace in case_traces]
+        if not all(_is_executable(sections, target) for target in member_targets):
+            raise AnchorError("SIGNAL_MEMBER_TARGET_NOT_EXECUTABLE")
+        member_traces = [_bounded_structural_trace(raw, sections, target) for target in member_targets]
+        activation_target = select_unique_common_branch_target(member_traces)
+        require_signal_activation_arguments(member_traces[world_index], world_index, static_meta)
+        return {
+            "state": "PROVEN",
+            "mode": "FOLLOWED_SIGNAL_MEMBER",
+            "qmeta_activate_target_va": activation_target,
+            "signal_trace_count": len(member_traces),
+            "world_activation_entry_va": int(member_traces[world_index]["entry_va"]),
+            "world_signal_member_va": member_targets[world_index],
+            "world_edx_values": member_traces[world_index]["edx_values"],
+            "world_rip_refs": member_traces[world_index]["rip_refs"],
+            "world_external_branch_targets": member_traces[world_index]["branch_targets"],
+        }
+    except AnchorError as exc:
+        member_error = str(exc)
+
+    return {
+        "state": "UNKNOWN",
+        "direct_case_error": direct_error,
+        "member_layer_error": member_error,
+        "signal_trace_count": len(case_traces),
+        "world_case_external_branch_targets": case_traces[world_index]["branch_targets"],
+        "world_case_edx_values": case_traces[world_index]["edx_values"],
+        "world_case_rip_refs": case_traces[world_index]["rip_refs"],
+    }
 
 
 if __name__ == "__main__":

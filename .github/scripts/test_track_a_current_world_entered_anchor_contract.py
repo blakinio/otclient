@@ -27,9 +27,11 @@ checks = {
     'no runtime execution': 'docker exec' not in w and 'client_executed: true' not in w,
     'dynamic qmeta': 'recover_world_entered_anchor' in s and 'TARGET_CLASS' in s,
     'dynamic dispatch': 'recover_dispatch_case' in s and 'FULL_RANGE_DISPATCH_NOT_UNIQUE' in s,
+    'activation boundary': 'recover_activation_boundary' in s and 'qmeta_activate_target_va' in s,
+    'activation arguments': 'SIGNAL_INDEX_ARGUMENT_NOT_PROVEN' in s and 'STATIC_METAOBJECT_ARGUMENT_NOT_PROVEN' in s,
     'no historical address reuse': 'historical_address_reuse' in s and 'False' in s,
     'no ingame claim': 'in_game_claimed' in s and 'False' in s,
-    'task frontier': 'world_entered_exact_current_anchor: UNKNOWN' in t,
+    'task frontier': 'world_entered_exact_current_anchor: STATIC_QMETA_DISPATCH_RECOVERED_NOT_RUNTIME_VALIDATED' in t,
 }
 failed = [name for name, ok in checks.items() if not ok]
 if failed:

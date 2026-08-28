@@ -83,6 +83,14 @@ jobs:
           grep -Fqx 'gui_input_authorized: false' "$task"
           grep -Fqx 'process_control_authorized: false' "$task"
           grep -Fqx 'physical_action_budget: 0' "$task"
+          grep -Fqx 'gate_a: PASS' "$task"
+          grep -Eq '^generation_rebind: (PASS|NOT_REQUIRED)$' "$task"
+          grep -Fqx 'gate_b: PASS' "$task"
+          grep -Fqx 'target_uniqueness: PROVEN' "$task"
+          echo GATE_A_REQUIRED=PASS
+          echo GENERATION_REBIND_REQUIRED=PASS_OR_NOT_REQUIRED
+          echo GATE_B_REQUIRED=PASS
+          echo TARGET_UNIQUENESS_REQUIRED=PROVEN
           python3 .github/scripts/test_track_a_canonical_current_client_fence.py
           echo GAME_WINDOW_STATE_LIVE_AUTHORITY=PASS
 

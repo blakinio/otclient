@@ -5,12 +5,15 @@ root = Path(__file__).resolve().parents[2]
 probe = root / 'tools/tibia_re_current_game_login_pre_success_outbound/probe.py'
 qmeta_runner = root / 'tools/tibia_re_current_game_login_pre_success_outbound/qmeta_runner.py'
 auth_graph = root / 'tools/tibia_re_current_game_login_pre_success_outbound/auth_graph.py'
+handler_owner = root / 'tools/tibia_re_current_game_login_pre_success_outbound/handler_owner.py'
 assert probe.exists(), 'pre-success outbound probe not implemented'
 assert qmeta_runner.exists(), 'qmeta class-root regression runner not implemented'
 assert auth_graph.exists(), 'auth start-game causal graph not implemented'
+assert handler_owner.exists(), 'handler owner-field census not implemented'
 text = probe.read_text(encoding='utf-8')
 runner = qmeta_runner.read_text(encoding='utf-8')
 graph = auth_graph.read_text(encoding='utf-8')
+owner = handler_owner.read_text(encoding='utf-8')
 for required in (
     "'runtime_access': 'none'",
     "'login_performed': False",
@@ -40,12 +43,15 @@ assert 'AUTH_START_GAMESERVER_LOGIN_GRAPH' in graph
 assert 'TAuthenticationProcessController' in graph
 assert 'onStartGameServerLoginStateEntered' in graph
 assert "result['auth_start_gameserver_login_graph']" in graph
+assert 'HANDLER_OWNER_FIELD_REF_CENSUS' in owner
+assert '0x9c0' in owner
+assert "result['handler_owner_field_refs']" in owner
 assert "'field6_source_context'" in runner
 assert "'field6_backward_source'" in runner
 assert "'nested_source_contexts'" in runner
 assert "'producer_callsite_contexts'" in runner
 assert "'virtual_slot_0x60_callsites'" in runner
-combined = text + runner + graph
+combined = text + runner + graph + owner
 assert 'subprocess' not in combined
 assert 'ptrace' not in combined.lower()
 assert 'process_vm_readv' not in combined.lower()

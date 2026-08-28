@@ -1,0 +1,31 @@
+name: Track A game window state qualification
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+    paths:
+      - .github/scripts/track_a_game_window_state_qualification.py
+      - .github/scripts/test_track_a_game_window_state_qualification.py
+      - .github/scripts/test_track_a_game_window_state_workflow_contract.py
+      - .github/workflows/track-a-game-window-state-qualification.yml
+      - docs/agents/tasks/active/OTC-20260828-game-window-state-qualification.md
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    name: Read-only gameWindowState contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+      - name: Validate focused reader contract
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 .github/scripts/test_track_a_game_window_state_qualification.py

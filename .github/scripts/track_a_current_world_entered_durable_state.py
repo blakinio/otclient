@@ -282,6 +282,7 @@ def main(argv: list[str]) -> int:
     qmeta_activate_target = int(player_activation["qmeta_activate_target_va"])
     meta = recover_qmeta_class(raw, sections, relocs, TARGET_CLASS)
     game_window_meta = recover_qmeta_class(raw, sections, relocs, GAME_WINDOW_CLASS)
+    game_window_rtti = resolve_primary_vptr_from_rtti(raw, sections, relocs, GAME_WINDOW_CLASS)
     game_window_entry_trace = extract_bounded_case_trace(raw, sections, int(game_window_meta["static_metacall_va"]))
     game_window_semantic_properties = select_world_semantic_properties(game_window_meta["properties"])
     game_window_state_properties = [prop for prop in game_window_meta["properties"] if prop["name"] == "gameWindowState"]
@@ -477,6 +478,7 @@ def main(argv: list[str]) -> int:
         "exact_client": {"version": "15.32.75d4a0", "size": base.EXPECTED_SIZE, "sha256": base.EXPECTED_SHA256},
         "game_window_property_census": {
             "class_name": game_window_meta["class_name"],
+            "game_window_rtti": game_window_rtti,
             "static_metacall_entry_trace": game_window_entry_trace,
             "static_metaobject_va": game_window_meta["static_metaobject_va"],
             "static_metacall_va": game_window_meta["static_metacall_va"],
@@ -1143,6 +1145,63 @@ def scan_nearby_static_literal_candidates(raw: bytes, sections, literal_va: int,
             if previous is None or (abs(relative), relative) < (abs(int(previous["offset"])), int(previous["offset"])):
                 by_value[key] = record
     return sorted(by_value.values(), key=lambda item: (abs(int(item["offset"])), int(item["offset"]), -int(item["length"]), str(item["encoding"]), str(item["value"])))
+
+
+def itanium_nested_type_name(qualified_name: str) -> str:
+    parts = qualified_name.split("::")
+    if len(parts) < 2 or any(not part for part in parts):
+        raise DurableStateError(f"ITANIUM_QUALIFIED_NAME_INVALID:{qualified_name}")
+    return "N" + "".join(f"{len(part)}{part}" for part in parts) + "E"
+
+
+def _file_offset_to_static_va(sections, file_offset: int) -> int | None:
+    for section_va, section_offset, size, _flags in sections:
+        if int(section_offset) <= file_offset < int(section_offset) + int(size):
+            return int(section_va) + file_offset - int(section_offset)
+    return None
+
+
+def _static_string_vas(raw: bytes, sections, text: str) -> set[int]:
+    needle = text.encode("utf-8") + b"\0"
+    result: set[int] = set()
+    cursor = 0
+    while True:
+        found = raw.find(needle, cursor)
+        if found < 0:
+            break
+        va = _file_offset_to_static_va(sections, found)
+        if va is not None:
+            result.add(va)
+        cursor = found + 1
+    return result
+
+
+def resolve_primary_vptr_from_rtti(raw: bytes, sections, relocs: dict[int, int], qualified_name: str) -> dict[str, object]:
+    mangled = itanium_nested_type_name(qualified_name)
+    mangled_vas = _static_string_vas(raw, sections, mangled)
+    if not mangled_vas:
+        raise DurableStateError(f"RTTI_MANGLED_NAME_MISSING:{qualified_name}:{mangled}")
+    typeinfos = {int(slot) - 8 for slot, target in relocs.items() if int(target) in mangled_vas and int(slot) >= 8}
+    if not typeinfos:
+        raise DurableStateError(f"RTTI_TYPEINFO_MISSING:{qualified_name}")
+    candidates: set[tuple[int, int]] = set()
+    for slot, target in relocs.items():
+        slot_i = int(slot)
+        target_i = int(target)
+        if target_i not in typeinfos:
+            continue
+        vptr = slot_i + 8
+        if vptr in relocs:
+            candidates.add((vptr, target_i))
+    if len(candidates) != 1:
+        raise DurableStateError(f"RTTI_PRIMARY_VPTR_NOT_UNIQUE:{qualified_name}:{sorted(candidates)}")
+    vptr, typeinfo = next(iter(candidates))
+    return {
+        "class_name": qualified_name,
+        "mangled_type_name": mangled,
+        "vptr_offset": vptr,
+        "typeinfo_offset": typeinfo,
+    }
 
 
 if __name__ == "__main__":

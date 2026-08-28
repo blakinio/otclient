@@ -360,5 +360,44 @@ class NearbyLiteralCandidateTests(unittest.TestCase):
         self.assertEqual(1, len(matches))
 
 
+class ItaniumRttiVptrTests(unittest.TestCase):
+    def test_derives_nested_typeinfo_name(self):
+        self.assertEqual(
+            "N5tibia10gamewindow21TGameWindowControllerE",
+            module.itanium_nested_type_name("tibia::gamewindow::TGameWindowController"),
+        )
+
+    def test_recovers_unique_primary_vptr_from_relative_relocations(self):
+        raw = bytearray(0x1000)
+        sections = [(0x100, 0x100, 0x800, 2)]
+        mangled = module.itanium_nested_type_name("tibia::gamewindow::TGameWindowController").encode() + b"\0"
+        raw[0x500:0x500 + len(mangled)] = mangled
+        relocs = {
+            0x608: 0x500,
+            0x710: 0x600,
+            0x718: 0x1234,
+        }
+        result = module.resolve_primary_vptr_from_rtti(
+            bytes(raw), sections, relocs, "tibia::gamewindow::TGameWindowController"
+        )
+        self.assertEqual(0x718, result["vptr_offset"])
+        self.assertEqual(0x600, result["typeinfo_offset"])
+
+    def test_rejects_ambiguous_primary_vptr(self):
+        raw = bytearray(0x1000)
+        sections = [(0x100, 0x100, 0x800, 2)]
+        mangled = module.itanium_nested_type_name("tibia::gamewindow::TGameWindowController").encode() + b"\0"
+        raw[0x500:0x500 + len(mangled)] = mangled
+        relocs = {
+            0x608: 0x500,
+            0x710: 0x600, 0x718: 0x1234,
+            0x730: 0x600, 0x738: 0x5678,
+        }
+        with self.assertRaisesRegex(module.DurableStateError, "RTTI_PRIMARY_VPTR_NOT_UNIQUE"):
+            module.resolve_primary_vptr_from_rtti(
+                bytes(raw), sections, relocs, "tibia::gamewindow::TGameWindowController"
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

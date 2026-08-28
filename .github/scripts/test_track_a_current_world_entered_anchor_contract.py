@@ -42,6 +42,7 @@ checks = {
     'display signal callers': 'game_window_display_signal_callers' in d and 'scan_direct_branch_target_xrefs' in d,
     'initializer literal decode': 'initializer_literal_calls' in d and 'decode_bounded_static_literal_candidates' in d,
     'initializer helper semantics': 'literal_nearby_candidates' in d and 'initializer_helper_trace' in d and 'scan_nearby_static_literal_candidates' in d,
+    'game window rtti': 'game_window_rtti' in d and 'resolve_primary_vptr_from_rtti' in d and 'itanium_nested_type_name' in d,
     'durable fail closed': 'PROVEN_STATIC_SIMPLE_FIELD_CANDIDATE' in d and 'NOT_PROVEN' in d,
     'no historical address reuse': 'historical_address_reuse' in s and 'False' in s and 'historical_address_reuse' in d,
     'no ingame claim': 'in_game_claimed' in s and 'False' in s and 'in_game_claimed' in d,

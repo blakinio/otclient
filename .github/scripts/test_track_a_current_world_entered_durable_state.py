@@ -255,5 +255,27 @@ class StaticQStringSourceDecodeTests(unittest.TestCase):
             module.decode_static_qstring_source(bytes(raw), sections, relocs, source)
 
 
+class GlobalQStringInitializerXrefTests(unittest.TestCase):
+    def test_finds_rip_reference_to_bss_source_with_context(self):
+        raw = bytearray(0x400)
+        # 0x1000: lea rdi,[rip+0xf9] -> 0x1100; nop; ret
+        raw[0x100:0x108] = bytes.fromhex("48 8d 3d f9 00 00 00 90")
+        raw[0x108] = 0xC3
+        sections = [(0x1000, 0x100, 0x100, 6)]
+        result = module.scan_rip_target_xrefs(bytes(raw), sections, {0x1100})
+        self.assertIn(0x1100, result)
+        self.assertEqual(1, len(result[0x1100]))
+        self.assertEqual(0x1000, result[0x1100][0]["reference_va"])
+        self.assertEqual("lea", result[0x1100][0]["reference"]["mnemonic"])
+
+    def test_ignores_other_rip_targets(self):
+        raw = bytearray(0x400)
+        raw[0x100:0x108] = bytes.fromhex("48 8d 3d f9 00 00 00 90")
+        raw[0x108] = 0xC3
+        sections = [(0x1000, 0x100, 0x100, 6)]
+        result = module.scan_rip_target_xrefs(bytes(raw), sections, {0x1200})
+        self.assertEqual({0x1200: []}, result)
+
+
 if __name__ == "__main__":
     unittest.main()

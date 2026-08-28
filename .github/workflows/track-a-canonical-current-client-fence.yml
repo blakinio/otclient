@@ -76,7 +76,7 @@ jobs:
           ref: fix/OTC-20260828-canonical-current-client-fence
           fetch-depth: 0
           persist-credentials: true
-      - name: Replace only stale deterministic governance constants
+      - name: Replace only count-asserted stale governance constants
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -86,30 +86,24 @@ jobs:
           text = path.read_text(encoding='utf-8')
           old_sha = 'ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8'
           new_sha = 'd1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a'
-          replacements = (
-              ('    exact_fence = "' + old_sha + '"', '    exact_fence = "' + new_sha + '"'),
-              ('    exact_size = "52109920"', '    exact_size = "52105824"'),
-              ('    exact_version = "15.32"', '    exact_version = "15.32.75d4a0"'),
-              ('require("current canonical transition fence", transition, ("VER = \'15.32\'", "SIZE = 52109920", "SHA = \'" + old_sha + "\'"))',
-               'require("current canonical transition fence", transition, ("VER = \'15.32.75d4a0\'", "SIZE = 52105824", "SHA = \'" + new_sha + "\'"))'),
-              ('require("current canonical live-session fence", session, ("SIZE=52109920", "SHA=' + old_sha + '"))',
-               'require("current canonical live-session fence", session, ("SIZE=52105824", "SHA=' + new_sha + '"))'),
-          )
-          changed = False
-          for old, new in replacements:
+
+          def replace_all_asserted(old: str, new: str, old_expected: int, new_expected_after: int) -> None:
+              global text
               old_count = text.count(old)
-              new_count = text.count(new)
-              if old_count == 1:
+              if old_count == old_expected:
                   text = text.replace(old, new)
-                  changed = True
-              elif old_count == 0 and new_count == 1:
-                  pass
+              elif old_count == 0 and text.count(new) == new_expected_after:
+                  return
               else:
-                  raise SystemExit(f'governance replacement ambiguity: old={old_count} new={new_count} marker={old[:80]!r}')
-          if old_sha in text or 'exact_size = "52109920"' in text or 'exact_version = "15.32"' in text:
-              raise SystemExit('stale current fence survived deterministic governance repair')
-          if changed:
-              path.write_text(text, encoding='utf-8')
+                  raise SystemExit(f'governance replacement count invalid for {old!r}: old={old_count}, new={text.count(new)}')
+              if text.count(new) != new_expected_after:
+                  raise SystemExit(f'governance replacement post-count invalid for {new!r}: {text.count(new)}')
+
+          replace_all_asserted(old_sha, new_sha, 3, 3)
+          replace_all_asserted('52109920', '52105824', 3, 3)
+          replace_all_asserted('exact_version = "15.32"', 'exact_version = "15.32.75d4a0"', 1, 1)
+          replace_all_asserted("VER = '15.32'", "VER = '15.32.75d4a0'", 1, 1)
+          path.write_text(text, encoding='utf-8')
           PY
           python3 -m py_compile .github/scripts/test_track_a_agent_runtime_governance.py
           python3 .github/scripts/test_track_a_agent_runtime_governance.py \

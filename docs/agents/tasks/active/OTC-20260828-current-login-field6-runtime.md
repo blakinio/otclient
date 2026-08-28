@@ -1,24 +1,24 @@
 ---
 task_id: OTC-20260828-current-login-field6-runtime
-status: live_authorized_pending_trigger
+status: repair_pending_merge
 agent: ChatGPT
 session_role: implementer
 project_lane: otclient
 lane: RUNTIME_RESEARCH
 track_id: official-client-re
 task_kind: reverse_engineering_runtime
-phase: live_admission
-branch: work/OTC-20260828-current-login-field6-runtime
+phase: implementation_repair
+branch: fix/OTC-20260828-field6-current-client-materialize
 base_branch: main
-base_main: 87a8351f6f6d3faae9869a119f165fc30882ab53
+base_main: 79279315df2975e79558a15192e4c5c87b90194a
 created: 2026-08-28T19:00:00+02:00
-updated: 2026-08-28T19:33:00+02:00
+updated: 2026-08-28T20:39:00+02:00
 risk: high
 execution_class: self_hosted
 execution_mode: github_actions_ephemeral_isolated
-runtime_access: ephemeral_isolated
-runtime_owner_task: OTC-20260828-current-login-field6-runtime
-runtime_namespace: field6-runtime-ephemeral-OTC-20260828-display131-port25441
+runtime_access: none
+runtime_owner_task: NOT_APPLICABLE
+runtime_namespace: NOT_APPLICABLE
 canonical_registration: NOT_APPLICABLE
 canonical_lease_generation: NOT_APPLICABLE
 registration_lease_generation: NOT_APPLICABLE
@@ -26,24 +26,26 @@ gate_a: NOT_APPLICABLE
 generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
-target_uniqueness: PROVEN
-mutation_authorized: true
-credentials_allowed: true
-login_allowed: true
+target_uniqueness: NOT_APPLICABLE
+mutation_authorized: false
+credentials_allowed: false
+login_allowed: false
 relogin_allowed: false
 restart_allowed: false
 character_selection_allowed: false
 gameplay_allowed: false
-gui_input_authorized: true
-process_control_authorized: true
+gui_input_authorized: false
+process_control_authorized: false
 network_payload_capture_allowed: false
-physical_action_budget: 1
+physical_action_budget: 0
 physical_action_count: 0
 implementation_authorized: true
-live_runtime_authorization_source: PR_758_COMMENT_5455680140
-related_pr: 758
+live_runtime_authorization_source: NOT_APPLICABLE
+related_pr: 764
 owned_paths:
   - .github/scripts/test_track_a_current_login_field6_runtime.py
+  - .github/scripts/track_a_current_client_package_materialize.py
+  - .github/scripts/track_a_current_client_package_acquire.sh
   - .github/scripts/track_a_current_login_field6_runtime.sh
   - .github/scripts/track_a_current_login_field6_runtime_secret_wrapper.sh
   - .github/workflows/track-a-current-login-field6-runtime.yml
@@ -55,7 +57,8 @@ depends_on:
   - merged PR #752 exact-current field6 scalar-owner promotion
   - merged PR #754 exact-current client fence
   - merged PR #758 runtime observation implementation
-  - PR #758 owner authorization comment 5455680140
+  - merged PR #762 one-shot V1 live admission
+  - failed pre-action run 33195339335 / job 98930921032
 blocks:
   - OTCLIENT-TIBIA-GLOBAL-LOGIN-FINAL-CONTINUE
 ---
@@ -64,63 +67,58 @@ blocks:
 
 Recover the exact current public scalar value carried in `edx` when official Linux Tibia enters the statically proven `GameclientMessageLogin` producer at `PIE + 0xe25620`, then promote that value as the only admissible Track B field6 input.
 
-# Live admission
+# Repair checkpoint
 
-The repository-side observer implementation is trusted on `main` at merge `87a8351f6f6d3faae9869a119f165fc30882ab53`. The owner explicitly authorized one separately admitted isolated login experiment in PR #758 comment `5455680140`.
-
-This checkpoint reclassifies only this task to `ephemeral_isolated`. It does not grant canonical authority and it does not touch, attach to, reuse, signal, stop, inject into, or clean any canonical Track A or Track B runtime. Canonical registration, lease, Gate A, Gate B, rebind and bootstrap are `NOT_APPLICABLE` by design for this task-owned sandbox.
-
-The namespace is task-owned and non-canonical:
+The first admitted V1 execution trigger was comment `5455709588`. Run `33195339335`, job `98930921032`, consumed that trigger but failed with:
 
 ```text
-state root: /home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260828-current-login-field6-runtime/runs/$GITHUB_RUN_ID
-display: :131
-WARP SOCKS port: 25441
-client/process ownership: OTCLIENT_TIBIA_RE_TASK=OTC-20260828-current-login-field6-runtime + exact run id + role
+TRACK_A_FIELD6_RUNTIME_ERROR=exact_current_source_package_missing
 ```
 
-`target_uniqueness: PROVEN` refers to the reviewed task-owned namespace selection and fail-closed ownership model. The trusted helper still refuses execution before login if the run root, display, WARP port, exact client fence, toolroot, window, tracer-child identity, or ownership markers are not uniquely valid at runtime.
+The failure occurred before WARP, Xvfb, GDB, the official client, credential entry, or login submission. Therefore the observed physical action count remains exactly zero. The consumed V1 trigger is historical evidence only and MUST NOT be replayed or copied into a new execution admission.
+
+This task is deliberately returned to `runtime_access: none` while PR #764 repairs only the pre-action package acquisition path. No runtime mutation, credential use, login, GUI input, process control, character selection, world entry, gameplay, or packet capture is authorized by this repair checkpoint.
 
 # Exact source boundary
 
-Only this exact official native Linux client is admitted:
+Only this exact official native Linux client remains admissible:
 
 - version `15.32.75d4a0`;
-- size `52105824`;
-- SHA-256 `d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a`;
+- unpacked size `52105824`;
+- unpacked SHA-256 `d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a`;
+- packed `bin/client` SHA-256 `075810c54af2d6912000eab062763db29563f5a1f4bf1d984154b2d07fd5729f`;
 - exact producer entry `0xe25620` promoted by merged PR #752;
 - current authoritative pre-observation result `FIELD6_VALUE=UNKNOWN`.
 
-The historical closed/unmerged PR #303 remains discovery input only for the Yama-safe parent-GDB shape. None of its old client hashes, displays, ports, branches, tasks or runtime records are authority.
+PR #764 adds `.github/scripts/track_a_current_client_package_materialize.py` and `.github/scripts/track_a_current_client_package_acquire.sh`. The acquisition preflight must use a task-owned WARP process, retrieve the current public package manifest and every declared file, verify every packed size/hash and unpacked size/hash, reassert the exact `bin/client` fence, and never execute downloaded Tibia package content during acquisition.
 
-# Mutation and credential boundary
+The acquisition root is task/run-owned. The legacy package path used by the already-reviewed runtime helper may only be a temporary symlink to that exact task-owned materialization and is removed by an ownership-checked cleanup step. The preflight WARP process is stopped before the runtime helper starts its separately owned login WARP process.
 
-The live physical-action budget is exactly one logical account-login form submission. No relog or restart is authorized. Character selection, character activation, world entry and gameplay are explicitly forbidden.
+# Preserved runtime observer boundary
 
-The observer is GDB-as-parent, never attach. ASLR remains enabled, the exact child PIE is resolved after `exec`, and the one breakpoint at `PIE + 0xe25620` retains only `uint32(edx)`. It may not retain stack bytes, packet payloads, credentials, process environment, unrelated registers, raw memory or unrelated process state.
+The merged runtime observer remains unchanged in purpose and authority:
 
-The protected-step credential environment is scrubbed before any helper preflight child process: the task-owned wrapper removes the export attribute from `TIBIA_TEST_EMAIL` and `TIBIA_TEST_PASSWORD`, proves those names are absent from `env`, and only then sources the helper in the same shell. The values remain non-exported shell variables solely until the one login-form submit.
+- GDB is the parent of the exact official client, never an attaching debugger;
+- ASLR remains enabled;
+- the exact child PIE is resolved after `exec`;
+- the single breakpoint is `PIE + 0xe25620`;
+- only `uint32(edx)` is retained;
+- no stack bytes, packet payloads, credentials, process environment, unrelated registers, raw memory, character selection or gameplay may be retained or performed.
 
-The admitted outcome must preserve:
+The protected credential wrapper remains the only path that may receive login secrets after a future live admission. It removes the export attribute from the two login variables and proves they are absent from child-process environments before any runtime preflight child is launched.
 
-```text
-login_submit_count=1
-character_selection_performed=false
-world_entry_performed=false
-gameplay_performed=false
-network_payload_capture_performed=false
-```
+# V2 execution gate
 
-# Execution trigger
-
-This live admission PR itself MUST NOT start the official client. After this admission is reviewed, GREEN and merged to trusted `main`, live execution still requires a new top-level owner comment on merged PR #758 whose body is exactly:
+PR #764 may encode the next exact trigger string:
 
 ```text
-AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V1 once=true
+AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V2 once=true
 ```
 
-The workflow accepts only that exact repository-owner comment, consumes its GitHub comment id once in task-owned persistent authorization state, checks out fresh `main`, revalidates this live task state and repository governance, then performs at most the one admitted login submit. Replaying the same comment id is refused.
+That string in workflow code is not an authorization by itself. While this task remains `runtime_access: none`, the trusted-main live-admission step must fail closed before package acquisition, authorization consumption, client start, or login.
+
+After PR #764 is independently reviewed, GREEN and merged onto fresh trusted `main`, a separate docs-only live-admission transition is required. It must explicitly cite the V1 pre-action failure and `physical_action_count: 0`, restore only the bounded `ephemeral_isolated` one-login authority, and bind a new owner authorization source to V2. Only after that admission is merged may a new distinct repository-owner trigger comment be posted.
 
 # Completion
 
-This task is complete only when one admitted trusted-main run produces a sanitized scalar-only artifact with `FIELD6_VALUE_PROVEN=true`, that evidence is independently reviewed/promoted, and the value is consumed by Track B without guessing. Until then, `FIELD6_VALUE=UNKNOWN` remains authoritative.
+This task is complete only when one separately admitted trusted-main V2 run produces a sanitized scalar-only artifact with `FIELD6_VALUE_PROVEN=true`, that evidence is independently reviewed/promoted, and the proven scalar is consumed by Track B without guessing. Until then, `FIELD6_VALUE=UNKNOWN` remains authoritative.

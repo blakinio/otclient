@@ -191,26 +191,29 @@ jobs:
           PY
 
       - name: Re-prove global unique exact target
+        id: current_target
         shell: bash
         env:
-          CONTAINER: ${{ steps.target.outputs.container }}
-          CONTAINER_NAME: ${{ steps.target.outputs.container_name }}
-          TARGET_PID: ${{ steps.target.outputs.pid }}
-          TARGET_START: ${{ steps.target.outputs.start_ticks }}
+          REGISTERED_CONTAINER: ${{ steps.target.outputs.container }}
+          REGISTERED_CONTAINER_NAME: ${{ steps.target.outputs.container_name }}
+          REGISTERED_PID: ${{ steps.target.outputs.pid }}
+          REGISTERED_START: ${{ steps.target.outputs.start_ticks }}
         run: |
           set -Eeuo pipefail
-          test -n "$CONTAINER"
-          test -n "$CONTAINER_NAME"
-          test -n "$TARGET_PID"
-          test -n "$TARGET_START"
-          docker inspect -f '{{.State.Running}}' "$CONTAINER" | grep -Fx true >/dev/null
-          actual_name="$(docker inspect -f '{{.Name}}' "$CONTAINER" | sed 's#^/##')"
-          test "$actual_name" = "$CONTAINER_NAME"
+          test -n "$REGISTERED_CONTAINER"
+          test -n "$REGISTERED_CONTAINER_NAME"
+          test -n "$REGISTERED_PID"
+          test -n "$REGISTERED_START"
+          docker inspect -f '{{.State.Running}}' "$REGISTERED_CONTAINER" | grep -Fx true >/dev/null
+          actual_name="$(docker inspect -f '{{.Name}}' "$REGISTERED_CONTAINER" | sed 's#^/##')"
+          test "$actual_name" = "$REGISTERED_CONTAINER_NAME"
 
           mapfile -t INVENTORY_CONTAINERS < <(docker ps --no-trunc --format '{{.ID}}')
           test "${#INVENTORY_CONTAINERS[@]}" -ge 1
           candidate_count=0
-          matched=0
+          current_container=''
+          current_pid=''
+          current_start=''
           for cid in "${INVENTORY_CONTAINERS[@]}"; do
             tmp="$(mktemp)"
             if ! docker exec "$cid" sh -lc '
@@ -254,13 +257,31 @@ jobs:
                 exit 2
               fi
               candidate_count=$((candidate_count + 1))
-              if [ "$cid" = "$CONTAINER" ] && [ "$pid" = "$TARGET_PID" ] && [ "$start" = "$TARGET_START" ]; then
-                matched=$((matched + 1))
-              fi
+              current_container="$cid"
+              current_pid="$pid"
+              current_start="$start"
             done
           done
           test "$candidate_count" -eq 1 || { echo "OFFICIAL_CLIENT_CANDIDATE_COUNT=$candidate_count" >&2; exit 2; }
-          test "$matched" -eq 1 || { echo REGISTERED_TARGET_NOT_CURRENT_UNIQUE_CANDIDATE >&2; exit 2; }
+          test "$current_container" = "$REGISTERED_CONTAINER" || {
+            echo CURRENT_UNIQUE_CANDIDATE_NOT_CANONICAL_CONTAINER >&2
+            exit 2
+          }
+          if [ "$current_pid" = "$REGISTERED_PID" ] && [ "$current_start" = "$REGISTERED_START" ]; then
+            echo READ_ONLY_CURRENT_TARGET_IDENTITY=REGISTERED_CURRENT
+          else
+            test "$current_start" -gt "$REGISTERED_START" || {
+              echo READ_ONLY_CURRENT_TARGET_NOT_NEWER_THAN_REGISTRATION >&2
+              exit 2
+            }
+            echo READ_ONLY_CURRENT_TARGET_REFRESH=PASS
+          fi
+          {
+            echo "container=$current_container"
+            echo "container_name=$REGISTERED_CONTAINER_NAME"
+            echo "pid=$current_pid"
+            echo "start_ticks=$current_start"
+          } >> "$GITHUB_OUTPUT"
           echo OFFICIAL_CLIENT_CANDIDATE_COUNT=1
           echo TARGET_PROCESS_UNIQUENESS=PROVEN
 
@@ -268,8 +289,8 @@ jobs:
         id: admission
         shell: bash
         env:
-          TARGET_PID: ${{ steps.target.outputs.pid }}
-          TARGET_START: ${{ steps.target.outputs.start_ticks }}
+          TARGET_PID: ${{ steps.current_target.outputs.pid }}
+          TARGET_START: ${{ steps.current_target.outputs.start_ticks }}
         run: |
           set -Eeuo pipefail
           admission="$RUNNER_TEMP/game-window-state-readonly-admission.json"
@@ -334,8 +355,9 @@ jobs:
         shell: bash
         env:
           ADMISSION: ${{ steps.admission.outputs.path }}
-          TARGET_PID: ${{ steps.target.outputs.pid }}
-          TARGET_START: ${{ steps.target.outputs.start_ticks }}
+          CONTAINER: ${{ steps.current_target.outputs.container }}
+          TARGET_PID: ${{ steps.current_target.outputs.pid }}
+          TARGET_START: ${{ steps.current_target.outputs.start_ticks }}
         run: |
           set -Eeuo pipefail
           python3 - "$ADMISSION" "$TASK_ID" "$RUNTIME_NAMESPACE" "$EXPECTED_VERSION" "$EXPECTED_SIZE" "$EXPECTED_SHA" "$TARGET_PID" "$TARGET_START" "$(git rev-parse HEAD)" <<'PY'
@@ -359,6 +381,15 @@ jobs:
               raise SystemExit('READ_ONLY_ADMISSION_REVALIDATION_FAILED')
           print('READ_ONLY_ADMISSION_REVALIDATION=PASS')
           PY
+          test "$(git rev-parse HEAD)" = "$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          docker inspect -f '{{.State.Running}}' "$CONTAINER" | grep -Fx true >/dev/null
+          actual_start="$(docker exec "$CONTAINER" sh -lc "awk '{print \$22}' /proc/$TARGET_PID/stat")"
+          test "$actual_start" = "$TARGET_START"
+          actual_size="$(docker exec "$CONTAINER" stat -Lc %s "/proc/$TARGET_PID/exe")"
+          test "$actual_size" = "$EXPECTED_SIZE"
+          actual_sha="$(docker exec "$CONTAINER" sha256sum "/proc/$TARGET_PID/exe" | awk '{print $1}')"
+          test "$actual_sha" = "$EXPECTED_SHA"
+          echo READ_ONLY_TARGET_RUNTIME_REVALIDATION=PASS
 
       - name: Report memory-free logger readiness preflight
         if: github.event.comment.body == 'PREFLIGHT_GAME_WINDOW_STATE_QUALIFICATION'
@@ -403,9 +434,9 @@ jobs:
         if: github.event.comment.body == 'START_GAME_WINDOW_STATE_QUALIFICATION'
         shell: bash
         env:
-          CONTAINER: ${{ steps.target.outputs.container }}
-          TARGET_PID: ${{ steps.target.outputs.pid }}
-          TARGET_START: ${{ steps.target.outputs.start_ticks }}
+          CONTAINER: ${{ steps.current_target.outputs.container }}
+          TARGET_PID: ${{ steps.current_target.outputs.pid }}
+          TARGET_START: ${{ steps.current_target.outputs.start_ticks }}
           BUNDLE: ${{ steps.bundle.outputs.path }}
         run: |
           set -Eeuo pipefail

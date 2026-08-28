@@ -7,10 +7,10 @@ project_lane: otclient
 lane: RUNTIME_RESEARCH
 track_id: official-client-re
 task_kind: reverse_engineering_runtime
-phase: blocked_fail_closed_current_target_mismatch
-branch: docs/OTC-20260828-game-window-state-current-target-blocker
+phase: implementation_readonly_current_target_refresh
+branch: fix/OTC-20260828-game-window-readonly-current-target
 base_branch: main
-base_main: 1d9e69ba1afb369dbef911771d240a9633ff6798
+base_main: b61f70e73575582d10af3789d2cfb7cb01087b6d
 created: 2026-08-28T16:20:00+02:00
 risk: high
 execution_class: github_hosted
@@ -108,11 +108,11 @@ The trusted-main live workflow must fail closed unless all of the following are 
 - this repository task checkpoint still declares `runtime_access: none`, no runtime owner/namespace/target claim, `mutation_authorized: false`, and all canonical control gates `NOT_APPLICABLE`;
 - the authoritative canonical registration is present, exact-fenced to `15.32.75d4a0 / 52105824 / d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a`, and provides a valid Docker runtime locator plus exact PID/start identity;
 - no active canonical lease belongs to another task;
-- a fresh bounded inventory across all running Docker containers finds exactly one `client` candidate, exact-fenced to the current build, and it is exactly the registered PID/start/container;
+- a fresh bounded inventory across all running Docker containers finds exactly one `client` candidate exact-fenced to the current build, in exactly the canonical Docker container from the authoritative registration; the ephemeral read-only admission binds to the freshly observed PID/start rather than treating stale registered PID/start as read-only authority;
 - only after that proof the workflow persists and validates a secret-free runtime admission record containing `runtime_access: read_only`, this task as `runtime_owner_task`, explicit namespace `track-a-game-window-state-validation`, canonical control gates `NOT_APPLICABLE`, `target_uniqueness: PROVEN`, and `mutation_authorized: false`;
 - only after that complete admission record validates may the reader open `/proc/<pid>/mem` read-only.
 
-Any missing/ambiguous registration, ownership conflict, stale locator, stale PID/start, mismatched executable, additional candidate, unreadable candidate, or invalid emitted admission fails closed before process-memory observation.
+Any missing/ambiguous registration, ownership conflict, stale canonical container locator, candidate outside the registered canonical container, non-newer contradictory process generation, mismatched executable, additional candidate, unreadable candidate, or invalid emitted admission fails closed before process-memory observation. A stale registered PID/start alone may cause only an ephemeral read-only target refresh after singleton/exact-fence/container proof; it never rewrites canonical registration.
 
 # Runtime acceptance
 
@@ -134,7 +134,7 @@ semantic_promotion_performed=false
 
 Only after causal PASS and separate independent exact-head review may a later promotion PR change canonical `IN_GAME` semantics.
 
-# Current terminal blocker
+# Historical blocker and current bounded repair
 
 After PR #772 returned canonical recovery authority to `runtime_access: none`, a fresh owner trigger comment `5456931858` on PR #756 invoked memory-free preflight run `33204467524`, job `98961872769`, on `synology-otclient-01` at exact trusted main `1d9e69ba1afb369dbef911771d240a9633ff6798`.
 
@@ -175,3 +175,9 @@ Terminal result:
 The task remains `runtime_access: none`; the failed preflight created no reusable runtime authority that requires release.
 
 next_action: under a separate fresh canonical-live governance admission, reconcile or re-admit the authoritative registration to the exact currently unique official-client container/PID/start identity without ad-hoc metadata edits; release that temporary authority; then rerun a new `PREFLIGHT_GAME_WINDOW_STATE_QUALIFICATION`. Only a fresh READY result may engage the owner for `LOGIN_SCREEN -> CHARACTER_SELECT -> WORLD -> WORLD_EXIT`.
+
+## Repeated preflight race observed after reconciliation retry
+
+Fresh preflight runs `33209672873 / 98979530228` and `33210370254 / 98981865047` both failed memory-free with `REGISTERED_TARGET_NOT_CURRENT_UNIQUE_CANDIDATE` after proving exactly one exact-fenced candidate. Between them, guarded metadata reconciliation `33210019599 / 98980682859` passed with lease generation `43 > 42`, three stable probes, uniqueness `PROVEN`, state `UNKNOWN`, zero process-memory observation and lease release PASS. This proves the failure mode is runtime PID/start drift between separate reconciliation and preflight workflows, not an exact-fence ambiguity.
+
+The bounded repair keeps the durable canonical registration untouched and keeps repository authority at `runtime_access: none`. The read-only workflow now requires the canonical container from that registration, inventories all running containers, requires exactly one exact-fenced official client, binds only the ephemeral read-only admission to that freshly observed PID/start, and memory-free revalidates the exact process immediately before READY/observation. A candidate in any other container, any second/unverifiable candidate, any fence mismatch, or a contradictory non-newer generation still fails closed.

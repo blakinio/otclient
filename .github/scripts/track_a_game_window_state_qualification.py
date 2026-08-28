@@ -224,14 +224,14 @@ def _load_exact_executable(pid: int, expected_size: int, expected_sha256: str) -
 
 def _mapping_base(regions: Sequence[Mapping], exe: Path) -> int:
     executable_path = str(exe)
-    bases = {
+    bases = [
         region.begin - region.file_offset
         for region in regions
         if region.path == executable_path
-    }
-    if len(bases) != 1:
-        raise QualificationError(f"CLIENT_MAPPING_BASE_COUNT={len(bases)}")
-    return next(iter(bases))
+    ]
+    if not bases:
+        raise QualificationError("CLIENT_MAPPING_MISSING")
+    return min(bases)
 
 
 def _heap_bounds(regions: Sequence[Mapping]) -> tuple[int, int]:

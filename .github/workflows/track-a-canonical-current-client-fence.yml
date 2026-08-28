@@ -39,13 +39,11 @@ jobs:
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
-
       - name: Validate current canonical fence contract
         shell: bash
         run: |
           set -Eeuo pipefail
           python3 .github/scripts/test_track_a_canonical_current_client_fence.py
-
       - name: Validate canonical runtime components
         shell: bash
         run: |
@@ -57,8 +55,6 @@ jobs:
           python3 .github/scripts/test_tibia_official_client_re_canonical_live_session.py -v
           python3 .github/scripts/test_tibia_official_client_re_canonical_live_transition.py -v
           python3 .github/scripts/test_tibia_official_client_re_kasm_existing_runtime_probe.py -v
-          echo TRACK_A_CANONICAL_RUNTIME_COMPONENTS=PASS
-
       - name: Assert repository-only execution boundary
         shell: bash
         run: |
@@ -70,15 +66,14 @@ jobs:
           grep -Fq 'login_allowed: false' "$task"
           grep -Fq 'process_control_authorized: false' "$task"
           grep -Fq 'physical_action_budget: 0' "$task"
-          echo TRACK_A_CANONICAL_CURRENT_FENCE_RUNTIME_ACCESS=NONE
 
-  apply-coherent-fence-repair:
+  apply-provenance-cleanup:
     if: >-
       github.event_name == 'push' &&
       github.ref == 'refs/heads/fix/OTC-20260828-canonical-current-client-fence'
-    name: Apply one-shot repository-only fence repair
+    name: Apply exact provenance cleanup
     runs-on: ubuntu-24.04
-    timeout-minutes: 8
+    timeout-minutes: 5
     permissions:
       contents: write
     steps:
@@ -88,120 +83,42 @@ jobs:
           ref: fix/OTC-20260828-canonical-current-client-fence
           fetch-depth: 0
           persist-credentials: true
-
-      - name: Apply only asserted non-workflow current-authority replacements
+      - name: Replace only the proven stale provenance sentence
         shell: bash
         run: |
           set -Eeuo pipefail
           python3 - <<'PY'
           from pathlib import Path
-
-          NEW_VERSION = '15.32.75d4a0'
-          OLD_SIZE = '52109920'
-          NEW_SIZE = '52105824'
-          OLD_SHA = 'ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8'
-          NEW_SHA = 'd1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a'
-
-          def load(path_s: str):
-              path = Path(path_s)
-              return path, path.read_text(encoding='utf-8')
-
-          def exact(text: str, old: str, new: str, label: str, expected: int = 1) -> str:
+          old = ('The current public native-Linux package is fenced by size `52105824` and SHA-256 '
+                 '`d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a`; '
+                 '`15.32` is an embedded version-family token, not a claim of a more specific suffix.')
+          new = ('The current public native-Linux package is fenced exactly as '
+                 '`15.32.75d4a0 / 52105824 / d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a`.')
+          paths = (
+              Path('docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md'),
+              Path('docs/agents/decisions/ADR-0001-track-a-canonical-live-runtime.md'),
+              Path('docs/agents/contracts/TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md'),
+          )
+          for path in paths:
+              text = path.read_text(encoding='utf-8')
               count = text.count(old)
-              if count != expected:
-                  raise SystemExit(f'{label}: expected {expected} old occurrence(s), found {count}')
-              return text.replace(old, new)
-
-          def current_doc(path_s: str) -> None:
-              path, text = load(path_s)
-              if OLD_SHA not in text or OLD_SIZE not in text:
-                  raise SystemExit(f'{path_s}: superseded current fence not found')
-              text = text.replace('client_version: 15.32\n', f'client_version: {NEW_VERSION}\n')
-              text = text.replace('version: 15.32\n', f'version: {NEW_VERSION}\n')
-              text = text.replace(OLD_SIZE, NEW_SIZE)
-              text = text.replace(OLD_SHA, NEW_SHA)
-              if NEW_VERSION not in text or NEW_SIZE not in text or NEW_SHA not in text or OLD_SHA in text:
-                  raise SystemExit(f'{path_s}: exact fence replacement incomplete')
-              path.write_text(text, encoding='utf-8')
-
-          path, text = load('.github/scripts/tibia-official-client-re-canonical-live-session.sh')
-          text = exact(text, 'SIZE=52109920\n', 'SIZE=52105824\n', 'session worker size')
-          text = exact(text, f'SHA={OLD_SHA}\n', f'SHA={NEW_SHA}\n', 'session worker sha')
-          path.write_text(text, encoding='utf-8')
-
-          path, text = load('.github/scripts/tibia-official-client-re-canonical-live-transition.py')
-          text = exact(text, "VER = '15.32'\n", "VER = '15.32.75d4a0'\n", 'transition version')
-          text = exact(text, 'SIZE = 52109920\n', 'SIZE = 52105824\n', 'transition size')
-          text = exact(text, f"SHA = '{OLD_SHA}'\n", f"SHA = '{NEW_SHA}'\n", 'transition sha')
-          path.write_text(text, encoding='utf-8')
-
-          path, text = load('.github/scripts/tibia-official-client-re-kasm-existing-runtime-probe.py')
-          text = exact(text, 'VER = "15.32"\n', 'VER = "15.32.75d4a0"\n', 'adoption version')
-          text = exact(text, 'SIZE = 52109920\n', 'SIZE = 52105824\n', 'adoption size')
-          text = exact(text, f'SHA = "{OLD_SHA}"\n', f'SHA = "{NEW_SHA}"\n', 'adoption sha')
-          path.write_text(text, encoding='utf-8')
-
-          for path_s in (
-              'docs/agents/TIBIA_RESEARCH_TRACKS.md',
-              'docs/agents/decisions/ADR-0001-track-a-canonical-live-runtime.md',
-              'docs/agents/contracts/TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md',
-              'docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md',
-          ):
-              current_doc(path_s)
-
-          path, text = load('docs/agents/TIBIA_RESEARCH_TRACKS.md')
-          old_provenance = (
-              'The current public native-Linux package is fenced by size `52105824` and SHA-256 '
-              f'`{NEW_SHA}`; `15.32` is an embedded version-family token, not a claim of a more specific suffix.'
-          )
-          new_provenance = (
-              'The current public native-Linux package is fenced exactly as '
-              f'`{NEW_VERSION} / {NEW_SIZE} / {NEW_SHA}`.'
-          )
-          text = exact(text, old_provenance, new_provenance, 'Track A current provenance')
-          path.write_text(text, encoding='utf-8')
-
-          path, text = load('docs/agents/CHANGELOG.md')
-          marker = '## Unreleased\n'
-          if text.count(marker) != 1:
-              raise SystemExit('changelog: Unreleased marker count invalid')
-          entry = (
-              '- 2026-08-28: Track A canonical exact-client fence advances to `15.32.75d4a0` '
-              f'/ `{NEW_SIZE}` / `{NEW_SHA}` from independently promoted exact-current evidence. '
-              'The canonical session worker, transition/Gate-B controller, existing-runtime adoption probe, mandatory runtime-admission contract and normative governance are synchronized as one trusted-base identity contract. This repository-only repair grants no login, credentials, gameplay, input, process-control or semantic-promotion authority.\n'
-          )
-          if entry in text:
-              raise SystemExit('changelog: current fence entry already present')
-          path.write_text(text.replace(marker, marker + entry, 1), encoding='utf-8')
+              if count != 1:
+                  raise SystemExit(f'{path}: expected exactly one stale provenance sentence, found {count}')
+              path.write_text(text.replace(old, new), encoding='utf-8')
           PY
-
           python3 .github/scripts/test_track_a_canonical_current_client_fence.py
-          bash -n .github/scripts/tibia-official-client-re-canonical-live-session.sh
-          python3 -m py_compile \
-            .github/scripts/tibia-official-client-re-canonical-live-transition.py \
-            .github/scripts/tibia-official-client-re-kasm-existing-runtime-probe.py
-          python3 .github/scripts/test_tibia_official_client_re_canonical_live_session.py -v
-          python3 .github/scripts/test_tibia_official_client_re_canonical_live_transition.py -v
-          python3 .github/scripts/test_tibia_official_client_re_kasm_existing_runtime_probe.py -v
           git diff --check
           git diff --stat
-
-      - name: Commit non-workflow fence repair to the PR branch
+      - name: Commit provenance cleanup
         shell: bash
         run: |
           set -Eeuo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add \
-            .github/scripts/tibia-official-client-re-canonical-live-session.sh \
-            .github/scripts/tibia-official-client-re-canonical-live-transition.py \
-            .github/scripts/tibia-official-client-re-kasm-existing-runtime-probe.py \
-            docs/agents/TIBIA_RESEARCH_TRACKS.md \
-            docs/agents/decisions/ADR-0001-track-a-canonical-live-runtime.md \
-            docs/agents/contracts/TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md \
             docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md \
-            docs/agents/CHANGELOG.md
-          test -n "$(git diff --cached --name-only)"
+            docs/agents/decisions/ADR-0001-track-a-canonical-live-runtime.md \
+            docs/agents/contracts/TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md
           git diff --cached --check
-          git commit -m 'fix(track-a): advance canonical exact-client fence'
+          git commit -m 'docs(track-a): align exact-client provenance'
           git push origin HEAD:fix/OTC-20260828-canonical-current-client-fence

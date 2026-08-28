@@ -48,7 +48,13 @@ assetversion=$(curl --socks5-hostname 127.0.0.1:25344 --compressed -fsSL --conne
 printf "%s" "$assetversion" >/tmp/tibia-assetversion
 '
 
-docker exec -i -e TIBIA_TEST_EMAIL -e TIBIA_TEST_PASSWORD "$CONTAINER" python3 - <<'PY'
+clientversion=$(docker exec "$CONTAINER" python3 -c "import json; print(str(json.load(open('/lab/state/current-package/package.json', encoding='utf-8')).get('version') or ''))")
+[[ "$clientversion" =~ ^15\.32\.[0-9a-fA-F]{6}$ ]]
+echo LAB_CURRENT_LOGIN_CLIENT_VERSION_READY=true
+
+docker exec -i -e TIBIA_TEST_EMAIL -e TIBIA_TEST_PASSWORD \
+  -e TIBIA_CLIENT_VERSION_STRING="$clientversion" \
+  "$CONTAINER" python3 - <<'PY'
 import json, os
 import platform
 from pathlib import Path
@@ -69,7 +75,7 @@ payload = {
     "password": os.environ["TIBIA_TEST_PASSWORD"],
     "stayloggedin": True,
     "type": "login",
-    "clientversion": "15.32.bf29ac",
+    "clientversion": os.environ["TIBIA_CLIENT_VERSION_STRING"],
     "clienttype": 2,
     "assetversion": assetversion,
     "operatingsystem": qsysinfo_pretty_product_name(),

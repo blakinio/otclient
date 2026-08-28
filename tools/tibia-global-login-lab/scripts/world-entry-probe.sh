@@ -12,7 +12,6 @@ STATE_VOLUME=otclient-tibia-global-login-state
 RUNTIME_VOLUME=otclient-tibia-global-login-runtime
 IMAGE=otclient-tibia-global-login-lab-runtime:local
 TASK=OTC-20260813-tibia-global-login-lab
-CLIENT_VERSION_STRING=15.32.bf29ac
 
 docker volume inspect "$STATE_VOLUME" >/dev/null
 docker image inspect "$IMAGE" >/dev/null
@@ -52,6 +51,9 @@ asset_count=$(docker exec "$CONTAINER" bash -lc 'find /lab/state/things/1532 -ma
 docker exec "$CONTAINER" bash -lc 'test -s /lab/state/things/1532/catalog-content.json; rm -rf /otclient/data/things/1532; mkdir -p /otclient/data/things/1532; cp -a /lab/state/things/1532/. /otclient/data/things/1532/'
 ASSET_VERSION=$(docker exec "$CONTAINER" bash -lc "awk 'NR==1{print \$1}' /lab/state/things/1532/assets.json.sha256")
 [[ "$ASSET_VERSION" =~ ^[0-9a-fA-F]{64}$ ]]
+CLIENT_VERSION_STRING=$(docker exec "$CONTAINER" python3 -c "import json; print(str(json.load(open('/lab/state/current-package/package.json', encoding='utf-8')).get('version') or ''))")
+[[ "$CLIENT_VERSION_STRING" =~ ^15\.32\.[0-9a-fA-F]{6}$ ]]
+echo LAB_CURRENT_LOGIN_CLIENT_VERSION_READY=true
 printf '%s' "$ASSET_VERSION" | docker exec -i "$CONTAINER" sh -c 'cat > /otclient/data/things/1532/assets.json.sha256'
 echo LAB_REUSED_VERIFIED_ASSETS=true
 echo LAB_ASSET_VERSION_READY=true

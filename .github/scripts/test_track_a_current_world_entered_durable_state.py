@@ -342,5 +342,23 @@ class GlobalQStringInitializerLiteralTests(unittest.TestCase):
         self.assertEqual([], module.extract_global_qstring_initializer_literals(xrefs))
 
 
+class NearbyLiteralCandidateTests(unittest.TestCase):
+    def test_finds_printable_candidate_at_small_positive_offset(self):
+        raw = bytearray(0x400)
+        sections = [(0x1000, 0x100, 0x300, 2)]
+        raw[0x183:0x183 + 11] = b"GameScreen\x00"
+        result = module.scan_nearby_static_literal_candidates(bytes(raw), sections, 0x1080, radius=16)
+        values = {(item["offset"], item["encoding"], item["value"]) for item in result}
+        self.assertIn((3, "utf-8", "GameScreen"), values)
+
+    def test_deduplicates_overlapping_candidates(self):
+        raw = bytearray(0x400)
+        sections = [(0x1000, 0x100, 0x300, 2)]
+        raw[0x180:0x180 + 6] = b"Game\x00"
+        result = module.scan_nearby_static_literal_candidates(bytes(raw), sections, 0x1080, radius=2)
+        matches = [item for item in result if item["value"] == "Game"]
+        self.assertEqual(1, len(matches))
+
+
 if __name__ == "__main__":
     unittest.main()

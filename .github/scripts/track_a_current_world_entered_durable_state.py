@@ -393,10 +393,18 @@ def main(argv: list[str]) -> int:
             item = dict(call)
             try:
                 item["literal_candidates"] = decode_bounded_static_literal_candidates(raw, sections, int(call["literal_va"]))
-                item["decode_state"] = "CANDIDATES_AVAILABLE" if item["literal_candidates"] else "NO_PRINTABLE_CANDIDATE"
+                item["literal_nearby_candidates"] = scan_nearby_static_literal_candidates(
+                    raw, sections, int(call["literal_va"]), radius=32
+                )[:16]
+                item["decode_state"] = "CANDIDATES_AVAILABLE" if (item["literal_candidates"] or item["literal_nearby_candidates"]) else "NO_PRINTABLE_CANDIDATE"
             except DurableStateError as exc:
                 item["decode_state"] = "NOT_PROVEN"
                 item["decode_reason"] = str(exc)
+            helper_target = int(call["helper_target_va"])
+            try:
+                item["initializer_helper_trace"] = extract_bounded_case_trace(raw, sections, helper_target)
+            except DurableStateError as exc:
+                item["initializer_helper_trace"] = {"state": "NOT_PROVEN", "reason": str(exc)}
             decoded_literal_calls.append(item)
         game_window_state_initializer_xrefs[f"0x{target:x}"] = {
             "source_va": target,
@@ -1107,6 +1115,34 @@ def decode_bounded_static_literal_candidates(raw: bytes, sections, literal_va: i
             candidates.append({"encoding": "utf-16-le", "length": len(value), "value": value})
     unique = {(item["encoding"], item["value"]): item for item in candidates}
     return sorted(unique.values(), key=lambda item: (-int(item["length"]), str(item["encoding"])))
+
+
+def scan_nearby_static_literal_candidates(raw: bytes, sections, literal_va: int, *, radius: int = 32) -> list[dict[str, object]]:
+    if radius < 0 or radius > 64:
+        raise DurableStateError(f"NEARBY_LITERAL_RADIUS_OUT_OF_BOUNDS:{radius}")
+    by_value: dict[tuple[str, str], dict[str, object]] = {}
+    for relative in range(-radius, radius + 1):
+        candidate_va = literal_va + relative
+        try:
+            decoded = decode_bounded_static_literal_candidates(raw, sections, candidate_va)
+        except DurableStateError:
+            continue
+        for item in decoded:
+            value = str(item["value"])
+            if len(value) < 2:
+                continue
+            record = {
+                "offset": relative,
+                "literal_va": candidate_va,
+                "encoding": str(item["encoding"]),
+                "length": int(item["length"]),
+                "value": value,
+            }
+            key = (record["encoding"], record["value"])
+            previous = by_value.get(key)
+            if previous is None or (abs(relative), relative) < (abs(int(previous["offset"])), int(previous["offset"])):
+                by_value[key] = record
+    return sorted(by_value.values(), key=lambda item: (abs(int(item["offset"])), int(item["offset"]), -int(item["length"]), str(item["encoding"]), str(item["value"])))
 
 
 if __name__ == "__main__":

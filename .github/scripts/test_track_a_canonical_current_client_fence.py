@@ -20,6 +20,7 @@ ADOPTION = ROOT / '.github/scripts/tibia-official-client-re-kasm-existing-runtim
 TRACKS = ROOT / 'docs/agents/TIBIA_RESEARCH_TRACKS.md'
 ADR = ROOT / 'docs/agents/decisions/ADR-0001-track-a-canonical-live-runtime.md'
 BOOTSTRAP = ROOT / 'docs/agents/contracts/TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md'
+RUNTIME_ADMISSION = ROOT / 'docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md'
 GOVERNANCE = ROOT / '.github/workflows/track-a-canonical-live-governance.yml'
 CHANGELOG = ROOT / 'docs/agents/CHANGELOG.md'
 
@@ -41,6 +42,13 @@ def assert_python_constants(text: str, label: str) -> None:
         assert actual == value.replace('_', ''), f'{label}: {actual} != {value}'
 
 
+def assert_current_governance_fence(text: str, label: str) -> None:
+    assert CURRENT_VERSION in text, f'{label}: current build version missing'
+    assert str(CURRENT_SIZE) in text, f'{label}: current client size missing'
+    assert CURRENT_SHA in text, f'{label}: current client SHA missing'
+    assert SUPERSEDED_SHA not in text, f'{label}: superseded SHA still authoritative'
+
+
 def main() -> None:
     promoted = json.loads(read(PROMOTION))
     exact = promoted['exact_client']
@@ -48,6 +56,10 @@ def main() -> None:
     assert exact['size'] == CURRENT_SIZE
     assert exact['sha256'] == CURRENT_SHA
     assert promoted['decision'] == 'PASS_BOUNDED_STATIC_VALUE_STILL_UNKNOWN'
+
+    # The mandatory admission contract is checked first so a stale admission fence
+    # cannot be hidden by a different stale canonical-live consumer.
+    assert_current_governance_fence(read(RUNTIME_ADMISSION), 'runtime admission contract')
 
     worker = read(WORKER)
     assert re.search(rf'^SIZE={CURRENT_SIZE}$', worker, flags=re.MULTILINE), 'canonical session worker: stale client size'
@@ -62,11 +74,7 @@ def main() -> None:
         ('canonical runtime ADR', ADR),
         ('canonical bootstrap contract', BOOTSTRAP),
     ):
-        text = read(path)
-        assert CURRENT_VERSION in text, f'{label}: current build version missing'
-        assert str(CURRENT_SIZE) in text, f'{label}: current client size missing'
-        assert CURRENT_SHA in text, f'{label}: current client SHA missing'
-        assert SUPERSEDED_SHA not in text, f'{label}: superseded SHA still authoritative'
+        assert_current_governance_fence(read(path), label)
 
     governance = read(GOVERNANCE)
     assert f"fence = '{CURRENT_SHA}'" in governance, 'canonical-live governance: stale exact-fence audit'

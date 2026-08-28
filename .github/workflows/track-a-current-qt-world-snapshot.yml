@@ -1,0 +1,156 @@
+name: Track A current Qt world snapshot
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/track-a-current-qt-world-snapshot.yml"
+      - ".github/scripts/track_a_current_qt_world_snapshot.py"
+      - ".github/scripts/test_track_a_current_qt_world_snapshot_contract.py"
+      - "docs/agents/tasks/active/OTC-20260828-current-qt-world-correlation.md"
+
+permissions:
+  contents: read
+
+env:
+  CONTAINER: otclient-track-a-kasmvnc
+  DISPLAY_NAME: ':1'
+  EXPECTED_SIZE: '52105824'
+  EXPECTED_SHA: d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a
+  CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime
+  TASK_ID: OTC-20260828-current-qt-world-correlation
+
+jobs:
+  contract:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      - name: Validate snapshot contract
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 -m py_compile .github/scripts/track_a_current_qt_world_snapshot.py
+          python3 .github/scripts/test_track_a_current_qt_world_snapshot_contract.py
+
+  snapshot:
+    if: >-
+      github.event_name == 'issue_comment' &&
+      github.actor == 'blakinio' &&
+      github.event.issue.pull_request &&
+      github.event.comment.body == 'ONE_SHOT_QT_WORLD_SNAPSHOT'
+    runs-on: [otclient, synology]
+    timeout-minutes: 6
+    steps:
+      - name: Validate read-only authority
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          echo TRACK_A_QT_WORLD_SNAPSHOT_AUTHORIZATION=PASS
+          echo AGENT_GUI_INPUT=false
+          echo AGENT_LOGIN=false
+          echo AGENT_CHARACTER_SELECTION=false
+          echo GAMEPLAY_ACTIONS=false
+          echo PROCESS_CONTROL=false
+          echo CREDENTIAL_ACCESS=false
+          echo PACKET_PAYLOAD_CAPTURE=false
+          echo RAW_WINDOW_TITLE_RETENTION=false
+
+      - name: Checkout exact trusted main
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+          ref: main
+
+      - name: Prove released control plane and exact current target
+        id: target
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$(git rev-parse HEAD)" = "$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          python3 - "$CANONICAL_STATE" "$TASK_ID" <<'PY'
+          import json, pathlib, sys, time
+          root=pathlib.Path(sys.argv[1]); task=sys.argv[2]; now=int(time.time())
+          def load(name):
+              p=root/name
+              if not p.is_file(): return None
+              d=json.loads(p.read_text(encoding='utf-8'))
+              if not isinstance(d,dict): raise SystemExit(name+'_NOT_OBJECT')
+              return d
+          reg=load('runtime-registration.json'); lease=load('lease.json')
+          if reg is None: raise SystemExit('REGISTRATION_ABSENT')
+          if lease is not None and lease.get('status')=='active' and isinstance(lease.get('expires_at'),(int,float)) and int(lease['expires_at'])>now:
+              if lease.get('controller_task') != task: raise SystemExit('ACTIVE_RUNTIME_OWNER_CONFLICT')
+          print('CONTROL_PLANE_PREFLIGHT=PASS')
+          print('REGISTRATION_GENERATION='+str(reg.get('registration_generation','UNKNOWN')))
+          print('CANONICAL_LEASE_GENERATION='+str((lease or {}).get('generation','UNKNOWN')))
+          PY
+          docker inspect -f '{{.State.Running}}' "$CONTAINER" | grep -Fx true >/dev/null
+          mapfile -t pids < <(docker exec "$CONTAINER" pgrep -x client)
+          test "${#pids[@]}" -eq 1
+          pid="${pids[0]}"
+          test "$(docker exec "$CONTAINER" stat -Lc %s "/proc/$pid/exe")" = "$EXPECTED_SIZE"
+          test "$(docker exec "$CONTAINER" sha256sum "/proc/$pid/exe" | awk '{print $1}')" = "$EXPECTED_SHA"
+          start="$(docker exec -i "$CONTAINER" python3 - "$pid" <<'PY'
+          import pathlib,sys
+          raw=pathlib.Path('/proc/'+sys.argv[1]+'/stat').read_text(encoding='ascii')
+          print(raw[raw.rfind(')')+2:].split()[19])
+          PY
+          )"
+          [[ "$start" =~ ^[0-9]+$ ]]
+          matching=0
+          while IFS= read -r xid; do
+            [[ "$xid" =~ ^[0-9]+$ ]] || continue
+            owner="$(docker exec -u kasm-user -e DISPLAY="$DISPLAY_NAME" "$CONTAINER" xprop -id "$xid" _NET_WM_PID 2>/dev/null | sed -nE 's/.*= *([0-9]+).*/\1/p')"
+            [[ "$owner" == "$pid" ]] && matching=$((matching+1))
+          done < <(docker exec -u kasm-user -e DISPLAY="$DISPLAY_NAME" "$CONTAINER" xdotool search --onlyvisible --name '^Tibia' 2>/dev/null || true)
+          test "$matching" -eq 1
+          echo "pid=$pid" >> "$GITHUB_OUTPUT"
+          echo "start=$start" >> "$GITHUB_OUTPUT"
+          echo TARGET_UNIQUENESS=PROVEN
+          echo TARGET_PID="$pid"
+          echo TARGET_START_TICKS="$start"
+
+      - name: Capture bounded Qt lifecycle snapshot
+        shell: bash
+        env:
+          TARGET_PID: ${{ steps.target.outputs.pid }}
+          TARGET_START: ${{ steps.target.outputs.start }}
+        run: |
+          set -Eeuo pipefail
+          out="$RUNNER_TEMP/current-qt-world-snapshot.json"
+          docker exec -i "$CONTAINER" python3 - "$TARGET_PID" "$TARGET_START" "$EXPECTED_SIZE" "$EXPECTED_SHA" \
+            < .github/scripts/track_a_current_qt_world_snapshot.py > "$out"
+          python3 - "$out" <<'PY'
+          import json,sys
+          d=json.load(open(sys.argv[1],encoding='utf-8'))
+          assert d['schema']=='otclient.track-a.current-qt-world-snapshot.v1'
+          assert d['in_game_claimed'] is False
+          assert d['semantic_promotion_performed'] is False
+          assert d['process_memory_access']=='read_only'
+          for key in ('raw_window_title_retained','credentials_retained','session_secrets_retained','packet_payloads_retained','process_environment_retained'):
+              assert d[key] is False, key
+          print('QT_WORLD_SNAPSHOT=PASS')
+          print('AUTH_MEMBER_OFFSET='+hex(d['auth_relation']['member_offset']))
+          print('AUTH_QSTATE_RAW='+str(d['auth_relation']['auth_qstate_raw']))
+          print('AUTH_QSTATE_RUNNING='+str(d['auth_relation']['authentication_state_machine_running']).lower())
+          for key in ('player_protocol_handler','gameserver_game_session','worldmap_protocol_handler','disconnect_reaction_controller'):
+              item=d['resolved_types'].get(key,{})
+              print(key.upper()+'_COUNT='+str(item.get('heap_vptr_hit_count','UNRESOLVED')))
+          print('IN_GAME_CLAIMED=false')
+          PY
+
+      - name: Upload secret-free Qt snapshot
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: track-a-current-qt-world-snapshot-${{ github.run_id }}
+          path: ${{ runner.temp }}/current-qt-world-snapshot.json
+          if-no-files-found: warn
+          retention-days: 3

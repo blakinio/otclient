@@ -1,4 +1,4 @@
-name: Track A capture updated Tibia client visual proof
+name: Track A observe character selection to world
 on:
   push:
     branches: [research/OTC-20260827-kasm-endpoint-inventory]
@@ -6,29 +6,94 @@ on:
 permissions:
   contents: read
 jobs:
-  capture:
+  observe:
     if: github.actor == 'blakinio'
     runs-on: [otclient, synology]
     timeout-minutes: 5
     steps:
-      - name: Verify and capture visible updated client
+      - name: Arm read-only current-client observer
+        id: arm
         shell: bash
         run: |
           set -Eeuo pipefail
           c=otclient-track-a-kasmvnc
-          docker inspect -f '{{.State.Running}}' "$c" | grep -Fx true
-          client="$(docker exec "$c" pgrep -a -x client 2>/dev/null || true)"
-          [ -n "$client" ] || { echo CLIENT_MISSING=true; exit 1; }
-          windows="$(docker exec -u kasm-user -e DISPLAY=:1 "$c" sh -lc "xwininfo -root -tree 2>/dev/null | grep -E '\"Tibia' | grep -v 'Qt Selection Owner' | grep -v ' 1x1+' || true")"
-          echo "$client"
-          echo "$windows"
-          echo "$windows" | grep -Eq '[[:space:]][8-9][0-9]{2,}x[5-9][0-9]{2,}|[[:space:]][1-9][0-9]{3,}x[6-9][0-9]{2,}' || { echo LARGE_CLIENT_WINDOW_MISSING=true; exit 1; }
-          docker exec -u kasm-user -e DISPLAY=:1 "$c" xwd -root -silent -out /tmp/tibia-final-visible.xwd
-          docker cp "$c:/tmp/tibia-final-visible.xwd" "$RUNNER_TEMP/tibia-final-visible.xwd"
-          echo VISUAL_PROOF_CAPTURED=true
+          docker inspect -f '{{.State.Running}}' "$c" | grep -Fx true >/dev/null
+          docker exec -u kasm-user -e DISPLAY=:1 "$c" xdpyinfo >/dev/null
+          mapfile -t pids < <(docker exec "$c" pgrep -x client)
+          test "${#pids[@]}" -eq 1
+          pid="${pids[0]}"
+          start="$(docker exec "$c" sh -lc "awk '{print \$22}' /proc/$pid/stat")"
+          exe="$(docker exec "$c" readlink -f "/proc/$pid/exe")"
+          size="$(docker exec "$c" stat -Lc %s "/proc/$pid/exe")"
+          sha="$(docker exec "$c" sha256sum "/proc/$pid/exe" | awk '{print $1}')"
+          visible="$(docker exec -u kasm-user -e DISPLAY=:1 "$c" sh -lc "xdotool search --onlyvisible --name '^Tibia' 2>/dev/null | wc -l")"
+          test "$visible" -ge 1
+          echo "pid=$pid" >> "$GITHUB_OUTPUT"
+          echo "start=$start" >> "$GITHUB_OUTPUT"
+          echo CURRENT_CLIENT_EXE="$exe"
+          echo CURRENT_CLIENT_SIZE="$size"
+          echo CURRENT_CLIENT_SHA256="$sha"
+          echo CURRENT_CLIENT_PID="$pid"
+          echo CURRENT_CLIENT_START_TICKS="$start"
+          echo LOGGER_READY=true
+      - name: Observe character-selection to IN_GAME read-only
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          c=otclient-track-a-kasmvnc
+          out="$RUNNER_TEMP/character-to-world.jsonl"
+          : > "$out"
+          end=$(( $(date +%s) + 180 ))
+          last=''
+          while (( $(date +%s) < end )); do
+            pids="$(docker exec "$c" pgrep -x client 2>/dev/null || true)"
+            count="$(printf '%s\n' "$pids" | sed '/^$/d' | wc -l | tr -d ' ')"
+            pid=''; start=''; sha=''; tcp=-1
+            if [ "$count" = 1 ]; then
+              pid="$pids"
+              start="$(docker exec "$c" sh -lc "awk '{print \$22}' /proc/$pid/stat" 2>/dev/null || true)"
+              sha="$(docker exec "$c" sha256sum "/proc/$pid/exe" 2>/dev/null | awk '{print $1}' || true)"
+              tcp="$(docker exec "$c" python3 - "$pid" <<'PY'
+import os,pathlib,sys
+pid=sys.argv[1]; ins=set()
+try:
+ for fd in pathlib.Path('/proc',pid,'fd').iterdir():
+  try:t=os.readlink(fd)
+  except OSError:continue
+  if t.startswith('socket:['):ins.add(t[8:-1])
+except OSError: pass
+n=0
+for name in ('tcp','tcp6'):
+ try: rows=pathlib.Path('/proc',pid,'net',name).read_text().splitlines()[1:]
+ except OSError: continue
+ for r in rows:
+  c=r.split()
+  if len(c)>9 and c[9] in ins and c[3]=='01': n+=1
+print(n)
+PY
+              )"
+            fi
+            title_context=false
+            titles="$(docker exec -u kasm-user -e DISPLAY=:1 "$c" sh -lc "for x in \$(xdotool search --onlyvisible --name '^Tibia' 2>/dev/null); do xdotool getwindowname \$x 2>/dev/null || true; done" || true)"
+            printf '%s\n' "$titles" | grep -q '^Tibia - ' && title_context=true || true
+            state="$count|$pid|$start|$sha|$tcp|$title_context"
+            if [ "$state" != "$last" ]; then
+              python3 - "$out" "$count" "$pid" "$start" "$sha" "$tcp" "$title_context" <<'PY'
+import json,sys,time
+p=sys.argv[1]
+d={'epoch_ms':time.time_ns()//1_000_000,'client_count':int(sys.argv[2]),'pid':sys.argv[3] or None,'start_ticks':sys.argv[4] or None,'client_sha256':sys.argv[5] or None,'tcp_established':int(sys.argv[6]),'character_window_context':sys.argv[7]=='true','credentials_retained':False,'packet_payloads_retained':False,'raw_window_titles_retained':False}
+with open(p,'a',encoding='utf-8') as f:f.write(json.dumps(d,sort_keys=True)+'\n')
+print(json.dumps(d,sort_keys=True),flush=True)
+PY
+              last="$state"
+            fi
+            sleep .25
+          done
+          echo OBSERVER_DONE=true
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: tibia-final-visible-xwd
-          path: ${{ runner.temp }}/tibia-final-visible.xwd
-          if-no-files-found: error
+          name: character-to-world-${{ github.run_id }}
+          path: ${{ runner.temp }}/character-to-world.jsonl
+          if-no-files-found: warn
+          retention-days: 3

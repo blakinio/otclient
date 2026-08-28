@@ -385,7 +385,9 @@ def main(argv: list[str]) -> int:
             item["decode_reason"] = str(exc)
         game_window_state_assignment_sources.append(item)
     source_targets = {int(item["source_va"]) for item in game_window_state_assignment_sources}
-    raw_initializer_xrefs = scan_rip_target_xrefs(raw, sections, source_targets) if source_targets else {}
+    raw_initializer_xrefs = scan_rip_target_xrefs(
+        raw, sections, source_targets, pre_count=16, post_count=32
+    ) if source_targets else {}
     game_window_state_initializer_xrefs: dict[str, object] = {}
     for target in sorted(source_targets):
         xrefs = raw_initializer_xrefs.get(target, [])
@@ -1065,9 +1067,11 @@ def extract_global_qstring_initializer_literals(xrefs: list[dict[str, object]]) 
             continue
         literal_va = None
         destination_bound = False
-        for item in context[ref_index + 1:ref_index + 10]:
+        for item in context[ref_index + 1:ref_index + 25]:
             mnemonic = str(item.get("mnemonic", ""))
             op_str = str(item.get("op_str", ""))
+            if mnemonic in ("ret", "jmp"):
+                break
             compact = op_str.replace(" ", "")
             if mnemonic == "lea" and compact.startswith("rsi,[rip"):
                 disp = _parse_hex_displacement(op_str.split(",", 1)[1], "rip")

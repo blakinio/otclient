@@ -424,5 +424,23 @@ class BoundedCStringLiteralTests(unittest.TestCase):
             module.decode_bounded_c_string_literal(bytes(raw), sections, 0x1080, max_bytes=16)
 
 
+class ExtendedInitializerFollowTests(unittest.TestCase):
+    def test_follows_bounded_initializer_after_longer_prologue(self):
+        context = [
+            {"address": 0x2000, "size": 7, "mnemonic": "lea", "op_str": "rbp, [rip + 0xf9]"},
+        ]
+        for index in range(11):
+            context.append({"address": 0x2007 + index, "size": 1, "mnemonic": "nop", "op_str": ""})
+        context.extend([
+            {"address": 0x2012, "size": 7, "mnemonic": "lea", "op_str": "rsi, [rip + 0x1e7]"},
+            {"address": 0x2019, "size": 3, "mnemonic": "mov", "op_str": "rdi, rbp"},
+            {"address": 0x201c, "size": 5, "mnemonic": "call", "op_str": "0x3000"},
+        ])
+        xrefs = [{"reference_va": 0x2000, "reference": context[0], "context": context}]
+        result = module.extract_global_qstring_initializer_literals(xrefs)
+        self.assertEqual(1, len(result))
+        self.assertEqual(0x2200, result[0]["literal_va"])
+
+
 if __name__ == "__main__":
     unittest.main()

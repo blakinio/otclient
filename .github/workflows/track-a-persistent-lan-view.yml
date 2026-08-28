@@ -1,4 +1,4 @@
-﻿name: Track A inspect normal Tibia package launcher
+﻿name: Track A normal Tibia launcher update
 on:
   push:
     branches: [research/OTC-20260827-kasm-endpoint-inventory]
@@ -6,19 +6,42 @@ on:
 permissions:
   contents: read
 jobs:
-  inventory:
+  launch:
     if: github.actor == 'blakinio'
     runs-on: [otclient, synology]
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
-      - name: Inspect original package and extracted roots read-only
+      - name: Launch official updater normally in existing Kasm
         shell: bash
         run: |
           set -Eeuo pipefail
           c=otclient-track-a-kasmvnc
-          echo '=== ARCHIVE TOP ==='
-          docker exec "$c" sh -lc "tar -tf /home/kasm-user/Downloads/tibia.x64.tar.gz 2>/dev/null | head -100"
-          echo '=== SNAPSHOT TOP ==='
-          docker exec "$c" sh -lc "find /home/kasm-user/otclient-track-a/Tibia-32177065988-1 -maxdepth 3 -printf '%y %m %s %p\n' 2>/dev/null | head -250"
-          echo '=== HOME EXEC NAMES ==='
-          docker exec "$c" sh -lc "find /home/kasm-user -maxdepth 10 -type f -perm -111 -printf '%p|%s\n' 2>/dev/null | grep -Ei '/(Tibia|launcher|updater|patch|start)[^/]*$' | head -200 || true"
+          docker inspect -f '{{.State.Running}}' "$c" | grep -Fx true
+          docker exec -u kasm-user -e DISPLAY=:1 "$c" xdpyinfo >/dev/null
+          archive=/home/kasm-user/Downloads/tibia.x64.tar.gz
+          root=/home/kasm-user/Tibia
+          docker exec "$c" test -s "$archive"
+          if ! docker exec "$c" test -x "$root/Tibia"; then
+            docker exec -u kasm-user "$c" sh -lc 'cd /home/kasm-user && tar -xzf Downloads/tibia.x64.tar.gz'
+          fi
+          docker exec "$c" test -x "$root/Tibia"
+          echo NORMAL_LAUNCHER_PATH="$root/Tibia"
+          echo BEFORE_CLIENTS="$(docker exec "$c" pgrep -a -x client 2>/dev/null || true)"
+          echo BEFORE_LAUNCHERS="$(docker exec "$c" pgrep -af '/home/kasm-user/Tibia/Tibia' 2>/dev/null || true)"
+          if ! docker exec "$c" pgrep -f '^/home/kasm-user/Tibia/Tibia$' >/dev/null 2>&1; then
+            docker exec -d -u kasm-user -e DISPLAY=:1 -e HOME=/home/kasm-user -w "$root" "$c" sh -lc 'exec ./Tibia >/tmp/tibia-normal-launcher.log 2>&1'
+          fi
+          for _ in $(seq 1 80); do
+            if docker exec "$c" pgrep -f '^/home/kasm-user/Tibia/Tibia$' >/dev/null 2>&1 || docker exec -u kasm-user -e DISPLAY=:1 "$c" sh -lc 'xwininfo -root -tree 2>/dev/null | grep -Ei "Tibia|launcher|update"' >/dev/null; then
+              echo NORMAL_TIBIA_LAUNCHER_STARTED=true
+              docker exec "$c" pgrep -af '(/home/kasm-user/Tibia/Tibia|/packages/.*/bin/client)' || true
+              docker exec -u kasm-user -e DISPLAY=:1 "$c" sh -lc 'xwininfo -root -tree 2>/dev/null | grep -Ei "Tibia|launcher|update" | head -20' || true
+              exit 0
+            fi
+            sleep .25
+          done
+          echo NORMAL_TIBIA_LAUNCHER_STARTED=false
+          echo LAUNCHER_LOG_BEGIN=true
+          docker exec "$c" sh -lc 'tail -n 120 /tmp/tibia-normal-launcher.log 2>/dev/null || true'
+          echo LAUNCHER_LOG_END=true
+          exit 1

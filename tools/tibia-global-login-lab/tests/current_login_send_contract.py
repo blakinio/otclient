@@ -44,4 +44,22 @@ assert 'if (!isXteaEncryptionEnabled())' in protocol_game
 assert protocol.count('if (m_checksumEnabled || m_sequencedPackets)') >= 1
 assert protocol.count('if (self->m_checksumEnabled || self->m_sequencedPackets)') >= 1
 
+# Trusted-main promotion #738 proves that the first exact-current Global
+# application byte 0x34 is UNKNOWN_FALLBACK with no concrete GameserverMessage
+# type. It must therefore be consumed as one bounded opaque first-response
+# packet before the legacy opcode parser can interpret decimal 52.
+first_recv = protocol_game.index('if (m_firstRecv)')
+legacy_parse = protocol_game.index('parseMessage(inputMessage);')
+assert 'CURRENT_TIBIA_GLOBAL_OPAQUE_FALLBACK_0X34' in protocol_game
+opaque = protocol_game.index('CURRENT_TIBIA_GLOBAL_OPAQUE_FALLBACK_0X34')
+assert first_recv < opaque < legacy_parse
+assert protocol_game.count('g_game.getClientVersion() == 1532') >= 2
+assert protocol_game.count('g_game.getProtocolVersion() == 1532') >= 2
+assert protocol_game.count('g_game.getFeature(Otc::GameSessionKey)') >= 2
+assert protocol_game.count('g_game.getFeature(Otc::GameSequencedPackets)') >= 2
+assert 'inputMessage->peekU8() == 0x34' in protocol_game
+assert 'inputMessage->skipBytes(static_cast<uint16_t>(inputMessage->getUnreadSize()));' in protocol_game
+assert 'recv();' in protocol_game[opaque:legacy_parse]
+assert 'return;' in protocol_game[opaque:legacy_parse]
+
 print('CURRENT_TIBIA_LOGIN_SEND_INTEGRATION_CONTRACT=PASS')

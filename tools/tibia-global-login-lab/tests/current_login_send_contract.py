@@ -38,4 +38,10 @@ protocol_h = (root / 'src/framework/net/protocol.h').read_text(encoding='utf-8')
 assert 'const uint8_t paddingSize = inputMessage->getU8();' in protocol
 assert 'bool isXteaEncryptionEnabled() const' in protocol_h
 assert 'if (!isXteaEncryptionEnabled())' in protocol_game
+# The 4-byte outer sequence occupies receive-header space exactly like the
+# legacy checksum dword. Otherwise modern xteaDecrypt shortens unread payload
+# by four bytes after consuming the sequence before decryption.
+assert protocol.count('if (m_checksumEnabled || m_sequencedPackets)') >= 1
+assert protocol.count('if (self->m_checksumEnabled || self->m_sequencedPackets)') >= 1
+
 print('CURRENT_TIBIA_LOGIN_SEND_INTEGRATION_CONTRACT=PASS')

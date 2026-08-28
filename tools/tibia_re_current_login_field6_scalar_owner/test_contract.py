@@ -68,9 +68,12 @@ for required in (
     assert required in focused_text, required
 for forbidden in ('recover_vtables(', 'enumerate_slot_calls(', 'SCALAR_CALLSITE_CENSUS'):
     assert forbidden not in focused_text, forbidden
-assert 'focused_qmeta_owner.py --client' in workflow_text
-assert 'probe.py --client' not in workflow_text
-assert 'qmeta_owner.py --client' not in workflow_text
+focused_command = 'python3 tools/tibia_re_current_login_field6_scalar_owner/focused_qmeta_owner.py --client'
+probe_command = 'python3 tools/tibia_re_current_login_field6_scalar_owner/probe.py --client'
+qmeta_command = 'python3 tools/tibia_re_current_login_field6_scalar_owner/qmeta_owner.py --client'
+assert focused_command in workflow_text
+assert probe_command not in workflow_text
+assert qmeta_command not in workflow_text
 assert 'WARP_PROFILE_ATTEMPTS=2' in warp_text
 assert 'WARP_BOOTSTRAP_FALLBACK=PASS' in warp_text
 assert '25346' in warp_text and '25347' in warp_text

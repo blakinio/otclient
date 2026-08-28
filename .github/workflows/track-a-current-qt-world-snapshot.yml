@@ -68,6 +68,37 @@ jobs:
           persist-credentials: false
           ref: main
 
+
+      - name: Prove live task mode
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          task = Path('docs/agents/tasks/active/OTC-20260828-current-qt-world-correlation.md')
+          if not task.is_file():
+              raise SystemExit('LIVE_TASK_FILE_ABSENT')
+          text = task.read_text(encoding='utf-8-sig')
+          if not text.startswith('---\n'):
+              raise SystemExit('LIVE_TASK_FRONT_MATTER_MISSING')
+          end = text.find('\n---\n', 4)
+          if end < 0:
+              raise SystemExit('LIVE_TASK_FRONT_MATTER_UNTERMINATED')
+          fields = {}
+          for line in text[4:end].splitlines():
+              if ':' not in line:
+                  continue
+              key, value = line.split(':', 1)
+              fields[key.strip()] = value.strip()
+          if fields.get('runtime_access') != 'read_only':
+              raise SystemExit('LIVE_TASK_RUNTIME_ACCESS_REQUIRED=read_only')
+          if fields.get('mutation_authorized') != 'false':
+              raise SystemExit('LIVE_TASK_MUTATION_AUTHORIZED_REQUIRED=false')
+          print('LIVE_TASK_RUNTIME_ACCESS_REQUIRED=read_only')
+          print('LIVE_TASK_MUTATION_AUTHORIZED_REQUIRED=false')
+          print('LIVE_TASK_MODE=PASS')
+          PY
+
       - name: Prove released control plane and exact current target
         id: target
         shell: bash

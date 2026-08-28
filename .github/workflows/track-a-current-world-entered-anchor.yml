@@ -172,8 +172,9 @@ jobs:
         run: |
           set -Eeuo pipefail
           r="$RUNNER_TEMP/world-entered-anchor"
-          rm -rf "$r/client" "$r/state" "$r/bin" "$r/wireproxy.log" "$r/trace"
-          test ! -e "$r/client"
+          : "${r:?WORLD_ENTERED_RUNNER_TEMP_REQUIRED}"
+          rm -rf "${r:?}/client" "${r:?}/state" "${r:?}/bin" "${r:?}/wireproxy.log" "${r:?}/trace"
+          test ! -e "${r:?}/client"
           echo RAW_CLIENT_RETAINED=false
       - name: Upload bounded static anchor evidence
         if: always()

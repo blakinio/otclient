@@ -109,7 +109,7 @@ jobs:
           [[ "$size" == "$expected_size" && "$sha" == "$expected_sha" ]]
           echo INSTALLED_CLIENT_PATH="$client"
           echo INSTALLED_CLIENT_FENCE=PASS
-          docker exec -d -u kasm-user -e DISPLAY=:1 -e HOME=/home/kasm-user -w "$pkg" "$target" ./client
+          docker exec -d -u kasm-user -e DISPLAY=:1 -e HOME=/home/kasm-user -e QT_QUICK_BACKEND=software -e QT_XCB_GL_INTEGRATION=none -e LD_LIBRARY_PATH="$pkg/lib" -w "$pkg" "$target" sh -lc 'exec ./client >/tmp/oteryn-owner-client-launch.log 2>&1'
           for _ in $(seq 1 120); do
             pids="$(docker exec "$target" pgrep -x client 2>/dev/null || true)"
             count="$(printf '%s\n' "$pids" | sed '/^$/d' | wc -l | tr -d ' ')"

@@ -6,15 +6,19 @@ workflow_path = root / '.github/workflows/tibia-global-login-encrypted-handoff.y
 main_workflow_path = root / '.github/workflows/tibia-global-login-lab.yml'
 prepare_path = root / '.github/track-b-encrypted-handoff/prepare.sh'
 emitter_path = root / '.github/track-b-encrypted-handoff/emit.sh'
+http_preflight_path = root / 'tools/tibia-global-login-lab/scripts/http-login-preflight.sh'
+world_entry_path = root / 'tools/tibia-global-login-lab/scripts/world-entry-probe.sh'
 cert_path = root / '.github/track-b-encrypted-handoff/recipient.pem'
 
-for path in (workflow_path, main_workflow_path, prepare_path, emitter_path, cert_path):
+for path in (workflow_path, main_workflow_path, prepare_path, emitter_path, http_preflight_path, world_entry_path, cert_path):
     assert path.is_file(), f'missing: {path}'
 
 workflow = workflow_path.read_text(encoding='utf-8')
 main_workflow = main_workflow_path.read_text(encoding='utf-8')
 prepare = prepare_path.read_text(encoding='utf-8')
 emitter = emitter_path.read_text(encoding='utf-8')
+http_preflight = http_preflight_path.read_text(encoding='utf-8')
+world_entry = world_entry_path.read_text(encoding='utf-8')
 cert = cert_path.read_text(encoding='utf-8')
 
 prep_step = workflow.index('Prepare encrypted handoff runtime')
@@ -61,6 +65,32 @@ assert 'print(error_message)' not in emitter
 assert 'print(f"{error_message}")' not in emitter
 assert "docker exec \"$CONTAINER\" python3 - <<'PY'" not in emitter
 assert "docker exec -i \"$CONTAINER\" python3 - <<'PY'" in emitter
+
+def login_payload_block(source: str) -> str:
+    start = source.index('payload = {')
+    end = source.index('\n}', start) + 2
+    return source[start:end]
+
+conditional_login_fields = (
+    'token',
+    'deviceverificationcode',
+    'trusteddevicetoken',
+    'emailcode',
+    'loginconfirmationcode',
+    'loginconfirmationtoken',
+)
+for producer_name, producer in (
+    ('encrypted handoff emitter', emitter),
+    ('HTTP preflight', http_preflight),
+    ('world-entry probe', world_entry),
+):
+    payload = login_payload_block(producer)
+    assert 'operatingsystem' in payload, f'{producer_name}: missing mandatory operatingsystem'
+    assert 'TIBIA_OPERATING_SYSTEM' in payload, f'{producer_name}: operatingsystem must come from runtime-derived value'
+    for field in conditional_login_fields:
+        assert f"'{field}'" not in payload and f'\"{field}\"' not in payload, (
+            f'{producer_name}: synthesized conditional login field {field}'
+        )
 
 build_job = main_workflow.index('  build-linux:')
 build_steps = main_workflow.index('    steps:', build_job)

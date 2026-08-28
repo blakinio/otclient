@@ -46,6 +46,10 @@ implementation_authorized: true
 owned_paths:
   - .github/scripts/tibia-official-client-re-canonical-live-session.sh
   - .github/scripts/test_tibia_official_client_re_canonical_live_session.py
+  - .github/scripts/tibia-official-client-re-canonical-live-transition.py
+  - .github/scripts/test_tibia_official_client_re_canonical_live_transition.py
+  - .github/scripts/tibia-official-client-re-kasm-existing-runtime-probe.py
+  - .github/scripts/test_tibia_official_client_re-kasm-existing-runtime-probe.py
   - .github/scripts/test_track_a_canonical_current_client_fence.py
   - .github/workflows/track-a-canonical-current-client-fence.yml
   - .github/workflows/track-a-canonical-live-governance.yml
@@ -59,6 +63,7 @@ modules_touched:
 reuses:
   - trusted-main promotion #752 exact current client and field6 runtime-observation boundary
   - merged canonical lease/transition/session worker
+  - merged existing-runtime adoption probe
   - merged exact-current observer evidence from #744/#745/#746
 blocks:
   - CURRENT_GAME_LOGIN_FIELD6_RUNTIME_VALUE_OBSERVATION_REQUIRED
@@ -70,10 +75,14 @@ Repair the trusted canonical-live bootstrap contract so it admits the already in
 
 This task is repository-only. It must not bootstrap, execute, authenticate, observe, mutate or control any official client. A later runtime successor must use the merged result under fresh Gate A/Gate B admission.
 
+# Root-cause boundary
+
+The stale fence is not isolated to one launcher. Trusted `main` currently binds the superseded cut in the canonical session worker, the canonical transition/Gate-B controller, the Kasm existing-runtime adoption probe, normative Track A/ADR/bootstrap governance and the canonical-live governance audit. Updating only one consumer would create a split-brain canonical identity contract and is forbidden.
+
 # Acceptance
 
 1. Hosted RED proves current trusted main still binds the canonical worker/governance contract to the superseded client.
-2. Update the canonical worker, governance fence and normative current-client references as one coherent exact-client contract; do not preserve two competing "current" fences.
+2. Update the canonical worker, transition controller, adoption probe, governance fence and normative current-client references as one coherent exact-client contract; do not preserve two competing "current" fences.
 3. Historical evidence may keep historical client hashes when explicitly historical; only current canonical authority is updated.
 4. Existing canonical session/transition/lease/adoption tests remain GREEN.
 5. Fresh exact-current promotion evidence on trusted main is referenced as provenance; no new client download/execution is needed for this repair.
@@ -81,4 +90,4 @@ This task is repository-only. It must not bootstrap, execute, authenticate, obse
 7. Fresh post-implementation audit must find zero material issues before merge.
 8. No runtime, credentials, login, process memory or packet access from this PR.
 
-next_action: add a focused current-fence contract test/workflow and obtain hosted RED before changing the worker or normative governance text.
+next_action: add a focused current-fence contract test/workflow and obtain hosted RED before changing the worker, transition, adoption probe or normative governance text.

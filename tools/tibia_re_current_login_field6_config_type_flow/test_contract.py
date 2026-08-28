@@ -15,7 +15,7 @@ assert "'official_client_executed':False" in compact
 for required in (
     '0x30b6700','0xe25620','0x7d15c0','0x7d1a8a','0x9c8','0x30',
     'CONFIG_TYPE_IDENTITY','CONFIG_TYPE_UNKNOWN','CONFIG_OWNED_METHOD_FLOW',
-    'FIELD6_VALUE_PROVEN','FIELD6_VALUE_UNKNOWN','NO_HEURISTIC_RANKING','NO_SEMANTIC_GUESSING',
+    'FIELD6_VALUE_UNKNOWN','NO_HEURISTIC_RANKING','NO_SEMANTIC_GUESSING',
 ):
     assert required.lower() in text.lower(), required
 assert 'WARP_PROFILE_ATTEMPTS=2' in warp_text

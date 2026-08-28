@@ -12,6 +12,7 @@ CURRENT_SIZE = 52_105_824
 CURRENT_SHA = 'd1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a'
 SUPERSEDED_SIZE = 52_109_920
 SUPERSEDED_SHA = 'ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8'
+STALE_VERSION_PROVENANCE = '`15.32` is an embedded version-family token, not a claim of a more specific suffix.'
 
 PROMOTION = ROOT / 'docs/agents/evidence/OTC-20260828-current-login-field6-scalar-owner-promotion/result.json'
 WORKER = ROOT / '.github/scripts/tibia-official-client-re-canonical-live-session.sh'
@@ -47,6 +48,7 @@ def assert_current_governance_fence(text: str, label: str) -> None:
     assert str(CURRENT_SIZE) in text, f'{label}: current client size missing'
     assert CURRENT_SHA in text, f'{label}: current client SHA missing'
     assert SUPERSEDED_SHA not in text, f'{label}: superseded SHA still authoritative'
+    assert STALE_VERSION_PROVENANCE not in text, f'{label}: stale version-family provenance remains'
 
 
 def main() -> None:

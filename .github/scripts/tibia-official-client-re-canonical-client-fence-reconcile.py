@@ -145,7 +145,7 @@ def _base_registration(data: dict[str, Any]) -> None:
         raise ReconcileError('source_registration_inventory_invalid')
     if not isinstance(data.get('display'), str) or not str(data['display']).startswith(':'):
         raise ReconcileError('source_registration_display_invalid')
-    if data.get('remote_view_mapping') != 'PROVEN':
+    if data.get('remote_view_mapping') not in {'PROVEN', 'UNKNOWN'}:
         raise ReconcileError('source_registration_remote_mapping_invalid')
     _namespace(data.get('runtime_locator'))
     expected_window_pid = f":pid:{data['pid']}:class:client/Tibia:"

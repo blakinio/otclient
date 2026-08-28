@@ -198,6 +198,27 @@ class Tests(unittest.TestCase):
         self.assertEqual(data["source_run"], "123")
         self.assertEqual(stat.S_IMODE(self.m.REG.stat().st_mode), 0o600)
 
+    def test_reconciles_when_stable_remote_view_mapping_is_unknown(self):
+        old = dict(self.old, remote_view_mapping="UNKNOWN")
+        old["candidate_fingerprint"] = fingerprint(old)
+        fresh = dict(self.fresh, remote_view_mapping="UNKNOWN")
+        fresh["candidate_fingerprint"] = fingerprint(fresh)
+        self.write_registration(old)
+        probe = self.reconcile([dict(fresh), dict(fresh), dict(fresh)])
+        data = json.loads(self.m.REG.read_text())
+        self.assertEqual(probe.call_count, 3)
+        self.assertEqual(data["remote_view_mapping"], "UNKNOWN")
+        self.assertEqual(data["state"], "UNKNOWN")
+
+    def test_rejects_invalid_source_remote_view_mapping_before_probe(self):
+        bad = dict(self.old, remote_view_mapping="UNVERIFIED")
+        self.write_registration(bad)
+        with mock.patch.object(self.m, "_require_external_guard", return_value=None), \
+                mock.patch.object(self.m, "_probe") as probe:
+            with self.assertRaisesRegex(self.m.ReconcileError, "source_registration_remote_mapping_invalid"):
+                self.m.reconcile(self.args)
+        probe.assert_not_called()
+
     def test_rejects_any_unapproved_source_fence_before_probe(self):
         bad = dict(self.old, client_version="15.31")
         self.write_registration(bad)

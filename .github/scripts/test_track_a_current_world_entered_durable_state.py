@@ -399,5 +399,30 @@ class ItaniumRttiVptrTests(unittest.TestCase):
             )
 
 
+class BoundedCStringLiteralTests(unittest.TestCase):
+    def test_decodes_nonprintable_single_byte_literal_without_raw_string(self):
+        raw = bytearray(0x300)
+        sections = [(0x1000, 0x100, 0x200, 2)]
+        raw[0x180:0x182] = b"\x02\x00"
+        result = module.decode_bounded_c_string_literal(bytes(raw), sections, 0x1080)
+        self.assertEqual(1, result["length"])
+        self.assertEqual([2], result["byte_values"])
+        self.assertIsNone(result["printable_utf8"])
+
+    def test_decodes_printable_c_string(self):
+        raw = bytearray(0x300)
+        sections = [(0x1000, 0x100, 0x200, 2)]
+        raw[0x180:0x185] = b"Game\x00"
+        result = module.decode_bounded_c_string_literal(bytes(raw), sections, 0x1080)
+        self.assertEqual(4, result["length"])
+        self.assertEqual("Game", result["printable_utf8"])
+
+    def test_rejects_unterminated_literal(self):
+        raw = bytearray(b"A" * 0x300)
+        sections = [(0x1000, 0x100, 0x200, 2)]
+        with self.assertRaisesRegex(module.DurableStateError, "C_STRING_LITERAL_UNTERMINATED"):
+            module.decode_bounded_c_string_literal(bytes(raw), sections, 0x1080, max_bytes=16)
+
+
 if __name__ == "__main__":
     unittest.main()

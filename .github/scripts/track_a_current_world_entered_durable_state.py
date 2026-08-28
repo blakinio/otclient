@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections import defaultdict, deque
+import hashlib
 import json
 import re
 import struct
@@ -393,12 +394,16 @@ def main(argv: list[str]) -> int:
         for call in literal_calls:
             item = dict(call)
             try:
+                item["c_string_literal"] = decode_bounded_c_string_literal(raw, sections, int(call["literal_va"]))
                 item["literal_candidates"] = decode_bounded_static_literal_candidates(raw, sections, int(call["literal_va"]))
                 item["literal_nearby_candidates"] = scan_nearby_static_literal_candidates(
                     raw, sections, int(call["literal_va"]), radius=32
                 )[:16]
-                item["decode_state"] = "CANDIDATES_AVAILABLE" if (item["literal_candidates"] or item["literal_nearby_candidates"]) else "NO_PRINTABLE_CANDIDATE"
+                item["decode_state"] = "CANDIDATES_AVAILABLE" if (
+                    item["c_string_literal"].get("length", 0) >= 0
+                ) else "NOT_PROVEN"
             except DurableStateError as exc:
+                item["c_string_literal"] = {"state": "NOT_PROVEN", "reason": str(exc)}
                 item["decode_state"] = "NOT_PROVEN"
                 item["decode_reason"] = str(exc)
             helper_target = int(call["helper_target_va"])
@@ -1201,6 +1206,32 @@ def resolve_primary_vptr_from_rtti(raw: bytes, sections, relocs: dict[int, int],
         "mangled_type_name": mangled,
         "vptr_offset": vptr,
         "typeinfo_offset": typeinfo,
+    }
+
+
+def decode_bounded_c_string_literal(raw: bytes, sections, literal_va: int, *, max_bytes: int = 128) -> dict[str, object]:
+    if max_bytes <= 0 or max_bytes > 256:
+        raise DurableStateError(f"C_STRING_LITERAL_MAX_OUT_OF_BOUNDS:{max_bytes}")
+    offset = _static_va_to_offset(sections, literal_va)
+    window = raw[offset:min(len(raw), offset + max_bytes + 1)]
+    end = window.find(b"\x00")
+    if end < 0 or end > max_bytes:
+        raise DurableStateError(f"C_STRING_LITERAL_UNTERMINATED:{literal_va:#x}")
+    payload = bytes(window[:end])
+    printable_utf8 = None
+    try:
+        decoded = payload.decode("utf-8", "strict")
+    except UnicodeDecodeError:
+        decoded = ""
+    if decoded and _printable_literal(decoded):
+        printable_utf8 = decoded
+    return {
+        "literal_va": literal_va,
+        "length": len(payload),
+        "sha256": hashlib.sha256(payload).hexdigest(),
+        "byte_values": list(payload[:32]),
+        "byte_values_truncated": len(payload) > 32,
+        "printable_utf8": printable_utf8,
     }
 
 

@@ -1,18 +1,18 @@
 ---
 task_id: OTC-20260828-current-login-field6-runtime
-status: live_authorized_pending_trigger
+status: live_v3_in_progress_checkpoint
 agent: ChatGPT
 session_role: implementer
 project_lane: otclient
 lane: RUNTIME_RESEARCH
 track_id: official-client-re
 task_kind: reverse_engineering_runtime
-phase: live_admission
-branch: docs/OTC-20260828-field6-runtime-v3-admission
+phase: live_observation
+branch: docs/OTC-20260828-field6-v3-live-checkpoint
 base_branch: main
-base_main: eb316cd4ce4b9926ade8b170babe2b3d7053b531
+base_main: 32146659213cba71910cbe8d46aa4c2f6ded607c
 created: 2026-08-28T19:00:00+02:00
-updated: 2026-08-28T21:04:00+02:00
+updated: 2026-08-28T21:17:00+02:00
 risk: high
 execution_class: self_hosted
 execution_mode: github_actions_ephemeral_isolated
@@ -63,7 +63,10 @@ depends_on:
   - merged PR #768 one-shot V2 live admission
   - failed pre-action V2 run 33200939531 / job 98949936038
   - merged PR #769 direct task-owned package source repair
+  - merged PR #771 one-shot V3 live admission
   - PR #758 owner V3 admission comment 5456573590
+  - PR #758 exact V3 trigger comment 5456601015
+  - V3 run 33202129157 / live job 98953921602
 blocks:
   - OTCLIENT-TIBIA-GLOBAL-LOGIN-FINAL-CONTINUE
 ---
@@ -141,14 +144,53 @@ raw_memory_retained=false
 
 # V3 execution trigger
 
-This admission change MUST NOT start the official client. After this one-file docs admission is independently reviewed, GREEN and merged to fresh trusted `main`, execution still requires a new top-level repository-owner comment on merged PR #758 whose body is exactly:
+V3 admission was merged by PR #771 as trusted `main@32146659213cba71910cbe8d46aa4c2f6ded607c`. The distinct exact owner trigger is PR #758 comment `5456601015` with body:
 
 ```text
 AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V3 once=true
 ```
 
-The workflow rejects any non-exact body or non-owner author. Exact-current package materialization must complete successfully before that V3 trigger is consumed, credentials are exposed to the wrapper or a login is submitted.
+It created workflow run `33202129157` on exact trusted `main@32146659213cba71910cbe8d46aa4c2f6ded607c`.
+
+# V3 live checkpoint — 2026-08-28 21:17 +02:00
+
+Live job `98953921602` is in progress. At the checkpoint, GitHub reports:
+
+```text
+Checkout exact trusted main                         SUCCESS
+Prove trusted-main live admission and boundaries    SUCCESS
+Materialize exact current package through WARP      IN_PROGRESS
+Consume exact owner authorization once              PENDING
+Capture field6 with protected login inputs          PENDING
+Validate scalar-only evidence                       PENDING
+Upload sanitized field6 evidence                    PENDING
+Clean exact current package preflight state          PENDING
+```
+
+Consequently, at this exact checkpoint:
+
+```text
+physical_action_count=0
+login_submit_count=0
+owner_trigger_consumed=false
+credentials_exposed_to_wrapper=false
+official_client_started=false
+FIELD6_VALUE=UNKNOWN
+FIELD6_VALUE_PROVEN=false
+```
+
+The durable checkpoint is:
+
+`docs/agents/evidence/OTC-20260828-current-login-field6-runtime/20260828-v3-live-checkpoint.md`
+
+Comment `5456601015` MUST NOT be rerun, replayed or duplicated. Continue only by inspecting run `33202129157` to terminal state.
+
+# Track B consequence after proof
+
+Trusted static promotion proves outer protobuf field 6 is written at `0xe25ccc` from the producer input `edx`. Track B PR #284 currently encodes outer fields `1,2,3,4,5,7` and physically omits field 6. Do not mutate Track B until V3 proves the scalar and that value is independently promoted to trusted `main`.
+
+After promotion, the next bounded Track B change is to add the proven scalar as outer varint field 6 between fields 5 and 7, update exact wire contracts under TDD, restack #284 cleanly on fresh `main`, run contracts/build, and only then spend a newly justified official-service game E2E toward real `GAME_START` / `IN_GAME`.
 
 # Completion
 
-`FIELD6_VALUE=UNKNOWN` remains authoritative until one separately triggered trusted-main V3 run produces a sanitized scalar-only artifact with `FIELD6_VALUE_PROVEN=true`. This task completes only after that scalar is independently reviewed/promoted and consumed by Track B without guessing.
+`FIELD6_VALUE=UNKNOWN` remains authoritative until run `33202129157` or another separately governed successor produces sanitized scalar-only evidence with `FIELD6_VALUE_PROVEN=true`. This task completes only after that scalar is independently reviewed/promoted and consumed by Track B without guessing.

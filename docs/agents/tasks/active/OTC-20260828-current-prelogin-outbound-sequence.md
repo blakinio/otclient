@@ -9,7 +9,7 @@ track_id: official-client-re
 task_kind: discovery
 phase: source_research
 branch: research/OTC-20260828-current-prelogin-outbound-sequence
-related_pr: PENDING
+related_pr: 742
 base_branch: main
 base_main: 5ac2eef58ebcff2f0e00ec1de008d51f2cd1fe59
 created: 2026-08-28T10:10:00+02:00

@@ -1,204 +1,28 @@
-name: Track A owner-authorized Synology client launch
-
+﻿name: Track A inventory normal Tibia launcher
 on:
   push:
-    branches:
-      - research/OTC-20260827-kasm-endpoint-inventory
-    paths:
-      - .github/workflows/track-a-persistent-lan-view.yml
-
+    branches: [research/OTC-20260827-kasm-endpoint-inventory]
+    paths: [.github/workflows/track-a-persistent-lan-view.yml]
 permissions:
   contents: read
-
 jobs:
-  launch:
+  inventory:
     if: github.actor == 'blakinio'
     runs-on: [otclient, synology]
-    timeout-minutes: 10
-    env:
-      TARGET_CONTAINER: otclient-track-a-kasmvnc
-      EXPECTED_SIZE: '52109920'
-      EXPECTED_SHA: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
-      STATE_ROOT: /home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime
-      TASK_ID: OTC-20260828-owner-authorized-kasm-client-launch
-      SESSION_ID: chatgpt-kasm-client-launch-20260828-1
-      TRUSTED_ROOT: /tmp/oteryn-trusted-main-client-launch
+    timeout-minutes: 5
     steps:
-      - name: Checkout invocation branch
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-        with:
-          persist-credentials: false
-
-      - name: Materialize fresh trusted main operator
-        id: trusted
+      - name: Inventory installed launcher without mutation
         shell: bash
         run: |
           set -Eeuo pipefail
-          sha="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
-          [[ "$sha" =~ ^[0-9a-f]{40}$ ]]
-          git fetch --no-tags --depth=1 origin "$sha"
-          rm -rf "$TRUSTED_ROOT"
-          git worktree add --detach "$TRUSTED_ROOT" "$sha"
-          echo "sha=$sha" >> "$GITHUB_OUTPUT"
-          echo TRUSTED_MAIN_SHA="$sha"
-          for f in \
-            .github/scripts/tibia-official-client-re-canonical-live-lease \
-            .github/scripts/tibia-official-client-re-canonical-live-lease.py \
-            .github/scripts/tibia-official-client-re-canonical-live-guard.py \
-            .github/scripts/tibia-official-client-re-canonical-live-transition.py \
-            .github/scripts/tibia-official-client-re-input-lock.py \
-            .github/scripts/tibia-official-client-re-kasm-existing-runtime-probe.py; do
-            test -f "$TRUSTED_ROOT/$f"
-          done
-          chmod +x "$TRUSTED_ROOT/.github/scripts/tibia-official-client-re-canonical-live-lease" \
-            "$TRUSTED_ROOT/.github/scripts/tibia-official-client-re-canonical-live-transition.py" \
-            "$TRUSTED_ROOT/.github/scripts/tibia-official-client-re-kasm-existing-runtime-probe.py"
-          echo TRUSTED_MAIN_OPERATOR=PASS
-
-      - name: Acquire canonical authority
-        id: lease
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          task_root="/home/runner/_work/_otclient_tibia_re_state/tasks/$TASK_ID"
-          mkdir -p "$task_root"; chmod 700 "$task_root"
-          token="$task_root/client-launch.token"
-          out="$($TRUSTED_ROOT/.github/scripts/tibia-official-client-re-canonical-live-lease acquire \
-            --task-id "$TASK_ID" --session-id "$SESSION_ID" --token-file "$token" \
-            --ttl-seconds 600 --stale-takeover-reason owner_authorized_client_launch_after_vanished_runtime)"
-          printf '%s\n' "$out"
-          gen="$(printf '%s\n' "$out" | sed -n 's/^TRACK_A_CANONICAL_LEASE_GENERATION=//p' | tail -1)"
-          [[ "$gen" =~ ^[0-9]+$ ]]
-          echo "token=$token" >> "$GITHUB_OUTPUT"
-          echo "generation=$gen" >> "$GITHUB_OUTPUT"
-
-      - name: Launch exactly one client under canonical guard
-        shell: bash
-        env:
-          TOKEN_FILE: ${{ steps.lease.outputs.token }}
-        run: |
-          set -Eeuo pipefail
-          launch=/tmp/oteryn-owner-authorized-kasm-client-launch.sh
-          cat >"$launch" <<'SH'
-          #!/usr/bin/env bash
-          set -Eeuo pipefail
-          target=otclient-track-a-kasmvnc
-          state=/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime/runtime-registration.json
-          expected_size=52109920
-          expected_sha=ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
-          docker inspect -f '{{.State.Running}}' "$target" | grep -Fx true >/dev/null
-          docker exec -u kasm-user -e DISPLAY=:1 "$target" xdpyinfo >/dev/null
-          pids="$(docker exec "$target" pgrep -x client 2>/dev/null || true)"
-          [[ -z "$pids" ]] || { echo PRELAUNCH_CLIENT_ALREADY_PRESENT=true; exit 91; }
-          test -f "$state"
-          python3 - "$state" <<'PY'
-          import json,sys
-          d=json.load(open(sys.argv[1],encoding='utf-8'))
-          assert d.get('proof_kind')=='existing_runtime_adoption_v1', d.get('proof_kind')
-          assert d.get('state')=='UNKNOWN', d.get('state')
-          assert d.get('display')==':1', d.get('display')
-          assert d.get('client_size')==52109920, d.get('client_size')
-          assert d.get('client_sha256')=='ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8', d.get('client_sha256')
-          print('STALE_REGISTRATION_SHAPE=PASS')
-          PY
-          pkg='/home/kasm-user/otclient-track-a/Tibia-32177065988-1/bin'
-          client="$pkg/client"
-          docker exec "$target" test -x "$client"
-          size="$(docker exec "$target" stat -Lc %s "$client")"
-          sha="$(docker exec "$target" sha256sum "$client" | awk '{print $1}')"
-          [[ "$size" == "$expected_size" && "$sha" == "$expected_sha" ]]
-          echo INSTALLED_CLIENT_PATH="$client"
-          echo INSTALLED_CLIENT_FENCE=PASS
-          docker exec -d -u kasm-user -e DISPLAY=:1 -e HOME=/home/kasm-user -e QT_QUICK_BACKEND=software -e QT_XCB_GL_INTEGRATION=none -e LD_LIBRARY_PATH="$pkg/lib" -w "$pkg" "$target" sh -lc 'exec ./client >/tmp/oteryn-owner-client-launch.log 2>&1'
-          for _ in $(seq 1 120); do
-            pids="$(docker exec "$target" pgrep -x client 2>/dev/null || true)"
-            count="$(printf '%s\n' "$pids" | sed '/^$/d' | wc -l | tr -d ' ')"
-            [[ "$count" -le 1 ]] || { echo CLIENT_UNIQUENESS=FAIL; exit 92; }
-            if [[ "$count" == 1 ]]; then
-              pid="$pids"
-              size="$(docker exec "$target" stat -Lc %s "/proc/$pid/exe")"
-              sha="$(docker exec "$target" sha256sum "/proc/$pid/exe" | awk '{print $1}')"
-              [[ "$size" == "$expected_size" && "$sha" == "$expected_sha" ]] || exit 93
-              if docker exec -u kasm-user -e DISPLAY=:1 "$target" sh -lc 'xwininfo -root -tree 2>/dev/null | grep -Eq "Tibia|client"'; then
-                echo CLIENT_PID="$pid"
-                echo CLIENT_EXACT_FENCE=PASS
-                echo CLIENT_WINDOW=PASS
-                exit 0
-              fi
-            fi
-            sleep .25
-          done
-          echo CLIENT_WINDOW_TIMEOUT=true
-          exit 94
-          SH
-          chmod 700 "$launch"
-          "$TRUSTED_ROOT/.github/scripts/tibia-official-client-re-canonical-live-lease" guard-run \
-            --task-id "$TASK_ID" --session-id "$SESSION_ID" --token-file "$TOKEN_FILE" -- "$launch"
-          echo OWNER_AUTHORIZED_CLIENT_LAUNCH=PASS
-
-      - name: Recover stale canonical registration from trusted main
-        id: recover
-        shell: bash
-        env:
-          TOKEN_FILE: ${{ steps.lease.outputs.token }}
-        run: |
-          set -Eeuo pipefail
-          reg="$STATE_ROOT/runtime-registration.json"
-          reg_boot="$(python3 - "$reg" <<'PY'
-          import json,sys
-          print(json.load(open(sys.argv[1],encoding='utf-8'))['boot_id_sha256'])
-          PY
-          )"
-          current_boot="$(python3 - <<'PY'
-          import hashlib,pathlib
-          print(hashlib.sha256(pathlib.Path('/proc/sys/kernel/random/boot_id').read_text().strip().encode()).hexdigest())
-          PY
-          )"
-          if [[ "$reg_boot" == "$current_boot" ]]; then
-            op=stale-registration-recovery
-          else
-            op=boot-epoch-registration-recovery
-          fi
-          echo RECOVERY_OPERATION="$op"
-          "$TRUSTED_ROOT/.github/scripts/tibia-official-client-re-canonical-live-transition.py" "$op" \
-            --task-id "$TASK_ID" --session-id "$SESSION_ID" --token-file "$TOKEN_FILE" \
-            --probe "$TRUSTED_ROOT/.github/scripts/tibia-official-client-re-kasm-existing-runtime-probe.py"
-          echo "operation=$op" >> "$GITHUB_OUTPUT"
-          echo CANONICAL_RECOVERY=PASS
-
-      - name: Fresh Gate B and final verification
-        shell: bash
-        env:
-          TOKEN_FILE: ${{ steps.lease.outputs.token }}
-        run: |
-          set -Eeuo pipefail
-          "$TRUSTED_ROOT/.github/scripts/tibia-official-client-re-canonical-live-transition.py" gate-b \
-            --task-id "$TASK_ID" --session-id "$SESSION_ID" --token-file "$TOKEN_FILE" \
-            --probe "$TRUSTED_ROOT/.github/scripts/tibia-official-client-re-kasm-existing-runtime-probe.py"
-          pids="$(docker exec "$TARGET_CONTAINER" pgrep -x client)"
-          [[ "$(printf '%s\n' "$pids" | sed '/^$/d' | wc -l | tr -d ' ')" == 1 ]]
-          pid="$pids"
-          [[ "$(docker exec "$TARGET_CONTAINER" stat -Lc %s "/proc/$pid/exe")" == "$EXPECTED_SIZE" ]]
-          [[ "$(docker exec "$TARGET_CONTAINER" sha256sum "/proc/$pid/exe" | awk '{print $1}')" == "$EXPECTED_SHA" ]]
-          docker exec -u kasm-user -e DISPLAY=:1 "$TARGET_CONTAINER" sh -lc 'xwininfo -root -tree 2>/dev/null | grep -Eq "Tibia|client"'
-          echo FINAL_CLIENT_PID="$pid"
-          echo FINAL_GATE_B=PASS
-          echo FINAL_CLIENT_SINGLETON=PASS
-          echo FINAL_WINDOW=PASS
-          echo LOGIN_PERFORMED=false
-          echo CREDENTIAL_ACCESS=false
-          echo CHARACTER_SELECTION=false
-
-      - name: Release canonical authority
-        if: always()
-        shell: bash
-        env:
-          TOKEN_FILE: ${{ steps.lease.outputs.token }}
-        run: |
-          set +e
-          if [[ -n "${TOKEN_FILE:-}" && -f "$TOKEN_FILE" ]]; then
-            "$TRUSTED_ROOT/.github/scripts/tibia-official-client-re-canonical-live-lease" release \
-              --task-id "$TASK_ID" --session-id "$SESSION_ID" --token-file "$TOKEN_FILE"
-          fi
-          rm -f /tmp/oteryn-owner-authorized-kasm-client-launch.sh
-          git worktree remove --force "$TRUSTED_ROOT" >/dev/null 2>&1 || true
+          c=otclient-track-a-kasmvnc
+          docker inspect -f '{{.State.Running}}' "$c" | grep -Fx true
+          docker exec -u kasm-user -e DISPLAY=:1 "$c" xdpyinfo >/dev/null
+          echo '=== CLIENT PROCESSES ==='
+          docker exec "$c" pgrep -a -x client || true
+          echo '=== DESKTOP ENTRIES ==='
+          docker exec "$c" sh -lc "find /home/kasm-user /usr/share/applications -maxdepth 6 -type f \( -name '*.desktop' -o -iname '*Tibia*' -o -iname '*launcher*' \) -print 2>/dev/null | head -200"
+          echo '=== EXEC CANDIDATES ==='
+          docker exec "$c" sh -lc "find /home/kasm-user -maxdepth 8 -type f -perm -111 \( -iname 'Tibia' -o -iname '*launcher*' -o -iname '*updater*' \) -printf '%p|%s\n' 2>/dev/null | head -200"
+          echo '=== TIBIA ROOTS ==='
+          docker exec "$c" sh -lc "find /home/kasm-user -maxdepth 6 -type d \( -iname 'Tibia' -o -iname '*CipSoft*' \) -print 2>/dev/null | head -100"

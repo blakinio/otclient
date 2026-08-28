@@ -93,9 +93,26 @@ simple_durable_field_result_sha256: a1f4f6bf492fb0b8fcbeb9de89a7db80ad921a97da22
 simple_durable_field_result: REJECTED_DURABLE_FIELD_NOT_FOUND
 offset_0xeb_as_in_game: REJECTED
 offset_0x1b8_as_in_game: REJECTED
-game_window_property_census: PENDING_EXACT_CURRENT_RUN
-current_blocker: GAME_WINDOW_PROPERTY_OR_WORLD_ENTERED_RECEIVER_NOT_PROVEN
-next_action: run exact-current TGameWindowController property census and recover worldEntered connection receivers; promote only a durable state that can be polled without instrumentation; preserve IN_GAME_CLAIMED=false until causal live validation and independent review
+game_window_property_census: EXACT_CURRENT_PROVEN
+game_window_state_run: 33173004656
+game_window_state_job: 98854514406
+game_window_state_artifact: 9686450777
+game_window_state_result_sha256: cad9437282929dc6324b1140b0939a3ef4b7c425dc133269af4735c2c9ca908f
+game_window_state_property: gameWindowState
+game_window_state_property_type: QString
+game_window_state_property_index: 2
+game_window_state_notify_signal_index: 4
+game_window_state_backing_offset: 0x60
+game_window_state_backing_state: PROVEN_STATIC_QMETA_BACKING_MEMBER
+start_screen_displayed_signal_index: 23
+start_screen_displayed_emitter: 0xd6acd3
+game_screen_displayed_signal_index: 24
+game_screen_displayed_emitter: 0xd6acf3
+game_window_state_source_a: 0x31b29b0
+game_window_state_source_b: 0x31b5940
+game_window_state_literal_values: PENDING_BSS_INITIALIZER_RECOVERY
+current_blocker: GAME_WINDOW_STATE_LITERAL_SEMANTICS_NOT_PROVEN
+next_action: recover exact-current global initializers for BSS QString sources 0x31b29b0 and 0x31b5940; if their literal semantics distinguish start screen from game screen, design a bounded read-only gameWindowState poller; preserve IN_GAME_CLAIMED=false until causal live validation and independent review
 ---
 
 # Current Qt world correlation
@@ -106,7 +123,9 @@ The merged deep lifecycle logger then captured three secret-free same-process ru
 
 Durable evidence is retained at `docs/agents/evidence/OTC-20260828-current-qt-world-correlation/`, including exact JSONL from runs `33159662745`, `33161071475` and `33162761241`, artifact hashes, owner markers, reverse control and the explicit no-promotion verdict.
 
-Exact-current static runs `33165852596` and `33166836780` recovered `TPlayerProtocolMessageHandler::worldEntered` independently from the `15.32.75d4a0` ELF: current method/signal index `17`, generated dispatch case `0xd28890`, current staticMetaObject `0x30b6ba0`, and a single common `QMetaObject::activate` boundary `0x4d7dc0` across all 22 signal traces. For `worldEntered`, the generated path proves `EDX=17` and the current staticMetaObject reference. Historical QMeta addresses remain background only. Track A `read_only` forbids changing instrumentation state, so the next frontier is a durable receiver/state that can be polled without instrumentation.
+Exact-current static runs `33165852596` and `33166836780` recovered `TPlayerProtocolMessageHandler::worldEntered` independently from the `15.32.75d4a0` ELF: current method/signal index `17`, generated dispatch case `0xd28890`, current staticMetaObject `0x30b6ba0`, and a single common `QMetaObject::activate` boundary `0x4d7dc0` across all 22 signal traces. For `worldEntered`, the generated path proves `EDX=17` and the current staticMetaObject reference. Historical QMeta addresses remain background only.
+
+Exact-current run `33173004656` then recovered `TGameWindowController::gameWindowState` as property index `2` (`QString`) and statically bound its backing storage to `TGameWindowController+0x60`. The same QMeta owner exposes unique `startScreenNowDisplayed` and `gameScreenNowDisplayed` signal emitters (indices `23/24`). Direct `gameWindowStateChanged` emitters assign from two global BSS QString objects (`0x31b29b0`, `0x31b5940`). Their literal values are not file-backed and remain unproven until current global initializer recovery completes. Track A `read_only` forbids changing instrumentation state, so no runtime promotion is performed from these static facts alone.
 
 The previous runtime container is no longer present on the Docker host. This is not evidence about client state. Any future live validation requires a fresh canonical runtime admission and exact process identity.
 

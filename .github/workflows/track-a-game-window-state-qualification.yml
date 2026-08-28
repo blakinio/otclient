@@ -109,7 +109,7 @@ jobs:
           print('QUALIFICATION_COMMAND=PASS')
           PY
 
-      - name: Re-prove canonical registration, ownership and exact target
+      - name: Resolve canonical registration and ownership
         id: target
         shell: bash
         run: |
@@ -132,11 +132,7 @@ jobs:
               return d
           reg=load('runtime-registration.json', required=True)
           lease=load('lease.json')
-          exact={
-              'client_version':version,
-              'client_size':size,
-              'client_sha256':sha,
-          }
+          exact={'client_version':version,'client_size':size,'client_sha256':sha}
           for key,value in exact.items():
               if reg.get(key)!=value: raise SystemExit('REGISTRATION_'+key.upper()+'_MISMATCH')
           pid=reg.get('pid'); start=reg.get('process_start_ticks')
@@ -161,11 +157,19 @@ jobs:
           print('CANONICAL_REGISTRATION_TARGET=PASS')
           PY
 
-          CONTAINER="${{ steps.target.outputs.container }}"
-          CONTAINER_NAME="${{ steps.target.outputs.container_name }}"
-          TARGET_PID="${{ steps.target.outputs.pid }}"
-          TARGET_START="${{ steps.target.outputs.start_ticks }}"
-
+      - name: Re-prove global unique exact target and emit read-only admission
+        shell: bash
+        env:
+          CONTAINER: ${{ steps.target.outputs.container }}
+          CONTAINER_NAME: ${{ steps.target.outputs.container_name }}
+          TARGET_PID: ${{ steps.target.outputs.pid }}
+          TARGET_START: ${{ steps.target.outputs.start_ticks }}
+        run: |
+          set -Eeuo pipefail
+          test -n "$CONTAINER"
+          test -n "$CONTAINER_NAME"
+          test -n "$TARGET_PID"
+          test -n "$TARGET_START"
           docker inspect -f '{{.State.Running}}' "$CONTAINER" | grep -Fx true >/dev/null
           actual_name="$(docker inspect -f '{{.Name}}' "$CONTAINER" | sed 's#^/##')"
           test "$actual_name" = "$CONTAINER_NAME"

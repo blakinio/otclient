@@ -80,4 +80,13 @@ assert 'expected exactly one GAME_START callback' in wrapper
 assert 'expected exactly one terminal poll block' in wrapper
 assert 'expected exactly one GAME_START terminal block' in wrapper
 
+# The first current server payload diagnostic is structure-only: it may expose
+# lengths and protobuf field/wire identifiers, never raw payload bytes/hex.
+assert 'GAME_SERVER_FIRST_PAYLOAD_LENGTH=' in wrapper
+assert 'GAME_SERVER_PROTOBUF_STRUCTURAL_VALID=true' in wrapper
+assert 'GAME_SERVER_PROTOBUF_STRUCTURAL_INVALID=true' in wrapper
+assert 'GAME_SERVER_PROTOBUF_FIELD_' in wrapper
+assert 'GAME_SERVER_PROTOBUF_FIELD_COUNT=' in wrapper
+assert 'GAME_SERVER_FIRST_PAYLOAD_RAW' not in wrapper
+assert 'GAME_SERVER_FIRST_PAYLOAD_HEX' not in wrapper
 print('EPHEMERAL_RUNNER_CONTRACT=PASS')

@@ -66,6 +66,16 @@ persistent_lan_websocket: https://192.168.1.21:16083/websockify
 persistent_lan_endpoint_probe: PASS_HTTP_200_AND_WEBSOCKET_101_RFB_003_008
 correlation_workflow_ready: true
 correlation_dispatch_pending: true
+owner_comment_trigger_attempt_comment: 5450054574
+owner_comment_trigger_attempt_run: 33154083180
+owner_comment_trigger_attempt_result: PASS
+correlation_dispatch_attempt_run: 33154087797
+correlation_dispatch_attempt_result: SKIPPED_PRE_RUNTIME
+correlation_dispatch_attempt_actor: github-actions[bot]
+trigger_repair_root_cause: GITHUB_TOKEN_WORKFLOW_DISPATCH_LOSES_OWNER_ACTOR
+trigger_repair_tdd_red: PASS_EXPECTED_FAILURE
+trigger_repair_tdd_green: PASS
+trigger_repair_scope: actor-preserving reusable workflow_call plus deterministic source contract
 last_progress_at: 2026-08-28T10:05:33+02:00
 current_blocker: WAITING_OWNER_MANUAL_LOGIN_CAPABILITY
 next_action: when the owner is ready to authenticate manually, dispatch exactly one trusted-main ONE_SHOT_QT_INGAME_CORRELATION run and capture the login -> character selection -> world transition; the agent performs zero GUI input/login/character selection/gameplay and does not promote semantics from an incomplete observation

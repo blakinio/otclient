@@ -1,6 +1,14 @@
 name: Track A Qt in-game live correlation
 
 on:
+  workflow_call:
+    inputs:
+      authorization:
+        required: true
+        type: string
+      duration_seconds:
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
       authorization:

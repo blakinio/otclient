@@ -36,8 +36,6 @@ def prove_guard(img: core.Image) -> dict:
     if fde is None:
         raise RuntimeError('producer FDE unavailable')
     instructions = img.instructions(fde)
-    # Exact-current producer promotion already fences 0xe25620. Re-prove the
-    # dependency guard structurally instead of trusting old instruction prose.
     matches = []
     for index, row in enumerate(instructions):
         if row.mnemonic != 'mov' or len(row.operands) < 2:
@@ -53,7 +51,9 @@ def prove_guard(img: core.Image) -> dict:
         slot_load = None
         compare = None
         target_lea = None
-        for candidate in instructions[max(0, index - 6):index + 8]:
+        # The exact current producer saves registers / copies this before the
+        # dependency load; the proven target LEA sits seven instructions back.
+        for candidate in instructions[max(0, index - 12):index + 8]:
             if candidate.mnemonic == 'lea' and core.rip_target(candidate) == DEPENDENCY_TARGET_0XE195B0:
                 target_lea = candidate
         for candidate in window:
@@ -61,8 +61,8 @@ def prove_guard(img: core.Image) -> dict:
                 cdst, csrc = candidate.operands[0], candidate.operands[1]
                 if cdst.type == core.X86_OP_REG and csrc.type == core.X86_OP_MEM and int(csrc.mem.disp) == DEPENDENCY_VIRTUAL_SLOT_0X98:
                     slot_load = candidate
-            if candidate.mnemonic == 'cmp' and DEPENDENCY_TARGET_0XE195B0:
-                compare = candidate if 'rax' in candidate.op_str and 'rdx' in candidate.op_str else compare
+            if candidate.mnemonic == 'cmp' and 'rax' in candidate.op_str and 'rdx' in candidate.op_str:
+                compare = candidate
         if target_lea and slot_load and compare:
             matches.append((row, target_lea, slot_load, compare))
     if len(matches) != 1:
@@ -78,7 +78,7 @@ def prove_guard(img: core.Image) -> dict:
         'virtual_slot_load_site': core.hx(slot_load.address),
         'dependency_target': core.hx(DEPENDENCY_TARGET_0XE195B0),
         'compare_site': core.hx(compare.address),
-        'context': bounded_context(instructions, member_load.address, before=6, after=12),
+        'context': bounded_context(instructions, member_load.address, before=8, after=12),
     }
 
 
@@ -115,7 +115,8 @@ def target_direct_contexts(img: core.Image) -> list[dict]:
     for fde in img.fdes:
         if not img.executable(fde[0]) or fde[1] - fde[0] > 0x10000:
             continue
-        for instruction in img.instructions(fde):
+        instructions = img.instructions(fde)
+        for instruction in instructions:
             if instruction.mnemonic not in ('call', 'jmp') or not instruction.operands:
                 continue
             if instruction.operands[0].type != core.X86_OP_IMM:
@@ -130,7 +131,7 @@ def target_direct_contexts(img: core.Image) -> list[dict]:
                 'site': core.hx(instruction.address),
                 'fde': [core.hx(fde[0]), core.hx(fde[1])],
                 'mnemonic': instruction.mnemonic,
-                'context': bounded_context(img.instructions(fde), instruction.address, before=6, after=6),
+                'context': bounded_context(instructions, instruction.address, before=6, after=6),
             })
     return rows
 

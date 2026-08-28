@@ -9,6 +9,7 @@ track_id: official-client-re
 task_kind: integration
 phase: validate
 branch: docs/OTC-20260828-current-gameserver-dispatch-envelope-promotion
+related_pr: 738
 base_branch: main
 base_main: 470d5bd285e29f9d3f24f70ff3fc5370e2990e2a
 created: 2026-08-28T09:47:00+02:00
@@ -66,4 +67,4 @@ result sha256   eabcb9445cdafd699fb266ee94b4aca9a1b006170007cbefe682b7a6579d3764
 6. Exact-head CI and Track A governance must pass.
 7. After merge, close source #737 unmerged as consumed, archive lifecycle, then allow #284 to implement a fail-closed current-fallback handler and one materially changed E2E.
 
-next_action: open the clean promotion PR, require exact-head green CI/governance and zero review blockers, merge, close source #737 unmerged as consumed, then continue Track B #284 with TDD.
+next_action: require PR #738 exact-head green CI/governance and zero review blockers, merge, close source #737 unmerged as consumed, then continue Track B #284 with TDD.

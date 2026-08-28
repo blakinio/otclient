@@ -9,6 +9,7 @@ track_id: official-client-re
 task_kind: integration
 phase: validate
 branch: docs/OTC-20260828-current-game-login-pre-success-promotion
+related_pr: 747
 base_branch: main
 base_main: e7f710b04da8c6f3adae43a019c44a6acb4a2866
 created: 2026-08-28T11:36:00+02:00
@@ -42,4 +43,4 @@ Promote only independently verified exact-current facts from source Draft #743. 
 5. Explicitly block Track B mutation and game E2E until a material exact-current value delta exists.
 6. Exact-head CI/governance and fresh read-only review must pass before merge.
 
-next_action: open clean promotion PR, require exact-head green checks and zero material review blockers, merge, close source #743 unmerged as consumed, archive this promotion lifecycle, then checkpoint #284 as blocked on CURRENT_GAME_LOGIN_FIELD6_VALUE_STILL_UNKNOWN.
+next_action: require PR #747 exact-head green checks and zero material review blockers, merge, close source #743 unmerged as consumed, archive this promotion lifecycle, then checkpoint #284 as blocked on CURRENT_GAME_LOGIN_FIELD6_VALUE_STILL_UNKNOWN.

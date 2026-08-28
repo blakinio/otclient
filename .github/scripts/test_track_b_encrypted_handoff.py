@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 from pathlib import Path
 
 root = Path(__file__).resolve().parents[2]
@@ -63,6 +63,11 @@ assert 'LAB_ENCRYPTED_HANDOFF_ERROR_CATEGORY=' in emitter
 assert 'LAB_ENCRYPTED_HANDOFF_ERROR_MESSAGE=' not in emitter
 assert 'print(error_message)' not in emitter
 assert 'print(f"{error_message}")' not in emitter
+
+for producer_name, producer in (('HTTP preflight', http_preflight), ('world-entry probe', world_entry)):
+    assert '15.32.bf29ac' not in producer, f'{producer_name}: stale hard-coded clientversion remains'
+    assert '/lab/state/current-package/package.json' in producer, f'{producer_name}: current staged package manifest not consumed'
+    assert 'LAB_CURRENT_LOGIN_CLIENT_VERSION_READY=true' in producer, f'{producer_name}: current clientversion readiness marker missing'
 assert "docker exec \"$CONTAINER\" python3 - <<'PY'" not in emitter
 assert "docker exec -i \"$CONTAINER\" python3 - <<'PY'" in emitter
 

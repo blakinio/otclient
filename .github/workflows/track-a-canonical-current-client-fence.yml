@@ -1,0 +1,67 @@
+name: Track A canonical current-client fence
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+    paths:
+      - .github/scripts/tibia-official-client-re-canonical-live-session.sh
+      - .github/scripts/test_tibia_official_client_re_canonical_live_session.py
+      - .github/scripts/tibia-official-client-re-canonical-live-transition.py
+      - .github/scripts/test_tibia_official_client_re_canonical_live_transition.py
+      - .github/scripts/tibia-official-client-re-kasm-existing-runtime-probe.py
+      - .github/scripts/test_tibia_official_client_re_kasm_existing_runtime_probe.py
+      - .github/scripts/test_track_a_canonical_current_client_fence.py
+      - .github/workflows/track-a-canonical-current-client-fence.yml
+      - .github/workflows/track-a-canonical-live-governance.yml
+      - docs/agents/TIBIA_RESEARCH_TRACKS.md
+      - docs/agents/decisions/ADR-0001-track-a-canonical-live-runtime.md
+      - docs/agents/contracts/TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md
+      - docs/agents/CHANGELOG.md
+      - docs/agents/tasks/active/OTC-20260828-canonical-current-client-fence.md
+
+permissions:
+  contents: read
+
+jobs:
+  current-canonical-fence:
+    name: Current exact-client canonical fence
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - name: Checkout exact repair head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+
+      - name: Validate current canonical fence contract
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 .github/scripts/test_track_a_canonical_current_client_fence.py
+
+      - name: Validate canonical runtime components
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          bash -n .github/scripts/tibia-official-client-re-canonical-live-session.sh
+          python3 -m py_compile \
+            .github/scripts/tibia-official-client-re-canonical-live-transition.py \
+            .github/scripts/tibia-official-client-re-kasm-existing-runtime-probe.py
+          python3 .github/scripts/test_tibia_official_client_re_canonical_live_session.py -v
+          python3 .github/scripts/test_tibia_official_client_re_canonical_live_transition.py -v
+          python3 .github/scripts/test_tibia_official_client_re_kasm_existing_runtime_probe.py -v
+          echo TRACK_A_CANONICAL_RUNTIME_COMPONENTS=PASS
+
+      - name: Assert repository-only execution boundary
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          task='docs/agents/tasks/active/OTC-20260828-canonical-current-client-fence.md'
+          grep -Fq 'runtime_access: none' "$task"
+          grep -Fq 'mutation_authorized: false' "$task"
+          grep -Fq 'credentials_allowed: false' "$task"
+          grep -Fq 'login_allowed: false' "$task"
+          grep -Fq 'process_control_authorized: false' "$task"
+          grep -Fq 'physical_action_budget: 0' "$task"
+          echo TRACK_A_CANONICAL_CURRENT_FENCE_RUNTIME_ACCESS=NONE

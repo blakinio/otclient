@@ -26,7 +26,9 @@ jobs:
         run: |
           set -Eeuo pipefail
           python3 tools/tibia_re_current_game_login_pre_success_outbound/test_contract.py
-          python3 -m py_compile tools/tibia_re_current_game_login_pre_success_outbound/probe.py
+          python3 -m py_compile \
+            tools/tibia_re_current_game_login_pre_success_outbound/probe.py \
+            tools/tibia_re_current_game_login_pre_success_outbound/qmeta_runner.py
 
       - name: Prepare exact public client package through WARP
         shell: bash
@@ -89,7 +91,7 @@ jobs:
           pathlib.Path(dst).write_bytes(raw)
           PY
           mkdir -p artifacts/current-game-login-pre-success-outbound
-          python3 tools/tibia_re_current_game_login_pre_success_outbound/probe.py --client "$RE_ROOT/pkg/client" --output artifacts/current-game-login-pre-success-outbound/result.json
+          python3 tools/tibia_re_current_game_login_pre_success_outbound/qmeta_runner.py --client "$RE_ROOT/pkg/client" --output artifacts/current-game-login-pre-success-outbound/result.json
           rm -f "$RE_ROOT/pkg/client" "$RE_ROOT/pkg/client.lzma"
           echo RAW_CLIENT_RETAINED=false
 

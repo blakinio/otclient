@@ -64,6 +64,17 @@ class MappingBoundsTests(unittest.TestCase):
         self.assertFalse(module.payload_range_allowed(self.regions, 0x5100, 2))
 
 
+class MappingBaseTests(unittest.TestCase):
+    def test_uses_lowest_executable_mapping_candidate_like_current_snapshot_reader(self):
+        exe = Path('/client')
+        regions = [
+            module.Mapping(0x55555000, 0x55556000, 'r--p', '/client', 0x0),
+            module.Mapping(0x55557000, 0x55558000, 'r-xp', '/client', 0x1000),
+            module.Mapping(0x70000000, 0x70001000, 'rw-p', '[heap]', 0x0),
+        ]
+        self.assertEqual(0x55555000, module._mapping_base(regions, exe))
+
+
 class QStringMemberTests(unittest.TestCase):
     def test_reads_exact_24_byte_member_and_payload(self):
         regions = [module.Mapping(0x1000, 0x2000, 'rw-p', '[heap]')]

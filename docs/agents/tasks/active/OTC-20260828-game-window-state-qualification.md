@@ -7,10 +7,10 @@ project_lane: otclient
 lane: RUNTIME_RESEARCH
 track_id: official-client-re
 task_kind: reverse_engineering_runtime
-phase: runtime_workflow_prepared
-branch: work/OTC-20260828-game-window-state-readonly-admission
+phase: blocked_fail_closed_current_target_mismatch
+branch: docs/OTC-20260828-game-window-state-current-target-blocker
 base_branch: main
-base_main: 76515d605f7a76eebe25af0fd0dd68781f086f88
+base_main: 1d9e69ba1afb369dbef911771d240a9633ff6798
 created: 2026-08-28T16:20:00+02:00
 risk: high
 execution_class: github_hosted
@@ -56,6 +56,7 @@ depends_on:
   - PR #750 merged exact-current gameWindowState static proof
   - PR #755 merged bounded reader/workflow preparation
   - PR #754 merged canonical current-client fence repair
+  - PR #772 merged canonical exact-current fence reconciliation PASS and authority release
 blocks:
   - LIVE_GAME_WINDOW_STATE_CAUSAL_VALIDATION
 ---
@@ -98,6 +99,8 @@ The merged reader provides:
 
 PR #754 advanced the trusted exact-client fence to the same build used by the reader. PR #756 aligned the live workflow with `docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md`: repository state remains `none`; a fresh live invocation must explicitly transition to `read_only`, while canonical Gate A, generation rebind and Gate B remain `NOT_APPLICABLE` for that observation.
 
+PR #772 later recorded a successful metadata-only canonical client-fence reconciliation and released its temporary `canonical_recovery` authority. The exact-current registration fence remained `15.32.75d4a0 / 52105824 / d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a`, with semantic registration state `UNKNOWN`.
+
 # Fresh live admission before process-memory observation
 
 The trusted-main live workflow must fail closed unless all of the following are freshly true before opening `/proc/<pid>/mem`:
@@ -131,32 +134,44 @@ semantic_promotion_performed=false
 
 Only after causal PASS and separate independent exact-head review may a later promotion PR change canonical `IN_GAME` semantics.
 
-# Current blocker
+# Current terminal blocker
 
-Trusted-main PR #756 is merged as `356f49bfebab5f758dc1f95b1a74ef1d6e741b41`, and its memory-free readiness preflight was executed as workflow run `33193448068`, job `98924502254`.
+After PR #772 returned canonical recovery authority to `runtime_access: none`, a fresh owner trigger comment `5456931858` on PR #756 invoked memory-free preflight run `33204467524`, job `98961872769`, on `synology-otclient-01` at exact trusted main `1d9e69ba1afb369dbef911771d240a9633ff6798`.
 
-The preflight failed closed in `Resolve canonical registration and current ownership` with exact error:
+The preflight freshly passed:
 
-`REGISTRATION_CLIENT_VERSION_MISMATCH`
+- trusted-main runtime-none checkpoint and current exact client fence;
+- bounded qualification command validation;
+- canonical registration structure/exact fence and current ownership check.
 
-Therefore the authoritative `runtime-registration.json` does not currently satisfy the exact required version `15.32.75d4a0`. The run stopped before global candidate inventory, fresh read-only admission and every process-memory step. Current registered PID/start validity, live executable size/SHA, target uniqueness and every `gameWindowState` phase value remain `UNKNOWN` and must not be inferred from historical evidence.
+It then failed closed in `Re-prove global unique exact target` with exact error:
 
-Durable execution evidence:
+`REGISTERED_TARGET_NOT_CURRENT_UNIQUE_CANDIDATE`
 
-`docs/agents/evidence/OTC-20260828-game-window-state-qualification/live-preflight-blocker.md`
+The inventory gate tests singleton candidate count before this error can be emitted. Therefore the run proved exactly one exact-fenced official-client candidate was present, but the candidate did not match the canonical registration's current locator/PID/start identity. The registration supplied to that step was `otclient-track-a-kasmvnc / 1af4af4d67f5 / pid 13947 / start 51652120`.
 
-Canonical-live governance forbids ad-hoc editing of `runtime-registration.json`; reconciliation/re-admission must occur under the canonical-live governance lane before this qualification may retry preflight. Owner manual UI interaction is **not** requested because the logger is not READY.
+The workflow stopped before fresh read-only admission, admission revalidation, logger READY reporting, resolver construction and every process-memory observation step. No replacement live identity is inferred or retained as authority.
 
-Terminal result for this execution:
+Durable current execution evidence:
+
+`docs/agents/evidence/OTC-20260828-game-window-state-qualification/20260828-live-preflight-current-target-blocker.md`
+
+Canonical-live governance forbids ad-hoc editing of `runtime-registration.json`. Owner manual UI interaction is **not** requested because the logger is not READY.
+
+Terminal result:
 
 `LIVE_GAME_WINDOW_STATE_CAUSAL_VALIDATION=BLOCKED_FAIL_CLOSED`
 
-`BLOCKER=CANONICAL_REGISTRATION_CLIENT_VERSION_MISMATCH`
+`BLOCKER=REGISTERED_TARGET_NOT_CURRENT_UNIQUE_CANDIDATE`
 
 `PROCESS_MEMORY_OBSERVATION_PERFORMED=false`
+
+`READ_ONLY_ADMISSION_CREATED=false`
 
 `IN_GAME_CLAIMED=false`
 
 `semantic_promotion_performed=false`
 
-next_action: canonical-live governance owner/worker must freshly reconcile or re-admit one exact-current runtime without ad-hoc registration editing; then rerun `PREFLIGHT_GAME_WINDOW_STATE_QUALIFICATION`. Only a successful preflight may engage the owner for LOGIN_SCREEN -> CHARACTER_SELECT -> WORLD -> WORLD_EXIT.
+The task remains `runtime_access: none`; the failed preflight created no reusable runtime authority that requires release.
+
+next_action: under a separate fresh canonical-live governance admission, reconcile or re-admit the authoritative registration to the exact currently unique official-client container/PID/start identity without ad-hoc metadata edits; release that temporary authority; then rerun a new `PREFLIGHT_GAME_WINDOW_STATE_QUALIFICATION`. Only a fresh READY result may engage the owner for `LOGIN_SCREEN -> CHARACTER_SELECT -> WORLD -> WORLD_EXIT`.

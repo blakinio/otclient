@@ -1,6 +1,8 @@
 name: Track A game window state qualification
 
 on:
+  issue_comment:
+    types: [created]
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened]
@@ -14,8 +16,15 @@ on:
 permissions:
   contents: read
 
+env:
+  EXPECTED_SIZE: 52105824
+  EXPECTED_SHA: d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a
+  CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime
+  TASK_ID: OTC-20260828-game-window-state-qualification
+
 jobs:
   contract:
+    if: github.event_name == 'pull_request'
     name: Read-only gameWindowState contract
     runs-on: ubuntu-24.04
     timeout-minutes: 4
@@ -24,9 +33,211 @@ jobs:
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
-      - name: Validate focused reader contract
+          fetch-depth: 2
+      - name: Validate focused reader and workflow contracts
         shell: bash
         run: |
           set -Eeuo pipefail
+          python3 -m py_compile \
+            .github/scripts/track_a_game_window_state_qualification.py \
+            .github/scripts/test_track_a_game_window_state_qualification.py \
+            .github/scripts/test_track_a_game_window_state_workflow_contract.py
           python3 .github/scripts/test_track_a_game_window_state_qualification.py
           python3 .github/scripts/test_track_a_game_window_state_workflow_contract.py
+          ruby -e 'require "yaml"; YAML.load_file(ARGV[0]); puts "YAML_PARSE=PASS"' \
+            .github/workflows/track-a-game-window-state-qualification.yml
+          git diff --check HEAD^1 HEAD
+
+  live-qualification:
+    if: >-
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request &&
+      github.event.comment.user.login == github.repository_owner &&
+      startsWith(github.event.comment.body, 'START_GAME_WINDOW_STATE_QUALIFICATION ')
+    name: Continuous read-only gameWindowState qualification
+    runs-on: [otclient, synology]
+    timeout-minutes: 35
+    concurrency:
+      group: track-a-game-window-state-qualification-live
+      cancel-in-progress: false
+    steps:
+      - name: Checkout exact trusted main
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          ref: main
+          fetch-depth: 1
+
+      - name: Prove trusted-main read-only authority and current fence
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$(git rev-parse HEAD)" = "$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          task="docs/agents/tasks/active/OTC-20260828-game-window-state-qualification.md"
+          test -f "$task"
+          grep -Fqx 'runtime_access: read_only' "$task"
+          grep -Fqx 'mutation_authorized: false' "$task"
+          grep -Fqx 'login_allowed: false' "$task"
+          grep -Fqx 'character_selection_allowed: false' "$task"
+          grep -Fqx 'gameplay_allowed: false' "$task"
+          grep -Fqx 'gui_input_authorized: false' "$task"
+          grep -Fqx 'process_control_authorized: false' "$task"
+          grep -Fqx 'physical_action_budget: 0' "$task"
+          python3 .github/scripts/test_track_a_canonical_current_client_fence.py
+          echo GAME_WINDOW_STATE_LIVE_AUTHORITY=PASS
+
+      - name: Parse bounded target identity command
+        id: command
+        shell: bash
+        env:
+          COMMAND: ${{ github.event.comment.body }}
+        run: |
+          set -Eeuo pipefail
+          python3 - "$GITHUB_OUTPUT" <<'PY'
+          import os,re,sys
+          text=os.environ['COMMAND'].strip()
+          m=re.fullmatch(r'START_GAME_WINDOW_STATE_QUALIFICATION container=([A-Za-z0-9_.-]{1,80}) pid=([1-9][0-9]{0,9}) start_ticks=([1-9][0-9]{0,19})',text)
+          if not m: raise SystemExit('QUALIFICATION_COMMAND_INVALID')
+          with open(sys.argv[1],'a',encoding='utf-8') as f:
+              f.write('container='+m.group(1)+'\n')
+              f.write('pid='+m.group(2)+'\n')
+              f.write('start_ticks='+m.group(3)+'\n')
+          print('QUALIFICATION_COMMAND=PASS')
+          PY
+
+      - name: Re-prove canonical registration and exact target
+        id: target
+        shell: bash
+        env:
+          CONTAINER: ${{ steps.command.outputs.container }}
+          TARGET_PID: ${{ steps.command.outputs.pid }}
+          TARGET_START: ${{ steps.command.outputs.start_ticks }}
+        run: |
+          set -Eeuo pipefail
+          python3 - "$CANONICAL_STATE" "$TASK_ID" "$TARGET_PID" "$TARGET_START" "$EXPECTED_SIZE" "$EXPECTED_SHA" <<'PY'
+          import json,pathlib,sys,time
+          root=pathlib.Path(sys.argv[1]); task=sys.argv[2]
+          pid=int(sys.argv[3]); start=int(sys.argv[4]); size=int(sys.argv[5]); sha=sys.argv[6]
+          now=int(time.time())
+          def load(name):
+              p=root/name
+              if not p.is_file(): return None
+              d=json.loads(p.read_text(encoding='utf-8'))
+              if not isinstance(d,dict): raise SystemExit(name+'_NOT_OBJECT')
+              return d
+          reg=load('runtime-registration.json'); lease=load('lease.json')
+          if reg is None: raise SystemExit('REGISTRATION_ABSENT')
+          exact={
+              'pid':pid,'process_start_ticks':start,
+              'client_size':size,'client_sha256':sha,
+          }
+          for key,value in exact.items():
+              if reg.get(key)!=value: raise SystemExit('REGISTRATION_'+key.upper()+'_MISMATCH')
+          if lease is not None and lease.get('status')=='active' and isinstance(lease.get('expires_at'),(int,float)) and int(lease['expires_at'])>now:
+              if lease.get('controller_task') != task: raise SystemExit('ACTIVE_RUNTIME_OWNER_CONFLICT')
+          print('CANONICAL_REGISTRATION_TARGET=PASS')
+          PY
+          docker inspect -f '{{.State.Running}}' "$CONTAINER" | grep -Fx true >/dev/null
+          mapfile -t pids < <(docker exec "$CONTAINER" pgrep -x client)
+          test "${#pids[@]}" -eq 1
+          test "${pids[0]}" = "$TARGET_PID"
+          test "$(docker exec "$CONTAINER" stat -Lc %s "/proc/$TARGET_PID/exe")" = "$EXPECTED_SIZE"
+          test "$(docker exec "$CONTAINER" sha256sum "/proc/$TARGET_PID/exe" | awk '{print $1}')" = "$EXPECTED_SHA"
+          current_start="$(docker exec -i "$CONTAINER" python3 - "$TARGET_PID" <<'PY'
+          import pathlib,sys
+          raw=pathlib.Path('/proc/'+sys.argv[1]+'/stat').read_text(encoding='ascii')
+          print(raw[raw.rfind(')')+2:].split()[19])
+          PY
+          )"
+          test "$current_start" = "$TARGET_START"
+          echo TARGET_PROCESS_UNIQUENESS=PROVEN
+
+      - name: Build in-memory resolver bundle
+        id: bundle
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          bundle="$RUNNER_TEMP/game-window-state-qualification-bundle.py"
+          python3 - "$bundle" <<'PY'
+          from pathlib import Path
+          import sys
+          out=Path(sys.argv[1])
+          modules=(
+              ('track_a_current_world_entered_anchor','.github/scripts/track_a_current_world_entered_anchor.py'),
+              ('track_a_current_world_entered_durable_state','.github/scripts/track_a_current_world_entered_durable_state.py'),
+          )
+          lines=['import sys,types\n']
+          for name,path_s in modules:
+              path=Path(path_s); source=path.read_text(encoding='utf-8')
+              lines.append(f"m=types.ModuleType({name!r});m.__file__={str(path)!r};sys.modules[{name!r}]=m\n")
+              lines.append(f"exec(compile({source!r},{str(path)!r},'exec'),m.__dict__)\n")
+          qpath=Path('.github/scripts/track_a_game_window_state_qualification.py')
+          qsource=qpath.read_text(encoding='utf-8')
+          lines.append(f"globals()['__file__']={str(qpath)!r}\n")
+          lines.append(f"exec(compile({qsource!r},{str(qpath)!r},'exec'),globals())\n")
+          out.write_text(''.join(lines),encoding='utf-8')
+          PY
+          echo "path=$bundle" >> "$GITHUB_OUTPUT"
+          echo RESOLVER_BUNDLE=PASS
+
+      - name: Capture continuous bounded state log
+        shell: bash
+        env:
+          CONTAINER: ${{ steps.command.outputs.container }}
+          TARGET_PID: ${{ steps.command.outputs.pid }}
+          TARGET_START: ${{ steps.command.outputs.start_ticks }}
+          BUNDLE: ${{ steps.bundle.outputs.path }}
+        run: |
+          set -Eeuo pipefail
+          out="$RUNNER_TEMP/game-window-state-qualification.jsonl"
+          docker exec -i "$CONTAINER" python3 - \
+            --pid "$TARGET_PID" \
+            --start-ticks "$TARGET_START" \
+            --expected-size "$EXPECTED_SIZE" \
+            --expected-sha256 "$EXPECTED_SHA" \
+            --output /dev/stdout \
+            --duration-seconds 1800 \
+            --poll-seconds 0.25 \
+            --heartbeat-seconds 5 \
+            < "$BUNDLE" > "$out"
+          test -s "$out"
+          echo QUALIFICATION_CAPTURE=PASS
+
+      - name: Validate secret-free qualification artifact
+        if: always()
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          out="$RUNNER_TEMP/game-window-state-qualification.jsonl"
+          test -s "$out"
+          python3 - "$out" <<'PY'
+          import json,sys
+          rows=[]
+          with open(sys.argv[1],encoding='utf-8') as f:
+              for raw in f:
+                  if raw.strip(): rows.append(json.loads(raw))
+          if not rows: raise SystemExit('QUALIFICATION_LOG_EMPTY')
+          allowed={'EMPTY','INGAME','OTHER','UNKNOWN'}
+          for d in rows:
+              if d.get('schema')!='otclient.track-a.game-window-state-qualification.v1': raise SystemExit('SCHEMA_INVALID')
+              if d.get('semantic_state') not in allowed: raise SystemExit('STATE_INVALID')
+              if d.get('in_game_claimed') is not False: raise SystemExit('IN_GAME_CLAIM_FORBIDDEN')
+              if d.get('semantic_promotion_performed') is not False: raise SystemExit('SEMANTIC_PROMOTION_FORBIDDEN')
+              if d.get('process_memory_access')!='read_only': raise SystemExit('MEMORY_ACCESS_INVALID')
+              for key in ('raw_heap_bytes_retained','raw_pointer_values_retained','raw_window_title_retained','credentials_retained','session_secrets_retained','packet_payloads_retained','process_environment_retained'):
+                  if d.get(key) is not False: raise SystemExit(key+'_INVALID')
+              if d.get('semantic_state')=='OTHER' and (d.get('known_text') is not None or d.get('known_value_sha256') is not None):
+                  raise SystemExit('OTHER_PAYLOAD_RETENTION_FORBIDDEN')
+          print('QUALIFICATION_ARTIFACT_SANITIZED=PASS')
+          print('IN_GAME_CLAIMED=false')
+          print('semantic_promotion_performed=false')
+          PY
+
+      - name: Upload secret-free gameWindowState log
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: track-a-game-window-state-qualification-${{ github.run_id }}
+          path: ${{ runner.temp }}/game-window-state-qualification.jsonl
+          if-no-files-found: warn
+          retention-days: 3

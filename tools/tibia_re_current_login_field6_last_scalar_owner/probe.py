@@ -166,7 +166,6 @@ def qmeta_owner(img):
     for meta in static_meta_candidates(img,source_fdes):
         sf=img.fde(meta['static_metacall']); rel_edges=[e for e in edges if e['source_fde']==sf]
         if not rel_edges:continue
-        try,targets=None,None
         try:table,targets=recover_jump_table(img,meta['static_metacall'],meta['method_count'])
         except RuntimeError:continue
         all_targets=set(targets)
@@ -225,32 +224,28 @@ def member_binding(img,owner_class):
         for fde,ref in rip_refs_to(img,ap):
             rows=img.instructions(fde); ri=next((i for i,r in enumerate(rows) if r.address==ref),None)
             if ri is None:continue
-            # Constructor candidate only when vtable AP is stored into entry-this object.
             for i,row in enumerate(rows[ri:ri+12],start=ri):
                 if row.mnemonic!='mov' or len(row.operands)<2:continue
                 dst,src=row.operands[0],row.operands[1]
                 if dst.type!=X86_OP_MEM or src.type!=X86_OP_REG:continue
                 base=reg_family(img,dst.mem.base) if dst.mem.base else None
                 if int(dst.mem.disp)!=0 or base not in entry_aliases(img,rows,i):continue
-                # Look for an owner+0x20 store and a same-FDE control block with embedded handler+0x10.
                 for j,m in enumerate(rows[i+1:],start=i+1):
                     if m.mnemonic!='mov' or len(m.operands)<2:continue
                     mdst,msrc=m.operands[0],m.operands[1]
                     if mdst.type!=X86_OP_MEM or int(mdst.mem.disp)!=0x20 or reg_family(img,mdst.mem.base)!=base or msrc.type!=X86_OP_REG:continue
                     source=reg_family(img,msrc.reg); handler=False; detail=[]
-                    for prev in rows[max(i,j-100):j]:
-                        if prev.mnemonic=='lea' and len(prev.operands)>=2 and prev.operands[0].type==X86_OP_REG and reg_family(img,prev.operands[0].reg)!='':
+                    for pi,prev in enumerate(rows[max(i,j-100):j],start=max(i,j-100)):
+                        if prev.mnemonic=='lea' and len(prev.operands)>=2 and prev.operands[0].type==X86_OP_REG:
                             op=prev.operands[1]
                             if op.type==X86_OP_MEM and reg_family(img,op.mem.base)==source and int(op.mem.disp)==0x10:
                                 child=reg_family(img,prev.operands[0].reg)
-                                # Search handler vtable definition/store on child.
-                                for later in rows[rows.index(prev)+1:j+1]:
+                                for later in rows[pi+1:j+1]:
                                     if later.mnemonic=='mov' and len(later.operands)>=2 and later.operands[0].type==X86_OP_MEM and reg_family(img,later.operands[0].mem.base)==child and int(later.operands[0].mem.disp)==0:
                                         handler=True;detail.append({'child_lea':hx(prev.address),'handler_store':hx(later.address)})
                     proofs.append({'constructor_fde':[hx(fde[0]),hx(fde[1])],'member_store':hx(m.address),'source_family':source,'embedded_handler_pattern':handler,'detail':detail})
     proven=[p for p in proofs if p['embedded_handler_pattern']]
     return {'classification':'LAST_SCALAR_MEMBER_BINDING','binding':'PROVEN' if len(proven)==1 else 'UNKNOWN','owner_class':owner_class,'proof_count':len(proven),'proofs':proofs}
-
 def reassert(img):
     digest=hashlib.sha256(img.raw).hexdigest()
     if digest!=EXPECTED_SHA256 or len(img.raw)!=EXPECTED_SIZE:raise RuntimeError('exact client fence mismatch')

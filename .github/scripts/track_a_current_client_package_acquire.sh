@@ -18,7 +18,6 @@ RUN_ID="${GITHUB_RUN_ID:-manual-unknown}"
 ROOT="$TASK_BASE/package-acquisition/$RUN_ID"
 WARP="$ROOT/warp"
 SOURCE="$ROOT/current-package"
-LEGACY_SOURCE="$BASE/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia"
 MATERIALIZER="${BASH_SOURCE[0]%/*}/track_a_current_client_package_materialize.py"
 WIRE_PID_FILE="$ROOT/wireproxy.pid"
 WIRE_PID=''
@@ -119,21 +118,11 @@ stop_warp() {
   listen "$WARP_PORT" && return 1 || true
 }
 
-remove_owned_source_link() {
-  if [[ -L "$LEGACY_SOURCE" ]]; then
-    [[ "$(readlink "$LEGACY_SOURCE")" == "$SOURCE" ]] || return 1
-    rm -f "$LEGACY_SOURCE"
-  elif [[ -e "$LEGACY_SOURCE" ]]; then
-    return 1
-  fi
-}
-
 rollback_prepare() {
   local rc=$? cleanup_ok=1
   trap - EXIT
   set +e
   stop_warp || cleanup_ok=0
-  remove_owned_source_link || cleanup_ok=0
   if [[ "$cleanup_ok" == 1 ]]; then
     if [[ -d "$ROOT" && ! -L "$ROOT" ]]; then
       rm -rf --one-file-system "$ROOT"
@@ -220,12 +209,11 @@ prepare() {
   [[ "$RUN_ID" =~ ^[1-9][0-9]*$ ]] || fail invalid_run_id
   [[ -f "$MATERIALIZER" && ! -L "$MATERIALIZER" ]] || fail materializer_missing_or_symlink
   [[ ! -e "$ROOT" && ! -L "$ROOT" ]] || fail acquisition_root_collision
-  [[ ! -e "$LEGACY_SOURCE" && ! -L "$LEGACY_SOURCE" ]] || fail legacy_source_collision
   if env | grep -Eq '^(TIBIA_TEST_EMAIL|TIBIA_TEST_PASSWORD)='; then
     fail secret_environment_present_during_package_preflight
   fi
 
-  mkdir -p "$ROOT" "$(dirname "$LEGACY_SOURCE")"
+  mkdir -p "$ROOT"
   chmod 700 "$TASK_BASE" "$TASK_BASE/package-acquisition" "$ROOT" 2>/dev/null || true
   trap rollback_prepare EXIT
 
@@ -241,8 +229,6 @@ prepare() {
   [[ "$(sha256sum "$SOURCE/bin/client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]] || fail materialized_client_hash_mismatch
 
   stop_warp || fail warp_cleanup_failed
-  ln -s "$SOURCE" "$LEGACY_SOURCE"
-  [[ -L "$LEGACY_SOURCE" && "$(readlink "$LEGACY_SOURCE")" == "$SOURCE" ]] || fail legacy_source_link_failed
 
   trap - EXIT
   printf 'TRACK_A_FIELD6_EXACT_PACKAGE_SOURCE=materialized\n'
@@ -253,7 +239,6 @@ prepare() {
 cleanup() {
   [[ "$RUN_ID" =~ ^[1-9][0-9]*$ ]] || fail invalid_run_id
   stop_warp || fail cleanup_warp_ownership_refused
-  remove_owned_source_link || fail cleanup_source_ownership_refused
   if [[ -d "$ROOT" && ! -L "$ROOT" ]]; then
     rm -rf --one-file-system "$ROOT"
   elif [[ -e "$ROOT" || -L "$ROOT" ]]; then

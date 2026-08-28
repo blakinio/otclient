@@ -207,6 +207,11 @@ jobs:
           docker inspect -f '{{.State.Running}}' "$REGISTERED_CONTAINER" | grep -Fx true >/dev/null
           actual_name="$(docker inspect -f '{{.Name}}' "$REGISTERED_CONTAINER" | sed 's#^/##')"
           test "$actual_name" = "$REGISTERED_CONTAINER_NAME"
+          REGISTERED_CONTAINER_FULL="$(docker inspect -f '{{.Id}}' "$REGISTERED_CONTAINER")"
+          [[ "$REGISTERED_CONTAINER_FULL" =~ ^[0-9a-f]{64}$ ]] || {
+            echo REGISTERED_CONTAINER_FULL_ID_INVALID >&2
+            exit 2
+          }
 
           mapfile -t INVENTORY_CONTAINERS < <(docker ps --no-trunc --format '{{.ID}}')
           test "${#INVENTORY_CONTAINERS[@]}" -ge 1
@@ -263,7 +268,7 @@ jobs:
             done
           done
           test "$candidate_count" -eq 1 || { echo "OFFICIAL_CLIENT_CANDIDATE_COUNT=$candidate_count" >&2; exit 2; }
-          test "$current_container" = "$REGISTERED_CONTAINER" || {
+          test "$current_container" = "$REGISTERED_CONTAINER_FULL" || {
             echo CURRENT_UNIQUE_CANDIDATE_NOT_CANONICAL_CONTAINER >&2
             exit 2
           }

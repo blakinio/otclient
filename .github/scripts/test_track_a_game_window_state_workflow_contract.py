@@ -101,6 +101,9 @@ for forbidden in (
 ):
     assert forbidden.lower() not in text.lower(), f'WORKFLOW_FORBIDDEN_SURFACE:{forbidden}'
 
+assert "docker inspect -f '{{.Id}}' \"$REGISTERED_CONTAINER\"" in text, 'WORKFLOW_CONTRACT_MISSING:canonical full container id normalization'
+assert 'test "$current_container" = "$REGISTERED_CONTAINER_FULL"' in text, 'WORKFLOW_CONTRACT_MISSING:full container id comparison'
+assert 'test "$current_container" = "$REGISTERED_CONTAINER" || {' not in text, 'WORKFLOW_SHORT_ID_COMPARISON_FORBIDDEN'
 assert text.index('GAME_WINDOW_STATE_LOGGER_PREFLIGHT=READY') < text.index('Build in-memory resolver bundle')
 assert text.count("if: github.event.comment.body == 'START_GAME_WINDOW_STATE_QUALIFICATION'") >= 3
 assert text.count('semantic_promotion_performed') >= 1

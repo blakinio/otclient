@@ -7,10 +7,10 @@ project_lane: otclient
 lane: RUNTIME_RESEARCH
 track_id: official-client-re
 task_kind: reverse_engineering_runtime
-phase: implementation_readonly_current_target_refresh
-branch: fix/OTC-20260828-game-window-readonly-current-target
+phase: implementation_container_id_normalization
+branch: fix/OTC-20260828-game-window-container-id-normalization
 base_branch: main
-base_main: b61f70e73575582d10af3789d2cfb7cb01087b6d
+base_main: cbdc66cdb72b51e4774e3b2a9153294cd6dcc169
 created: 2026-08-28T16:20:00+02:00
 risk: high
 execution_class: github_hosted
@@ -181,3 +181,9 @@ next_action: under a separate fresh canonical-live governance admission, reconci
 Fresh preflight runs `33209672873 / 98979530228` and `33210370254 / 98981865047` both failed memory-free with `REGISTERED_TARGET_NOT_CURRENT_UNIQUE_CANDIDATE` after proving exactly one exact-fenced candidate. Between them, guarded metadata reconciliation `33210019599 / 98980682859` passed with lease generation `43 > 42`, three stable probes, uniqueness `PROVEN`, state `UNKNOWN`, zero process-memory observation and lease release PASS. This proves the failure mode is runtime PID/start drift between separate reconciliation and preflight workflows, not an exact-fence ambiguity.
 
 The bounded repair keeps the durable canonical registration untouched and keeps repository authority at `runtime_access: none`. The read-only workflow now requires the canonical container from that registration, inventories all running containers, requires exactly one exact-fenced official client, binds only the ephemeral read-only admission to that freshly observed PID/start, and memory-free revalidates the exact process immediately before READY/observation. A candidate in any other container, any second/unverifiable candidate, any fence mismatch, or a contradictory non-newer generation still fails closed.
+
+## Container-ID normalization correction
+
+Fresh memory-free preflight `33211069929 / 98984132666` at trusted main `cbdc66cdb72b51e4774e3b2a9153294cd6dcc169` reached the singleton exact-fence container check and failed with `CURRENT_UNIQUE_CANDIDATE_NOT_CANONICAL_CONTAINER`. The authoritative registration exposes the canonical Docker container through the accepted short ID `1af4af4d67f5`, while the inventory intentionally uses `docker ps --no-trunc` and therefore produces a 64-hex ID. The comparison was representation-sensitive rather than identity-sensitive.
+
+The bounded repair on this branch resolves the already accepted registered container through `docker inspect`, validates its full 64-hex `.Id`, and compares that normalized full ID to the no-trunc inventory candidate. It does not alter the canonical registration, does not create controller authority, and performs no process-memory observation. All exact-client, singleton, container-name, current-process and immediate pre-observation revalidation requirements remain unchanged.

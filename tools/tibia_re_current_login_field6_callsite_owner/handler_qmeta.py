@@ -10,45 +10,26 @@ import probe as core
 HANDLER_QMETA_CLASS = 'tibia::authentication::TLoginProtocolMessageHandler'
 UNRESOLVED_TYPE = 0x80000000
 
-# Only names that are fixed by Qt's public QMetaType ids are rendered. Unknown
-# numeric ids stay numeric; no semantic name is guessed.
 QT_METATYPE_NAMES = {
-    0: 'UnknownType',
-    1: 'bool',
-    2: 'int',
-    3: 'uint',
-    4: 'qlonglong',
-    5: 'qulonglong',
-    6: 'double',
-    7: 'QChar',
-    8: 'QVariantMap',
-    9: 'QVariantList',
-    10: 'QString',
-    11: 'QStringList',
-    12: 'QByteArray',
-    13: 'QBitArray',
-    14: 'QDate',
-    15: 'QTime',
-    16: 'QDateTime',
-    17: 'QUrl',
-    18: 'QLocale',
-    19: 'QRect',
-    20: 'QRectF',
-    21: 'QSize',
-    22: 'QSizeF',
-    23: 'QLine',
-    24: 'QLineF',
-    25: 'QPoint',
-    26: 'QPointF',
+    0: 'UnknownType', 1: 'bool', 2: 'int', 3: 'uint', 4: 'qlonglong',
+    5: 'qulonglong', 6: 'double', 7: 'QChar', 8: 'QVariantMap',
+    9: 'QVariantList', 10: 'QString', 11: 'QStringList', 12: 'QByteArray',
+    13: 'QBitArray', 14: 'QDate', 15: 'QTime', 16: 'QDateTime',
+    17: 'QUrl', 18: 'QLocale', 19: 'QRect', 20: 'QRectF', 21: 'QSize',
+    22: 'QSizeF', 23: 'QLine', 24: 'QLineF', 25: 'QPoint', 26: 'QPointF',
 }
+
+
+def u32(img: core.Image, va: int) -> int:
+    return int.from_bytes(img.bytes(va, 4), 'little', signed=False)
 
 
 def qstring(img: core.Image, base: int, index: int) -> str:
     entry = base + index * 8
     if not img.mapped(entry, 8):
         raise ValueError('qstring entry unmapped')
-    rel = img.u32(entry)
-    length = img.u32(entry + 4)
+    rel = u32(img, entry)
+    length = u32(img, entry + 4)
     if length > 4096 or not img.mapped(base + rel, length):
         raise ValueError('qstring payload invalid')
     return img.bytes(base + rel, length).decode('utf-8')
@@ -65,8 +46,8 @@ def stringdata_bases_for_literal(img: core.Image, literal: str) -> list[int]:
             if entry_va is None or not img.mapped(entry_va, 8):
                 continue
             try:
-                rel = img.u32(entry_va)
-                length = img.u32(entry_va + 4)
+                rel = u32(img, entry_va)
+                length = u32(img, entry_va + 4)
             except Exception:
                 continue
             if length != len(encoded) or rel > 0x20000:
@@ -90,28 +71,18 @@ def decode_type(img: core.Image, sbase: int, raw: int) -> dict:
             name = qstring(img, sbase, index)
         except Exception:
             name = None
-        return {
-            'encoding': 'UNRESOLVED_STRING_INDEX',
-            'raw': raw,
-            'string_index': index,
-            'name': name,
-        }
-    return {
-        'encoding': 'QMETATYPE_ID',
-        'raw': raw,
-        'id': raw,
-        'name': QT_METATYPE_NAMES.get(raw),
-    }
+        return {'encoding': 'UNRESOLVED_STRING_INDEX', 'raw': raw, 'string_index': index, 'name': name}
+    return {'encoding': 'QMETATYPE_ID', 'raw': raw, 'id': raw, 'name': QT_METATYPE_NAMES.get(raw)}
 
 
 def parse_meta_candidate(img: core.Image, sbase: int, mbase: int) -> dict | None:
     if not img.mapped(mbase, 56):
         return None
     try:
-        header = [img.u32(mbase + i * 4) for i in range(14)]
+        header = [u32(img, mbase + i * 4) for i in range(14)]
     except Exception:
         return None
-    revision, class_index, _class_info_count, _class_info_offset, method_count, method_offset, _property_count, _property_offset, _enum_count, _enum_offset, _ctor_count, _ctor_offset, flags, signal_count = header
+    revision, class_index, _cic, _cio, method_count, method_offset, _pc, _po, _ec, _eo, _cc, _co, flags, signal_count = header
     if not (7 <= revision <= 20 and class_index == 0 and 0 < method_count <= 1000 and 14 <= method_offset < 200000 and signal_count <= method_count):
         return None
     try:
@@ -125,18 +96,15 @@ def parse_meta_candidate(img: core.Image, sbase: int, mbase: int) -> dict | None
     try:
         for index in range(method_count):
             at = mbase + (method_offset + index * 6) * 4
-            row = [img.u32(at + j * 4) for j in range(6)]
+            row = [u32(img, at + j * 4) for j in range(6)]
             name_index, argc, parameter_offset, tag_index, method_flags, meta_type_offset = row
             if argc > 64 or parameter_offset >= 400000:
                 return None
             name = qstring(img, sbase, name_index)
             tag = qstring(img, sbase, tag_index) if tag_index else ''
-
             parameter_base = mbase + parameter_offset * 4
-            # Qt moc metadata stores return type followed by argc argument types,
-            # then argc argument-name string indices.
-            type_refs = [img.u32(parameter_base + 4 * i) for i in range(argc + 1)]
-            name_refs = [img.u32(parameter_base + 4 * (argc + 1 + i)) for i in range(argc)]
+            type_refs = [u32(img, parameter_base + 4 * i) for i in range(argc + 1)]
+            name_refs = [u32(img, parameter_base + 4 * (argc + 1 + i)) for i in range(argc)]
             parameter_names = [qstring(img, sbase, ref) if ref else '' for ref in name_refs]
             methods.append({
                 'index': index,
@@ -152,7 +120,6 @@ def parse_meta_candidate(img: core.Image, sbase: int, mbase: int) -> dict | None
             })
     except Exception:
         return None
-
     return {
         'revision': revision,
         'flags': flags,
@@ -164,7 +131,6 @@ def parse_meta_candidate(img: core.Image, sbase: int, mbase: int) -> dict | None
 
 
 def recover_jump_table(img: core.Image, static_metacall: int, method_count: int) -> tuple[int, list[int]]:
-    # Same bounded Qt static-metacall discriminator already proven in source #743.
     instructions = list(img.md.disasm(img.bytes(static_metacall, 0x900), static_metacall))[:420]
     candidates: set[tuple[int, tuple[int, ...]]] = set()
     for pos, row in enumerate(instructions):
@@ -188,13 +154,13 @@ def recover_jump_table(img: core.Image, static_metacall: int, method_count: int)
         if not all(img.executable(target) for target in targets):
             continue
         bounded = any(
-            previous.mnemonic == 'cmp'
-            and len(previous.operands) >= 2
-            and previous.operands[0].type == core.X86_OP_REG
-            and img.md.reg_name(previous.operands[0].reg) == 'edx'
-            and previous.operands[1].type == core.X86_OP_IMM
-            and int(previous.operands[1].imm) == method_count - 1
-            for previous in instructions[max(0, pos - 12):pos]
+            prev.mnemonic == 'cmp'
+            and len(prev.operands) >= 2
+            and prev.operands[0].type == core.X86_OP_REG
+            and img.md.reg_name(prev.operands[0].reg) == 'edx'
+            and prev.operands[1].type == core.X86_OP_IMM
+            and int(prev.operands[1].imm) == method_count - 1
+            for prev in instructions[max(0, pos - 12):pos]
         )
         if bounded:
             candidates.add((table, targets))
@@ -249,11 +215,6 @@ def direct_edges_to(img: core.Image, fde: tuple[int, int] | None, target: int) -
     return rows
 
 
-def sanitize_type(value: dict) -> dict:
-    # Keep only static metadata; no binary bytes or runtime values.
-    return value
-
-
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument('--client', type=Path, required=True)
@@ -283,8 +244,8 @@ def main() -> None:
             'index': method['index'],
             'name': method['name'],
             'argc': method['argc'],
-            'return_type': sanitize_type(method['return_type']),
-            'parameter_types': [sanitize_type(value) for value in method['parameter_types']],
+            'return_type': method['return_type'],
+            'parameter_types': method['parameter_types'],
             'parameter_names': method['parameter_names'],
             'flags': method['flags'],
             'case_target': core.hx(target),

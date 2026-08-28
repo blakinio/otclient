@@ -1,16 +1,16 @@
 ---
 task_id: OTC-20260828-canonical-client-fence-reconciliation
-status: live_reconciliation_pass_release_pending
+status: implementing_current_identity_reconciliation
 agent: ChatGPT
 session_role: implementer
 project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: infrastructure
-phase: closeout
-branch: docs/OTC-20260828-canonical-client-fence-reconciliation-closeout
+phase: implementation_repair
+branch: fix/OTC-20260828-current-identity-reconciliation
 base_branch: main
-base_main: 32146659213cba71910cbe8d46aa4c2f6ded607c
+base_main: 20185ccc95962322f8ea46c1661cc17538897ac6
 created: 2026-08-28T22:00:00+02:00
 risk: high
 execution_class: github_hosted
@@ -64,7 +64,9 @@ reuses:
   - PR #766 first recovery admission
   - PR #767 merged UNKNOWN remote-mapping repair
   - PR #770 repaired recovery re-admission
-blocks: []
+  - PR #774 recorded fresh gameWindowState preflight identity mismatch
+blocks:
+  - LIVE_GAME_WINDOW_STATE_CAUSAL_VALIDATION
 ---
 
 # Objective
@@ -136,10 +138,10 @@ mutation_authorized: false
 recovery_mode: NOT_APPLICABLE
 ```
 
-No further canonical client-fence reconciliation trigger is authorized or needed from this task.
+No live reconciliation trigger is authorized by this implementation checkpoint. A separate repository admission is required after this repair is merged and exact-head verified.
 
 # Downstream next action
 
-After this closeout is exact-head GREEN and merged to protected `main`, rerun the memory-free `PREFLIGHT_GAME_WINDOW_STATE_QUALIFICATION`. That preflight must freshly resolve the exact-current registration and global singleton target without process-memory observation. Only if it emits logger readiness may the owner be asked to manually perform `LOGIN_SCREEN -> CHARACTER_SELECT -> WORLD -> WORLD_EXIT` while one continuous read-only logger runs.
+After this implementation repair is exact-head GREEN and merged to protected `main`, create and merge a separate fresh `canonical_recovery` admission for one metadata-only current-identity reconciliation. Only after that live reconciliation succeeds and its temporary authority is released may the memory-free `PREFLIGHT_GAME_WINDOW_STATE_QUALIFICATION` be rerun. That preflight must freshly resolve the exact-current registration and global singleton target without process-memory observation. Only if it emits logger readiness may the owner be asked to manually perform `LOGIN_SCREEN -> CHARACTER_SELECT -> WORLD -> WORLD_EXIT` while one continuous read-only logger runs.
 
-next_action: merge this repository-only authority-release checkpoint after fresh governance/CI, then run one fresh `PREFLIGHT_GAME_WINDOW_STATE_QUALIFICATION`; do not request owner UI interaction unless that preflight explicitly reports READY.
+next_action: merge this repository-only implementation repair after fresh governance/CI; then use a separate fresh canonical-recovery admission to reconcile the exact-current stale runtime identity, release it, and rerun a new memory-free preflight.

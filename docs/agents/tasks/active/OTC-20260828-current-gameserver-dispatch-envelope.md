@@ -1,4 +1,4 @@
-﻿---
+---
 task_id: OTC-20260828-current-gameserver-dispatch-envelope
 status: investigating
 agent: ChatGPT
@@ -9,7 +9,7 @@ track_id: official-client-re
 task_kind: discovery
 phase: source_research
 branch: research/OTC-20260828-current-gameserver-dispatch-envelope
-related_pr: PENDING
+related_pr: 737
 base_branch: main
 base_main: 470d5bd285e29f9d3f24f70ff3fc5370e2990e2a
 created: 2026-08-28T09:41:41+02:00

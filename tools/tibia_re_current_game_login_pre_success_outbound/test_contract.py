@@ -32,10 +32,12 @@ assert 'FIELD6_BACKWARD_SOURCE' in runner
 assert 'CFG_REACHING_DEFINITION' in runner
 assert 'NEAREST_STATIC_REGISTER_DEFINITION' not in runner
 assert 'LOGIN_PRODUCER_CALLSITE_CONTEXTS' in runner
+assert 'VIRTUAL_SLOT_0X60_CENSUS' in runner
 assert "'field6_source_context'" in runner
 assert "'field6_backward_source'" in runner
 assert "'nested_source_contexts'" in runner
 assert "'producer_callsite_contexts'" in runner
+assert "'virtual_slot_0x60_callsites'" in runner
 assert 'subprocess' not in text + runner
 assert 'ptrace' not in (text + runner).lower()
 assert 'process_vm_readv' not in (text + runner).lower()

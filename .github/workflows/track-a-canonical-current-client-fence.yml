@@ -21,6 +21,7 @@ on:
       - docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
       - docs/agents/CHANGELOG.md
       - docs/agents/tasks/active/OTC-20260828-canonical-current-client-fence.md
+      - docs/agents/evidence/OTC-20260828-canonical-current-client-fence/**
 
 permissions:
   contents: read
@@ -29,17 +30,20 @@ jobs:
   current-canonical-fence:
     name: Current exact-client canonical fence
     runs-on: ubuntu-24.04
-    timeout-minutes: 6
+    timeout-minutes: 8
     steps:
       - name: Checkout exact repair head
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
-      - name: Validate current canonical fence contract
+          fetch-depth: 0
+
+      - name: Validate focused current-fence contract
         shell: bash
         run: |
           set -Eeuo pipefail
           python3 .github/scripts/test_track_a_canonical_current_client_fence.py
+
       - name: Validate canonical runtime components
         shell: bash
         run: |
@@ -47,81 +51,72 @@ jobs:
           bash -n .github/scripts/tibia-official-client-re-canonical-live-session.sh
           python3 -m py_compile \
             .github/scripts/tibia-official-client-re-canonical-live-transition.py \
-            .github/scripts/tibia-official-client-re-kasm-existing-runtime-probe.py
+            .github/scripts/tibia-official-client-re-kasm-existing-runtime-probe.py \
+            .github/scripts/test_track_a_agent_runtime_governance.py \
+            .github/scripts/test_track_a_canonical_current_client_fence.py
           python3 .github/scripts/test_tibia_official_client_re_canonical_live_session.py -v
           python3 .github/scripts/test_tibia_official_client_re_canonical_live_transition.py -v
           python3 .github/scripts/test_tibia_official_client_re_kasm_existing_runtime_probe.py -v
-      - name: Assert repository-only execution boundary
+          echo TRACK_A_CANONICAL_RUNTIME_COMPONENTS=PASS
+
+      - name: Validate deterministic Track A governance against exact PR scope
         shell: bash
         run: |
           set -Eeuo pipefail
-          task='docs/agents/tasks/active/OTC-20260828-canonical-current-client-fence.md'
-          grep -Fq 'runtime_access: none' "$task"
-          grep -Fq 'mutation_authorized: false' "$task"
-          grep -Fq 'credentials_allowed: false' "$task"
-          grep -Fq 'login_allowed: false' "$task"
-          grep -Fq 'process_control_authorized: false' "$task"
-          grep -Fq 'physical_action_budget: 0' "$task"
+          git fetch --no-tags origin main
+          python3 .github/scripts/test_track_a_agent_runtime_governance.py \
+            --changed-from origin/main \
+            --expected-branch fix/OTC-20260828-canonical-current-client-fence
+          echo TRACK_A_DETERMINISTIC_GOVERNANCE=PASS
 
-  apply-governance-fence-repair:
-    name: Apply deterministic governance fence repair
-    runs-on: ubuntu-24.04
-    timeout-minutes: 6
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout repair branch
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
-        with:
-          ref: fix/OTC-20260828-canonical-current-client-fence
-          fetch-depth: 0
-          persist-credentials: true
-      - name: Replace only count-asserted stale governance constants
+      - name: Parse workflow YAML and validate diff
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          ruby -e 'require "yaml"; YAML.load_file(ARGV[0]); YAML.load_file(ARGV[1]); puts "YAML_PARSE=PASS"' \
+            .github/workflows/track-a-canonical-current-client-fence.yml \
+            .github/workflows/track-a-canonical-live-governance.yml
+          git diff --check origin/main...HEAD
+          echo GIT_DIFF_CHECK=PASS
+
+      - name: Assert current-authority stale fence is absent
         shell: bash
         run: |
           set -Eeuo pipefail
           python3 - <<'PY'
           from pathlib import Path
-          path = Path('.github/scripts/test_track_a_agent_runtime_governance.py')
-          text = path.read_text(encoding='utf-8')
-          old_sha = 'ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8'
-          new_sha = 'd1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a'
-
-          def replace_all_asserted(old: str, new: str, old_expected: int, new_expected_after: int) -> None:
-              global text
-              old_count = text.count(old)
-              if old_count == old_expected:
-                  text = text.replace(old, new)
-              elif old_count == 0 and text.count(new) == new_expected_after:
-                  return
-              else:
-                  raise SystemExit(f'governance replacement count invalid for {old!r}: old={old_count}, new={text.count(new)}')
-              if text.count(new) != new_expected_after:
-                  raise SystemExit(f'governance replacement post-count invalid for {new!r}: {text.count(new)}')
-
-          replace_all_asserted(old_sha, new_sha, 3, 3)
-          replace_all_asserted('52109920', '52105824', 3, 3)
-          replace_all_asserted('exact_version = "15.32"', 'exact_version = "15.32.75d4a0"', 1, 1)
-          replace_all_asserted("VER = '15.32'", "VER = '15.32.75d4a0'", 1, 1)
-          path.write_text(text, encoding='utf-8')
+          old_sha='ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8'
+          current_paths=(
+              '.github/scripts/tibia-official-client-re-canonical-live-session.sh',
+              '.github/scripts/tibia-official-client-re-canonical-live-transition.py',
+              '.github/scripts/tibia-official-client-re-kasm-existing-runtime-probe.py',
+              '.github/scripts/test_track_a_agent_runtime_governance.py',
+              '.github/workflows/track-a-canonical-live-governance.yml',
+              'docs/agents/TIBIA_RESEARCH_TRACKS.md',
+              'docs/agents/decisions/ADR-0001-track-a-canonical-live-runtime.md',
+              'docs/agents/contracts/TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md',
+              'docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md',
+          )
+          for path_s in current_paths:
+              text=Path(path_s).read_text(encoding='utf-8')
+              if old_sha in text:
+                  raise SystemExit(f'STALE_CURRENT_SHA:{path_s}')
+          print('STALE_CURRENT_AUTHORITY_SCAN=PASS')
           PY
-          python3 -m py_compile .github/scripts/test_track_a_agent_runtime_governance.py
-          python3 .github/scripts/test_track_a_agent_runtime_governance.py \
-            --changed-from origin/main \
-            --expected-branch fix/OTC-20260828-canonical-current-client-fence
-          python3 .github/scripts/test_track_a_canonical_current_client_fence.py
-          git diff --check
-      - name: Commit deterministic governance repair when needed
+
+      - name: Assert repository-only execution boundary
         shell: bash
         run: |
           set -Eeuo pipefail
-          if git diff --quiet -- .github/scripts/test_track_a_agent_runtime_governance.py; then
-            echo GOVERNANCE_FENCE_REPAIR_ALREADY_APPLIED=true
-            exit 0
-          fi
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add .github/scripts/test_track_a_agent_runtime_governance.py
-          git diff --cached --check
-          git commit -m 'test(track-a): advance deterministic governance fence'
-          git push origin HEAD:fix/OTC-20260828-canonical-current-client-fence
+          task='docs/agents/tasks/active/OTC-20260828-canonical-current-client-fence.md'
+          grep -Fqx 'runtime_access: none' "$task"
+          grep -Fqx 'mutation_authorized: false' "$task"
+          grep -Fqx 'credentials_allowed: false' "$task"
+          grep -Fqx 'login_allowed: false' "$task"
+          grep -Fqx 'character_selection_allowed: false' "$task"
+          grep -Fqx 'gameplay_allowed: false' "$task"
+          grep -Fqx 'gui_input_authorized: false' "$task"
+          grep -Fqx 'process_control_authorized: false' "$task"
+          grep -Fqx 'network_payload_capture_allowed: false' "$task"
+          grep -Fqx 'physical_action_budget: 0' "$task"
+          echo TRACK_A_CANONICAL_CURRENT_FENCE_RUNTIME_ACCESS=NONE

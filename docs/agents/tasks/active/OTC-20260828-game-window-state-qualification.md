@@ -96,7 +96,7 @@ The merged reader provides:
 - no arbitrary `OTHER` text retention;
 - `in_game_claimed=false` and `semantic_promotion_performed=false` unconditionally.
 
-PR #754 advanced the trusted exact-client fence to the same build used by the reader. PR #756 aligns the live workflow with `docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md`: repository state remains `none`; a fresh live invocation must explicitly transition to `read_only`, while canonical Gate A, generation rebind and Gate B remain `NOT_APPLICABLE` for that observation.
+PR #754 advanced the trusted exact-client fence to the same build used by the reader. PR #756 aligned the live workflow with `docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md`: repository state remains `none`; a fresh live invocation must explicitly transition to `read_only`, while canonical Gate A, generation rebind and Gate B remain `NOT_APPLICABLE` for that observation.
 
 # Fresh live admission before process-memory observation
 
@@ -133,6 +133,30 @@ Only after causal PASS and separate independent exact-head review may a later pr
 
 # Current blocker
 
-No repository/static prerequisite remains after #754 and #755. Live observation remains refused until #756 is trusted-main GREEN and a live invocation freshly persists/validates the read-only admission record described above. Owner interaction is not required until the continuous logger is actually ready to start from `LOGIN_SCREEN`.
+Trusted-main PR #756 is merged as `356f49bfebab5f758dc1f95b1a74ef1d6e741b41`, and its memory-free readiness preflight was executed as workflow run `33193448068`, job `98924502254`.
 
-next_action: finish PR #756 exact-head verification and merge if protected-main policy permits; then perform fresh trusted-main read-only admission and engage the owner only for the manual LOGIN_SCREEN -> CHARACTER_SELECT -> WORLD -> WORLD_EXIT sequence.
+The preflight failed closed in `Resolve canonical registration and current ownership` with exact error:
+
+`REGISTRATION_CLIENT_VERSION_MISMATCH`
+
+Therefore the authoritative `runtime-registration.json` does not currently satisfy the exact required version `15.32.75d4a0`. The run stopped before global candidate inventory, fresh read-only admission and every process-memory step. Current registered PID/start validity, live executable size/SHA, target uniqueness and every `gameWindowState` phase value remain `UNKNOWN` and must not be inferred from historical evidence.
+
+Durable execution evidence:
+
+`docs/agents/evidence/OTC-20260828-game-window-state-qualification/live-preflight-blocker.md`
+
+Canonical-live governance forbids ad-hoc editing of `runtime-registration.json`; reconciliation/re-admission must occur under the canonical-live governance lane before this qualification may retry preflight. Owner manual UI interaction is **not** requested because the logger is not READY.
+
+Terminal result for this execution:
+
+`LIVE_GAME_WINDOW_STATE_CAUSAL_VALIDATION=BLOCKED_FAIL_CLOSED`
+
+`BLOCKER=CANONICAL_REGISTRATION_CLIENT_VERSION_MISMATCH`
+
+`PROCESS_MEMORY_OBSERVATION_PERFORMED=false`
+
+`IN_GAME_CLAIMED=false`
+
+`semantic_promotion_performed=false`
+
+next_action: canonical-live governance owner/worker must freshly reconcile or re-admit one exact-current runtime without ad-hoc registration editing; then rerun `PREFLIGHT_GAME_WINDOW_STATE_QUALIFICATION`. Only a successful preflight may engage the owner for LOGIN_SCREEN -> CHARACTER_SELECT -> WORLD -> WORLD_EXIT.

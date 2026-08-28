@@ -29,34 +29,28 @@ jobs:
           python3 -m py_compile \
             tools/tibia_re_current_login_field6_callsite_owner/probe.py \
             tools/tibia_re_current_login_field6_callsite_owner/member_provenance.py
+          bash -n tools/tibia_re_current_login_field6_callsite_owner/prepare_warp.sh
 
-      - name: Prepare exact public client through WARP
+      - name: Prepare exact public client through bounded WARP fallback
         shell: bash
         run: |
           set -Eeuo pipefail
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends curl python3-capstone python3-pyelftools
           r="$RUNNER_TEMP/field6-owner"
-          mkdir -p "$r/bin" "$r/state" "$r/pkg"
+          mkdir -p "$r/bin" "$r/pkg"
           curl -fsSL -o "$r/bin/wgcf" https://github.com/ViRb3/wgcf/releases/download/v2.2.32/wgcf_2.2.32_linux_amd64
           echo '2ff97f2201972ce582a424455d50a3719a380eef0cd1f3144f7779348e122a2c  '"$r"'/bin/wgcf' | sha256sum -c - >/dev/null
           curl -fsSL -o "$r/bin/wireproxy.tgz" https://github.com/windtf/wireproxy/releases/download/v1.1.3/wireproxy_linux_amd64.tar.gz
           echo 'e88c1d090740373fc606c1bafd81d9a5eadc642cce5667616e20e9d7a444f51c  '"$r"'/bin/wireproxy.tgz' | sha256sum -c - >/dev/null
           mkdir "$r/bin/wp" && tar -xzf "$r/bin/wireproxy.tgz" -C "$r/bin/wp"
           cp "$(find "$r/bin/wp" -type f -name wireproxy -print -quit)" "$r/bin/wireproxy"
-          chmod 755 "$r/bin/wgcf" "$r/bin/wireproxy"
-          cd "$r/state"
-          "$r/bin/wgcf" register --accept-tos >/dev/null
-          "$r/bin/wgcf" generate >/dev/null
-          printf 'WGConfig = %s\n\n[Socks5]\nBindAddress = 127.0.0.1:25346\n' "$r/state/wgcf-profile.conf" > wireproxy.conf
-          nohup "$r/bin/wireproxy" -c wireproxy.conf >"$r/wireproxy.log" 2>&1 </dev/null &
-          for _ in $(seq 1 30); do
-            curl --socks5-hostname 127.0.0.1:25346 -fsS --max-time 10 https://www.cloudflare.com/cdn-cgi/trace >"$r/trace" 2>/dev/null && grep -Eq '^warp=(on|plus)$' "$r/trace" && break
-            sleep 2
-          done
-          grep -Eq '^warp=(on|plus)$' "$r/trace"
+          chmod 755 "$r/bin/wgcf" "$r/bin/wireproxy" tools/tibia_re_current_login_field6_callsite_owner/prepare_warp.sh
+          tools/tibia_re_current_login_field6_callsite_owner/prepare_warp.sh
+          socks_port="$(cat "$r/active-socks-port")"
+          echo "RE_SOCKS_PORT=$socks_port" >> "$GITHUB_ENV"
           base=https://static.tibia.com/launcher/tibiaclient-linux-current
-          curl --socks5-hostname 127.0.0.1:25346 --compressed -fL "$base/package.json" -o "$r/pkg/package.json"
+          curl --socks5-hostname "127.0.0.1:$socks_port" --compressed -fL "$base/package.json" -o "$r/pkg/package.json"
           python3 - "$r/pkg/package.json" "$GITHUB_ENV" <<'PY'
           import json,sys
           doc=json.load(open(sys.argv[1],encoding='utf-8'))
@@ -79,7 +73,7 @@ jobs:
         run: |
           set -Eeuo pipefail
           trap 'rm -f "$RE_ROOT/pkg/client" "$RE_ROOT/pkg/client.lzma"' EXIT
-          curl --socks5-hostname 127.0.0.1:25346 --compressed -fL "$RE_BASE/$RE_CLIENT_URL" -o "$RE_ROOT/pkg/client.lzma"
+          curl --socks5-hostname "127.0.0.1:$RE_SOCKS_PORT" --compressed -fL "$RE_BASE/$RE_CLIENT_URL" -o "$RE_ROOT/pkg/client.lzma"
           echo "$RE_PACKED_SHA  $RE_ROOT/pkg/client.lzma" | sha256sum -c - >/dev/null
           test "$(stat -c %s "$RE_ROOT/pkg/client.lzma")" = "$RE_PACKED_SIZE"
           python3 - "$RE_ROOT/pkg/client.lzma" "$RE_ROOT/pkg/client" "$RE_UNPACKED_SHA" "$RE_UNPACKED_SIZE" <<'PY'

@@ -25,7 +25,9 @@ jobs:
         run: |
           set -Eeuo pipefail
           python3 tools/tibia_re_current_login_field6_last_scalar_owner/test_contract.py
-          python3 -m py_compile tools/tibia_re_current_login_field6_last_scalar_owner/probe.py
+          python3 -m py_compile \
+            tools/tibia_re_current_login_field6_last_scalar_owner/probe.py \
+            tools/tibia_re_current_login_field6_last_scalar_owner/focused_probe.py
           bash -n tools/tibia_re_current_login_field6_last_scalar_owner/prepare_warp.sh
       - name: Prepare exact public client through bounded WARP fallback
         shell: bash
@@ -80,7 +82,7 @@ jobs:
           pathlib.Path(dst).write_bytes(raw)
           PY
           mkdir -p artifacts/current-login-field6-last-scalar-owner
-          python3 tools/tibia_re_current_login_field6_last_scalar_owner/probe.py --client "$RE_ROOT/pkg/client" --output artifacts/current-login-field6-last-scalar-owner/result.json
+          python3 tools/tibia_re_current_login_field6_last_scalar_owner/focused_probe.py --client "$RE_ROOT/pkg/client" --output artifacts/current-login-field6-last-scalar-owner/result.json
           rm -f "$RE_ROOT/pkg/client" "$RE_ROOT/pkg/client.lzma"
           echo RAW_CLIENT_RETAINED=false
       - name: Validate sanitized result

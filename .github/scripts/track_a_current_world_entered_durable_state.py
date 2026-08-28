@@ -274,6 +274,7 @@ def main(argv: list[str]) -> int:
     sections, relocs = base.parse_elf_layout(raw)
     meta = recover_qmeta_class(raw, sections, relocs, TARGET_CLASS)
     game_window_meta = recover_qmeta_class(raw, sections, relocs, GAME_WINDOW_CLASS)
+    game_window_entry_trace = extract_bounded_case_trace(raw, sections, int(game_window_meta["static_metacall_va"]))
     game_window_semantic_properties = select_world_semantic_properties(game_window_meta["properties"])
     game_window_state_properties = [prop for prop in game_window_meta["properties"] if prop["name"] == "gameWindowState"]
     game_window_state_read: dict[str, object] = {"state": "NOT_PROVEN"}
@@ -285,9 +286,16 @@ def main(argv: list[str]) -> int:
             body = resolve_generated_slot_body(raw, sections, int(read_case["case_target_va"]))
             try:
                 backing_shape = {"state": "PROVEN_STATIC_DIRECT_QSTRING_MEMBER_SHAPE", **classify_qstring_member_copy(case_trace)}
+                backing_member = prove_qmeta_backing_member(game_window_entry_trace, backing_shape)
             except DurableStateError as exc:
                 backing_shape = {"state": "NOT_PROVEN", "reason": str(exc)}
-            game_window_state_read = {**read_case, **body, "case_trace": case_trace, "backing_member_shape": backing_shape, "property": property_meta}
+                backing_member = {"state": "NOT_PROVEN", "reason": str(exc)}
+            game_window_state_read = {
+                **read_case, **body, "case_trace": case_trace,
+                "backing_member_shape": backing_shape,
+                "qmeta_backing_member": backing_member,
+                "property": property_meta,
+            }
         except DurableStateError as exc:
             game_window_state_read = {"state": "NOT_PROVEN", "reason": str(exc), "property": property_meta}
     elif len(game_window_state_properties) != 1:
@@ -337,7 +345,7 @@ def main(argv: list[str]) -> int:
         "exact_client": {"version": "15.32.75d4a0", "size": base.EXPECTED_SIZE, "sha256": base.EXPECTED_SHA256},
         "game_window_property_census": {
             "class_name": game_window_meta["class_name"],
-            "static_metacall_entry_trace": extract_bounded_case_trace(raw, sections, int(game_window_meta["static_metacall_va"])),
+            "static_metacall_entry_trace": game_window_entry_trace,
             "static_metaobject_va": game_window_meta["static_metaobject_va"],
             "static_metacall_va": game_window_meta["static_metacall_va"],
             "method_count": game_window_meta["method_count"],
@@ -600,6 +608,38 @@ def classify_qstring_member_copy(trace: dict[str, object]) -> dict[str, object]:
     if len(unique) != 1:
         raise DurableStateError(f"QSTRING_MEMBER_COPY_NOT_UNIQUE:{sorted(unique)}")
     return next(iter(unique.values()))
+
+
+def prove_qmeta_backing_member(entry_trace: dict[str, object], backing_shape: dict[str, object]) -> dict[str, object]:
+    import re
+
+    base_register = str(backing_shape.get("base_register", ""))
+    aliases = {"rdi"}
+    proven = False
+    for item in entry_trace.get("instructions", []):
+        mnemonic = str(item.get("mnemonic", ""))
+        op_str = str(item.get("op_str", ""))
+        if mnemonic != "mov":
+            continue
+        match = re.fullmatch(r"([a-z0-9]+), ([a-z0-9]+)", op_str)
+        if not match:
+            continue
+        dest = _canonical_register(match.group(1))
+        source = _canonical_register(match.group(2))
+        aliases.discard(dest)
+        if source in aliases:
+            aliases.add(dest)
+        if dest == base_register:
+            proven = source in aliases
+    if base_register not in aliases or not proven:
+        raise DurableStateError(f"QMETA_BACKING_OBJECT_ALIAS_NOT_PROVEN:{base_register}")
+    return {
+        "state": "PROVEN_STATIC_QMETA_BACKING_MEMBER",
+        "qmeta_object_argument_register": "rdi",
+        "backing_register": base_register,
+        "member_offset": int(backing_shape["member_offset"]),
+        "byte_width": int(backing_shape["byte_width"]),
+    }
 
 
 if __name__ == "__main__":

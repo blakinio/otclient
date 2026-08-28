@@ -162,5 +162,24 @@ class QStringBackingMemberShapeTests(unittest.TestCase):
             module.classify_qstring_member_copy(trace)
 
 
+class QMetaBackingObjectAliasTests(unittest.TestCase):
+    def test_proves_backing_member_base_from_static_metacall_prologue(self):
+        entry = {"instructions": [
+            {"mnemonic": "push", "op_str": "rbx"},
+            {"mnemonic": "mov", "op_str": "rbx, rdi"},
+            {"mnemonic": "sub", "op_str": "rsp, 0x98"},
+        ]}
+        shape = {"base_register": "rbx", "member_offset": 0x60, "byte_width": 24}
+        result = module.prove_qmeta_backing_member(entry, shape)
+        self.assertEqual(0x60, result["member_offset"])
+        self.assertEqual("rdi", result["qmeta_object_argument_register"])
+
+    def test_rejects_unbound_backing_register(self):
+        entry = {"instructions": [{"mnemonic": "mov", "op_str": "rbx, rax"}]}
+        shape = {"base_register": "rbx", "member_offset": 0x60, "byte_width": 24}
+        with self.assertRaisesRegex(module.DurableStateError, "QMETA_BACKING_OBJECT_ALIAS_NOT_PROVEN"):
+            module.prove_qmeta_backing_member(entry, shape)
+
+
 if __name__ == "__main__":
     unittest.main()

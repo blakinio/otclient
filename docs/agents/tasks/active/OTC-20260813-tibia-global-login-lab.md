@@ -847,3 +847,19 @@ TDD RED is proven on hosted run `33145320209`, job `98764948909`, exact test-onl
 The minimal repair adds runtime-derived `operatingsystem` to the encrypted producer, HTTP preflight and world-entry producer, while forbidding synthesized conditional token/code fields. Local focused contract, shell syntax, QSysInfo-compatible Linux derivation check and `git diff --check` pass. The game E2E marker remains absent.
 
 `next_action`: push the GREEN implementation head and consume exactly one automatic encrypted-handoff HTTP-only validation; if session/playdata is valid, authorize the single typed game E2E, otherwise checkpoint the redacted rejection and do not retry identically.
+## 2026-08-28 current `0x34` fallback V6 terminal checkpoint
+
+This checkpoint supersedes the prior current-dispatch next action.
+
+Durable evidence: `docs/agents/evidence/OTC-20260813-tibia-global-login-lab/20260828-current-0x34-fallback-e2e-server-silence.md`.
+
+Exact sequence:
+- trusted-main promotion #738 proves current `0x34 = UNKNOWN_FALLBACK` and controls `0x14/0x17/0x1f`;
+- TDD RED run `33153321907` proved the required fallback boundary before implementation;
+- repair `62845fd2783f8e58a80e831ce01103f20367045b` consumes only the first exact-current bounded `0x34` packet before legacy parsing;
+- focused GREEN run `33153409826` passed with game build/probe skipped;
+- one materially changed E2E run `33153487819`, exact build job `98790748187`, world-entry job `98791849013`, reached valid HTTP session/playdata and game TCP setup but sent `102` client bytes and received `0` server bytes;
+- `GAME_START=false`, `IN_GAME=false`; no `GAME_SERVER_OPCODE_*` marker occurred, so the new fallback code was never exercised;
+- marker was removed on `4a59adb9423b51dae0fdb4bac0cd7bc9d2d579dc`; identical retry remains forbidden.
+
+`next_action`: `BLOCKED_REQUIRED_CURRENT_NATIVE_PRE_LOGIN_OUTBOUND_SEQUENCE_EVIDENCE`. Recover exact-current static causality for all native `GameclientMessage*` sends surrounding first game-server connect / `sendLogin` and before login success. No further official-service game E2E until a promoted material outbound delta exists.

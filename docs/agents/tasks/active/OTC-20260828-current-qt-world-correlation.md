@@ -1,7 +1,7 @@
 ---
 task_id: OTC-20260828-current-qt-world-correlation
 status: implementing
-phase: world_entered_semantic_anchor_static_recovery
+phase: world_entered_signal_member_static_recovery
 agent: ChatGPT
 session_role: runtime_observer
 project_lane: otclient
@@ -71,9 +71,18 @@ deep_lifecycle_same_start_ticks: 51652120
 deep_lifecycle_causal_corridor: REPEATABLE_NOT_PROMOTED
 deep_lifecycle_durable_evidence: docs/agents/evidence/OTC-20260828-current-qt-world-correlation
 world_entered_historical_owner_type: tibia::game::TPlayerProtocolMessageHandler
-world_entered_exact_current_anchor: UNKNOWN
-current_blocker: EXACT_CURRENT_WORLD_ENTERED_SEMANTIC_ANCHOR_NOT_RECOVERED
-next_action: recover exact-current TPlayerProtocolMessageHandler::worldEntered QMeta/signal anchor without historical address reuse; build a read-only semantic observer only after static recovery; preserve IN_GAME_CLAIMED=false until causal live validation and independent review
+world_entered_exact_current_anchor: STATIC_QMETA_DISPATCH_RECOVERED_NOT_RUNTIME_VALIDATED
+world_entered_static_run: 33165852596
+world_entered_static_job: 98830952068
+world_entered_static_artifact: 9683536921
+world_entered_static_result_sha256: 64f476776746065802a07492260f7bf2431d91d191faa61941651f7c197b3130
+world_entered_static_metaobject: 0x30b6ba0
+world_entered_static_metacall: 0xd28460
+world_entered_static_dispatch_table: 0x1d941e8
+world_entered_method_index: 17
+world_entered_dispatch_case: 0xd28890
+current_blocker: WORLD_ENTERED_NORMAL_RUNTIME_SIGNAL_MEMBER_NOT_PROVEN
+next_action: follow exact-current generated worldEntered dispatch case to the normal signal member/QMetaObject::activate boundary; only after that design a read-only live event observer; preserve IN_GAME_CLAIMED=false until causal live validation and independent review
 ---
 
 # Current Qt world correlation
@@ -84,7 +93,7 @@ The merged deep lifecycle logger then captured three secret-free same-process ru
 
 Durable evidence is retained at `docs/agents/evidence/OTC-20260828-current-qt-world-correlation/`, including exact JSONL from runs `33159662745`, `33161071475` and `33162761241`, artifact hashes, owner markers, reverse control and the explicit no-promotion verdict.
 
-The next frontier is static exact-current recovery of the native `tibia::game::TPlayerProtocolMessageHandler::worldEntered` signal or a durable state directly caused by that signal. Historical QMeta addresses may be used only as background semantic evidence, never as current lookup keys. Any current anchor must be recovered from the exact `15.32.75d4a0` / `d1a16819...` ELF and independently reviewed.
+Exact-current static run `33165852596` recovered `TPlayerProtocolMessageHandler::worldEntered` independently from the `15.32.75d4a0` ELF: current method/signal index `17`, generated dispatch case `0xd28890`, with materially shifted current QMeta addresses. Historical QMeta addresses remain background only. The next frontier is to follow that generated case to the normal signal member / `QMetaObject::activate` emission boundary before any live observer is built.
 
 The previous runtime container is no longer present on the Docker host. This is not evidence about client state. Any future live validation requires a fresh canonical runtime admission and exact process identity.
 

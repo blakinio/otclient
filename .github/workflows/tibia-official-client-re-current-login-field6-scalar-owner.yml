@@ -14,7 +14,7 @@ permissions:
 jobs:
   static-field6-scalar-owner:
     runs-on: ubuntu-24.04
-    timeout-minutes: 12
+    timeout-minutes: 8
     steps:
       - name: Checkout exact research head
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
@@ -28,7 +28,8 @@ jobs:
           python3 tools/tibia_re_current_login_field6_scalar_owner/test_contract.py
           python3 -m py_compile \
             tools/tibia_re_current_login_field6_scalar_owner/probe.py \
-            tools/tibia_re_current_login_field6_scalar_owner/qmeta_owner.py
+            tools/tibia_re_current_login_field6_scalar_owner/qmeta_owner.py \
+            tools/tibia_re_current_login_field6_scalar_owner/focused_qmeta_owner.py
           bash -n tools/tibia_re_current_login_field6_scalar_owner/prepare_warp.sh
 
       - name: Prepare exact public client through bounded WARP fallback
@@ -68,7 +69,7 @@ jobs:
           print('CURRENT_LOGIN_FIELD6_SCALAR_OWNER_EXACT_FENCE=PASS')
           PY
 
-      - name: Resolve exact scalar caller QMeta owner and handler binding
+      - name: Resolve focused exact scalar caller owner and handler binding
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -85,12 +86,11 @@ jobs:
           pathlib.Path(dst).write_bytes(raw)
           PY
           mkdir -p artifacts/current-login-field6-scalar-owner
-          python3 tools/tibia_re_current_login_field6_scalar_owner/probe.py --client "$RE_ROOT/pkg/client" --output artifacts/current-login-field6-scalar-owner/result.json
-          python3 tools/tibia_re_current_login_field6_scalar_owner/qmeta_owner.py --client "$RE_ROOT/pkg/client" --output artifacts/current-login-field6-scalar-owner/result.json
+          python3 tools/tibia_re_current_login_field6_scalar_owner/focused_qmeta_owner.py --client "$RE_ROOT/pkg/client" --output artifacts/current-login-field6-scalar-owner/result.json
           rm -f "$RE_ROOT/pkg/client" "$RE_ROOT/pkg/client.lzma"
           echo RAW_CLIENT_RETAINED=false
 
-      - name: Validate sanitized scalar-owner result
+      - name: Validate sanitized focused result
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -103,29 +103,23 @@ jobs:
           assert d['process_memory_access'] is False
           assert d['raw_client_uploaded'] is False
           assert d['exact_client']['sha256']=='d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a'
-          assert d['promoted_target']['handler_vtable_address_point']=='0x30b6700'
-          assert d['promoted_target']['slot_0x60_target']=='0xe25620'
-          assert d['scalar_callsite_census']['classification']=='SCALAR_CALLSITE_CENSUS'
-          assert d['scalar_callsite_census']['scope_markers']['CALLER_FDE_RTTI_OWNERS'] is True
-          assert d['scalar_callsite_census']['scope_markers']['PARENT_MEMBER_HANDLER_BINDING'] is True
-          assert d['scalar_callsite_census']['scope_markers']['NO_HEURISTIC_RANKING'] is True
-          assert d['scalar_callsite_census']['scope_markers']['NO_SEMANTIC_GUESSING'] is True
-          assert d['qmeta_caller_owner']['classification']=='QMETA_CALLER_OWNER'
-          assert d['qmeta_caller_owner']['scope_markers']['TARGET_SCALAR_PARENT_THIS'] is True
-          assert d['qmeta_caller_owner']['scope_markers']['STATIC_METAOBJECT_TRIPLE'] is True
-          assert d['qmeta_caller_owner']['scope_markers']['METHOD_CASE_DIRECT_EDGE'] is True
-          assert d['qmeta_caller_owner']['scope_markers']['OWNER_QMETA_CLASS'] is True
-          assert d['qmeta_caller_owner']['scope_markers']['PARENT_MEMBER_HANDLER_BINDING'] is True
-          assert d['qmeta_caller_owner']['scope_markers']['NO_HEURISTIC_RANKING'] is True
-          assert d['qmeta_caller_owner']['scope_markers']['NO_SEMANTIC_GUESSING'] is True
+          assert d['fresh_exact_reassertion']['classification']=='FRESH_EXACT_REASSERTION'
+          assert d['fresh_exact_reassertion']['viable_callsite']=='0xceddcb'
+          assert d['fresh_exact_reassertion']['viable_edx_value']==1
+          assert d['focused_timeout_recovery']['classification']=='FOCUSED_TIMEOUT_RECOVERY'
+          assert d['focused_timeout_recovery']['no_full_scalar_census'] is True
+          assert d['focused_qmeta_owner']['classification']=='FOCUSED_QMETA_OWNER'
+          assert d['focused_owner_constructor_binding']['classification']=='FOCUSED_OWNER_CONSTRUCTOR_BINDING'
+          assert d['scope_markers']['NO_HEURISTIC_RANKING'] is True
+          assert d['scope_markers']['NO_SEMANTIC_GUESSING'] is True
           assert d['classification'] in ('FIELD6_VALUE_PROVEN','FIELD6_VALUE_UNKNOWN')
-          print('CURRENT_LOGIN_FIELD6_SCALAR_OWNER_SANITIZED_RESULT=PASS')
+          print('CURRENT_LOGIN_FIELD6_FOCUSED_OWNER_SANITIZED_RESULT=PASS')
           PY
 
       - name: Upload sanitized result only
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: current-login-field6-scalar-owner-${{ github.sha }}
+          name: current-login-field6-focused-owner-${{ github.sha }}
           path: artifacts/current-login-field6-scalar-owner/result.json
           if-no-files-found: error
           retention-days: 3

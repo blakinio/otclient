@@ -5,7 +5,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW = ROOT / '.github/workflows/track-a-game-window-state-qualification.yml'
+TASK = ROOT / 'docs/agents/tasks/active/OTC-20260828-game-window-state-qualification.md'
 text = WORKFLOW.read_text(encoding='utf-8')
+task_text = TASK.read_text(encoding='utf-8')
 
 required = (
     'issue_comment:',
@@ -21,9 +23,11 @@ required = (
     'gui_input_authorized: false',
     'process_control_authorized: false',
     'physical_action_budget: 0',
-    'GATE_A_REQUIRED=PASS',
-    'GENERATION_REBIND_REQUIRED=PASS_OR_NOT_REQUIRED',
-    'GATE_B_REQUIRED=PASS',
+    "grep -Fqx 'gate_a: NOT_APPLICABLE' \"$task\"",
+    "grep -Fqx 'generation_rebind: NOT_APPLICABLE' \"$task\"",
+    "grep -Fqx 'gate_b: NOT_APPLICABLE' \"$task\"",
+    "grep -Fqx 'target_uniqueness: PROVEN' \"$task\"",
+    'READ_ONLY_CANONICAL_GATES=NOT_APPLICABLE',
     'TARGET_UNIQUENESS_REQUIRED=PROVEN',
     'python3 .github/scripts/test_track_a_canonical_current_client_fence.py',
     'EXPECTED_SIZE: 52105824',
@@ -42,7 +46,22 @@ required = (
 for needle in required:
     assert needle in text, f'WORKFLOW_CONTRACT_MISSING:{needle}'
 
+for needle in (
+    'runtime_access: read_only',
+    'runtime_owner_task: OTC-20260828-game-window-state-qualification',
+    'runtime_namespace: track-a-game-window-state-validation',
+    'gate_a: NOT_APPLICABLE',
+    'generation_rebind: NOT_APPLICABLE',
+    'gate_b: NOT_APPLICABLE',
+    'target_uniqueness: PROVEN',
+    'mutation_authorized: false',
+):
+    assert needle in task_text, f'TASK_READ_ONLY_ADMISSION_MISSING:{needle}'
+
 for forbidden in (
+    'GATE_A_REQUIRED=PASS',
+    'GENERATION_REBIND_REQUIRED=PASS_OR_NOT_REQUIRED',
+    'GATE_B_REQUIRED=PASS',
     'xdotool', 'xprop', 'xwininfo', 'wmctrl', 'screenshot',
     'TIBIA_TEST_EMAIL', 'TIBIA_TEST_PASSWORD', 'docker cp', '/proc/$pid/environ',
 ):

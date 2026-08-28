@@ -1,0 +1,73 @@
+{
+  "schema": "otclient.track-a.current-game-login-pre-success-outbound.promotion.v1",
+  "decision": "PASS_BOUNDED_NO_IMPLEMENTABLE_VALUE_DELTA",
+  "source": {
+    "pr": 743,
+    "head": "1342423c6fe4ef675f4b0b0cdc39ae012089f20e",
+    "run": 33159660190,
+    "job": 98810772742,
+    "artifact": 9681208967,
+    "artifact_sha256": "c3fabb53fb82d1f466a82c508bfb1be9502061dc9e96737e0f33171a8415247c",
+    "result_json_sha256": "1c1748bbcd0cfe3410111ac3eb3f70563d6695d858cf007e8d07263adf1a472f",
+    "ci_run": 33159660423,
+    "governance_run": 33159660171
+  },
+  "exact_client": {
+    "version": "15.32.75d4a0",
+    "sha256": "d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a",
+    "size": 52105824
+  },
+  "accepted": {
+    "primary_login_producer": {
+      "target": "0xe25620",
+      "fde": ["0xe25620", "0xe2656d"],
+      "handler_vtable_address_point": "0x30b6700",
+      "handler_slot": "0x60"
+    },
+    "gameclient_message_login_outer_fields_present": [1, 2, 3, 6],
+    "outer_field6_write_site": "0xe25ccc",
+    "outer_field6_source": "producer input edx via mov r14d, edx at 0xe25624",
+    "outer_field6_value": "UNKNOWN_CURRENT_EXACT",
+    "nested_authinfo_sources_referenced": {
+      "field1": "auth slot +0x30",
+      "field2": "auth slot +0x40",
+      "field5": "auth slot +0x18",
+      "field6": "auth slot +0x50",
+      "field7": "auth slot +0x60"
+    },
+    "nested_field2_presence": "CONDITIONAL_IN_PRIMARY_PRODUCER",
+    "producer_direct_call_refs": 0,
+    "producer_rip_refs": 0,
+    "auth_start_gameserver_direct_graph_reachable_slot_0x60_calls": 0,
+    "handler_owner_field": "0x9c0",
+    "handler_owner_field_ref_count": 41,
+    "handler_owner_field_to_slot_0x60_calls": 0,
+    "handler_constructor_fde": ["0x7d15c0", "0x7d1a8a"],
+    "handler_connection_count": 5,
+    "handler_connection_reachable_slot_0x60_calls": 0
+  },
+  "withheld": {
+    "outer_field6_semantic_name": "UNKNOWN",
+    "outer_field6_value": "UNKNOWN",
+    "nested_fields1_2_6_7_runtime_values": "UNKNOWN",
+    "nested_fields1_2_6_7_user_facing_semantics": "UNKNOWN",
+    "complete_pre_success_send_sequence": "UNKNOWN",
+    "safe_track_b_outbound_value_delta": "NOT_PROVEN"
+  },
+  "track_b_consequence": {
+    "current_encoder_omits_outer_field6": true,
+    "material_value_for_field6_proven": false,
+    "mutation_authorized_from_this_result": false,
+    "official_service_game_e2e_authorized": false,
+    "next_blocker": "CURRENT_GAME_LOGIN_FIELD6_VALUE_STILL_UNKNOWN"
+  },
+  "safety": {
+    "runtime_access": "none",
+    "official_client_executed": false,
+    "login_performed": false,
+    "secret_access": false,
+    "process_memory_access": false,
+    "packet_capture": false,
+    "raw_client_uploaded": false
+  }
+}

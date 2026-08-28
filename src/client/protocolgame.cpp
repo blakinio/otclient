@@ -75,7 +75,11 @@ void ProtocolGame::onRecv(const InputMessagePtr& inputMessage)
         m_firstRecv = false;
 
         if (g_game.getClientVersion() >= 1405) {
-            inputMessage->getU8(); // padding
+            // Protocol::xteaDecrypt already consumes the modern padding-count
+            // byte when XTEA is active. Only consume it here for an unencrypted
+            // first message.
+            if (!isXteaEncryptionEnabled())
+                inputMessage->getU8();
         } else if (g_game.getFeature(Otc::GameMessageSizeCheck)) {
             const int size = inputMessage->getU16();
             if (size != inputMessage->getUnreadSize()) {

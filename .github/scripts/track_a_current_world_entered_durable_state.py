@@ -283,7 +283,11 @@ def main(argv: list[str]) -> int:
             read_case = recover_property_dispatch_case(raw, sections, game_window_meta, int(property_meta["index"]), 1)
             case_trace = extract_bounded_case_trace(raw, sections, int(read_case["case_target_va"]))
             body = resolve_generated_slot_body(raw, sections, int(read_case["case_target_va"]))
-            game_window_state_read = {**read_case, **body, "case_trace": case_trace, "property": property_meta}
+            try:
+                backing_shape = {"state": "PROVEN_STATIC_DIRECT_QSTRING_MEMBER_SHAPE", **classify_qstring_member_copy(case_trace)}
+            except DurableStateError as exc:
+                backing_shape = {"state": "NOT_PROVEN", "reason": str(exc)}
+            game_window_state_read = {**read_case, **body, "case_trace": case_trace, "backing_member_shape": backing_shape, "property": property_meta}
         except DurableStateError as exc:
             game_window_state_read = {"state": "NOT_PROVEN", "reason": str(exc), "property": property_meta}
     elif len(game_window_state_properties) != 1:
@@ -333,11 +337,17 @@ def main(argv: list[str]) -> int:
         "exact_client": {"version": "15.32.75d4a0", "size": base.EXPECTED_SIZE, "sha256": base.EXPECTED_SHA256},
         "game_window_property_census": {
             "class_name": game_window_meta["class_name"],
+            "static_metacall_entry_trace": extract_bounded_case_trace(raw, sections, int(game_window_meta["static_metacall_va"])),
             "static_metaobject_va": game_window_meta["static_metaobject_va"],
             "static_metacall_va": game_window_meta["static_metacall_va"],
             "method_count": game_window_meta["method_count"],
             "signal_count": game_window_meta["signal_count"],
             "property_count": game_window_meta["property_count"],
+            "methods": game_window_meta["methods"],
+            "state_related_methods": [
+                method for method in game_window_meta["methods"]
+                if any(term in str(method["name"]).lower() for term in ("state", "login", "world", "character", "window"))
+            ],
             "properties": game_window_meta["properties"],
             "world_semantic_properties": game_window_semantic_properties,
             "game_window_state_read": game_window_state_read,
@@ -555,6 +565,41 @@ def extract_bounded_case_trace(raw: bytes, sections, start: int) -> dict[str, ob
         "terminal_jump": terminal_jump,
         "terminal_return": terminal_return,
     }
+
+
+def classify_qstring_member_copy(trace: dict[str, object]) -> dict[str, object]:
+    import re
+
+    instructions = list(trace.get("instructions", []))
+    candidates: list[dict[str, object]] = []
+    for index, item in enumerate(instructions):
+        mnemonic = str(item.get("mnemonic", ""))
+        op_str = str(item.get("op_str", ""))
+        if mnemonic not in ("movdqu", "movups", "movaps") or "xmmword ptr" not in op_str:
+            continue
+        match = re.search(r"xmmword ptr \[([a-z0-9]+) \+ 0x([0-9a-f]+)\]", op_str)
+        if not match:
+            continue
+        base_register = match.group(1)
+        if base_register == "rsp":
+            continue
+        member_offset = int(match.group(2), 16)
+        found_tail = False
+        for later in instructions[index + 1:]:
+            later_mnemonic = str(later.get("mnemonic", ""))
+            later_op = str(later.get("op_str", ""))
+            if later_mnemonic == "call":
+                break
+            qmatch = re.search(r"qword ptr \[([a-z0-9]+) \+ 0x([0-9a-f]+)\]", later_op)
+            if qmatch and qmatch.group(1) == base_register and int(qmatch.group(2), 16) == member_offset + 16:
+                found_tail = True
+                break
+        if found_tail:
+            candidates.append({"base_register": base_register, "member_offset": member_offset, "byte_width": 24})
+    unique = {(c["base_register"], c["member_offset"], c["byte_width"]): c for c in candidates}
+    if len(unique) != 1:
+        raise DurableStateError(f"QSTRING_MEMBER_COPY_NOT_UNIQUE:{sorted(unique)}")
+    return next(iter(unique.values()))
 
 
 if __name__ == "__main__":

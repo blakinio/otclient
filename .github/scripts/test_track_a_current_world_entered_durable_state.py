@@ -129,5 +129,38 @@ class PropertyCaseTraceTests(unittest.TestCase):
         self.assertEqual(3, len(trace["instructions"]))
 
 
+class QStringBackingMemberShapeTests(unittest.TestCase):
+    def test_classifies_direct_24_byte_qstring_member_copy(self):
+        trace = {"instructions": [
+            {"mnemonic": "movdqu", "op_str": "xmm0, xmmword ptr [rbx + 0x60]"},
+            {"mnemonic": "mov", "op_str": "rdx, qword ptr [rbx + 0x70]"},
+            {"mnemonic": "call", "op_str": "0x6a7270"},
+        ]}
+        result = module.classify_qstring_member_copy(trace)
+        self.assertEqual("rbx", result["base_register"])
+        self.assertEqual(0x60, result["member_offset"])
+        self.assertEqual(24, result["byte_width"])
+
+    def test_ignores_stack_qstring_temporary_copy(self):
+        trace = {"instructions": [
+            {"mnemonic": "movdqu", "op_str": "xmm0, xmmword ptr [rbx + 0x60]"},
+            {"mnemonic": "mov", "op_str": "rdx, qword ptr [rbx + 0x70]"},
+            {"mnemonic": "movdqu", "op_str": "xmm1, xmmword ptr [rsp + 0x50]"},
+            {"mnemonic": "mov", "op_str": "rax, qword ptr [rsp + 0x60]"},
+            {"mnemonic": "call", "op_str": "0x6a7270"},
+        ]}
+        result = module.classify_qstring_member_copy(trace)
+        self.assertEqual("rbx", result["base_register"])
+        self.assertEqual(0x60, result["member_offset"])
+
+    def test_rejects_noncontiguous_qstring_shape(self):
+        trace = {"instructions": [
+            {"mnemonic": "movdqu", "op_str": "xmm0, xmmword ptr [rbx + 0x60]"},
+            {"mnemonic": "mov", "op_str": "rdx, qword ptr [rbx + 0x78]"},
+        ]}
+        with self.assertRaisesRegex(module.DurableStateError, "QSTRING_MEMBER_COPY_NOT_UNIQUE"):
+            module.classify_qstring_member_copy(trace)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -117,5 +117,17 @@ class PropertyDispatchSelectionTests(unittest.TestCase):
             module.select_unique_property_dispatch_candidate(candidates, 1)
 
 
+class PropertyCaseTraceTests(unittest.TestCase):
+    def test_stops_at_terminal_jump_and_retains_direct_call(self):
+        raw = bytearray(0x80)
+        # 0x1000 mov rax,[rdi+0x20]; 0x1004 call 0x1010; 0x1009 jmp 0x1015
+        raw[:14] = bytes.fromhex("488b4720e807000000e907000000")
+        sections = [(0x1000, 0, 0x80, 0x6)]
+        trace = module.extract_bounded_case_trace(bytes(raw), sections, 0x1000)
+        self.assertEqual([0x1010], trace["direct_calls"])
+        self.assertEqual(0x1015, trace["terminal_jump"])
+        self.assertEqual(3, len(trace["instructions"]))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -281,8 +281,9 @@ def main(argv: list[str]) -> int:
         property_meta = game_window_state_properties[0]
         try:
             read_case = recover_property_dispatch_case(raw, sections, game_window_meta, int(property_meta["index"]), 1)
+            case_trace = extract_bounded_case_trace(raw, sections, int(read_case["case_target_va"]))
             body = resolve_generated_slot_body(raw, sections, int(read_case["case_target_va"]))
-            game_window_state_read = {**read_case, **body, "property": property_meta}
+            game_window_state_read = {**read_case, **body, "case_trace": case_trace, "property": property_meta}
         except DurableStateError as exc:
             game_window_state_read = {"state": "NOT_PROVEN", "reason": str(exc), "property": property_meta}
     elif len(game_window_state_properties) != 1:
@@ -517,6 +518,42 @@ def recover_property_dispatch_case(raw: bytes, sections, meta: dict[str, object]
         "dispatch_lea_va": int(selected["lea"]),
         "dispatch_table_va": int(selected["table"]),
         "case_target_va": target,
+    }
+
+
+def extract_bounded_case_trace(raw: bytes, sections, start: int) -> dict[str, object]:
+    try:
+        from capstone import Cs, CS_ARCH_X86, CS_MODE_64
+        from capstone.x86_const import X86_OP_IMM
+    except ImportError as exc:
+        raise DurableStateError("CAPSTONE_REQUIRED") from exc
+    import track_a_current_world_entered_anchor as base
+
+    offset = base._va_to_offset(sections, start)
+    md = Cs(CS_ARCH_X86, CS_MODE_64)
+    md.detail = True
+    instructions: list[dict[str, object]] = []
+    direct_calls: list[int] = []
+    terminal_jump: int | None = None
+    terminal_return = False
+    for ins in md.disasm(raw[offset:min(len(raw), offset + 0x180)], start):
+        instructions.append({"address": int(ins.address), "mnemonic": ins.mnemonic, "op_str": ins.op_str})
+        if ins.mnemonic == "call" and ins.operands and ins.operands[0].type == X86_OP_IMM:
+            direct_calls.append(int(ins.operands[0].imm))
+        if ins.mnemonic == "jmp":
+            if ins.operands and ins.operands[0].type == X86_OP_IMM:
+                terminal_jump = int(ins.operands[0].imm)
+            break
+        if ins.mnemonic == "ret":
+            terminal_return = True
+            break
+        if len(instructions) >= 48:
+            break
+    return {
+        "instructions": instructions,
+        "direct_calls": sorted(set(direct_calls)),
+        "terminal_jump": terminal_jump,
+        "terminal_return": terminal_return,
     }
 
 

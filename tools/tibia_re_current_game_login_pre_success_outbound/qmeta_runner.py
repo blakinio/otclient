@@ -62,11 +62,7 @@ def bounded_context(instructions, site: int, before: int = 18, after: int = 20) 
         raise RuntimeError(f'CONTEXT_SITE_AMBIGUOUS:{site:#x}:{len(indexes)}')
     index = indexes[0]
     return [
-        {
-            'at': core.hx(row.address),
-            'mnemonic': row.mnemonic,
-            'operand': row.op_str,
-        }
+        {'at': core.hx(row.address), 'mnemonic': row.mnemonic, 'operand': row.op_str}
         for row in instructions[max(0, index - before):index + after + 1]
     ]
 
@@ -117,9 +113,8 @@ def instruction_predecessors(instructions) -> dict[int, set[int]]:
                     successors.add(target)
             if next_address is not None:
                 successors.add(next_address)
-        else:
-            if next_address is not None:
-                successors.add(next_address)
+        elif next_address is not None:
+            successors.add(next_address)
         for successor in successors:
             predecessors[successor].add(row.address)
     return predecessors
@@ -135,7 +130,6 @@ def backward_register_definition(img: core.Image, instructions, site: int, sourc
     visited: set[int] = set()
     definitions: dict[int, dict] = {}
     reaches_entry_without_definition = False
-
     while queue:
         address = queue.popleft()
         if address in visited:
@@ -156,7 +150,6 @@ def backward_register_definition(img: core.Image, instructions, site: int, sourc
             reaches_entry_without_definition = True
         else:
             queue.extend(preds)
-
     rows = [definitions[key] for key in sorted(definitions)]
     if len(rows) == 1 and not reaches_entry_without_definition:
         classification = 'CFG_REACHING_DEFINITION_UNIQUE'
@@ -199,7 +192,6 @@ def rip_refs(img: core.Image, target: int) -> list[int]:
         if not (section.flags & 4):
             continue
         blob = img.raw[section.offset:section.offset + section.size]
-        # Common x86-64 RIP-relative LEA/MOV encodings, with or without REX.
         for pos in range(0, max(0, len(blob) - 7)):
             if 0x40 <= blob[pos] <= 0x4F and blob[pos + 1] in (0x8D, 0x8B) and (blob[pos + 2] & 0xC7) == 0x05:
                 disp = int.from_bytes(blob[pos + 3:pos + 7], 'little', signed=True)
@@ -242,6 +234,73 @@ def producer_callsite_contexts(img: core.Image, producer: int) -> dict:
     }
 
 
+def local_virtual_dataflow(img: core.Image, instructions, site: int, vtable_reg: int) -> dict:
+    indexes = [i for i, row in enumerate(instructions) if row.address == site]
+    if len(indexes) != 1:
+        return {'classification': 'CALLSITE_NOT_ALIGNED'}
+    call_index = indexes[0]
+    vtable_load = None
+    object_reg = None
+    for row in reversed(instructions[max(0, call_index - 10):call_index]):
+        if row.mnemonic != 'mov' or len(row.operands) < 2:
+            continue
+        dst, src = row.operands[0], row.operands[1]
+        if dst.type != core.X86_OP_REG or dst.reg != vtable_reg:
+            continue
+        if src.type == core.X86_OP_MEM and src.mem.disp == 0 and src.mem.base:
+            vtable_load = row
+            object_reg = src.mem.base
+            break
+    object_definition = None
+    if vtable_load is not None and object_reg is not None:
+        load_index = next(i for i, row in enumerate(instructions) if row.address == vtable_load.address)
+        for row in reversed(instructions[max(0, load_index - 12):load_index]):
+            if not writes_register_family(img, row, register_family(img.md.reg_name(object_reg))):
+                continue
+            object_definition = row
+            break
+    return {
+        'classification': 'LOCAL_VTABLE_LOAD_FOUND' if vtable_load is not None else 'LOCAL_VTABLE_LOAD_UNKNOWN',
+        'vtable_register': img.md.reg_name(vtable_reg),
+        'vtable_load': ({'at': core.hx(vtable_load.address), 'mnemonic': vtable_load.mnemonic, 'operand': vtable_load.op_str} if vtable_load else None),
+        'object_register': (img.md.reg_name(object_reg) if object_reg else None),
+        'object_definition': ({'at': core.hx(object_definition.address), 'mnemonic': object_definition.mnemonic, 'operand': object_definition.op_str} if object_definition else None),
+    }
+
+
+def virtual_slot_0x60_callsites(img: core.Image) -> dict:
+    sites: list[dict] = []
+    seen: set[int] = set()
+    for section in img.sections:
+        if not (section.flags & 4):
+            continue
+        blob = img.raw[section.offset:section.offset + section.size]
+        for row in img.md.disasm(blob, section.va):
+            if row.mnemonic != 'call' or not row.operands:
+                continue
+            operand = row.operands[0]
+            if operand.type != core.X86_OP_MEM or int(operand.mem.disp) != 0x60 or not operand.mem.base:
+                continue
+            if row.address in seen:
+                continue
+            seen.add(row.address)
+            fde = img.fde(row.address)
+            instructions = img.instructions(fde) if fde else []
+            sites.append({
+                'site': core.hx(row.address),
+                'operand': row.op_str,
+                'fde': ([core.hx(fde[0]), core.hx(fde[1])] if fde else None),
+                'local_dataflow': (local_virtual_dataflow(img, instructions, row.address, operand.mem.base) if fde else {'classification': 'NO_UNIQUE_FDE'}),
+                'instructions': (bounded_context(instructions, row.address, before=24, after=16) if fde else []),
+            })
+    return {
+        'slot_offset': '0x60',
+        'callsite_count': len(sites),
+        'callsites': sites,
+        'classification': 'VIRTUAL_SLOT_0X60_CENSUS',
+    }
+
+
 def add_source_contexts(client: Path, output: Path) -> None:
     result = json.loads(output.read_text(encoding='utf-8'))
     img = core.Image(client)
@@ -270,12 +329,7 @@ def add_source_contexts(client: Path, output: Path) -> None:
         'instructions': bounded_context(instructions, field6_site),
         'classification': 'BOUNDED_INSTRUCTION_CONTEXT_ONLY',
     }
-    result['field6_backward_source'] = backward_register_definition(
-        img,
-        instructions,
-        field6_site,
-        field6_source,
-    )
+    result['field6_backward_source'] = backward_register_definition(img, instructions, field6_site, field6_source)
     result['nested_source_contexts'] = {
         slot: {
             'reference_site': sites[0],
@@ -286,11 +340,13 @@ def add_source_contexts(client: Path, output: Path) -> None:
         if slot in required_slots
     }
     result['producer_callsite_contexts'] = producer_callsite_contexts(img, producer)
+    result['virtual_slot_0x60_callsites'] = virtual_slot_0x60_callsites(img)
     output.write_text(json.dumps(result, indent=2, sort_keys=True) + '\n', encoding='utf-8')
     print('FIELD6_SOURCE_CONTEXT=PASS')
     print('FIELD6_BACKWARD_SOURCE=PASS')
     print('NESTED_SOURCE_CONTEXTS=PASS')
     print('LOGIN_PRODUCER_CALLSITE_CONTEXTS=PASS')
+    print('VIRTUAL_SLOT_0X60_CENSUS=PASS')
 
 
 if __name__ == '__main__':

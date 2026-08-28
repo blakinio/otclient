@@ -1,10 +1,6 @@
 name: Track A canonical current-client fence
 
 on:
-  push:
-    branches: [fix/OTC-20260828-canonical-current-client-fence]
-    paths:
-      - .github/workflows/track-a-canonical-current-client-fence.yml
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened]
@@ -30,7 +26,6 @@ permissions:
 
 jobs:
   current-canonical-fence:
-    if: github.event_name == 'pull_request'
     name: Current exact-client canonical fence
     runs-on: ubuntu-24.04
     timeout-minutes: 6
@@ -68,9 +63,6 @@ jobs:
           grep -Fq 'physical_action_budget: 0' "$task"
 
   apply-provenance-cleanup:
-    if: >-
-      github.event_name == 'push' &&
-      github.ref == 'refs/heads/fix/OTC-20260828-canonical-current-client-fence'
     name: Apply exact provenance cleanup
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -102,17 +94,23 @@ jobs:
           for path in paths:
               text = path.read_text(encoding='utf-8')
               count = text.count(old)
-              if count != 1:
-                  raise SystemExit(f'{path}: expected exactly one stale provenance sentence, found {count}')
-              path.write_text(text.replace(old, new), encoding='utf-8')
+              if count == 1:
+                  path.write_text(text.replace(old, new), encoding='utf-8')
+              elif count == 0 and new in text:
+                  pass
+              else:
+                  raise SystemExit(f'{path}: stale/current provenance count invalid: old={count}, new={text.count(new)}')
           PY
           python3 .github/scripts/test_track_a_canonical_current_client_fence.py
           git diff --check
-          git diff --stat
-      - name: Commit provenance cleanup
+      - name: Commit provenance cleanup when needed
         shell: bash
         run: |
           set -Eeuo pipefail
+          if test -z "$(git status --porcelain -- docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md docs/agents/decisions/ADR-0001-track-a-canonical-live-runtime.md docs/agents/contracts/TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md)"; then
+            echo PROVENANCE_CLEANUP_ALREADY_APPLIED=true
+            exit 0
+          fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add \

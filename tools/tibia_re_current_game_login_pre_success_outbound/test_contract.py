@@ -4,10 +4,13 @@ from pathlib import Path
 root = Path(__file__).resolve().parents[2]
 probe = root / 'tools/tibia_re_current_game_login_pre_success_outbound/probe.py'
 qmeta_runner = root / 'tools/tibia_re_current_game_login_pre_success_outbound/qmeta_runner.py'
+auth_graph = root / 'tools/tibia_re_current_game_login_pre_success_outbound/auth_graph.py'
 assert probe.exists(), 'pre-success outbound probe not implemented'
 assert qmeta_runner.exists(), 'qmeta class-root regression runner not implemented'
+assert auth_graph.exists(), 'auth start-game causal graph not implemented'
 text = probe.read_text(encoding='utf-8')
 runner = qmeta_runner.read_text(encoding='utf-8')
+graph = auth_graph.read_text(encoding='utf-8')
 for required in (
     "'runtime_access': 'none'",
     "'login_performed': False",
@@ -33,16 +36,17 @@ assert 'CFG_REACHING_DEFINITION' in runner
 assert 'NEAREST_STATIC_REGISTER_DEFINITION' not in runner
 assert 'LOGIN_PRODUCER_CALLSITE_CONTEXTS' in runner
 assert 'VIRTUAL_SLOT_0X60_CENSUS' in runner
-assert 'AUTH_START_GAMESERVER_LOGIN_GRAPH' in runner
-assert 'TAuthenticationProcessController' in runner
-assert 'onStartGameServerLoginStateEntered' in runner
-assert "'auth_start_gameserver_login_graph'" in runner
+assert 'AUTH_START_GAMESERVER_LOGIN_GRAPH' in graph
+assert 'TAuthenticationProcessController' in graph
+assert 'onStartGameServerLoginStateEntered' in graph
+assert "result['auth_start_gameserver_login_graph']" in graph
 assert "'field6_source_context'" in runner
 assert "'field6_backward_source'" in runner
 assert "'nested_source_contexts'" in runner
 assert "'producer_callsite_contexts'" in runner
 assert "'virtual_slot_0x60_callsites'" in runner
-assert 'subprocess' not in text + runner
-assert 'ptrace' not in (text + runner).lower()
-assert 'process_vm_readv' not in (text + runner).lower()
+combined = text + runner + graph
+assert 'subprocess' not in combined
+assert 'ptrace' not in combined.lower()
+assert 'process_vm_readv' not in combined.lower()
 print('CURRENT_GAME_LOGIN_PRE_SUCCESS_OUTBOUND_CONTRACT=PASS')

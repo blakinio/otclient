@@ -1,0 +1,45 @@
+{
+  "schema": "otclient.track-a.current-gameserver-dispatch-envelope.promotion.v1",
+  "decision": "PASS_BOUNDED",
+  "source": {
+    "pr": 737,
+    "head": "5273d52e0fdd3f0e2c212f633fb8e406409851ff",
+    "run": 33152704802,
+    "job": 98788182962,
+    "artifact": 9678356574,
+    "artifact_sha256": "9bb4f18d2d684b4a7a0f5c9254367fdfc9786c633890b2beb5fe324c421aa918",
+    "result_json_sha256": "eabcb9445cdafd699fb266ee94b4aca9a1b006170007cbefe682b7a6579d3764"
+  },
+  "exact_client": {
+    "version": "15.32.75d4a0",
+    "packed_sha256": "075810c54af2d6912000eab062763db29563f5a1f4bf1d984154b2d07fd5729f",
+    "unpacked_sha256": "d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a",
+    "unpacked_size": 52105824
+  },
+  "accepted": {
+    "dispatch_parser_fde": "0xb84cd0..0xb8795e",
+    "dispatch_table": "0x1d6f058",
+    "dispatch_base_id": 3,
+    "control_0x14": "GameserverMessageLoginError",
+    "control_0x17": "GameserverMessageLoginSuccess",
+    "control_0x1f": "GameserverMessageLoginChallenge",
+    "target_dispatch_id": 52,
+    "target_dispatch_hex": "0x34",
+    "target_dispatch_destination": "0xb84ddf",
+    "target_dispatch_classification": "UNKNOWN_FALLBACK",
+    "target_dispatch_concrete_type": null,
+    "track_b_legacy_opcode_52_semantics_match_current": false
+  },
+  "withheld": [
+    "dispatch 0x34 user-facing meaning",
+    "dispatch 0x34 payload field schema",
+    "dispatch 0x34 downstream semantic callback"
+  ],
+  "safety": {
+    "runtime_access": "none",
+    "login_performed": false,
+    "secret_access": false,
+    "process_memory_access": false,
+    "raw_client_uploaded": false
+  }
+}

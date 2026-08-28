@@ -275,6 +275,18 @@ def main(argv: list[str]) -> int:
     meta = recover_qmeta_class(raw, sections, relocs, TARGET_CLASS)
     game_window_meta = recover_qmeta_class(raw, sections, relocs, GAME_WINDOW_CLASS)
     game_window_semantic_properties = select_world_semantic_properties(game_window_meta["properties"])
+    game_window_state_properties = [prop for prop in game_window_meta["properties"] if prop["name"] == "gameWindowState"]
+    game_window_state_read: dict[str, object] = {"state": "NOT_PROVEN"}
+    if len(game_window_state_properties) == 1:
+        property_meta = game_window_state_properties[0]
+        try:
+            read_case = recover_property_dispatch_case(raw, sections, game_window_meta, int(property_meta["index"]), 1)
+            body = resolve_generated_slot_body(raw, sections, int(read_case["case_target_va"]))
+            game_window_state_read = {**read_case, **body, "property": property_meta}
+        except DurableStateError as exc:
+            game_window_state_read = {"state": "NOT_PROVEN", "reason": str(exc), "property": property_meta}
+    elif len(game_window_state_properties) != 1:
+        game_window_state_read = {"state": "NOT_PROVEN", "reason": f"GAME_WINDOW_STATE_PROPERTY_NOT_UNIQUE:{len(game_window_state_properties)}"}
     dispatch_targets = recover_dispatch_targets(raw, sections, meta)
 
     methods_by_name = {str(method["name"]): method for method in meta["methods"]}
@@ -327,6 +339,7 @@ def main(argv: list[str]) -> int:
             "property_count": game_window_meta["property_count"],
             "properties": game_window_meta["properties"],
             "world_semantic_properties": game_window_semantic_properties,
+            "game_window_state_read": game_window_state_read,
         },
         "controller": {
             "class_name": meta["class_name"],
@@ -355,6 +368,9 @@ def main(argv: list[str]) -> int:
     print(f"WORLD_ENTERED_DURABLE_STATE_CANDIDATE={candidate_state}")
     print(f"GAME_WINDOW_PROPERTY_COUNT={game_window_meta['property_count']}")
     print("GAME_WINDOW_WORLD_SEMANTIC_PROPERTIES=" + ",".join(str(p["name"]) for p in game_window_semantic_properties))
+    print(f"GAME_WINDOW_STATE_READ={game_window_state_read.get('state')}")
+    if game_window_state_read.get("case_target_va") is not None:
+        print(f"GAME_WINDOW_STATE_READ_CASE=0x{int(game_window_state_read['case_target_va']):x}")
     if candidate_reason:
         print(f"WORLD_ENTERED_DURABLE_STATE_REASON={candidate_reason}")
     print("IN_GAME_CLAIMED=false")
@@ -419,6 +435,77 @@ def select_world_semantic_properties(properties: list[dict[str, object]]) -> lis
         if lower.startswith("game") and any(term in lower for term in game_state_terms):
             selected.append(prop)
     return selected
+
+def select_unique_property_dispatch_candidate(candidates: list[dict[str, object]], selector: int) -> dict[str, object]:
+    matches = [candidate for candidate in candidates if candidate.get("full_range") is True and int(candidate.get("selector", -1)) == selector]
+    if len(matches) != 1:
+        raise DurableStateError(f"READ_PROPERTY_DISPATCH_NOT_UNIQUE:{[(c.get('selector'), c.get('table')) for c in matches]}")
+    return matches[0]
+
+
+def recover_property_dispatch_case(raw: bytes, sections, meta: dict[str, object], property_index: int,
+                                   selector: int = 1) -> dict[str, object]:
+    try:
+        from capstone import Cs, CS_ARCH_X86, CS_MODE_64
+        from capstone.x86_const import X86_OP_IMM, X86_OP_MEM, X86_OP_REG, X86_REG_ESI, X86_REG_RIP
+    except ImportError as exc:
+        raise DurableStateError("CAPSTONE_REQUIRED") from exc
+    import track_a_current_world_entered_anchor as base
+
+    property_count = int(meta["property_count"])
+    if not (0 <= property_index < property_count):
+        raise DurableStateError(f"PROPERTY_INDEX_OUT_OF_RANGE:{property_index}:{property_count}")
+    start = int(meta["static_metacall_va"])
+    offset = base._va_to_offset(sections, start)
+    md = Cs(CS_ARCH_X86, CS_MODE_64)
+    md.detail = True
+    instructions = list(md.disasm(raw[offset: min(len(raw), offset + 0x3000)], start))
+    candidates: list[dict[str, object]] = []
+    for pos, ins in enumerate(instructions):
+        if ins.mnemonic != "lea" or len(ins.operands) < 2:
+            continue
+        dest, source = ins.operands[0], ins.operands[1]
+        if dest.type != X86_OP_REG or source.type != X86_OP_MEM or source.mem.base != X86_REG_RIP:
+            continue
+        table = ins.address + ins.size + source.mem.disp
+        reg = dest.reg
+        used = False
+        for nxt in instructions[pos + 1:pos + 12]:
+            if any(op.type == X86_OP_MEM and op.mem.base == reg and op.mem.scale == 4 for op in nxt.operands):
+                used = True
+                break
+        if not used:
+            continue
+        try:
+            targets = [table + base._i32(raw, sections, table + index * 4) for index in range(property_count)]
+        except base.AnchorError:
+            continue
+        if not all(base._is_executable(sections, target) for target in targets):
+            continue
+        context = instructions[max(0, pos - 24):pos + 4]
+        normalized = [(item.mnemonic, item.op_str.replace(" ", "")) for item in context]
+        range_tokens = (f"edx,{property_count - 1}", f"edx,0x{property_count - 1:x}")
+        full_range = any(mnemonic == "cmp" and operands in range_tokens for mnemonic, operands in normalized)
+        selector_values: set[int] = set()
+        for item in context:
+            if item.mnemonic != "cmp" or len(item.operands) != 2:
+                continue
+            left, right = item.operands
+            if left.type == X86_OP_REG and left.reg == X86_REG_ESI and right.type == X86_OP_IMM:
+                selector_values.add(int(right.imm))
+        for selector_value in selector_values:
+            candidates.append({"selector": selector_value, "full_range": full_range, "table": table, "lea": ins.address, "targets": targets})
+    selected = select_unique_property_dispatch_candidate(candidates, selector)
+    target = [int(value) for value in selected["targets"]][property_index]
+    return {
+        "state": "PROVEN_STATIC_READ_PROPERTY_CASE",
+        "selector": selector,
+        "property_index": property_index,
+        "dispatch_lea_va": int(selected["lea"]),
+        "dispatch_table_va": int(selected["table"]),
+        "case_target_va": target,
+    }
+
 
 if __name__ == "__main__":
     raise SystemExit(main(sys.argv))

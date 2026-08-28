@@ -93,5 +93,24 @@ class QMetaPropertyParsingTests(unittest.TestCase):
         self.assertEqual(["gameVisible", "sessionState", "worldName"], names)
 
 
+class PropertyDispatchSelectionTests(unittest.TestCase):
+    def test_selects_read_property_full_range_candidate(self):
+        candidates = [
+            {"selector": 0, "full_range": True, "table": 0x1000},
+            {"selector": 1, "full_range": True, "table": 0x2000},
+            {"selector": 2, "full_range": True, "table": 0x3000},
+        ]
+        result = module.select_unique_property_dispatch_candidate(candidates, 1)
+        self.assertEqual(0x2000, result["table"])
+
+    def test_rejects_ambiguous_read_property_tables(self):
+        candidates = [
+            {"selector": 1, "full_range": True, "table": 0x2000},
+            {"selector": 1, "full_range": True, "table": 0x2100},
+        ]
+        with self.assertRaisesRegex(module.DurableStateError, "READ_PROPERTY_DISPATCH_NOT_UNIQUE"):
+            module.select_unique_property_dispatch_candidate(candidates, 1)
+
+
 if __name__ == "__main__":
     unittest.main()

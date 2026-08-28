@@ -10,7 +10,7 @@ task_kind: infrastructure
 phase: tdd_red
 branch: fix/OTC-20260828-canonical-current-client-fence
 base_branch: main
-base_main: fad15486417f5f95d917b8b706bff5ad1d978066
+base_main: 785d888e8392e32c8ba852d6db7c8de03db9d8be
 created: 2026-08-28T15:40:00+02:00
 risk: high
 execution_class: github_hosted
@@ -56,6 +56,7 @@ owned_paths:
   - docs/agents/TIBIA_RESEARCH_TRACKS.md
   - docs/agents/decisions/ADR-0001-track-a-canonical-live-runtime.md
   - docs/agents/contracts/TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md
+  - docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
   - docs/agents/CHANGELOG.md
   - docs/agents/tasks/active/OTC-20260828-canonical-current-client-fence.md
 modules_touched:
@@ -66,23 +67,23 @@ reuses:
   - merged existing-runtime adoption probe
   - merged exact-current observer evidence from #744/#745/#746
 blocks:
-  - CURRENT_GAME_LOGIN_FIELD6_RUNTIME_VALUE_OBSERVATION_REQUIRED
+  - LIVE_GAME_WINDOW_STATE_CAUSAL_VALIDATION
 ---
 
 # Objective
 
-Repair the trusted canonical-live bootstrap contract so it admits the already independently promoted current official Linux client `15.32.75d4a0 / 52105824 / d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a` instead of the superseded `ed5469... / 52109920` cut.
+Repair the trusted canonical-live and runtime-admission exact-client contract so it admits the already independently promoted current official Linux client `15.32.75d4a0 / 52105824 / d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a` instead of the superseded `ed5469... / 52109920` cut.
 
-This task is repository-only. It must not bootstrap, execute, authenticate, observe, mutate or control any official client. A later runtime successor must use the merged result under fresh Gate A/Gate B admission.
+This task is repository-only. It must not bootstrap, execute, authenticate, observe, mutate or control any official client. A later runtime successor must use the merged result under fresh admission and whatever Gate A/rebind/Gate B requirements the chosen runtime-access class requires.
 
 # Root-cause boundary
 
-The stale fence is not isolated to one launcher. Trusted `main` currently binds the superseded cut in the canonical session worker, the canonical transition/Gate-B controller, the Kasm existing-runtime adoption probe, normative Track A/ADR/bootstrap governance and the canonical-live governance audit. Updating only one consumer would create a split-brain canonical identity contract and is forbidden.
+The stale fence is not isolated to one launcher. Trusted `main` binds the superseded cut in the canonical session worker, the canonical transition/Gate-B controller, the Kasm existing-runtime adoption probe, the mandatory Track A runtime-admission contract, normative Track A/ADR/bootstrap governance and the canonical-live governance audit. Updating only one consumer would create a split-brain canonical identity contract and is forbidden.
 
 # Acceptance
 
-1. Hosted RED proves current trusted main still binds the canonical worker/governance contract to the superseded client.
-2. Update the canonical worker, transition controller, adoption probe, governance fence and normative current-client references as one coherent exact-client contract; do not preserve two competing "current" fences.
+1. Hosted RED proves current trusted main still binds the canonical worker/governance contract to the superseded client; the focused contract must also explicitly falsify the mandatory runtime-admission fence.
+2. Update the canonical worker, transition controller, adoption probe, runtime-admission contract, governance fence and normative current-client references as one coherent exact-client contract; do not preserve two competing "current" fences.
 3. Historical evidence may keep historical client hashes when explicitly historical; only current canonical authority is updated.
 4. Existing canonical session/transition/lease/adoption tests remain GREEN.
 5. Fresh exact-current promotion evidence on trusted main is referenced as provenance; no new client download/execution is needed for this repair.
@@ -90,4 +91,4 @@ The stale fence is not isolated to one launcher. Trusted `main` currently binds 
 7. Fresh post-implementation audit must find zero material issues before merge.
 8. No runtime, credentials, login, process memory or packet access from this PR.
 
-next_action: add a focused current-fence contract test/workflow and obtain hosted RED before changing the worker, transition, adoption probe or normative governance text.
+next_action: prove a focused hosted RED specifically against the stale mandatory runtime-admission fence, then perform one coherent repository-only exact-client replacement across all current authority consumers.

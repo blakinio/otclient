@@ -44,7 +44,7 @@ physical_e2e_required: false
 implementation_authorized: true
 owned_paths:
   - .github/scripts/tibia-official-client-re-canonical-client-fence-reconcile.py
-  - .github/scripts/test_tibia_official_client_re_canonical_client-fence-reconcile.py
+  - .github/scripts/test_tibia_official_client_re_canonical_client_fence_reconcile.py
   - .github/scripts/test_track_a_agent_runtime_governance.py
   - .github/workflows/track-a-canonical-client-fence-reconciliation.yml
   - docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md

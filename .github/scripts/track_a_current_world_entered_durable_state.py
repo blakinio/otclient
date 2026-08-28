@@ -339,6 +339,25 @@ def main(argv: list[str]) -> int:
             "qmeta_activate_target_va": qmeta_activate_target,
             "sites": sites,
         }
+    display_stub_by_name: dict[str, int] = {}
+    for signal_name in ("startScreenNowDisplayed", "gameScreenNowDisplayed"):
+        sites = list(game_window_display_signal_emitters.get(signal_name, {}).get("sites", []))
+        if len(sites) == 1:
+            display_stub_by_name[signal_name] = int(sites[0]["sequence_start_va"])
+    raw_display_callers = scan_direct_branch_target_xrefs(raw, sections, set(display_stub_by_name.values())) if display_stub_by_name else {}
+    game_window_display_signal_callers: dict[str, object] = {}
+    for signal_name in ("startScreenNowDisplayed", "gameScreenNowDisplayed"):
+        stub = display_stub_by_name.get(signal_name)
+        if stub is None:
+            game_window_display_signal_callers[signal_name] = {"state": "SIGNAL_STUB_NOT_UNIQUE"}
+            continue
+        callers = raw_display_callers.get(stub, [])
+        game_window_display_signal_callers[signal_name] = {
+            "state": "FOUND" if callers else "NOT_FOUND",
+            "signal_stub_va": stub,
+            "caller_count": len(callers),
+            "callers": callers,
+        }
     state_emitter_sites = list(game_window_display_signal_emitters.get("gameWindowStateChanged", {}).get("sites", []))
     raw_assignments = extract_qstring_member_assignment_sources(state_emitter_sites, 0x60)
     grouped_assignments: dict[tuple[int, int], dict[str, object]] = {}
@@ -454,6 +473,7 @@ def main(argv: list[str]) -> int:
             "game_window_state_read": game_window_state_read,
             "game_window_display_signal_cases": game_window_display_signal_cases,
             "game_window_display_signal_emitters": game_window_display_signal_emitters,
+            "game_window_display_signal_callers": game_window_display_signal_callers,
             "game_window_state_assignment_sources": game_window_state_assignment_sources,
             "game_window_state_initializer_xrefs": game_window_state_initializer_xrefs,
             "game_window_state_method_traces": game_window_state_method_traces,
@@ -947,6 +967,57 @@ def scan_rip_target_xrefs(raw: bytes, sections, target_vas: set[int], *, pre_cou
                 pre.clear()
     for target in result:
         unique = {int(site["reference_va"]): site for site in result[target]}
+        result[target] = [unique[key] for key in sorted(unique)]
+    return result
+
+
+def scan_direct_branch_target_xrefs(raw: bytes, sections, target_vas: set[int], *, pre_count: int = 12,
+                                    post_count: int = 12, max_per_target: int = 64) -> dict[int, list[dict[str, object]]]:
+    try:
+        from capstone import Cs, CS_ARCH_X86, CS_MODE_64
+        from capstone.x86_const import X86_OP_IMM
+    except ImportError as exc:
+        raise DurableStateError("CAPSTONE_REQUIRED") from exc
+    targets = {int(value) for value in target_vas}
+    result: dict[int, list[dict[str, object]]] = {target: [] for target in sorted(targets)}
+    md = Cs(CS_ARCH_X86, CS_MODE_64)
+    md.detail = True
+    for section_va, file_offset, size, flags in sections:
+        if not (int(flags) & 0x4) or int(size) <= 0:
+            continue
+        pre = deque(maxlen=pre_count)
+        active: list[tuple[dict[str, object], int]] = []
+        code = raw[int(file_offset):int(file_offset) + int(size)]
+        for ins in md.disasm(code, int(section_va)):
+            record = _instruction_record(ins)
+            next_active: list[tuple[dict[str, object], int]] = []
+            for site, remaining in active:
+                site["context"].append(record)
+                remaining -= 1
+                if remaining > 0:
+                    next_active.append((site, remaining))
+            active = next_active
+            target = None
+            if ins.mnemonic in ("call", "jmp") and ins.operands and ins.operands[0].type == X86_OP_IMM:
+                candidate = int(ins.operands[0].imm)
+                if candidate in targets:
+                    target = candidate
+            if target is not None:
+                if len(result[target]) >= max_per_target:
+                    raise DurableStateError(f"DIRECT_BRANCH_XREF_LIMIT_EXCEEDED:{target:#x}")
+                site = {
+                    "branch_va": int(ins.address),
+                    "branch_kind": ins.mnemonic,
+                    "context": list(pre) + [record],
+                }
+                result[target].append(site)
+                if post_count > 0:
+                    active.append((site, post_count))
+            pre.append(record)
+            if ins.mnemonic in ("ret", "jmp"):
+                pre.clear()
+    for target in result:
+        unique = {int(site["branch_va"]): site for site in result[target]}
         result[target] = [unique[key] for key in sorted(unique)]
     return result
 

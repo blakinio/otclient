@@ -277,5 +277,31 @@ class GlobalQStringInitializerXrefTests(unittest.TestCase):
         self.assertEqual({0x1200: []}, result)
 
 
+class DirectBranchTargetXrefTests(unittest.TestCase):
+    def test_finds_direct_call_to_target_with_context(self):
+        raw = bytearray(0x400)
+        # 0x1000: call 0x1100; nop; ret
+        rel = 0x1100 - (0x1000 + 5)
+        raw[0x100] = 0xE8
+        struct.pack_into("<i", raw, 0x101, rel)
+        raw[0x105] = 0x90
+        raw[0x106] = 0xC3
+        sections = [(0x1000, 0x100, 0x100, 6)]
+        result = module.scan_direct_branch_target_xrefs(bytes(raw), sections, {0x1100})
+        self.assertEqual(1, len(result[0x1100]))
+        self.assertEqual(0x1000, result[0x1100][0]["branch_va"])
+        self.assertEqual("call", result[0x1100][0]["branch_kind"])
+
+    def test_ignores_other_branch_targets(self):
+        raw = bytearray(0x400)
+        rel = 0x1100 - (0x1000 + 5)
+        raw[0x100] = 0xE8
+        struct.pack_into("<i", raw, 0x101, rel)
+        raw[0x105] = 0xC3
+        sections = [(0x1000, 0x100, 0x100, 6)]
+        result = module.scan_direct_branch_target_xrefs(bytes(raw), sections, {0x1200})
+        self.assertEqual({0x1200: []}, result)
+
+
 if __name__ == "__main__":
     unittest.main()

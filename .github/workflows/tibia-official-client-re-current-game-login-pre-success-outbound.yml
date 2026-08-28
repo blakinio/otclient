@@ -30,7 +30,8 @@ jobs:
             tools/tibia_re_current_game_login_pre_success_outbound/probe.py \
             tools/tibia_re_current_game_login_pre_success_outbound/qmeta_runner.py \
             tools/tibia_re_current_game_login_pre_success_outbound/auth_graph.py \
-            tools/tibia_re_current_game_login_pre_success_outbound/handler_owner.py
+            tools/tibia_re_current_game_login_pre_success_outbound/handler_owner.py \
+            tools/tibia_re_current_game_login_pre_success_outbound/handler_connections.py
 
       - name: Prepare exact public client package through WARP
         shell: bash
@@ -96,6 +97,7 @@ jobs:
           python3 tools/tibia_re_current_game_login_pre_success_outbound/qmeta_runner.py --client "$RE_ROOT/pkg/client" --output artifacts/current-game-login-pre-success-outbound/result.json
           python3 tools/tibia_re_current_game_login_pre_success_outbound/auth_graph.py --client "$RE_ROOT/pkg/client" --output artifacts/current-game-login-pre-success-outbound/result.json
           python3 tools/tibia_re_current_game_login_pre_success_outbound/handler_owner.py --client "$RE_ROOT/pkg/client" --output artifacts/current-game-login-pre-success-outbound/result.json
+          python3 tools/tibia_re_current_game_login_pre_success_outbound/handler_connections.py --client "$RE_ROOT/pkg/client" --output artifacts/current-game-login-pre-success-outbound/result.json
           rm -f "$RE_ROOT/pkg/client" "$RE_ROOT/pkg/client.lzma"
           echo RAW_CLIENT_RETAINED=false
 
@@ -118,6 +120,7 @@ jobs:
           assert d['pre_success_send_sequence']['classification'] in ('PROVEN_BOUNDED','UNKNOWN')
           assert d['auth_start_gameserver_login_graph']['classification']=='AUTH_START_GAMESERVER_LOGIN_GRAPH'
           assert d['handler_owner_field_refs']['classification']=='HANDLER_OWNER_FIELD_REF_CENSUS'
+          assert d['handler_connection_thunk_graph']['classification']=='HANDLER_CONNECTION_THUNK_GRAPH'
           print('CURRENT_GAME_LOGIN_PRE_SUCCESS_SANITIZED_RESULT=PASS')
           PY
 

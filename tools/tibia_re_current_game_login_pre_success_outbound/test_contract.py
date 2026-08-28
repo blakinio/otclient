@@ -29,6 +29,8 @@ assert 'core.exact_qmeta_class = exact_qmeta_class' in runner
 assert 'FIELD6_SOURCE_CONTEXT' in runner
 assert 'NESTED_SOURCE_CONTEXTS' in runner
 assert 'FIELD6_BACKWARD_SOURCE' in runner
+assert 'CFG_REACHING_DEFINITION' in runner
+assert 'NEAREST_STATIC_REGISTER_DEFINITION' not in runner
 assert "'field6_source_context'" in runner
 assert "'field6_backward_source'" in runner
 assert "'nested_source_contexts'" in runner

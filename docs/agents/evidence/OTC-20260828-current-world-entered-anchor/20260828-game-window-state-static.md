@@ -72,3 +72,28 @@ SEMANTIC_PROMOTION_PERFORMED=false
 ```
 
 Next: resolve executable RIP xrefs to only `0x31b29b0` and `0x31b5940`, identify their bounded startup initializers, and recover the literal values if structurally provable. No live client action is required for that step.
+## Exact source-B payload and RTTI proof
+
+Exact run `33175306133` / artifact `9687437490` (head `065bd557a6416abfcf59038054c694a617f1cc5b`) decoded the `0x31b5940` initializer source through its proven C-string constructor wrapper `0x6a7200`. The bounded payload is:
+
+```text
+literal VA        0x20cea63
+length            0
+byte_values       []
+sha256            e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+classification    PROVEN_EMPTY_C_STRING_TO_QSTRING
+```
+
+The durable-state JSON SHA-256 for that run is `b5b329c395aae48331788c1ff767b53939ed6c833b96d90e82af9e71d0cf8ebf`. This proves source B is an empty QString state; it does **not** by itself prove whether empty means start screen, character selection, or gameplay.
+
+Exact RTTI run `33174987862` / artifact `9687279558` (head `f7a0d0a7581675ec6119c296b626c4890207a331`) independently recovered:
+
+```text
+typeinfo  0x30c2250
+primary vptr 0x30c3488
+mangled N5tibia10gamewindow21TGameWindowControllerE
+```
+
+That result JSON SHA-256 is `a4886d573e63cc491287548dfbcb1521f059904966dc5e88051afe3342b66e36`. It is sufficient for future exact-current unique-object discovery without reusing historical object addresses.
+
+Source A (`0x31b29b0`) remains semantically unresolved. Its bounded xref window ends before the next use, so the next static step is to extend only that source initializer context.

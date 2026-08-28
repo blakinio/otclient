@@ -109,10 +109,20 @@ start_screen_displayed_emitter: 0xd6acd3
 game_screen_displayed_signal_index: 24
 game_screen_displayed_emitter: 0xd6acf3
 game_window_state_source_a: 0x31b29b0
+game_window_state_source_a_semantics: PENDING_EXTENDED_INITIALIZER_RECOVERY
 game_window_state_source_b: 0x31b5940
-game_window_state_literal_values: PENDING_BSS_INITIALIZER_RECOVERY
-current_blocker: GAME_WINDOW_STATE_LITERAL_SEMANTICS_NOT_PROVEN
-next_action: recover exact-current global initializers for BSS QString sources 0x31b29b0 and 0x31b5940; if their literal semantics distinguish start screen from game screen, design a bounded read-only gameWindowState poller; preserve IN_GAME_CLAIMED=false until causal live validation and independent review
+game_window_state_source_b_semantics: PROVEN_EMPTY_QSTRING
+game_window_state_source_b_payload_run: 33175306133
+game_window_state_source_b_payload_artifact: 9687437490
+game_window_state_source_b_payload_result_sha256: b5b329c395aae48331788c1ff767b53939ed6c833b96d90e82af9e71d0cf8ebf
+game_window_controller_typeinfo: 0x30c2250
+game_window_controller_primary_vptr: 0x30c3488
+game_window_controller_rtti_run: 33174987862
+game_window_controller_rtti_artifact: 9687279558
+game_window_controller_rtti_result_sha256: a4886d573e63cc491287548dfbcb1521f059904966dc5e88051afe3342b66e36
+game_window_state_literal_values: SOURCE_B_EMPTY_PROVEN_SOURCE_A_PENDING
+current_blocker: GAME_WINDOW_STATE_SOURCE_A_SEMANTICS_NOT_PROVEN
+next_action: extend only the exact-current source-A 0x31b29b0 initializer/use context to resolve its value; then design a bounded read-only gameWindowState poller using dynamically recovered TGameWindowController vptr and +0x60 backing; preserve IN_GAME_CLAIMED=false until causal live validation and independent review
 ---
 
 # Current Qt world correlation

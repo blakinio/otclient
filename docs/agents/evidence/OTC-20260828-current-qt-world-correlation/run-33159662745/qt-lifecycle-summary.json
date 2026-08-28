@@ -1,0 +1,44 @@
+{
+  "credentials_retained": false,
+  "in_game_claimed": false,
+  "packet_payloads_retained": false,
+  "qstate_candidate_values": {
+    "auth_controller": [
+      0,
+      2
+    ],
+    "character_selection_controller": [
+      0
+    ],
+    "disconnect_reaction_controller": [
+      0
+    ],
+    "gameserver_login_controller": [
+      0,
+      null
+    ]
+  },
+  "raw_window_titles_retained": false,
+  "result": "OBSERVATION_COMPLETE",
+  "semantic_promotion_performed": false,
+  "session_secrets_retained": false,
+  "socket_endpoints_retained": false,
+  "tcp_established_values": [
+    1,
+    0,
+    2,
+    3,
+    4
+  ],
+  "tcp_socket_count_values": [
+    1,
+    0,
+    2,
+    3,
+    4
+  ],
+  "window_character_context_values": [
+    false,
+    true
+  ]
+}

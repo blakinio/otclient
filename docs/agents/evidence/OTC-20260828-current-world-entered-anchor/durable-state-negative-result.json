@@ -1,0 +1,101 @@
+{
+  "candidate": {
+    "field": null,
+    "reason": "DURABLE_FIELD_NOT_FOUND",
+    "state": "NOT_PROVEN"
+  },
+  "classification": "STATIC_DURABLE_STATE_CANDIDATE_NOT_RUNTIME_PROMOTED",
+  "controller": {
+    "class_name": "tibia::gamewindow::TGameSessionDisconnectReactionController",
+    "interesting_methods_missing": [],
+    "method_count": 23,
+    "methods": {
+      "onConnectionError": {
+        "argc": 1,
+        "body_target_va": null,
+        "case_target_va": 14118368,
+        "index": 10,
+        "is_signal": false,
+        "resolution": "AMBIGUOUS_BRANCHES",
+        "this_immediate_writes": []
+      },
+      "onDialogResponseShowCharacterSelection": {
+        "argc": 1,
+        "body_target_va": 9558880,
+        "case_target_va": 14117856,
+        "index": 14,
+        "is_signal": false,
+        "resolution": "TAIL_JUMP",
+        "this_immediate_writes": [
+          {
+            "offset": 235,
+            "value": 1,
+            "width": 1
+          }
+        ]
+      },
+      "onDialogResponseShowLoginDialog": {
+        "argc": 1,
+        "body_target_va": null,
+        "case_target_va": 14117979,
+        "index": 15,
+        "is_signal": false,
+        "resolution": "AMBIGUOUS_BRANCHES",
+        "this_immediate_writes": []
+      },
+      "onGameSessionDisconnected": {
+        "argc": 0,
+        "body_target_va": 8780176,
+        "case_target_va": 14118392,
+        "index": 9,
+        "is_signal": false,
+        "resolution": "TAIL_JUMP",
+        "this_immediate_writes": [
+          {
+            "offset": 440,
+            "value": 0,
+            "width": 1
+          }
+        ]
+      },
+      "onSessionEndInformation": {
+        "argc": 1,
+        "body_target_va": null,
+        "case_target_va": 14118496,
+        "index": 8,
+        "is_signal": false,
+        "resolution": "AMBIGUOUS_BRANCHES",
+        "this_immediate_writes": []
+      },
+      "onWorldEntered": {
+        "argc": 0,
+        "body_target_va": 9356480,
+        "case_target_va": 14118176,
+        "index": 6,
+        "is_signal": false,
+        "resolution": "SINGLE_CALL",
+        "this_immediate_writes": []
+      }
+    },
+    "signal_count": 3,
+    "static_metacall_va": 14117696,
+    "static_metaobject_va": 51027040
+  },
+  "exact_client": {
+    "sha256": "d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a",
+    "size": 52105824,
+    "version": "15.32.75d4a0"
+  },
+  "safety": {
+    "client_executed": false,
+    "credentials_accessed": false,
+    "historical_address_reuse": false,
+    "in_game_claimed": false,
+    "packet_payloads_captured": false,
+    "raw_client_retained": false,
+    "runtime_access": "none",
+    "semantic_promotion_performed": false,
+    "session_secrets_accessed": false
+  },
+  "schema": "otclient.track-a.current-world-entered-durable-state.v1"
+}

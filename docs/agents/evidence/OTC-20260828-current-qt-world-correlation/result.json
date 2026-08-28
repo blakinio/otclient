@@ -1,0 +1,124 @@
+{
+  "schema": "otclient.track-a.current-qt-world-correlation.v1",
+  "classification": "CAUSAL_CANDIDATE_NOT_PROMOTED",
+  "exact_client": {
+    "version": "15.32.75d4a0",
+    "size": 52105824,
+    "sha256": "d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a"
+  },
+  "process_identity": {
+    "pid": 13947,
+    "start_ticks": 51652120,
+    "same_process_all_three_runs": true
+  },
+  "runs": {
+    "33159662745": {
+      "job": 98810780559,
+      "head": "e7f710b04da8c6f3adae43a019c44a6acb4a2866",
+      "artifact": 9681511026,
+      "role": "owner_marked_login_to_world",
+      "owner_world_visible_marker": "2026-08-28T11:36:43+02:00",
+      "window_world_context_true": "2026-08-28T11:36:31.258+02:00"
+    },
+    "33161071475": {
+      "job": 98815400955,
+      "head": "7a7a7cc4d09dee08ea07f8c91144d8ac869111b7",
+      "artifact": 9682068904,
+      "role": "mixed_entry_plus_owner_marked_world_exit_control",
+      "window_world_context_true": "2026-08-28T12:00:21.017+02:00",
+      "window_world_context_false": "2026-08-28T12:05:56.775+02:00",
+      "owner_character_select_marker": "2026-08-28T12:06:10+02:00"
+    },
+    "33162761241": {
+      "job": 98820910859,
+      "head": "7a7a7cc4d09dee08ea07f8c91144d8ac869111b7",
+      "artifact": 9682715983,
+      "role": "owner_continuous_login_character_select_world",
+      "owner_world_visible_marker": "2026-08-28T12:27:44+02:00",
+      "window_world_context_true": "2026-08-28T12:27:27.717+02:00"
+    }
+  },
+  "artifact_hashes": {
+    "33159662745": {
+      "transition_sha256": "0bfb73455c3e5db6e3df3b231ef9c668e5419f73463e209ad34b40a827ff3c6a",
+      "window_sha256": "e77a68e5cf0a4c35eea8845bc007d35ec2cdfb1b3c1611f5d40375fef7b7e798",
+      "summary_sha256": "09220c6a4b8a42584ba07beeaf35b9f5b346efa14f8ba1a818544f91388e27fc"
+    },
+    "33161071475": {
+      "transition_sha256": "207a8bfac8b32a6bb0264f5416ba91ef149a1637afa6313896d90c9112cf50c8",
+      "window_sha256": "28f6289535ebc4350d05131f7eae96c35c3869ff4279bddf697782ee18ada899",
+      "summary_sha256": "dd4d215cfd84b88f70b4b18501c8e676b0eb12cf7f4b7a6a5374bea2af11a530"
+    },
+    "33162761241": {
+      "transition_sha256": "34e730dcede80d0a55d59fef68b7c0b377f017922cbc1dfcec3b6026502e5bea",
+      "window_sha256": "232bce249e705837b0719753ffd7cba94c9840622f784554a7b2c38be81b3dae",
+      "summary_sha256": "048a8e9255cb659c5cc0f1c670b0b3eb9f6fc93227f28c0b655f2b4dd8dc7fd5"
+    }
+  },
+  "repeated_entry_sequences": [
+    {
+      "run": 33159662745,
+      "auth_qstate_2_at": "2026-08-28T11:36:26.455+02:00",
+      "auth_qstate_0_at": "2026-08-28T11:36:27.768+02:00",
+      "gameserver_login_qstate_null_at": "2026-08-28T11:36:30.087+02:00",
+      "window_world_context_true_at": "2026-08-28T11:36:31.258+02:00"
+    },
+    {
+      "run": 33161071475,
+      "auth_qstate_2_at": "2026-08-28T12:00:14.690+02:00",
+      "auth_qstate_0_at": "2026-08-28T12:00:16.246+02:00",
+      "gameserver_login_qstate_null_at": "2026-08-28T12:00:19.600+02:00",
+      "window_world_context_true_at": "2026-08-28T12:00:21.017+02:00",
+      "owner_marker": null
+    },
+    {
+      "run": 33162761241,
+      "auth_qstate_2_last_at": "2026-08-28T12:27:04.853+02:00",
+      "auth_qstate_0_at": "2026-08-28T12:27:23.742+02:00",
+      "gameserver_login_qstate_null_at": "2026-08-28T12:27:25.797+02:00",
+      "window_world_context_true_at": "2026-08-28T12:27:27.717+02:00"
+    }
+  ],
+  "reverse_control": {
+    "run": 33161071475,
+    "tcp_zero_at": "2026-08-28T12:05:54.486+02:00",
+    "auth_qstate_2_at": "2026-08-28T12:05:55.520+02:00",
+    "window_world_context_false_at": "2026-08-28T12:05:56.775+02:00",
+    "owner_character_select_marker": "2026-08-28T12:06:10+02:00"
+  },
+  "rejected_standalone_markers": [
+    "BRIDGE_3_OF_3",
+    "player_protocol_handler_heap_vptr_hit_count",
+    "gameserver_game_session_heap_vptr_hit_count",
+    "worldmap_protocol_handler_heap_vptr_hit_count",
+    "disconnect_reaction_controller_heap_vptr_hit_count",
+    "authentication_state_machine_running",
+    "auth_qstate_equals_2",
+    "gameserver_login_qstate_null",
+    "tcp_established_count",
+    "window_character_context"
+  ],
+  "causal_candidate": {
+    "status": "REPEATABLE_BUT_NOT_SEMANTICALLY_PROMOTED",
+    "entry_order": [
+      "authentication lifecycle transient",
+      "gameserver-login QState candidate ceases to resolve",
+      "PID-owned TCP count rises",
+      "boolean character/world window context becomes true",
+      "owner later confirms visible map"
+    ],
+    "required_next_anchor": "exact-current tibia::game::TPlayerProtocolMessageHandler::worldEntered signal or a durable state directly caused by that signal",
+    "in_game_claimed": false,
+    "semantic_promotion_performed": false
+  },
+  "privacy": {
+    "process_memory_access": "read_only",
+    "heap_bytes_retained": false,
+    "credentials_retained": false,
+    "session_secrets_retained": false,
+    "packet_payloads_retained": false,
+    "socket_endpoints_retained": false,
+    "raw_window_titles_retained": false,
+    "process_environment_retained": false
+  }
+}

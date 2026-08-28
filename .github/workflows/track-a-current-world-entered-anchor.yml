@@ -1,0 +1,188 @@
+name: Track A current worldEntered anchor
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/track-a-current-world-entered-anchor.yml'
+      - '.github/scripts/track_a_current_world_entered_anchor.py'
+      - '.github/scripts/test_track_a_current_world_entered_anchor.py'
+      - '.github/scripts/test_track_a_current_world_entered_anchor_contract.py'
+      - 'docs/agents/tasks/active/OTC-20260828-current-qt-world-correlation.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  recover:
+    name: Recover exact-current worldEntered QMeta anchor
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Validate resolver contracts
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 -m py_compile .github/scripts/track_a_current_world_entered_anchor.py
+          python3 .github/scripts/test_track_a_current_world_entered_anchor.py
+          python3 .github/scripts/test_track_a_current_world_entered_anchor_contract.py
+      - name: Install static analysis dependency
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 -m pip install --disable-pip-version-check --no-input --user capstone
+          python3 - <<'PY'
+          import capstone
+          print('WORLD_ENTERED_CAPSTONE_VERSION=' + capstone.__version__)
+          PY
+
+      - name: Fetch exact current public Linux client through WARP
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          r="$RUNNER_TEMP/world-entered-anchor"
+          mkdir -p "$r/bin" "$r/state" "$r/client"
+          cd "$r/bin"
+          curl --retry 3 --connect-timeout 10 --max-time 60 -fsSL -o wgcf \
+            https://github.com/ViRb3/wgcf/releases/download/v2.2.32/wgcf_2.2.32_linux_amd64
+          echo '2ff97f2201972ce582a424455d50a3719a380eef0cd1f3144f7779348e122a2c  wgcf' | sha256sum -c -
+          curl --retry 3 --connect-timeout 10 --max-time 60 -fsSL -o wireproxy.tgz \
+            https://github.com/windtf/wireproxy/releases/download/v1.1.3/wireproxy_linux_amd64.tar.gz
+          echo 'e88c1d090740373fc606c1bafd81d9a5eadc642cce5667616e20e9d7a444f51c  wireproxy.tgz' | sha256sum -c -
+          mkdir wp
+          tar -xzf wireproxy.tgz -C wp
+          cp "$(find wp -type f -name wireproxy -print -quit)" wireproxy
+          chmod 755 wgcf wireproxy
+          cd "$r/state"
+          timeout 30s "$r/bin/wgcf" register --accept-tos >/dev/null
+          timeout 30s "$r/bin/wgcf" generate >/dev/null
+          printf 'WGConfig = %s\n\n[Socks5]\nBindAddress = 127.0.0.1:25344\n' \
+            "$r/state/wgcf-profile.conf" > wireproxy.conf
+          nohup "$r/bin/wireproxy" -c wireproxy.conf >"$r/wireproxy.log" 2>&1 </dev/null &
+          for _ in $(seq 1 30); do
+            if curl --socks5-hostname 127.0.0.1:25344 -fsS --max-time 10 \
+              https://www.cloudflare.com/cdn-cgi/trace >"$r/trace" 2>/dev/null; then
+              break
+            fi
+            sleep 2
+          done
+          grep -Eq '^warp=(on|plus)$' "$r/trace"
+
+          u=https://static.tibia.com/launcher/tibiaclient-linux-current/bin/client.lzma
+          curl --socks5-hostname 127.0.0.1:25344 --compressed --retry 3 \
+            --connect-timeout 10 --max-time 120 -fL \
+            -A 'Mozilla/5.0 (X11; Linux x86_64)' -e "$u" -H 'Accept: */*' \
+            "$u" -o "$r/client/client.lzma"
+          echo '075810c54af2d6912000eab062763db29563f5a1f4bf1d984154b2d07fd5729f  '"$r"'/client/client.lzma' \
+            | sha256sum -c -
+          echo WORLD_ENTERED_PACKED_FENCE=PASS
+      - name: Decompress and prove exact current client fence
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          r="$RUNNER_TEMP/world-entered-anchor"
+          python3 - "$r/client/client.lzma" "$r/client/client" <<'PY'
+          import hashlib
+          import lzma
+          from pathlib import Path
+          import sys
+
+          packed = Path(sys.argv[1]).read_bytes()
+          if len(packed) <= 45:
+              raise SystemExit('WORLD_ENTERED_LZMA_ENVELOPE_TOO_SHORT')
+          props = packed[32]
+          lc = props % 9
+          rest = props // 9
+          lp = rest % 5
+          pb = rest // 5
+          dictionary = int.from_bytes(packed[33:37], 'little')
+          raw = lzma.decompress(
+              packed[45:], format=lzma.FORMAT_RAW,
+              filters=[{'id': lzma.FILTER_LZMA1, 'dict_size': dictionary, 'lc': lc, 'lp': lp, 'pb': pb}],
+          )
+          digest = hashlib.sha256(raw).hexdigest()
+          if len(raw) != 52105824 or digest != 'd1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a':
+              raise SystemExit(f'WORLD_ENTERED_EXACT_CLIENT_FENCE_MISMATCH:{len(raw)}:{digest}')
+          Path(sys.argv[2]).write_bytes(raw)
+          print('WORLD_ENTERED_UNPACKED_FENCE=PASS')
+          print('WORLD_ENTERED_CLIENT_EXECUTED=false')
+          print('WORLD_ENTERED_RUNTIME_ACCESS=none')
+          PY
+      - name: Recover exact-current worldEntered static anchor
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          r="$RUNNER_TEMP/world-entered-anchor"
+          python3 .github/scripts/track_a_current_world_entered_anchor.py \
+            "$r/client/client" "$r/world-entered-anchor.json"
+          python3 - "$r/world-entered-anchor.json" <<'PY'
+          import json
+          from pathlib import Path
+          import sys
+
+          doc = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
+          anchor = doc['anchor']
+          safety = doc['safety']
+          assert anchor['class_name'] == 'tibia::game::TPlayerProtocolMessageHandler'
+          assert anchor['world_entered_argc'] == 0
+          assert anchor['world_entered_is_signal'] is True
+          assert 0 <= anchor['world_entered_method_index'] < anchor['signal_count']
+          assert safety['runtime_access'] == 'none'
+          assert safety['client_executed'] is False
+          assert safety['raw_client_retained'] is False
+          assert safety['historical_address_reuse'] is False
+          assert safety['in_game_claimed'] is False
+          assert safety['semantic_promotion_performed'] is False
+          print('WORLD_ENTERED_ANCHOR_JSON=PASS')
+          PY
+
+      - name: Recover exact-current durable world-state candidate
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          r="$RUNNER_TEMP/world-entered-anchor"
+          python3 .github/scripts/track_a_current_world_entered_durable_state.py \
+            "$r/client/client" "$r/world-entered-durable-state.json"
+          python3 - "$r/world-entered-durable-state.json" <<'PY'
+          import json
+          from pathlib import Path
+          import sys
+
+          doc = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
+          assert doc['exact_client']['sha256'] == 'd1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a'
+          assert doc['controller']['class_name'] == 'tibia::gamewindow::TGameSessionDisconnectReactionController'
+          assert doc['safety']['runtime_access'] == 'none'
+          assert doc['safety']['client_executed'] is False
+          assert doc['safety']['raw_client_retained'] is False
+          assert doc['safety']['historical_address_reuse'] is False
+          assert doc['safety']['in_game_claimed'] is False
+          assert doc['safety']['semantic_promotion_performed'] is False
+          print('WORLD_ENTERED_DURABLE_STATE_JSON=PASS')
+          PY
+
+      - name: Remove proprietary client bytes before artifact upload
+        if: always()
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          r="$RUNNER_TEMP/world-entered-anchor"
+          : "${r:?WORLD_ENTERED_RUNNER_TEMP_REQUIRED}"
+          rm -rf "${r:?}/client" "${r:?}/state" "${r:?}/bin" "${r:?}/wireproxy.log" "${r:?}/trace"
+          test ! -e "${r:?}/client"
+          echo RAW_CLIENT_RETAINED=false
+      - name: Upload bounded static anchor evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: track-a-current-world-entered-anchor-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/world-entered-anchor/world-entered-anchor.json
+            ${{ runner.temp }}/world-entered-anchor/world-entered-durable-state.json
+          if-no-files-found: error
+          retention-days: 3

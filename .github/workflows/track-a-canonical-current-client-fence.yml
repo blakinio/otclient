@@ -66,7 +66,7 @@ jobs:
           git fetch --no-tags origin main
           python3 .github/scripts/test_track_a_agent_runtime_governance.py \
             --changed-from origin/main \
-            --expected-branch fix/OTC-20260828-canonical-current-client-fence
+            --expected-branch "${GITHUB_HEAD_REF}"
           echo TRACK_A_DETERMINISTIC_GOVERNANCE=PASS
 
       - name: Parse workflow YAML and validate diff

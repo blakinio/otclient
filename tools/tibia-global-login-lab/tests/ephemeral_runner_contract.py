@@ -8,6 +8,7 @@ clear_pid = (root / 'tools/tibia-global-login-lab/scripts/clear-stale-wireproxy-
 stage_package = (root / 'tools/tibia-global-login-lab/scripts/stage-current-package-manifest.sh').read_text(encoding='utf-8')
 refresh = (root / 'tools/tibia-global-login-lab/scripts/refresh-current-assets.sh').read_text(encoding='utf-8')
 wrapper = (root / 'tools/tibia-global-login-lab/scripts/world-entry-probe-1532.sh').read_text(encoding='utf-8')
+world_probe = (root / 'tools/tibia-global-login-lab/scripts/world-entry-probe.sh').read_text(encoding='utf-8')
 
 probe = workflow.index('  probe:')
 build = workflow.index('      - name: Download exact native Linux binary', probe)
@@ -82,11 +83,11 @@ assert 'expected exactly one GAME_START terminal block' in wrapper
 
 # The first current server payload diagnostic is structure-only: it may expose
 # lengths and protobuf field/wire identifiers, never raw payload bytes/hex.
-assert 'GAME_SERVER_FIRST_PAYLOAD_LENGTH=' in wrapper
-assert 'GAME_SERVER_PROTOBUF_STRUCTURAL_VALID=true' in wrapper
-assert 'GAME_SERVER_PROTOBUF_STRUCTURAL_INVALID=true' in wrapper
-assert 'GAME_SERVER_PROTOBUF_FIELD_' in wrapper
-assert 'GAME_SERVER_PROTOBUF_FIELD_COUNT=' in wrapper
-assert 'GAME_SERVER_FIRST_PAYLOAD_RAW' not in wrapper
-assert 'GAME_SERVER_FIRST_PAYLOAD_HEX' not in wrapper
+assert 'GAME_SERVER_FIRST_PAYLOAD_LENGTH=' in world_probe
+assert 'GAME_SERVER_PROTOBUF_STRUCTURAL_VALID=true' in world_probe
+assert 'GAME_SERVER_PROTOBUF_STRUCTURAL_INVALID=true' in world_probe
+assert 'GAME_SERVER_PROTOBUF_FIELD_' in world_probe
+assert 'GAME_SERVER_PROTOBUF_FIELD_COUNT=' in world_probe
+assert 'GAME_SERVER_FIRST_PAYLOAD_RAW' not in world_probe
+assert 'GAME_SERVER_FIRST_PAYLOAD_HEX' not in world_probe
 print('EPHEMERAL_RUNNER_CONTRACT=PASS')

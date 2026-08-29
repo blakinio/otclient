@@ -1,18 +1,19 @@
 ---
 task_id: OTC-20260829-tibia-re-vision-benchmark
-status: validating
+status: completed
 agent: ChatGPT
 project_lane: otclient
 lane: P0-DESIGN
 track_id: official-client-re
 task_kind: documentation
-phase: prompt-persistence-validation
+phase: archived
 branch: docs/OTC-20260829-tibia-re-local-vision-model-benchmark
 base_branch: main
 base_sha: 4c751870b5dcd51d5b984b78a4f06625306be961
 related_pr: "787"
 created: 2026-08-29T07:37:00+02:00
-updated: 2026-08-29T07:59:49+02:00
+updated: 2026-08-29T08:03:37+02:00
+completed: 2026-08-29T08:03:37+02:00
 risk: medium
 execution_mode: chat_github
 run_scope: single_task
@@ -42,12 +43,7 @@ local_model_execution_performed: false
 molehill_accessed: true
 molehill_access_scope: closeout_validation_and_benchmark_readiness_preflight_only
 synology_accessed: false
-owned_paths:
-  - docs/agents/prompts/TIBIA_RE_VISION_BENCHMARK.md
-  - docs/agents/prompts/TIBIA_RE_VISION_BENCHMARK_ALIAS.md
-  - docs/agents/tasks/active/OTC-20260829-tibia-re-vision-benchmark.md
-  - docs/superpowers/specs/2026-08-29-tibia-re-vision-benchmark-design.md
-  - docs/superpowers/plans/2026-08-29-tibia-re-vision-benchmark.md
+owned_paths: []
 modules_touched:
   - agent-prompting
   - official-client-research-design
@@ -180,7 +176,7 @@ Branch comparison against the base verified exactly five changed files and no so
 - [x] Prompt reuses current Track A/Control Center contracts rather than creating a second control plane.
 - [x] Full changed-file inventory contains only the five declared documentation paths.
 - [x] Runtime/model E2E is `NOT_APPLICABLE`: this persistence task performs no runtime/model execution.
-- [ ] Exact-final-head repository CI/review hygiene and any current required independent audit remain to be verified after this checkpoint commit.
+- [x] Exact-final-head repository CI/review hygiene and fresh independent audit passed before squash merge.
 
 ## Fresh independent closeout audit
 
@@ -201,53 +197,83 @@ Audit evidence before this remediation:
 
 Fresh independent audit result after remediation: **PASS_BOUNDED** (`fresh_coordinator_session`), `VISION-DOC-AUD-001` resolved, material findings open: **0**. Exact-final-head GitHub checks remain a separate closeout gate.
 
+## Terminal closeout
+
+PR #787 final ready head `3b322bda50daf7e23e7640e174a80abf40d2b82e` passed CI run `33237454649` and Track A governance run `33237454525`, remained mergeable with zero review comments/threads, and was squash-merged as `da2b511399c9a8447fdf6422cac6ff12b76085e7`. Fresh independent documentation audit result was `PASS_BOUNDED` with `VISION-DOC-AUD-001` resolved and zero open material findings. Runtime/model E2E is `NOT_APPLICABLE` because this PR persisted documentation/prompting only and performed no model inference or official-client runtime execution.
+
 ## Context checkpoint
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-29T07:59:49+02:00
-head: pending-closeout-remediation-commit
-branch: docs/OTC-20260829-tibia-re-local-vision-model-benchmark
+updated_at: 2026-08-29T08:03:37+02:00
+head: 3b322bda50daf7e23e7640e174a80abf40d2b82e
+branch: main
 pr: 787
-status: validating
+status: completed
 context_routes:
   - agent-prompting
   - official-client-research-design
-owned_paths:
-  - docs/agents/prompts/TIBIA_RE_VISION_BENCHMARK.md
-  - docs/agents/prompts/TIBIA_RE_VISION_BENCHMARK_ALIAS.md
-  - docs/agents/tasks/active/OTC-20260829-tibia-re-vision-benchmark.md
-  - docs/superpowers/specs/2026-08-29-tibia-re-vision-benchmark-design.md
-  - docs/superpowers/plans/2026-08-29-tibia-re-vision-benchmark.md
+owned_paths: []
 proven:
-  - exact pre-remediation PR head 5be9e8bf3e7b2ca634ecd48019c2b18b333ce83d had CI and Track A governance success
-  - PR 787 changed exactly the five declared documentation paths and was mergeable with zero review comments or threads
-  - prompt, alias, spec and plan preserve visual_only non-authoritative evidence, no cloud fallback and one-model residency
-  - current owner invocation verified Molehill-PC benchmark readiness without local model inference or official-client runtime access
-  - fresh independent documentation audit PASS_BOUNDED with VISION-DOC-AUD-001 resolved and zero open material findings
-derived:
-  - documentation programme is closeout-ready after this checkpoint-schema remediation if exact-final-head validation remains green
+  - PR 787 exact final ready head 3b322bda50daf7e23e7640e174a80abf40d2b82e passed CI run 33237454649
+  - PR 787 exact final ready head passed Track A governance run 33237454525
+  - fresh independent documentation audit PASS_BOUNDED with zero open material findings
+  - PR 787 squash-merged as da2b511399c9a8447fdf6422cac6ff12b76085e7
+  - runtime/model E2E is NOT_APPLICABLE because the merged deliverable is documentation/prompting only
+derived: []
 unknown:
-  - exact-final-head GitHub checks after this remediation commit
+  - none
 conflicts: []
 first_failure:
   marker: VISION-DOC-AUD-001
-  evidence: current checkpoint validator rejected obsolete checkpoint_version 2 shape and missing normative version-1 fields
+  evidence: stale checkpoint_version 2 shape was repaired before final exact-head validation and merge
 rejected_hypotheses:
   - prompt or alias contract mismatch
   - unexpected changed path outside declared documentation scope
 changed_paths:
-  - docs/agents/tasks/active/OTC-20260829-tibia-re-vision-benchmark.md
+  - docs/agents/tasks/archive/OTC-20260829-tibia-re-vision-benchmark.md
 validation:
-  - command: git diff --check origin/main...HEAD
-    result: PASS
-    evidence: no whitespace errors on pre-remediation exact head
-  - command: deterministic prompt/alias/changed-path contract check
-    result: PASS
-    evidence: all checked programme invariants passed; path comparison uses set equality
   - command: python tools/agents/checkpoint.py docs/agents/tasks/active/OTC-20260829-tibia-re-vision-benchmark.md --require-checkpoint
     result: PASS
-    evidence: remediation restores the current normative version-1 checkpoint shape; historical VISION-DOC-AUD-001 is resolved
+    evidence: final pre-merge task checkpoint validated on 3b322bda50daf7e23e7640e174a80abf40d2b82e
+  - command: GitHub CI
+    result: PASS
+    evidence: run 33237454649 on exact final ready head
+  - command: Track A agent runtime governance
+    result: PASS
+    evidence: run 33237454525 on exact final ready head
+  - command: runtime/model E2E
+    result: NOT_APPLICABLE
+    evidence: merged PR 787 changed documentation/prompting only and executed no model inference or official-client runtime
 blockers: []
-next_action: run the deterministic checkpoint validator and full fresh independent diff audit on the remediation head, then commit/push and verify exact-final-head GitHub checks before merge
+next_action: after this archive PR merges, start the separately scoped real local vision benchmark execution task from exact current main and keep the Track B secret-safe screenshot handoff as a dependency for project-specific research-value evaluation
+```
+
+## Closeout record
+
+```yaml
+closeout:
+  implementation_complete: true
+  vertical_slice_complete: true
+  audit:
+    result: PASS_BOUNDED
+    independent_validator: fresh_coordinator_session
+    material_findings_open: 0
+  e2e:
+    result: NOT_APPLICABLE
+    reason: documentation/prompting persistence only; no runtime/model execution in PR 787
+  final_ci:
+    head: 3b322bda50daf7e23e7640e174a80abf40d2b82e
+    result: PASS
+    required_checks:
+      - CI 33237454649
+      - Track A governance 33237454525
+  pull_requests:
+    vision_programme_787: MERGED
+    unresolved_review_threads: 0
+  task_status: completed
+  task_archived: true
+  ownership_released: true
+  blocker: none
+  next_action: after this archive PR merges, start the separately scoped real local vision benchmark execution task from exact current main and keep the Track B secret-safe screenshot handoff as a dependency for project-specific research-value evaluation
 ```

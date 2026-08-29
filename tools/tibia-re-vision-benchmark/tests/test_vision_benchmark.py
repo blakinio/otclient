@@ -11,6 +11,7 @@ from vision_benchmark import (  # noqa: E402
     evaluate_hard_gates,
     score_profile,
     sha256_file,
+    normalize_ocr_transcription,
     validate_visual_evidence,
 )
 
@@ -132,6 +133,27 @@ class ScoringTests(unittest.TestCase):
                 "latency_efficiency": 1.0,
                 "memory_efficiency": 1.0,
             })
+
+
+class OcrNormalizationTests(unittest.TestCase):
+    def test_raw_ocr_lines_become_non_authoritative_visual_evidence(self):
+        result = normalize_ocr_transcription(
+            "ACCOUNT LOGIN\n\nEMAIL\nPASSWORD\n",
+            evidence_ref="fixture:login",
+            capture_sha256="c" * 64,
+            model_profile_id="ocr-profile",
+        )
+        self.assertEqual(result["observation"]["screen_class"], "UNKNOWN")
+        self.assertEqual(result["observation"]["visible_text"], ["ACCOUNT LOGIN", "EMAIL", "PASSWORD"])
+        self.assertTrue(result["quality"]["visual_only"])
+        self.assertFalse(result["quality"]["structural_authority"])
+        self.assertEqual(validate_visual_evidence(result), [])
+
+    def test_ocr_adapter_preserves_hallucinated_nonempty_text(self):
+        result = normalize_ocr_transcription(
+            "invented text", evidence_ref="fixture:black", capture_sha256="d" * 64, model_profile_id="ocr-profile"
+        )
+        self.assertEqual(result["observation"]["visible_text"], ["invented text"])
 
 
 class HashTests(unittest.TestCase):

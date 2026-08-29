@@ -106,6 +106,58 @@ def validate_model_observation(observation: Any) -> list[str]:
             errors.append(f"model observation {key} invalid")
     return errors
 
+
+def normalize_ocr_transcription(
+    raw_text: str,
+    *,
+    evidence_ref: str,
+    capture_sha256: str,
+    model_profile_id: str,
+    source_monotonic_ns: int | None = None,
+) -> dict[str, Any]:
+    if not isinstance(raw_text, str):
+        raise ValueError("raw_text must be string")
+    if not isinstance(evidence_ref, str) or not evidence_ref:
+        raise ValueError("evidence_ref invalid")
+    if not isinstance(capture_sha256, str) or len(capture_sha256) != 64 or any(
+        c not in "0123456789abcdefABCDEF" for c in capture_sha256
+    ):
+        raise ValueError("capture_sha256 invalid")
+    if not isinstance(model_profile_id, str) or not model_profile_id:
+        raise ValueError("model_profile_id invalid")
+    if source_monotonic_ns is not None and (
+        not isinstance(source_monotonic_ns, int) or isinstance(source_monotonic_ns, bool)
+    ):
+        raise ValueError("source_monotonic_ns invalid")
+    visible_text = [line.strip() for line in raw_text.splitlines() if line.strip()]
+    result = {
+        "schema_version": 1,
+        "capture": {
+            "evidence_ref": evidence_ref,
+            "sha256": capture_sha256.lower(),
+            "source_monotonic_ns": source_monotonic_ns,
+        },
+        "model": {"model_profile_id": model_profile_id},
+        "observation": {
+            "screen_class": "UNKNOWN",
+            "visible_text": visible_text,
+            "ui_objects": [],
+            "appeared": [],
+            "disappeared": [],
+            "changed": [],
+        },
+        "quality": {
+            "schema_valid": True,
+            "visual_only": True,
+            "structural_authority": False,
+            "unknown_fields": ["observation.screen_class"],
+        },
+    }
+    errors = validate_visual_evidence(result)
+    if errors:
+        raise ValueError("normalized OCR VisualEvidence invalid: " + "; ".join(errors))
+    return result
+
 def evaluate_hard_gates(trials: Iterable[dict[str, Any]]) -> dict[str, Any]:
     trials = list(trials)
     gates = {

@@ -87,6 +87,8 @@
 
 ### Task 5: Track B research-value boundary and terminal decision
 
+- [x] **Pre-step: Bound Qwen runtime profile and rerun synthetic negative/performance suite.** Explicit `num_ctx=4096`, `num_predict=256`, `temperature=0`; preserve the earlier full-context run as diagnostic evidence only, then require explicit unload and empty shared model pool.
+
 **Files:**
 - Create: `docs/agents/reports/OTCLIENT-20260829-tibia-re-vision-benchmark-execution.md`
 - Modify: `docs/agents/tasks/active/OTC-20260829-tibia-re-vision-benchmark-execution.md`

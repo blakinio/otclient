@@ -28,6 +28,7 @@ class FakeRunner:
         self.calls: list[tuple[str, ...]] = []
         self.containers = [(FULL_ID, module.TARGET_CONTAINER)]
         self.display_ok = True
+        self.boot_id_sha256 = 'd' * 64
         self.package = {
             'path': module.CLIENT_PATH,
             'regular': True,
@@ -55,6 +56,10 @@ class FakeRunner:
             script = cmd[-2]
             if script == self.m.PACKAGE_IDENTITY_SCRIPT:
                 return json.dumps(self.package) + '\n'
+            if script == getattr(self.m, 'BOOT_ID_SCRIPT', None):
+                if self.boot_id_sha256 is None:
+                    raise self.m.WorkerError('command_failed')
+                return json.dumps({'boot_id_sha256': self.boot_id_sha256}) + '\n'
             if script == self.m.CANDIDATE_SCRIPT:
                 container_id = cmd[2]
                 return json.dumps(self.candidates.get(container_id, [])) + '\n'
@@ -124,9 +129,25 @@ class Tests(unittest.TestCase):
         self.assertEqual(payload['client_path'], self.m.CLIENT_PATH)
         self.assertEqual(payload['client_size'], self.m.SIZE)
         self.assertEqual(payload['client_sha256'], self.m.SHA)
+        self.assertEqual(payload['boot_id_sha256'], 'd' * 64)
         self.assertEqual(payload['candidate_count'], 0)
         self.assertEqual(payload['main_window_count'], 0)
         self.assertRegex(payload['preflight_fingerprint'], r'^[0-9a-f]{64}$')
+        unsigned = dict(payload)
+        fingerprint = unsigned.pop('preflight_fingerprint')
+        self.assertEqual(fingerprint, self.m._fingerprint(unsigned))
+
+
+    def test_preflight_rejects_unreadable_or_malformed_boot_identity(self):
+        self.fake.boot_id_sha256 = None
+        with self.assertRaisesRegex(self.m.WorkerError, 'boot_identity_unavailable'):
+            self.m.collect_preflight(runner=self.fake)
+        for value in ('', 'not-hex', 'a' * 63, 'G' * 64):
+            with self.subTest(value=value):
+                self.fake.boot_id_sha256 = value
+                with self.assertRaisesRegex(self.m.WorkerError, 'boot_identity_invalid'):
+                    self.m.collect_preflight(runner=self.fake)
+        self.fake.boot_id_sha256 = 'd' * 64
 
     def test_preflight_rejects_target_container_cardinality_and_bad_full_id(self):
         for label, containers, code in (

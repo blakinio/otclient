@@ -6,7 +6,7 @@ Mode: autonomous Track B coordinator with optional local Vision post-processing 
 
 ## Owner-facing behavior
 
-This alias is deliberately single-window. Resolve and continue Track B yourself; if accepted secret-safe visual evidence becomes available, run the local Vision/Qwen post-processing yourself in the same invocation. **Do not ask the owner to open a second chat/window** and do not ask the owner to start `TIBIA-RE-VISION-BENCHMARK` separately.
+This alias is deliberately single-window. Resolve and continue Track B yourself; if accepted secret-safe visual evidence becomes available, run the local Vision/Qwen post-processing yourself in the same invocation. **do not ask the owner to open a second chat/window** and do not ask the owner to start `TIBIA-RE-VISION-BENCHMARK` separately.
 
 Vision is a merged helper capability, not a second owner-operated programme. Use `tools/tibia-re-vision-benchmark` from fresh trusted `main` as the canonical local harness implementation.
 

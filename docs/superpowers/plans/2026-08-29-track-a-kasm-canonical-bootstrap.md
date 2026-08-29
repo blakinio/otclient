@@ -36,7 +36,7 @@
 
 **Interfaces:**
 - Consumes: Docker CLI; exact constants `TARGET_CONTAINER`, `TARGET_DISPLAY`, `PACKAGE_DIR`, `CLIENT_PATH`, `VER`, `SIZE`, `SHA` defined in the worker.
-- Produces CLI operations `preflight <record>`, `launch <record>`, `rollback <record>`.
+- Produces CLI operations `preflight "$RECORD_PATH"`, `launch "$RECORD_PATH"`, `rollback "$RECORD_PATH"`.
 - Produces preflight schema `otclient.track-a.kasm-bootstrap.preflight.v1` and launch schema `otclient.track-a.kasm-bootstrap.launch.v1` in mode `0600`.
 - Exposes importable helpers `collect_preflight(runner=run) -> dict[str, Any]`, `launch_from_preflight(path: Path, runner=run, sleeper=time.sleep) -> dict[str, Any]`, `rollback_launch(path: Path, runner=run, sleeper=time.sleep) -> None` for deterministic tests.
 
@@ -104,7 +104,7 @@ Implement these fixed record fields:
 }
 ```
 
-Use `docker ps --no-trunc --format '{{.ID}}\t{{.Names}}'`, exact target-name cardinality, `docker exec -u kasm-user -e DISPLAY=:1 ... xdpyinfo`, exact regular/non-symlink package executable verification, and an all-running-container process inventory modeled on the existing Kasm adoption probe. Treat any official-looking unreadable or wrong-fence candidate as a closed failure, not absence. Inspect `xwininfo -root -tree` and reject any Tibia main window before launch.
+Use `docker ps --no-trunc --format '{{.ID}}\t{{.Names}}'`, exact target-name cardinality, `docker exec -u kasm-user -e DISPLAY=:1 "$FULL_CONTAINER_ID" xdpyinfo`, exact regular/non-symlink package executable verification, and an all-running-container process inventory modeled on the existing Kasm adoption probe. Treat any official-looking unreadable or wrong-fence candidate as a closed failure, not absence. Inspect `xwininfo -root -tree` and reject any Tibia main window before launch.
 
 `preflight_fingerprint` is SHA-256 over canonical JSON of container name/full ID, display, package/client path, exact size/SHA and zero candidate/window counts.
 
@@ -240,9 +240,41 @@ KASM_PREFLIGHT_SCHEMA = 'otclient.track-a.kasm-bootstrap.preflight.v1'
 KASM_LAUNCH_SCHEMA = 'otclient.track-a.kasm-bootstrap.launch.v1'
 
 
-def _read_kasm_bootstrap_record(path: Path, expected_schema: str) -> dict[str, Any]: ...
-def _kasm_launch_signature(record: dict[str, Any]) -> tuple[Any, ...]: ...
-def _require_kasm_launch_matches_manifest(launch: dict[str, Any], manifest: dict[str, Any]) -> None: ...
+def _read_kasm_bootstrap_record(path: Path, expected_schema: str) -> dict[str, Any]:
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        raise E('kasm_bootstrap_record_invalid', str(exc)) from exc
+    if not isinstance(data, dict) or data.get('schema') != expected_schema:
+        raise E('kasm_bootstrap_record_invalid')
+    return data
+
+
+def _kasm_launch_signature(record: dict[str, Any]) -> tuple[Any, ...]:
+    return tuple(record[key] for key in (
+        'preflight_fingerprint', 'container_name', 'container_id', 'display',
+        'client_path', 'client_size', 'client_sha256', 'pid',
+        'process_start_ticks', 'launch_method', 'bootstrap_helper_residue',
+    ))
+
+
+def _require_kasm_launch_matches_manifest(launch: dict[str, Any], manifest: dict[str, Any]) -> None:
+    locator = f"docker:{launch['container_name']}:{launch['container_id']}"
+    required = {
+        'pid': launch['pid'],
+        'process_start_ticks': launch['process_start_ticks'],
+        'client_size': launch['client_size'],
+        'client_sha256': launch['client_sha256'],
+        'display': launch['display'],
+        'runtime_locator': locator,
+        'inventory_scope': 'all_running_docker_containers',
+        'inventory_complete': True,
+        'candidate_count': 1,
+        'state': 'UNKNOWN',
+    }
+    for key, expected in required.items():
+        if manifest.get(key) != expected:
+            raise E(f'kasm_bootstrap_manifest_{key}_mismatch')
 ```
 
 Validation must reject extra/missing critical identity fields, non-64hex full container ID, wrong exact fence, wrong target container/display/path, non-positive PID/start, wrong launch method or `bootstrap_helper_residue is not False`.

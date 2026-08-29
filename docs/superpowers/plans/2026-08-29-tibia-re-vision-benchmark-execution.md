@@ -97,8 +97,8 @@
 - Consumes: local profile evidence plus a future secret-safe Track B keyframe handoff.
 - Produces: `benchmark_result`, `primary_model`, `ocr_fallback_model`, and `research_value_verdict` without protocol-authority promotion.
 
-- [ ] **Step 1: Record the Track B coordination handoff** from PR #284 comment `5460730478` and revalidate that no network retry was triggered for screenshots.
-- [ ] **Step 2: If accepted Track B Linux-container keyframes are available, run the same frozen model profile on pre-attempt/first-change/terminal frames and compare structural-only versus structural+VisualEvidence hypothesis ranking.**
-- [ ] **Step 3: If keyframes are unavailable, return `PARTIAL` and `INCONCLUSIVE` rather than extrapolating from synthetic smoke; state exactly which P3-P7 measurements remain missing.**
-- [ ] **Step 4: Produce the report with exact host/model/dataset hashes, hard gates, latency/repeatability, candidate blockers, Track B impact, and no-authority boundary.**
+- [x] **Step 1: Record the Track B coordination handoff** from PR #284 comment `5460730478` and revalidate that no network retry was triggered for screenshots.
+- [x] **Step 2: If accepted Track B Linux-container keyframes are available, run the same frozen model profile on pre-attempt/first-change/terminal frames and compare structural-only versus structural+VisualEvidence hypothesis ranking.** Outcome: `NOT_RUN_INPUT_UNAVAILABLE`; no accepted Track B evidence frames exist and no retry was triggered to create them.
+- [x] **Step 3: If keyframes are unavailable, return `PARTIAL` and `INCONCLUSIVE` rather than extrapolating from synthetic smoke; state exactly which P3-P7 measurements remain missing.**
+- [x] **Step 4: Produce the report with exact host/model/dataset hashes, hard gates, latency/repeatability, candidate blockers, Track B impact, and no-authority boundary.**
 - [ ] **Step 5: Run full focused validation, `git diff --check`, checkpoint validation, fresh independent audit, exact-head CI, then close/merge/archive according to repository policy.**

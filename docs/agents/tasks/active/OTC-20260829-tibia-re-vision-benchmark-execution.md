@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260829-tibia-re-vision-benchmark-execution
-status: implementing
+status: validating
 agent: ChatGPT
 session_id: chatgpt-20260829-vision-benchmark-execution
 session_role: implementer
@@ -8,13 +8,13 @@ project_lane: otclient
 lane: P0-DESIGN
 track_id: official-client-re
 task_kind: implementation
-phase: implement
+phase: validate
 branch: feat/OTC-20260829-tibia-re-vision-benchmark-execution
 base_branch: main
 base_sha: f208a20cb4517e8b57bef91983337145d379267c
 related_pr: 790
 created: 2026-08-29T08:08:53+02:00
-updated: 2026-08-29T08:39:21+02:00
+updated: 2026-08-29T08:41:57+02:00
 risk: high
 execution_mode: local_owner_pc
 execution_reason: deterministic harness plus local real-model benchmark on verified Molehill-PC
@@ -63,6 +63,25 @@ cross_track_dependencies:
 
 Execute the repository-owned local vision benchmark programme on the verified Molehill-PC, prove the deterministic harness and first-pass local model compatibility, and measure Track B Global Login research value only when secret-safe Linux-container keyframes are available.
 
+
+# Terminal benchmark decision
+
+```yaml
+benchmark_result: PARTIAL
+primary_model: null
+leading_profile: ollama:qwen3-vl:4b-instruct-q4_K_M@sha256:ee4b975b58c17ce268cd19d40db35d5edc64603035d2ffc1fee1968eb0947f7b
+ocr_fallback_model: null
+research_value_verdict: INCONCLUSIVE
+track_b_help_verdict: USEFUL_DIAGNOSTIC_SENSOR_CANDIDATE_NOT_CURRENT_UNBLOCKER
+track_b_head_revalidated: 62383aded3acbeb5f405a12fe1f93849cd8e35f9
+track_b_current_blocker: BLOCKED_REQUIRED_CURRENT_NATIVE_PRE_LOGIN_OUTBOUND_SEQUENCE_EVIDENCE
+track_b_screenshot_handoff: UNAVAILABLE
+representative_selection_dataset: UNAVAILABLE
+weighted_selection_score: NOT_COMPUTED
+```
+
+The full rationale and measured profile evidence are persisted in `docs/agents/reports/OTCLIENT-20260829-tibia-re-vision-benchmark-execution.md`.
+
 # P0 verified state
 
 ```yaml
@@ -96,11 +115,11 @@ P1/P2 and backend compatibility work are READY offline. P3-P7 project-specific s
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-29T08:39:21+02:00
-head: pending-qwen-bounded-profile-commit
+updated_at: 2026-08-29T08:41:57+02:00
+head: pending-terminal-report-commit
 branch: feat/OTC-20260829-tibia-re-vision-benchmark-execution
 pr: 790
-status: implementing
+status: validating
 context_routes:
   - local-model-benchmark
   - official-client-research-design
@@ -112,53 +131,55 @@ owned_paths:
   - docs/agents/tasks/active/OTC-20260829-tibia-re-vision-benchmark-execution.md
   - docs/superpowers/plans/2026-08-29-tibia-re-vision-benchmark-execution.md
 proven:
-  - focused harness suite is 22 of 22 PASS after adding explicit Ollama num_ctx 4096 and num_predict 256 bounds
-  - an unbounded diagnostic run reproduced correct Qwen quality but exposed context 262144, about 44 GB residency and 66 percent CPU / 34 percent GPU spill, so its performance metrics are superseded
-  - bounded Qwen exact profile qwen3-vl:4b-instruct-q4_K_M digest ee4b975b58c17ce268cd19d40db35d5edc64603035d2ffc1fee1968eb0947f7b ran at context 4096, 3527545978 bytes resident and 3527545978 bytes VRAM, 100 percent GPU
-  - bounded Qwen login classification is LOGIN_SCREEN 3 of 3 with expected-text recall 1.0
-  - bounded Qwen black no-text negative control has zero non-empty visible-text outputs in 3 of 3 and zero false IN_GAME_VISUAL in 3 of 3
-  - bounded Qwen warm API p50 is 0.7998541 seconds and interpolated p95 is 1.14383672 seconds; cold total 5.2685395 seconds and cold load 3.8546923 seconds
-  - all bounded Qwen hard gates pass and explicit unload leaves both Ollama and Docker Model Runner resident sets empty
-  - OvisOCR2 retains exact-text recall 1.0 but false text on 3 of 3 black controls under both tested prompt profiles
-  - Ovis2.5-2B remains UNSUPPORTED_BACKEND on the current Windows AMD exact-profile path
+  - bounded Qwen profile passes all synthetic schema, login-state, exact-text, black-negative and residency hard gates
+  - bounded Qwen warm API p50 0.7998541 seconds, p95 1.14383672 seconds, context 4096, 3527545978 bytes VRAM, 100 percent GPU
+  - OvisOCR2 exact-text recall is 1.0 but black no-text false output is 3 of 3 under each of two prompt profiles
+  - Ovis2.5-2B exact current candidate is UNSUPPORTED_BACKEND on current Windows AMD local profile and was not substituted
+  - Track B PR 284 live head is 62383aded3acbeb5f405a12fe1f93849cd8e35f9 and its current terminal blocker is BLOCKED_REQUIRED_CURRENT_NATIVE_PRE_LOGIN_OUTBOUND_SEQUENCE_EVIDENCE
+  - PR 284 comment 5460730478 is the latest vision coordination comment and no later accepted screenshot handoff exists
+  - Track B branch contains no repo-owned screenshot or keyframe evidence dataset suitable for the benchmark; static product image assets do not qualify
+  - no Track B or official-client E2E was triggered for screenshot collection
+  - final benchmark decision is PARTIAL with primary_model null, ocr_fallback_model null and research_value_verdict INCONCLUSIVE
 derived:
-  - Qwen3-VL Q4_K_M num_ctx4096 num_predict256 is the leading viable local profile for representative Track B screenshot evaluation
-  - no formal primary or OCR fallback can be selected from synthetic smoke alone because selection_quality remains false and representative Track B frames are absent
+  - bounded Qwen is the leading profile to test first when representative Track B screenshots become legally available
+  - Vision is likely useful as an additive diagnostic sensor but does not remove the current native outbound-sequence blocker
 unknown:
-  - Qwen and OvisOCR2 behavior on accepted secret-safe real Tibia frames from Track B
-  - project-specific P7 structural-only versus structural-plus-VisualEvidence research-value result
-  - whether Track B has produced a screenshot handoff after coordination comment 5460730478
+  - representative real Track B state/OCR/delta accuracy
+  - measured structural-only versus structural-plus-VisualEvidence hypothesis/E2E/time reduction
 conflicts: []
 first_failure:
-  marker: QWEN_UNBOUNDED_CONTEXT_RESOURCE_SPILL
-  evidence: pre-unload ollama ps on the first warm suite showed context 262144, about 44 GB residency and CPU/GPU spill; harness now bounds num_ctx 4096 and bounded rerun is clean
+  marker: REPRESENTATIVE_TRACK_B_SCREENSHOT_DATASET_UNAVAILABLE
+  evidence: no post-comment handoff and no repo-owned Track B evidence image; current Track B no-retry blocker forbids manufacturing another service run merely for screenshots
 rejected_hypotheses:
-  - default Ollama model context is an acceptable benchmark resource profile
-  - Qwen shares OvisOCR2 black-negative hallucination behavior on the tested synthetic control
-  - a synthetic smoke result is sufficient to declare a benchmark winner
+  - synthetic smoke is sufficient for a formal winner claim
+  - Vision can prove or recover the native pre-login outbound sequence
+  - OvisOCR2 can be promoted as fallback despite repeatable black-negative hallucination
 changed_paths:
-  - tools/tibia-re-vision-benchmark/vision_benchmark.py
-  - tools/tibia-re-vision-benchmark/tests/test_ollama_adapter.py
-  - tools/tibia-re-vision-benchmark/run_qwen_synthetic_suite.py
-  - docs/agents/evidence/OTC-20260829-tibia-re-vision-benchmark-execution/qwen3-vl-unbounded-context-diagnostic.json
-  - docs/agents/evidence/OTC-20260829-tibia-re-vision-benchmark-execution/qwen3-vl-synthetic-suite.json
+  - docs/agents/reports/OTCLIENT-20260829-tibia-re-vision-benchmark-execution.md
   - docs/agents/tasks/active/OTC-20260829-tibia-re-vision-benchmark-execution.md
   - docs/superpowers/plans/2026-08-29-tibia-re-vision-benchmark-execution.md
 validation:
   - command: python -m unittest discover -s tools/tibia-re-vision-benchmark/tests -v
     result: PASS
-    evidence: 22 tests passed including explicit num_ctx and num_predict request assertions
-  - command: bounded Qwen synthetic login plus black-negative suite, three trials each
+    evidence: 22 tests passed on terminal report worktree
+  - command: python tools/agents/checkpoint.py docs/agents/tasks/active/OTC-20260829-tibia-re-vision-benchmark-execution.md --require-checkpoint
     result: PASS
-    evidence: DOMAIN_STATUS=PASS_PROFILE; LOGIN_SCREEN 3 of 3, text recall 1.0, black false text 0 of 3, false IN_GAME_VISUAL 0 of 3, hard gates eligible true
-  - command: Ollama API ps before explicit unload
+    evidence: current task checkpoint validated
+  - command: git diff --check
     result: PASS
-    evidence: exact digest, context 4096, resident size and size_vram both 3527545978 bytes
-  - command: ollama stop plus ollama ps and docker model ps
+    evidence: terminal report worktree has no whitespace errors
+  - command: ollama ps plus docker model ps
     result: PASS
-    evidence: both local model resident sets empty after bounded suite
-blockers: []
-next_action: revalidate PR 284 live Track B state and screenshot-handoff availability; if no accepted secret-safe frames exist, persist PARTIAL/INCONCLUSIVE terminal benchmark decision rather than extrapolating from synthetic smoke
+    evidence: both resident model sets empty after all real-model trials
+  - command: GitHub PR 284 live-state revalidation plus exact current task tail
+    result: PASS
+    evidence: head 62383aded3acbeb5f405a12fe1f93849cd8e35f9; current blocker BLOCKED_REQUIRED_CURRENT_NATIVE_PRE_LOGIN_OUTBOUND_SEQUENCE_EVIDENCE
+  - command: PR 284 comment and changed-file inventory
+    result: PASS
+    evidence: vision request comment 5460730478 exists; no subsequent accepted screenshot handoff and no Track B evidence screenshot/keyframe dataset path exists
+blockers:
+  - repository-mandated fresh independent post-implementation audit is still required before completion/merge; implementer session cannot self-approve material work
+next_action: run full focused validation and exact-scope checks on the terminal report head, push it, consume exact-head CI/governance and review hygiene, then stop at REQUIRED_FRESH_INDEPENDENT_POST_IMPLEMENTATION_AUDIT if no separate validator session is available
 ```
 
 ## Recovery checkpoint
@@ -166,13 +187,13 @@ next_action: revalidate PR 284 live Track B state and screenshot-handoff availab
 ```yaml
 status: active
 branch: feat/OTC-20260829-tibia-re-vision-benchmark-execution
-head: pending-qwen-bounded-profile-commit
+head: pending-terminal-report-commit
 worktree: C:/Users/barte/otclient-vision-benchmark
 active_operation: P1 deterministic harness followed by P2 bounded real-model smoke
 operation_started_at: null
 external_run_ids: []
-last_verified_state: bounded Qwen num_ctx4096 profile passes login and black-negative smoke with zero hallucinated black text, 100 percent GPU 3.527 GB residency, explicit unload clean; Ovis statuses unchanged
+last_verified_state: terminal benchmark PARTIAL/INCONCLUSIVE report prepared; bounded Qwen leading profile; no Track B screenshot handoff; Track B blocker unchanged; all local model residency empty
 resume_condition: current task branch still owns the declared paths and Ollama residency is empty or exact target only
 failure_handling: if a model/backend pull or inference fails, persist the typed failure and do not switch to cloud or a different undeclared provider
-next_action: revalidate Track B PR 284 and consume only an accepted secret-safe screenshot handoff; otherwise terminalize benchmark PARTIAL and research value INCONCLUSIVE
+next_action: full final focused validation plus exact-head CI/governance/review checks, then separate fresh audit or explicit audit blocker
 ```

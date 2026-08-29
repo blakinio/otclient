@@ -707,6 +707,78 @@ class Tests(unittest.TestCase):
         self.assertFalse(self.m.REG.exists())
         killed.assert_not_called()
 
+    def test_kasm_bootstrap_lease_drift_before_launch_never_attempts_launch(self):
+        calls = []
+        args = self.kasm_args()
+        with mock.patch.object(self.m, '_worker', side_effect=self._kasm_worker_writer(calls)), \
+                mock.patch.object(self.m, '_lease', side_effect=self.m.E('lease_generation_changed')), \
+                mock.patch.object(self.m, '_probe') as probe:
+            with self.assertRaisesRegex(self.m.E, 'lease_generation_changed'):
+                self.m._kasm_bootstrap(args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 1)
+        self.assertEqual(calls, ['preflight'])
+        probe.assert_not_called()
+
+    def test_kasm_bootstrap_registration_race_before_commit_preserves_racer(self):
+        calls = []
+        args = self.kasm_args()
+        manifest = self.kasm_manifest()
+        racer = self.registration(registration_generation=9)
+        racer['source_task'] = 'racer'
+        probes = 0
+        def probe(*_args):
+            nonlocal probes
+            probes += 1
+            if probes == 2:
+                self.write(racer)
+            return dict(manifest)
+        with mock.patch.object(self.m, '_worker', side_effect=self._kasm_worker_writer(calls)), \
+                mock.patch.object(self.m, '_probe', side_effect=probe), \
+                mock.patch.object(self.m, '_lease', return_value=1):
+            with self.assertRaisesRegex(self.m.E, 'kasm_bootstrap_registration_race'):
+                self.m._kasm_bootstrap(args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 1)
+        self.assertEqual(calls, ['preflight', 'launch', 'rollback'])
+        self.assertEqual(self.m._read(), racer)
+
+    def test_kasm_bootstrap_concurrent_replacement_after_commit_is_preserved(self):
+        calls = []
+        args = self.kasm_args()
+        manifest = self.kasm_manifest()
+        concurrent = self.registration(lease_generation=99, registration_generation=99)
+        concurrent['source_task'] = 'concurrent'
+        probes = 0
+        def probe(*_args):
+            nonlocal probes
+            probes += 1
+            if probes == 3:
+                self.write(concurrent)
+                raise self.m.E('final_probe_failed')
+            return dict(manifest)
+        with mock.patch.object(self.m, '_worker', side_effect=self._kasm_worker_writer(calls)), \
+                mock.patch.object(self.m, '_probe', side_effect=probe), \
+                mock.patch.object(self.m, '_lease', return_value=1):
+            with self.assertRaisesRegex(self.m.E, 'kasm_bootstrap_rollback_registration_conflict'):
+                self.m._kasm_bootstrap(args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 1)
+        self.assertEqual(calls, ['preflight', 'launch', 'rollback'])
+        self.assertEqual(self.m._read(), concurrent)
+
+    def test_kasm_bootstrap_rollback_worker_failure_surfaces_fail_closed(self):
+        calls = []
+        args = self.kasm_args()
+        mismatch = dict(self.kasm_manifest(), pid=4243)
+        base_worker = self._kasm_worker_writer(calls)
+        def worker(worker_path, operation, argument):
+            if operation == 'rollback':
+                calls.append(operation)
+                raise self.m.E('rollback_refused')
+            return base_worker(worker_path, operation, argument)
+        with mock.patch.object(self.m, '_worker', side_effect=worker), \
+                mock.patch.object(self.m, '_probe', return_value=mismatch), \
+                mock.patch.object(self.m, '_lease', return_value=1):
+            with self.assertRaisesRegex(self.m.E, 'kasm_bootstrap_rollback_failed'):
+                self.m._kasm_bootstrap(args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 1)
+        self.assertEqual(calls, ['preflight', 'launch', 'rollback'])
+        self.assertFalse(self.m.REG.exists())
+
     def test_kasm_bootstrap_provenance_is_additive_and_validated(self):
         manifest = self.kasm_manifest()
         registration = dict(manifest)

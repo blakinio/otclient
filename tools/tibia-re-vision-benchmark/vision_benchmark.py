@@ -89,6 +89,23 @@ def validate_visual_evidence(payload: Any) -> list[str]:
     return errors
 
 
+
+def validate_model_observation(observation: Any) -> list[str]:
+    errors: list[str] = []
+    required = {"screen_class", "visible_text", "ui_objects", "appeared", "disappeared", "changed"}
+    if not isinstance(observation, dict):
+        return ["model observation must be object"]
+    if set(observation) != required:
+        errors.append("model observation keys invalid")
+    if observation.get("screen_class") not in SCREEN_CLASSES:
+        errors.append("model observation screen_class invalid")
+    if not _is_str_list(observation.get("visible_text")):
+        errors.append("model observation visible_text invalid")
+    for key in ("ui_objects", "appeared", "disappeared", "changed"):
+        if not _is_object_list(observation.get(key)):
+            errors.append(f"model observation {key} invalid")
+    return errors
+
 def evaluate_hard_gates(trials: Iterable[dict[str, Any]]) -> dict[str, Any]:
     trials = list(trials)
     gates = {
@@ -205,6 +222,10 @@ def run_ollama_trial(
     image_path: str | Path,
     prompt: str,
     *,
+    evidence_ref: str,
+    capture_sha256: str,
+    model_profile_id: str,
+    source_monotonic_ns: int | None = None,
     keep_alive: str = "0s",
     timeout: float = 120.0,
 ) -> dict[str, Any]:
@@ -212,6 +233,19 @@ def run_ollama_trial(
     admitted, reason = admit_residency(resident, model)
     if not admitted:
         raise RuntimeError(f"MODEL_SLOT_NOT_EXCLUSIVE:{reason}:{resident}")
+    if not isinstance(evidence_ref, str) or not evidence_ref:
+        raise ValueError("evidence_ref invalid")
+    if not isinstance(capture_sha256, str) or len(capture_sha256) != 64 or any(
+        c not in "0123456789abcdefABCDEF" for c in capture_sha256
+    ):
+        raise ValueError("capture_sha256 invalid")
+    if not isinstance(model_profile_id, str) or not model_profile_id:
+        raise ValueError("model_profile_id invalid")
+    if source_monotonic_ns is not None and (
+        not isinstance(source_monotonic_ns, int) or isinstance(source_monotonic_ns, bool)
+    ):
+        raise ValueError("source_monotonic_ns invalid")
+
     image = Path(image_path)
     encoded = base64.b64encode(image.read_bytes()).decode("ascii")
     request = {
@@ -227,9 +261,29 @@ def run_ollama_trial(
     if not isinstance(message, dict) or not isinstance(message.get("content"), str):
         raise ValueError("Ollama response message.content missing")
     try:
-        visual_evidence = json.loads(message["content"])
+        observation = json.loads(message["content"])
     except json.JSONDecodeError as exc:
         raise ValueError("model output is not strict JSON") from exc
+    observation_errors = validate_model_observation(observation)
+    if observation_errors:
+        raise ValueError("model observation invalid: " + "; ".join(observation_errors))
+
+    visual_evidence = {
+        "schema_version": 1,
+        "capture": {
+            "evidence_ref": evidence_ref,
+            "sha256": capture_sha256.lower(),
+            "source_monotonic_ns": source_monotonic_ns,
+        },
+        "model": {"model_profile_id": model_profile_id},
+        "observation": observation,
+        "quality": {
+            "schema_valid": True,
+            "visual_only": True,
+            "structural_authority": False,
+            "unknown_fields": [],
+        },
+    }
     schema_errors = validate_visual_evidence(visual_evidence)
     telemetry = {
         key: response.get(key)

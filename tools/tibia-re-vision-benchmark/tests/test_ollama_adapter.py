@@ -17,22 +17,19 @@ from vision_benchmark import (  # noqa: E402
 )
 
 
-def visual_json():
+def model_observation():
     return {
-        "schema_version": 1,
-        "capture": {"evidence_ref": "fixture:test", "sha256": "b" * 64, "source_monotonic_ns": None},
-        "model": {"model_profile_id": "qwen-test"},
-        "observation": {
-            "screen_class": "LOGIN_SCREEN",
-            "visible_text": ["ACCOUNT LOGIN"],
-            "ui_objects": [], "appeared": [], "disappeared": [], "changed": [],
-        },
-        "quality": {"schema_valid": True, "visual_only": True, "structural_authority": False, "unknown_fields": []},
+        "screen_class": "LOGIN_SCREEN",
+        "visible_text": ["ACCOUNT LOGIN"],
+        "ui_objects": [],
+        "appeared": [],
+        "disappeared": [],
+        "changed": [],
     }
 
 
 class FakeOllamaHandler(BaseHTTPRequestHandler):
-    chat_content = json.dumps(visual_json())
+    chat_content = json.dumps(model_observation())
     last_chat = None
 
     def log_message(self, *_args):
@@ -64,7 +61,7 @@ class FakeOllamaHandler(BaseHTTPRequestHandler):
 
 class OllamaAdapterTests(unittest.TestCase):
     def setUp(self):
-        FakeOllamaHandler.chat_content = json.dumps(visual_json())
+        FakeOllamaHandler.chat_content = json.dumps(model_observation())
         FakeOllamaHandler.last_chat = None
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), FakeOllamaHandler)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
@@ -85,7 +82,16 @@ class OllamaAdapterTests(unittest.TestCase):
             query_ollama_ps("http://example.com:11434")
 
     def test_chat_sends_format_json_and_keepalive_zero(self):
-        result = run_ollama_trial(self.endpoint, "qwen-test", self.image, "Return JSON", keep_alive="0s")
+        result = run_ollama_trial(
+            self.endpoint,
+            "qwen-test",
+            self.image,
+            "Return JSON",
+            evidence_ref="fixture:test",
+            capture_sha256="b" * 64,
+            model_profile_id="qwen-test-profile",
+            keep_alive="0s",
+        )
         sent = FakeOllamaHandler.last_chat
         self.assertEqual(sent["format"], "json")
         self.assertEqual(sent["keep_alive"], "0s")
@@ -93,12 +99,33 @@ class OllamaAdapterTests(unittest.TestCase):
         self.assertEqual(sent["options"]["temperature"], 0)
         self.assertTrue(sent["messages"][0]["images"])
         self.assertEqual(result["visual_evidence"]["observation"]["screen_class"], "LOGIN_SCREEN")
+        self.assertEqual(result["visual_evidence"]["capture"]["sha256"], "b" * 64)
+        self.assertEqual(result["visual_evidence"]["model"]["model_profile_id"], "qwen-test-profile")
+        self.assertIs(result["visual_evidence"]["quality"]["structural_authority"], False)
         self.assertEqual(result["telemetry"]["eval_count"], 8)
 
     def test_invalid_model_json_is_not_repaired(self):
         FakeOllamaHandler.chat_content = "not-json"
         with self.assertRaises(ValueError):
-            run_ollama_trial(self.endpoint, "qwen-test", self.image, "Return JSON", keep_alive="0s")
+            run_ollama_trial(
+                self.endpoint, "qwen-test", self.image, "Return JSON",
+                evidence_ref="fixture:test", capture_sha256="b" * 64,
+                model_profile_id="qwen-test-profile", keep_alive="0s"
+            )
+
+
+    def test_model_cannot_author_authority_or_provenance_fields(self):
+        FakeOllamaHandler.chat_content = json.dumps({
+            **model_observation(),
+            "quality": {"structural_authority": True},
+            "capture": {"sha256": "0" * 64},
+        })
+        with self.assertRaises(ValueError):
+            run_ollama_trial(
+                self.endpoint, "qwen-test", self.image, "Return JSON",
+                evidence_ref="fixture:test", capture_sha256="b" * 64,
+                model_profile_id="qwen-test-profile", keep_alive="0s"
+            )
 
     def test_secret_metadata_is_rejected_before_inference(self):
         with self.assertRaises(UnsafeInputError):

@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260829-field6-clean-runner-host-probe
-status: ready
+status: completed
 agent: ChatGPT
 session_id: chatgpt-20260829-field6-clean-runner-host-probe
 session_role: runtime_observer
@@ -9,21 +9,21 @@ project_lane: otclient
 lane: RUNTIME_RESEARCH
 track_id: official-client-re
 task_kind: runtime_infrastructure_diagnostic
-phase: host_control_discovery
+phase: terminal
 branch: fix/OTC-20260829-field6-clean-runner-host-probe
 base_branch: main
 base_main: 08c31195fd2f44224badf1b6bdff85192495898b
 created: 2026-08-29T17:35:00+02:00
-updated: 2026-08-29T17:35:00+02:00
+updated: 2026-08-29T17:48:00+02:00
 risk: medium
 execution_class: synology_physical_runtime
 execution_mode: github_actions_read_only_host_probe
 execution_reason: discover a separate host-control path for provisioning the clean one-job V4 runner without exposing credentials or starting the official client
 persistent_session_role: none
 physical_e2e_required: false
-runtime_access: read_only
-runtime_owner_task: OTC-20260829-field6-clean-runner-host-probe
-runtime_namespace: field6-clean-runner-host-probe
+runtime_access: none
+runtime_owner_task: NOT_APPLICABLE
+runtime_namespace: NOT_APPLICABLE
 canonical_registration: NOT_APPLICABLE
 canonical_lease_generation: NOT_APPLICABLE
 registration_lease_generation: NOT_APPLICABLE
@@ -31,7 +31,7 @@ gate_a: NOT_APPLICABLE
 generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
-target_uniqueness: PROVEN
+target_uniqueness: NOT_APPLICABLE
 mutation_authorized: false
 credentials_allowed: false
 login_allowed: false
@@ -44,8 +44,8 @@ process_control_authorized: false
 network_payload_capture_allowed: false
 physical_action_budget: 0
 physical_action_count: 0
-implementation_authorized: true
-live_runtime_authorization_source: owner_prompt_current_invocation
+implementation_authorized: false
+live_runtime_authorization_source: NOT_APPLICABLE
 related_pr: 800
 validation_level: exact_head
 owned_paths:
@@ -78,4 +78,8 @@ This potentially contaminated historical runner is explicitly untrusted for cred
 
 # Next action
 
-Merge the static contract on fresh main, then dispatch this read-only workflow once. Use its sanitized result only to choose the next host-control remediation step.
+Terminal result captured in run `33261106292` / job `99123092884`. Do not reuse the historical runner for secrets. Continue only through an independently authenticated host-control remediation task; same-host fresh containers are not clean provenance after host Docker-socket RW was proven.
+
+# Terminal result
+
+Trusted-main run `33261106292`, job `99123092884`, completed success and emitted only the sanitized booleans/count below. The result proves the historical runner is inside a container with read/write access to the host Docker socket and server. Therefore this runner and same-host Docker children are not admissible as a clean secret boundary. No credentials, official client, login, GUI action, packet capture, process memory, or physical action occurred.

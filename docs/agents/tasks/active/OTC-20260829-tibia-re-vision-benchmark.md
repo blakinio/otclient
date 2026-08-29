@@ -1,17 +1,18 @@
 ---
 task_id: OTC-20260829-tibia-re-vision-benchmark
-status: implementing
+status: validating
 agent: ChatGPT
 project_lane: otclient
 lane: P0-DESIGN
 track_id: official-client-re
 task_kind: documentation
-phase: prompt-and-design-persistence
+phase: prompt-persistence-validation
 branch: docs/OTC-20260829-tibia-re-local-vision-model-benchmark
 base_branch: main
 base_sha: 4c751870b5dcd51d5b984b78a4f06625306be961
+related_pr: "787"
 created: 2026-08-29T07:37:00+02:00
-updated: 2026-08-29T07:37:00+02:00
+updated: 2026-08-29T07:40:16+02:00
 risk: medium
 execution_mode: chat_github
 run_scope: single_task
@@ -73,7 +74,7 @@ prompt_contract:
   changed_surfaces:
     - new repository-owned local vision benchmark coordinator prompt
     - short owner invocation alias
-    - benchmark architecture and future implementation plan
+    - benchmark architecture and persistence plan
   objective: Persist a restart-safe programme for selecting the best local vision/OCR model for official-client reverse engineering on the owner's verified PC, without making visual evidence structural authority or creating a parallel Track A/Control Center plane.
   baseline_version: no prior dedicated vision benchmark prompt
   eval_suite: manual scenario matrix in this task record
@@ -86,31 +87,31 @@ prompt_contract:
 
 Persist the architecture, benchmark contract and alias for a future local-PC evaluation of vision/OCR models used only as research evidence around the official Linux Tibia client.
 
-This task is documentation/prompting only. It does not execute any model, access Molehill-PC or Synology, capture a client screen, inspect credentials, perform login, send GUI input, attach to the official client, mutate Track A state, or run gameplay actions.
+This task is documentation/prompting only. It executes no model, accesses neither Molehill-PC nor Synology, captures no client screen, accesses no credential, performs no login, sends no GUI input, attaches to no official-client process, mutates no Track A state and performs no gameplay action.
 
-## Live-state findings used by this design
+## Verified live-state basis
 
-- Trusted base at task creation: `main@4c751870b5dcd51d5b984b78a4f06625306be961`.
+- Task branch was created from trusted `main@4c751870b5dcd51d5b984b78a4f06625306be961`.
 - No existing PR matched `TIBIA-RE-VISION`, `VISION-MODEL-BENCHMARK`, Ovis/OCR or Qwen vision benchmark ownership.
-- Draft PR #615 is the closest overlap. It implements a bounded local Ollama PoC harness but is blocked and remains unmerged. It is discovery input only; this task must not copy unmerged code or take its owned paths.
-- Current Track A hybrid routing keeps the physical official-client runtime on Synology and routes deterministic/disposable analysis away from the scarce physical runtime.
-- Control Center Adapter v1 already defines passive capture/snapshot/event semantics; the vision layer should consume those semantics rather than define a second control plane.
-- Current `gameWindowState` qualification already defines a high-value future four-state sequence: `LOGIN_SCREEN -> CHARACTER_SELECT -> WORLD -> WORLD_EXIT`. This is the preferred first screen-state benchmark when secret-safe captures/current runtime admission are available.
+- Draft PR #615 is the closest overlap. Its unmerged harness remains discovery input only and none of its owned paths are changed here.
+- Track A hybrid routing keeps the physical official-client runtime on Synology and routes deterministic/disposable analysis away from the scarce physical runtime.
+- Control Center Adapter v1 already defines passive capture/snapshot/event responsibilities; this design consumes those semantics rather than inventing a second control plane.
+- Current `gameWindowState` qualification provides the preferred future four-state benchmark sequence `LOGIN_SCREEN -> CHARACTER_SELECT -> WORLD -> WORLD_EXIT` when current admission and secret-safe captures permit it.
 
-## Design decision
+## Persisted design decision
 
-Create a model-agnostic `VisualEvidence` research layer. Local models run on the verified owner PC and consume only approved secret-safe screenshots/keyframes/ROIs. Their outputs remain `visual_only` evidence and never satisfy Track A structural read/action gates by themselves.
+Use a model-agnostic `VisualEvidence` layer. Candidate models run locally on the verified owner PC against frozen secret-safe Tibia inputs. Output remains `visual_only` and `structural_authority: false`; visual evidence cannot satisfy Track A R/A promotion gates by itself.
 
-Initial candidate set, to be revalidated at execution time rather than treated as permanent availability:
+Initial candidates are hypotheses to revalidate at execution time:
 
-1. `Qwen/Qwen3-VL-4B-Instruct` — primary whole-screen/UI-semantic hypothesis.
-2. `ATH-MaaS/Ovis2.5-2B` — lightweight whole-screen/UI-semantic challenger.
+1. `Qwen/Qwen3-VL-4B-Instruct` — whole-screen/UI-semantic hypothesis.
+2. `ATH-MaaS/Ovis2.5-2B` — lightweight general-vision challenger.
 3. `ATH-MaaS/OvisOCR2` — specialized exact-text/OCR challenger.
-4. Optional second-pass challengers only after the first three finish: `Qwen/Qwen3-VL-4B-Thinking` and a memory-safe quantized `ATH-MaaS/Ovis2.5-9B` if current backend support and resource limits are proven.
+4. Optional second pass only after first-pass completion: `Qwen/Qwen3-VL-4B-Thinking` and a proven memory-safe quantized `ATH-MaaS/Ovis2.5-9B` profile.
 
-No model is declared the winner by this documentation task.
+No winner is claimed by this persistence task.
 
-## Benchmark score
+## Benchmark contract
 
 Weighted score:
 
@@ -121,28 +122,18 @@ Weighted score:
 - 10% latency;
 - 5% peak VRAM/RAM efficiency.
 
-Hard gates override the weighted score:
+Hard gates override weighted score:
 
 - schema-valid output: 100%;
 - secret leakage/persistence: 0;
-- false `IN_GAME` on login/character-selection benchmark cases: 0;
-- model receives no runtime/action authority;
-- no model-authored executable action parameters;
-- at most one local model resident or actively inferencing at a time;
-- no silent cloud/API fallback;
-- every result records exact model revision/digest where available, backend, prompt/schema version and input hashes.
+- false visual `IN_GAME` on login/character-selection hard-gate cases: 0;
+- model runtime/action authority: 0;
+- model-authored executable action parameters: 0;
+- at most one resident or actively inferencing local model at a time;
+- no silent cloud/API/provider fallback;
+- complete scored-trial model/backend/prompt/input provenance.
 
-## Benchmark phases
-
-1. Host/backend proof and one-model residency.
-2. Fixed screen-state classification: login, character selection, world, world exit.
-3. Tibia text/ROI exact OCR.
-4. Paired before/after UI-delta extraction.
-5. Negative controls and hallucination tests.
-6. Performance/resource measurements on the same frozen inputs.
-7. Causal-correlation usefulness against structural Track A evidence.
-8. Deterministic/no-VLM baseline versus VisualEvidence-assisted research decisions.
-9. Winner/fallback decision or explicit `NO_WINNER`.
+The future programme includes host/backend proof, four-state screen classification, exact ROI OCR, paired UI-delta extraction, negative controls, resource/latency measurements, repeated trials, causal-correlation usefulness and deterministic/no-VLM research-value comparison. `NO_WINNER` is a valid terminal benchmark result.
 
 ## Manual prompt-eval matrix
 
@@ -150,48 +141,66 @@ This is a static documentation review, not model execution.
 
 | Case | Expected behavior | Result |
 |---|---|---|
-| Fresh agent is given only alias | Resolve current prompt/task from repository state; do not depend on chat history | PASS |
-| User PC hardware differs from remembered profile | Verify live host/GPU/RAM/backend; do not trust remembered hardware | PASS |
-| Different local model is already resident | Fail closed, unload/verify according to current policy before switching | PASS |
-| Qwen produces best OCR but hallucinates UI changes | Hard/weighted quality metrics decide; do not declare winner from OCR alone | PASS |
-| OvisOCR2 reads text well but cannot classify full UI reliably | Permit OCR-specialist fallback role without making it primary | PASS |
-| Model labels login screenshot as IN_GAME | Hard-gate failure for that model/configuration | PASS |
-| Screenshot may contain credentials/session secrets | Reject/quarantine before model inference or persistence | PASS |
-| Open PR #615 contains reusable code | Treat as discovery only until trusted-main merge; do not copy unmerged code | PASS |
-| Current Control Center capture is unavailable | Use approved existing secret-safe artifacts/offline dataset or return exact blocker; do not invent a second capture plane | PASS |
-| Model proposes gameplay action | Ignore/refuse; vision benchmark has no action authority | PASS |
-| Benchmark winner changes under a different backend/quantization | Record configuration-specific result; do not generalize across profiles without compatibility eval | PASS |
-| One successful run looks impressive | Require fixed dataset/repeatability and baseline comparison before recommendation | PASS |
+| Fresh agent receives only alias | Resolve current prompt/task from repository state; do not depend on chat history | PASS |
+| Owner PC differs from remembered profile | Verify live host/GPU/RAM/backend; remembered hardware is discovery input only | PASS |
+| Different local model is resident | Fail closed; unload/verify before switching according to current policy | PASS |
+| General VLM has strong OCR but hallucinates UI changes | Hard/weighted quality metrics decide; OCR alone cannot win | PASS |
+| OvisOCR2 reads text well but weakly classifies full UI | Permit measured OCR-specialist role without making it primary | PASS |
+| Model labels login/character-selection screenshot as IN_GAME_VISUAL | Hard-gate failure for that profile | PASS |
+| Screenshot may contain credentials/session secrets | Reject/quarantine before inference or ordinary persistence | PASS |
+| Open PR #615 contains useful code | Treat as discovery only until trusted-main merge; do not copy unmerged code | PASS |
+| Current Control Center capture is unavailable | Use approved secret-safe offline evidence or exact blocker; do not create a second capture plane | PASS |
+| Model proposes gameplay action | Refuse/ignore; vision benchmark has no action authority | PASS |
+| Backend/quantization changes | Treat as a new model profile; require targeted compatibility result | PASS |
+| One successful run looks impressive | Require fixed dataset/repeatability/baseline before recommendation | PASS |
 
-Static matrix: **12/12 PASS** by implementer self-review. No claim is made that the future runtime/model benchmark has executed.
+Static matrix: **12/12 PASS** by implementer self-review. It is not an automated/model benchmark pass and not an independent audit.
+
+## Direct persistence verification
+
+Direct branch reads verified:
+
+- canonical prompt exists, contract version `1.0.0`, alias `TIBIA-RE-VISION-BENCHMARK`, autonomous continuation metadata and explicit no-cloud/no-runtime-authority boundaries;
+- alias exists, contract version `1.0.0`, points to `docs/agents/prompts/TIBIA_RE_VISION_BENCHMARK.md`, exposes start/continue owner commands and preserves local-only/one-model/non-authoritative rules;
+- design spec exists and chooses the model-agnostic benchmark after considering OvisOCR2-only and one-general-VLM approaches;
+- implementation plan exists and keeps this PR documentation-only while deferring real runtime/model implementation to a future task.
+
+Branch comparison against the base verified exactly five changed files and no source/workflow/runtime/shared-index changes.
 
 ## Acceptance inventory
 
-- [ ] Canonical prompt exists and is self-contained.
-- [ ] Alias exists and resolves to the canonical prompt.
-- [ ] Design spec exists with architecture, evidence boundary and benchmark methodology.
-- [ ] Future implementation plan exists and preserves reuse/fail-closed rules.
-- [ ] Prompt explicitly preserves `visual_only` non-authoritative evidence semantics.
-- [ ] Prompt serializes local model residency/inference and forbids cloud fallback.
-- [ ] Prompt contains fixed benchmark metrics, hard gates and a `NO_WINNER` outcome.
-- [ ] Prompt reuses current Track A/Control Center contracts rather than creating a second control plane.
-- [ ] Full changed-file inventory contains only the five declared documentation paths.
-- [ ] Runtime/model E2E is `NOT_APPLICABLE` for this persistence task because it performs no runtime/model execution.
-- [ ] Exact-head repository CI and PR hygiene are verified before completion/merge.
+- [x] Canonical prompt exists and is self-contained.
+- [x] Alias exists and resolves to the canonical prompt.
+- [x] Design spec exists with architecture, evidence boundary and benchmark methodology.
+- [x] Persistence/future-work plan exists and preserves reuse/fail-closed rules.
+- [x] Prompt explicitly preserves `visual_only` non-authoritative evidence semantics.
+- [x] Prompt serializes local model residency/inference and forbids silent cloud/API fallback.
+- [x] Prompt contains fixed benchmark metrics, hard gates and a `NO_WINNER` outcome.
+- [x] Prompt reuses current Track A/Control Center contracts rather than creating a second control plane.
+- [x] Full changed-file inventory contains only the five declared documentation paths.
+- [x] Runtime/model E2E is `NOT_APPLICABLE`: this persistence task performs no runtime/model execution.
+- [ ] Exact-final-head repository CI/review hygiene and any current required independent audit remain to be verified after this checkpoint commit.
 
-## Current checkpoint
+## Context checkpoint
 
 ```yaml
-checkpoint_version: 1
-status: implementing
+checkpoint_version: 2
+status: validating
+phase: prompt-persistence-validation
 base_sha: 4c751870b5dcd51d5b984b78a4f06625306be961
 branch: docs/OTC-20260829-tibia-re-local-vision-model-benchmark
-pr: pending
+pr: 787
+head_before_checkpoint: f7732e49eac3151eddc1091bfef176632c552740
+head: pending-this-checkpoint-commit
 runtime_access: none
 local_model_execution_performed: false
 molehill_accessed: false
 synology_accessed: false
 credentials_accessed: false
+runtime_model_e2e: NOT_APPLICABLE_DOCUMENTATION_ONLY
+manual_prompt_eval: 12/12 PASS
+changed_file_inventory: exactly_5_declared_documentation_paths
 material_findings_open: 0
-next_action: persist canonical prompt, alias, design spec and future implementation plan; open/update Draft PR; verify exact changed paths and prompt-content matrix
+current_blocker: none
+next_action: verify exact-final-head CI, PR review threads/reviews and current independent-audit requirement; merge/archive only if every current documentation/prompt closeout gate is satisfied, otherwise leave the PR intentionally waiting with one exact next action
 ```

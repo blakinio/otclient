@@ -374,6 +374,13 @@ xd() {
     DISPLAY="$DISPLAY_VALUE" LD_LIBRARY_PATH="$XDO_LD" "$XDO" "$@"
 }
 
+xd_type_stdin() {
+  [[ $# == 1 ]] || fail xd_type_stdin_usage
+  env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD \
+    DISPLAY="$DISPLAY_VALUE" LD_LIBRARY_PATH="$XDO_LD" \
+    "$XDO" type --window "$1" --delay 12 --file -
+}
+
 wait_window() {
   local pid="$1" win geometry width height area best best_area
   for _ in $(seq 1 120); do
@@ -445,10 +452,10 @@ submit_login_once() {
   xd windowfocus --sync "$win"
   xd mousemove --window "$win" 535 275 click 1
   xd key --window "$win" ctrl+a
-  xd type --window "$win" --delay 12 -- "$email"
+  printf '%s' "$email" | xd_type_stdin "$win"
   xd mousemove --window "$win" 535 304 click 1
   xd key --window "$win" ctrl+a
-  xd type --window "$win" --delay 12 -- "$password"
+  printf '%s' "$password" | xd_type_stdin "$win"
   xd mousemove --window "$win" 590 388 click 1
   DID_LOGIN_SUBMIT=1
   unset email password TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD

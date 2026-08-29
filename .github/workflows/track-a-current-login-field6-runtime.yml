@@ -6,6 +6,7 @@ on:
     types: [opened, synchronize, reopened]
     paths:
       - .github/scripts/test_track_a_current_login_field6_runtime.py
+      - .github/scripts/test_track_a_current_login_field6_security_contract.py
       - .github/scripts/track_a_current_client_package_materialize.py
       - .github/scripts/track_a_current_client_package_acquire.sh
       - .github/scripts/track_a_current_login_field6_runtime.sh
@@ -42,6 +43,7 @@ jobs:
         run: |
           set -Eeuo pipefail
           python3 .github/scripts/test_track_a_current_login_field6_runtime.py
+          python3 .github/scripts/test_track_a_current_login_field6_security_contract.py
           python3 -m py_compile .github/scripts/track_a_current_client_package_materialize.py
           bash -n .github/scripts/track_a_current_client_package_acquire.sh
           bash -n .github/scripts/track_a_current_login_field6_runtime.sh
@@ -100,6 +102,7 @@ jobs:
           grep -Fq 'AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V4 once=true' "$task"
           python3 .github/scripts/test_track_a_agent_runtime_governance.py
           python3 .github/scripts/test_track_a_current_login_field6_runtime.py
+          python3 .github/scripts/test_track_a_current_login_field6_security_contract.py
           python3 -m py_compile .github/scripts/track_a_current_client_package_materialize.py
           bash -n .github/scripts/track_a_current_client_package_acquire.sh
           bash -n .github/scripts/track_a_current_login_field6_runtime.sh

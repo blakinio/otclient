@@ -426,7 +426,7 @@ Add negatives for unreadable/malformed boot id. Run worker tests and observe RED
 
 - [ ] **Step 2: Implement boot identity in Kasm preflight and confirm GREEN**
 
-Read `/proc/sys/kernel/random/boot_id` inside the exact target container and SHA-256 the normalized UUID text. Do not use host boot identity. Include the hash in the persisted preflight record and fingerprint.
+Read `/proc/sys/kernel/random/boot_id` inside the exact target container, validate the UUID text, and SHA-256 the exact file bytes (including its line ending) to match the existing Kasm probe's `sha256sum` semantics. Do not use host boot identity. Include the hash in the persisted preflight record and fingerprint.
 
 - [ ] **Step 3: Write failing invalidation transaction tests**
 

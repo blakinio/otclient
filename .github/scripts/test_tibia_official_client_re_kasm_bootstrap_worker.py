@@ -50,16 +50,17 @@ class FakeRunner:
             if not self.display_ok:
                 raise self.m.WorkerError('command_failed')
             return 'DISPLAY_OK\n'
-        if len(cmd) >= 6 and cmd[:2] == ('docker', 'exec') and cmd[-3:-1] == ('python3', '-c'):
+        if len(cmd) == 6 and cmd[:2] == ('docker', 'exec') and cmd[3:5] == ('python3', '-c'):
+            script = cmd[5]
+            if script == getattr(self.m, 'BOOT_ID_SCRIPT', None):
+                if self.boot_id_sha256 is None:
+                    raise self.m.WorkerError('command_failed')
+                return json.dumps({'boot_id_sha256': self.boot_id_sha256}) + '\n'
             raise AssertionError(f'unrecognized python command shape: {cmd!r}')
         if len(cmd) >= 7 and cmd[:2] == ('docker', 'exec') and cmd[-4:-2] == ('python3', '-c'):
             script = cmd[-2]
             if script == self.m.PACKAGE_IDENTITY_SCRIPT:
                 return json.dumps(self.package) + '\n'
-            if script == getattr(self.m, 'BOOT_ID_SCRIPT', None):
-                if self.boot_id_sha256 is None:
-                    raise self.m.WorkerError('command_failed')
-                return json.dumps({'boot_id_sha256': self.boot_id_sha256}) + '\n'
             if script == self.m.CANDIDATE_SCRIPT:
                 container_id = cmd[2]
                 return json.dumps(self.candidates.get(container_id, [])) + '\n'

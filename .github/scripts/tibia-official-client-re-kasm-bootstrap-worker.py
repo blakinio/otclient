@@ -88,6 +88,18 @@ for entry in pathlib.Path('/proc').iterdir():
 print(json.dumps(rows,sort_keys=True,separators=(',',':')))
 '''
 
+BOOT_ID_SCRIPT = r'''
+import hashlib,json,pathlib,uuid
+path=pathlib.Path('/proc/sys/kernel/random/boot_id')
+try:
+    raw=path.read_bytes()
+    uuid.UUID(raw.decode('ascii').strip())
+    digest=hashlib.sha256(raw).hexdigest()
+    print(json.dumps({'boot_id_sha256':digest},sort_keys=True,separators=(',',':')))
+except (OSError,UnicodeDecodeError,ValueError):
+    print(json.dumps({'boot_id_sha256':''},sort_keys=True,separators=(',',':')))
+'''
+
 PROCESS_IDENTITY_SCRIPT = r'''
 import hashlib,json,os,pathlib,sys
 pid=int(sys.argv[1]); root=pathlib.Path('/proc')/str(pid)
@@ -207,6 +219,20 @@ def package_identity(container_id: str, runner: Callable[[Sequence[str]], str] =
     return data
 
 
+def boot_identity(container_id: str, runner: Callable[[Sequence[str]], str] = run) -> str:
+    try:
+        output = runner(['docker', 'exec', container_id, 'python3', '-c', BOOT_ID_SCRIPT])
+    except WorkerError as exc:
+        raise WorkerError('boot_identity_unavailable') from exc
+    data = _json(output, 'boot_identity_invalid')
+    if not isinstance(data, dict):
+        raise WorkerError('boot_identity_invalid')
+    value = data.get('boot_id_sha256')
+    if not isinstance(value, str) or not FULL_ID_RE.fullmatch(value):
+        raise WorkerError('boot_identity_invalid')
+    return value
+
+
 def candidate_rows(container_id: str, runner: Callable[[Sequence[str]], str] = run) -> list[dict[str, Any]]:
     data = _json(
         runner(['docker', 'exec', container_id, 'python3', '-c', CANDIDATE_SCRIPT, str(SIZE)]),
@@ -265,6 +291,7 @@ def collect_preflight(runner: Callable[[Sequence[str]], str] = run) -> dict[str,
     except WorkerError as exc:
         raise WorkerError('display_unavailable') from exc
     package_identity(container_id, runner)
+    current_boot = boot_identity(container_id, runner)
     candidates = exact_candidates(containers, runner)
     if candidates:
         raise WorkerError(f'official_client_candidate_count:{len(candidates)}')
@@ -280,6 +307,7 @@ def collect_preflight(runner: Callable[[Sequence[str]], str] = run) -> dict[str,
         'client_path': CLIENT_PATH,
         'client_size': SIZE,
         'client_sha256': SHA,
+        'boot_id_sha256': current_boot,
         'candidate_count': 0,
         'main_window_count': 0,
     }
@@ -298,6 +326,8 @@ def _validate_preflight(data: dict[str, Any]) -> None:
         if data.get(key) != expected:
             raise WorkerError('preflight_record_invalid')
     if not FULL_ID_RE.fullmatch(str(data.get('container_id', ''))):
+        raise WorkerError('preflight_record_invalid')
+    if not FULL_ID_RE.fullmatch(str(data.get('boot_id_sha256', ''))):
         raise WorkerError('preflight_record_invalid')
     fingerprint = data.get('preflight_fingerprint')
     unsigned = dict(data)

@@ -1,8 +1,8 @@
 ---
 task_id: OTC-20260828-current-login-field6-runtime
-status: ready
+status: validating
 agent: ChatGPT
-session_id: chatgpt-20260829-field6-v4-admission-v2
+session_id: chatgpt-20260829-field6-v4-independent-runner
 session_role: implementer
 policy_version: 2
 project_lane: otclient
@@ -10,16 +10,16 @@ lane: RUNTIME_RESEARCH
 track_id: official-client-re
 task_kind: reverse_engineering_runtime
 phase: live_admission
-branch: fix/OTC-20260829-field6-v4-admission-v2
+branch: fix/OTC-20260829-field6-v4-independent-runner
 base_branch: main
-base_main: 0c9c4e1021b09eb0c2de6fe426ad0688e4539173
+base_main: 8c207b38ecad5154a83ec3588e172f096cf2ff29
 created: 2026-08-28T19:00:00+02:00
-updated: 2026-08-29T17:29:00+02:00
+updated: 2026-08-29T19:20:00+02:00
 risk: high
-execution_class: synology_physical_runtime
-execution_mode: github_actions_ephemeral_isolated
-execution_reason: one fresh exact-current scalar-only V4 login observation after trusted static generation and historical-rerun revocation
-persistent_session_role: canonical_runtime_owner
+execution_class: independent_ephemeral_physical_runtime
+execution_mode: github_actions_independent_ephemeral_physical
+execution_reason: one fresh exact-current scalar-only V4 login observation on a physically separate one-job clean Linux guest after terminal Synology secret-boundary disqualification
+persistent_session_role: none
 physical_e2e_required: true
 runtime_access: ephemeral_isolated
 runtime_owner_task: OTC-20260828-current-login-field6-runtime
@@ -46,7 +46,12 @@ physical_action_budget: 1
 physical_action_count: 0
 implementation_authorized: true
 live_runtime_authorization_source: PR_758_COMMENT_5457904227
-related_pr: 796
+related_pr: 806
+independent_guest_name: OTClientV4Clean
+independent_runner_name: molehill-otclient-v4-01
+independent_rootfs_url: https://cloud-images.ubuntu.com/releases/noble/release-20260801/ubuntu-24.04-server-cloudimg-amd64-root.tar.xz
+independent_rootfs_sha256: 915b4be62933475c3fb5f5031aa2e159294db95fb32aaa9e8b317aadcb6c065d
+independent_runner_provenance: /etc/otclient-field6-runner-provenance
 context_pressure: medium
 context_growth: stable
 context_score: 9
@@ -54,21 +59,21 @@ estimate_confidence: medium
 decomposition_decision: phased
 decomposition_reason: field6 proof remains one sequential evidence chain; Track B is a separate consumer phase after scalar promotion
 validation_level: exact_head
-last_completed_step: local admission/security/field6/boundary audit GREEN after #798; final one-commit restack ready for exact-head hosted validation
-session_rotation_count: 1
+last_completed_step: #805 one-commit candidate passed field6/fresh-audit/materializer/self-hosted/governance/CI; Draft Ready connector failed, #805 closed superseded and ready replacement #806 opened; task pointer updated for final restack
+session_rotation_count: 2
 heavy_validation_runs: 0
 stale_takeover_count: 0
 human_interruptions: 0
 invocation_started_at: 2026-08-28T22:50:00+02:00
-last_progress_at: 2026-08-29T17:29:00+02:00
+last_progress_at: 2026-08-29T19:20:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: v4_admission_v2_final_restack
+ci_check_generation: v4_independent_runner_ready_replacement
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 2
-context_reconstruction_attempts: 1
+repair_cycles_for_current_gate: 3
+context_reconstruction_attempts: 2
 stall_warnings: 0
 owned_paths:
   - .github/scripts/test_track_a_current_client_package_parallel.py
@@ -92,21 +97,14 @@ depends_on:
   - merged PR #752 exact-current field6 scalar-owner promotion
   - merged PR #754 exact-current client fence
   - merged PR #758 runtime observation implementation
-  - merged PR #762 one-shot V1 live admission
-  - failed pre-action run 33195339335 / job 98930921032
-  - merged PR #764 exact-current package reacquisition repair
-  - merged PR #768 one-shot V2 live admission
-  - failed pre-action V2 run 33200939531 / job 98949936038
-  - merged PR #769 direct task-owned package source repair
-  - merged PR #771 one-shot V3 live admission
-  - cancelled pre-action V3 run 33202129157 / job 98953921602
   - merged PR #775 bounded exact-current package materialization repair
-  - merged PR #780 canonical identity reconciliation retry closeout
   - merged PR #783 static V4 generation and historical-rerun guard
-  - merged PR #785 non-overlapping gameWindowState ELF mapping-base repair
-  - merged PR #795 self-hosted secret-runner boundary and independent audit
-  - merged PR #798 reusable self-hosted boundary audit repair
+  - merged PR #795 self-hosted secret-runner boundary
+  - merged PR #798 reusable self-hosted boundary audit
+  - merged PR #802 terminal Synology host-probe evidence
+  - merged PR #804 independent ephemeral physical runtime contract/routing
   - PR #758 owner V4 admission comment 5457904227
+  - host-probe run 33261106292 / job 99123092884 proving Synology Docker-socket RW
 blocks:
   - OTCLIENT-TIBIA-GLOBAL-LOGIN-FINAL-CONTINUE
 ---
@@ -117,7 +115,7 @@ Recover the exact current public scalar carried in `edx` when the official Linux
 
 # Terminal prior-generation evidence
 
-The terminal V3 owner comment produced run `33202129157` / job `98953921602` against trusted main `32146659213cba71910cbe8d46aa4c2f6ded607c`. WARP/SOCKS setup passed, but the then-serial full-package materializer exceeded the job-level 18-minute deadline. Authorization consumption, credential exposure, official-client execution and login were skipped.
+V1, V2 and V3 are consumed historical generations and must never be rerun or replayed. Terminal V3 run `33202129157` / job `98953921602` stopped before authorization consumption, credential exposure, official-client execution or login:
 
 ```text
 TRACK_A_FIELD6_PACKAGE_WARP=PASS attempt=1
@@ -127,35 +125,75 @@ login_submit_count=0
 FIELD6_VALUE=UNKNOWN
 ```
 
-V1, V2 and V3 are consumed historical generations and must never be rerun or replayed. The exact consumed V3 trigger literal is intentionally absent from this active task so the historical V3 workflow cannot satisfy its own current-main generation grep. Immutable terminal evidence remains in `docs/agents/evidence/OTC-20260828-current-login-field6-runtime/20260828-v3-terminal-pre-action-timeout.md`.
+The exact consumed V3 trigger literal is intentionally absent from this active task. Immutable V3 evidence remains under `docs/agents/evidence/OTC-20260828-current-login-field6-runtime/`.
 
-# Trusted V4 implementation boundary
+# Trusted V4 implementation and authority
 
-Materializer repair PR #775 is trusted as `5e9293f78e1757eafb88ca0b21cec8bf3d1d246a`. It uses bounded deterministic concurrency while retaining complete package verification, every packed/unpacked size/hash check, exact `bin/client` verification, task-owned WARP/SOCKS, no downloaded-content execution, atomic publication and fail-closed cleanup. The justified job deadline remains `18` minutes.
+Materializer repair PR #775 is trusted as `5e9293f78e1757eafb88ca0b21cec8bf3d1d246a`. Static generation PR #783 is trusted as `0720ddc77affefc4206afc7e09da03b77dc8c26f`; it rotates the only executable generation to V4 and blocks historical V3 reruns.
 
-Static generation PR #783 is trusted on `main` as `0720ddc77affefc4206afc7e09da03b77dc8c26f`. It rotates the only executable current workflow trigger to V4 and adds a current-main generation contract that rejects the consumed V3 generation. Its final exact-head field6/materializer/governance/CI checks were GREEN, and independent exact-head Codex review reported no major issues after the P1 historical-rerun guard was repaired.
-
-Protected `main@4c751870b5dcd51d5b984b78a4f06625306be961` is the fresh admission base. The intervening PR #785 changed only `.github/scripts/test_track_a_game_window_state_qualification.py` and `.github/scripts/track_a_game_window_state_qualification.py`; it does not overlap this field6 admission repair.
-
-# Fresh V4 owner admission
-
-A distinct repository-owner admission record exists on merged PR #758 as comment `5457904227`:
+A separate repository-owner admission exists on merged PR #758 as comment `5457904227`:
 
 ```text
 AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V4 admission=true previous_generation=V3 previous_run=33202129157 previous_physical_action_count=0 scope=one_login_scalar_only physical_action_budget=1 relogin=false restart=false character_selection=false world_entry=false gameplay=false network_payload_capture=false
 ```
 
-This text is deliberately **not** the exact live workflow trigger. It records authority for a later one-shot login only after this admission is independently reviewed, GREEN, clean-restacked and merged to fresh trusted `main`.
+This is not the live trigger. The exact V4 trigger remains unposted.
 
-Merged PR #795 (`ed0b048f72b93613ea87a177ce6c5a3ea9bfa92b`) is now the trusted self-hosted secret-runner boundary. V4 execution additionally requires an offline-by-default fresh one-job runner with disposable work/state, no restored historical runner state, no Docker socket/privileged host access, exact queued-job uniqueness, and post-job destruction. If that clean-runner provenance cannot be proven, credentials/login remain forbidden and the exact V4 trigger MUST NOT be posted.
+# Synology disqualification and independent fallback
 
-Because that fresh runner intentionally does not preserve the historical `COMMENT_ID.used` file, the live workflow rejects any `GITHUB_RUN_ATTEMPT != 1` in the first trusted-main admission step, before authorization consumption, credential exposure, client execution, or physical action. A GitHub rerun therefore fails before the one-shot boundary can be reused.
+Trusted-main host probe run `33261106292`, job `99123092884`, proved the historical `synology-otclient-01` runner was itself inside a container with read/write access to the Synology host Docker socket. PR #802 persisted the sanitized terminal evidence and removed the probe workflow. Therefore neither that historical runner nor a new container on the same unverified Synology host is admissible for Tibia credentials.
 
-The routing refresh now explicitly classifies the physical step as `synology_physical_runtime`, records `persistent_session_role: canonical_runtime_owner`, and marks `physical_e2e_required: true` as required by the hybrid routing contract. Fresh active-task searches immediately before this admission found no other active `canonical_recovery`, `ephemeral_isolated`, or `mutation_authorized: true` task. This V4 runtime is isolated to its task/run-owned state, Xvfb display `:131`, runtime WARP SOCKS port `25441`, and package-acquisition WARP SOCKS port `25442`; every collision fails closed.
+Merged PR #804 (`8c207b38ecad5154a83ec3588e172f096cf2ff29`) now defines the trusted `independent_ephemeral_physical_runtime` fallback. This V4 task satisfies its static routing shape: it is task-owned `ephemeral_isolated`, retains `physical_e2e_required: true`, has `persistent_session_role: none`, and does not use canonical registration/Gate A/rebind/Gate B/bootstrap/Kasm retained state.
+
+The only admitted executor is a freshly imported WSL2 Ubuntu 24.04 guest `OTClientV4Clean` on physically separate `Molehill-PC`, built from the immutable Canonical release-20260801 amd64 rootfs and exact SHA256 recorded in task metadata. It must have host automount/interop disabled, no Docker/Podman socket, no prior repository/runner/task state, and root-owned `/etc/otclient-field6-runner-provenance` before GitHub runner registration.
+
+The GitHub runner name is exactly `molehill-otclient-v4-01`. It is configured only after the V4 job queues, with `--ephemeral --disableupdate --no-default-labels` and the one-time label `field6-v4-<comment_id>`. Before registration/start, the coordinator must prove exactly one attempt-1 queued V4 job requires that exact comment-derived label and no other queued job requests it. A generic self-hosted job must never be eligible.
+
+# Consumer TDD and GREEN
+
+PR #805 exact RED head `ed5321fd8e4bdeb253da10a88c9eda58e816dc3a` changed only the security contract. Hosted run `33264367089`, contract job `99131694221`, failed exactly with:
+
+```text
+FIELD6_SECURITY_CONTRACT_RED: task missing 'execution_class: independent_ephemeral_physical_runtime'
+```
+
+Fresh independent admission audit also failed as expected on the old Synology admission shape; physical live job `99131694774` was skipped. No runtime/credential/client action occurred.
+
+During GREEN implementation, an additional existing causal gate was discovered: `.github/scripts/track_a_current_client_package_acquire.sh` also hard-coded `RUNNER_NAME=synology-otclient-01`. The independent consumer updates that gate under the same provenance flag; overriding/spoofing `RUNNER_NAME` is forbidden. The runtime helper accepts system toolroot `/` only when the exact independent runner name plus both provenance/system-toolroot flags are present; old Synology retained-toolroot resolution is unchanged.
+
+Pre-restack candidate `2aa4049e31b765f5f2c437fb4ea47b9547a193d3` passed:
+
+```text
+Track A current login field6 runtime observation  run 33264987994  success
+  Fresh independent V4 admission audit           job 99133361642  success
+  Current login field6 runtime contract           job 99133370772  success
+  One-shot isolated field6 observation            job 99133363963  skipped
+Track A current client package materializer       run 33264987970  success
+  Bounded package materializer contract           job 99133367013  success
+Track A self-hosted PR boundary                    run 33264987952  success
+Track A agent runtime governance                   run 33264987987  success
+CI                                                run 33264988038  success
+  Fast Checks / Syntax and workflow validation    job 99133387246  success
+  CI / Required                                   job 99133465023  success
+```
+
+The same six-file GREEN tree was clean-restacked as one commit `009b864a949083f043d02bb6b7140f79f1a36e96` directly on unchanged `main@8c207b38ecad5154a83ec3588e172f096cf2ff29`. Exact-head validation passed again:
+
+```text
+Track A current login field6 runtime observation  run 33265176263  success
+Track A current client package materializer       run 33265176266  success
+Track A self-hosted PR boundary                    run 33265176267  success
+Track A agent runtime governance                   run 33265176274  success
+CI                                                run 33265176375  success
+  CI / Required                                   job 99133970798  success
+review_threads                                     0
+```
+
+The connected Ready mutation has the known `Repository.fullDatabaseId` response-schema bug. Draft #805 was therefore closed unmerged as superseded rather than merged in Draft state; ready replacement #806 was opened from the same branch/tree. This pointer update will be folded back into one final replacement commit before merge.
 
 # Exact client and observer boundary
 
-The current trusted workflow will freshly verify before login:
+Before login the trusted workflow must freshly verify:
 
 - version `15.32.75d4a0`;
 - unpacked size `52105824`;
@@ -164,17 +202,17 @@ The current trusted workflow will freshly verify before login:
 - producer entry `0xe25620`;
 - authoritative pre-observation scalar `FIELD6_VALUE=UNKNOWN`.
 
-These values remain locators until the V4 live preflight verifies the current official package. Any fence movement fails closed before authorization consumption, credentials or login and requires a fresh exact-current producer binding. No scalar may be guessed.
+Any current-client fence movement fails closed before authorization consumption, credentials or login. No scalar may be guessed.
 
-The observer remains GDB as parent, never attach. ASLR remains enabled; the child PIE is resolved after `exec`; the only scalar capture is `uint32(edx)` at `PIE + 0xe25620`. Stack bytes, packet payloads, credentials, process environment, unrelated registers and arbitrary/raw process memory may not be retained.
+GDB remains the client parent, never attach. ASLR remains enabled; the child PIE is resolved after `exec`; the only retained process value is `uint32(edx)` at `PIE + 0xe25620`. Stack bytes, packet payloads, credentials, process environment, unrelated registers and arbitrary/raw process memory may not be retained.
 
-# V4 mutation and credential boundary
+# Credential and mutation boundary
 
-This admission grants exactly one logical account-login form submission after all trusted-main and exact-current package preflight gates pass. It grants no relog, restart, character selection, character activation, world entry or gameplay. Network payload capture is forbidden.
+The credential wrapper remains the only path receiving `TIBIA_TEST_EMAIL` and `TIBIA_TEST_PASSWORD`; it removes their export attribute and the helper sends both strings to `xdotool type --file -` through stdin, never argv.
 
-The credential wrapper remains the only path that may receive `TIBIA_TEST_EMAIL` and `TIBIA_TEST_PASSWORD`; it removes their export attribute and proves those names are absent from child-process environments. The runtime helper now sends both login strings to `xdotool type --file -` through stdin, so neither email nor password is present in the xdotool process argv. Credentials and process environment are not retained in evidence.
+V4 grants exactly one logical account-login form submission after independent guest provenance, trusted-main, exact package and run-attempt gates pass. It grants no relog, restart, character selection/activation, world entry or gameplay. Network payload capture is forbidden.
 
-The only admissible successful artifact must prove:
+Successful sanitized evidence must prove:
 
 ```text
 TRACK_A_FIELD6_RUNTIME_CAPTURED=true
@@ -191,20 +229,20 @@ process_environment_retained=false
 raw_memory_retained=false
 ```
 
-# V4 execution trigger
+# V4 trigger and cleanup
 
-This admission change MUST NOT start the official client. After this PR is independently reviewed, GREEN and squash-merged to a freshly revalidated `main`, execution still requires one new top-level repository-owner comment on merged PR #758 whose body is exactly:
+Only after ready PR #806 is independently audited, exact-head GREEN, clean-restacked and merged, and the fresh guest passes pre-registration provenance may one new top-level owner comment be created on merged PR #758 with body exactly:
 
 ```text
 AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V4 once=true
 ```
 
-That exact comment is the single V4 execution trigger and becomes consumed historical evidence immediately after use. It must never be replayed or rerun. Package materialization must complete before its one-shot authorization marker is consumed and before credentials or login are reachable.
+That comment ID becomes the one-time runner label. `GITHUB_RUN_ATTEMPT != 1` fails before authorization/secret/client/physical action. After the one job terminates, the ephemeral runner must deregister/exit and `OTClientV4Clean` must be destroyed. If the login submit occurred but scalar proof failed, an identical V4 retry is forbidden.
 
 # Completion
 
-`FIELD6_VALUE=UNKNOWN` remains authoritative until one trusted-main V4 run produces sanitized scalar-only evidence with `FIELD6_VALUE_PROVEN=true`. After the run, a separate repository-only evidence PR must return this task to `runtime_access: none`, disarm credentials/login/mutation authority, preserve the terminal physical action count and promote only sanitized scalar evidence. Track B may consume field6 only after that promotion reaches trusted `main`.
+`FIELD6_VALUE=UNKNOWN` and `physical_action_count=0` remain authoritative. After one terminal V4 run, a separate repository-only evidence PR must return this task to `runtime_access: none`, disarm credential/login/mutation authority, record the actual action count, archive the trigger as consumed, and promote only sanitized scalar/provenance evidence. Track B may consume field6 only after that promotion reaches trusted `main`.
 
 # Next action
 
-Verify exact-head security contract, field6 contract, materializer, governance, independent admission audit and CI; clean-restack and squash-merge on fresh main. Then prove/provision the #795 clean one-job runner boundary. Only after that host-level gate is freshly proven may exactly one distinct V4 execution trigger be created on PR #758.
+Fold this #806 pointer/checkpoint into the same one-commit six-file tree on fresh `main`, require replacement exact-head field6 security/runtime/fresh audit, materializer, Track A governance, reusable self-hosted boundary and `CI / Required` GREEN with zero material findings, then squash-merge. After merge, provision/attest the fresh `OTClientV4Clean` guest; no V4 trigger or runner registration is legal before that host gate.

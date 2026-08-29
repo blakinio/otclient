@@ -16,6 +16,7 @@ WIREPROXY_TAR_SHA='e88c1d090740373fc606c1bafd81d9a5eadc642cce5667616e20e9d7a444f
 DISPLAY_NUMBER='131'
 DISPLAY_VALUE=":$DISPLAY_NUMBER"
 WARP_PORT='25441'
+INDEPENDENT_RUNNER_NAME='molehill-otclient-v4-01'
 BASE='/home/runner/_work/_otclient_tibia_re_state'
 TASK_BASE="$BASE/tasks/$TASK_ID"
 RUN_ID="${GITHUB_RUN_ID:-manual-unknown}"
@@ -98,6 +99,17 @@ resolve_source() {
   printf '%s\n' "$package"
 }
 
+resolve_proxychains_library() {
+  local root="$1" lib
+  if [[ "$root" == / ]]; then
+    lib='/usr/lib/x86_64-linux-gnu/libproxychains.so.4'
+    [[ -f "$lib" && ! -L "$lib" ]] || return 1
+    printf '%s\n' "$lib"
+    return 0
+  fi
+  find "$root" -xdev -type f -name libproxychains.so.4 -print -quit 2>/dev/null
+}
+
 toolroot_ok() {
   local root="$1" name
   [[ -d "$root" && ! -L "$root" ]] || return 1
@@ -106,11 +118,33 @@ toolroot_ok() {
   done
   [[ -d "$root/usr/share/X11/xkb" ]] || return 1
   [[ -f "$root/usr/lib/x86_64-linux-gnu/dri/swrast_dri.so" ]] || return 1
-  find "$root" -xdev -type f -name libproxychains.so.4 -print -quit 2>/dev/null | grep -q .
+  [[ -n "$(resolve_proxychains_library "$root")" ]]
+}
+
+runner_allowed() {
+  case "${RUNNER_NAME:-}" in
+    synology-otclient-01)
+      return 0
+      ;;
+    "$INDEPENDENT_RUNNER_NAME")
+      [[ "${TRACK_A_FIELD6_INDEPENDENT_PROVENANCE_VERIFIED:-}" == 1 ]] || return 1
+      [[ "${TRACK_A_FIELD6_SYSTEM_TOOLROOT:-}" == 1 ]]
+      return
+      ;;
+    *)
+      return 1
+      ;;
+  esac
 }
 
 resolve_toolroot() {
   local root
+  if [[ "${TRACK_A_FIELD6_SYSTEM_TOOLROOT:-}" == 1 ]]; then
+    [[ "${RUNNER_NAME:-}" == "$INDEPENDENT_RUNNER_NAME" ]] || return 1
+    [[ "${TRACK_A_FIELD6_INDEPENDENT_PROVENANCE_VERIFIED:-}" == 1 ]] || return 1
+    toolroot_ok / && { printf '/\n'; return 0; }
+    return 1
+  fi
   for root in "$BASE/toolroot" /work/_otclient_tibia_re_state/toolroot; do
     toolroot_ok "$root" && { printf '%s\n' "$root"; return 0; }
   done
@@ -230,7 +264,7 @@ start_xvfb() {
 
 write_launcher() {
   local preload
-  preload="$(find "$TOOL" -xdev -type f -name libproxychains.so.4 -print -quit 2>/dev/null || true)"
+  preload="$(resolve_proxychains_library "$TOOL" || true)"
   [[ -n "$preload" ]] || fail proxychains_unavailable
   python3 - "$LAUNCHER" "$CLIENT" "$PACKAGE" "$HOME_DIR" "$DISPLAY_VALUE" "$TOOL" "$ROOT" "$preload" "$TRACK_ID" "$TASK_ID" "$RUN_ID" <<'PY'
 import shlex,sys
@@ -403,7 +437,7 @@ wait_window() {
 prepare() {
   local win pid rc=0
   [[ "${GITHUB_REPOSITORY:-}" == 'blakinio/otclient' ]] || fail wrong_repository
-  [[ "${RUNNER_NAME:-}" == 'synology-otclient-01' ]] || fail wrong_runner
+  runner_allowed || fail wrong_runner
   [[ "$RUN_ID" =~ ^[1-9][0-9]*$ ]] || fail invalid_run_id
   [[ ! -e "$ROOT" ]] || fail run_root_collision
   mkdir -p "$RUNTIME" "$HOME_DIR"

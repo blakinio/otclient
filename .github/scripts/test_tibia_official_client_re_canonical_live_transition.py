@@ -562,6 +562,7 @@ class Tests(unittest.TestCase):
             'client_path': '/home/kasm-user/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client',
             'client_size': self.m.SIZE,
             'client_sha256': self.m.SHA,
+            'boot_id_sha256': 'd' * 64,
             'candidate_count': 0,
             'main_window_count': 0,
         }
@@ -596,6 +597,36 @@ class Tests(unittest.TestCase):
             f"{data['client_size']}:{data['client_sha256']}".encode()
         ).hexdigest()
         return data
+
+    def prior_boot_registration(self, *, lease_generation=1, container_id=None):
+        data = self.adoption_manifest()
+        data.update({
+            'schema_version': 1,
+            'runtime_id': self.m.RID,
+            'registration_generation': 7,
+            'lease_generation': lease_generation,
+            'registered_at': 1,
+            'boot_id_sha256': 'b' * 64,
+            'state': 'UNKNOWN',
+            'state_evidence': 'NO_STRUCTURAL_BRIDGE',
+            'runtime_locator': 'docker:otclient-track-a-kasmvnc:' + (container_id or KASM_CONTAINER_ID[:12]),
+            'source_task': 'old',
+            'source_run': 'old',
+        })
+        return data
+
+    def _preflight_worker_writer(self, calls, records):
+        queue = [dict(record) for record in records]
+        def worker(_worker, operation, argument):
+            calls.append(operation)
+            if operation != 'preflight':
+                raise AssertionError(operation)
+            if not queue:
+                raise AssertionError('unexpected preflight call')
+            path = Path(argument)
+            path.write_text(json.dumps(queue.pop(0)))
+            path.chmod(0o600)
+        return worker
 
     def _kasm_worker_writer(self, calls, preflight=None, launch=None):
         preflight = dict(preflight or self.kasm_preflight())
@@ -639,6 +670,115 @@ class Tests(unittest.TestCase):
         })
         fresh['candidate_fingerprint'] = self.m._recovery_candidate_fingerprint(fresh)
         return old, fresh
+
+    def test_boot_epoch_registration_invalidate_parser_accepts_worker_shape(self):
+        args = self.kasm_args()
+        parsed = self.m.parser().parse_args([
+            'boot-epoch-registration-invalidate', '--task-id', args.task_id,
+            '--session-id', args.session_id, '--token-file', str(args.token_file),
+            '--worker', str(args.worker), '--worker-timeout', '90',
+        ])
+        self.assertEqual(parsed.operation, 'boot-epoch-registration-invalidate')
+        self.assertEqual(parsed.worker, KASM_WORKER)
+        self.assertEqual(parsed.worker_timeout, 90)
+
+    def test_boot_epoch_registration_invalidate_removes_only_proven_prior_boot_registration(self):
+        old = self.prior_boot_registration()
+        self.write(old)
+        calls = []
+        current = self.kasm_preflight()
+        args = self.kasm_args()
+        with mock.patch.object(self.m, '_worker', side_effect=self._preflight_worker_writer(calls, [current, current, current])), \
+                mock.patch.object(self.m, '_lease', return_value=2), \
+                mock.patch.object(self.m, '_kill') as killed, \
+                mock.patch.object(self.m, '_probe') as probe:
+            self.m._boot_epoch_registration_invalidate(
+                args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 2
+            )
+        self.assertEqual(calls, ['preflight', 'preflight', 'preflight'])
+        self.assertFalse(self.m.REG.exists())
+        killed.assert_not_called()
+        probe.assert_not_called()
+
+    def test_boot_epoch_registration_invalidate_rejects_same_boot_and_non_newer_generation(self):
+        args = self.kasm_args()
+        same = self.kasm_preflight(); same['boot_id_sha256'] = 'b' * 64
+        unsigned = dict(same); unsigned.pop('preflight_fingerprint')
+        same['preflight_fingerprint'] = hashlib.sha256(json.dumps(unsigned, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+        self.write(self.prior_boot_registration())
+        calls = []
+        with mock.patch.object(self.m, '_worker', side_effect=self._preflight_worker_writer(calls, [same])), \
+                mock.patch.object(self.m, '_lease', return_value=2):
+            with self.assertRaisesRegex(self.m.E, 'invalidation_boot_epoch_not_changed'):
+                self.m._boot_epoch_registration_invalidate(
+                    args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 2
+                )
+        self.assertTrue(self.m.REG.exists())
+        self.write(self.prior_boot_registration(lease_generation=2))
+        with mock.patch.object(self.m, '_worker') as worker:
+            with self.assertRaisesRegex(self.m.E, 'invalidation_generation_not_newer'):
+                self.m._boot_epoch_registration_invalidate(
+                    args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 2
+                )
+        worker.assert_not_called()
+
+    def test_boot_epoch_registration_invalidate_rejects_registration_boundary_violations(self):
+        args = self.kasm_args()
+        cases = []
+        non_adoption = self.registration(); cases.append(('proof', non_adoption, 'invalidation_adoption_registration_required'))
+        ingame = self.prior_boot_registration(); ingame.update(state='IN_GAME', state_evidence='BRIDGE_3_OF_3'); cases.append(('state', ingame, 'invalidation_registration_not_fail_closed'))
+        other = self.prior_boot_registration(); other['runtime_locator'] = 'docker:other-container:' + KASM_CONTAINER_ID[:12]; cases.append(('namespace', other, 'invalidation_runtime_namespace_mismatch'))
+        bad_id = self.prior_boot_registration(container_id='e' * 12); cases.append(('container', bad_id, 'invalidation_container_identity_mismatch'))
+        for label, registration, code in cases:
+            with self.subTest(label=label):
+                self.write(registration)
+                calls = []
+                with mock.patch.object(self.m, '_worker', side_effect=self._preflight_worker_writer(calls, [self.kasm_preflight()])), \
+                        mock.patch.object(self.m, '_lease', return_value=2):
+                    with self.assertRaisesRegex(self.m.E, code):
+                        self.m._boot_epoch_registration_invalidate(
+                            args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 2
+                        )
+                self.assertTrue(self.m.REG.exists())
+
+    def test_boot_epoch_registration_invalidate_rejects_preflight_drift_and_registration_race(self):
+        args = self.kasm_args()
+        old = self.prior_boot_registration(); self.write(old)
+        first = self.kasm_preflight()
+        changed = dict(first, container_id='e' * 64); unsigned = dict(changed); unsigned.pop('preflight_fingerprint')
+        changed['preflight_fingerprint'] = hashlib.sha256(json.dumps(unsigned, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+        calls = []
+        with mock.patch.object(self.m, '_worker', side_effect=self._preflight_worker_writer(calls, [first, changed])), \
+                mock.patch.object(self.m, '_lease', return_value=2):
+            with self.assertRaisesRegex(self.m.E, 'invalidation_preflight_changed'):
+                self.m._boot_epoch_registration_invalidate(args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 2)
+        self.assertEqual(self.m._read(), old)
+
+        racer = dict(old, registration_generation=99, source_task='racer')
+        self.write(old); calls = []; writes = 0
+        def worker(_worker, operation, argument):
+            nonlocal writes
+            calls.append(operation); Path(argument).write_text(json.dumps(first)); Path(argument).chmod(0o600); writes += 1
+            if writes == 2: self.write(racer)
+        with mock.patch.object(self.m, '_worker', side_effect=worker), mock.patch.object(self.m, '_lease', return_value=2):
+            with self.assertRaisesRegex(self.m.E, 'invalidation_registration_changed'):
+                self.m._boot_epoch_registration_invalidate(args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 2)
+        self.assertEqual(self.m._read(), racer)
+
+    def test_boot_epoch_registration_invalidate_postdelete_failure_never_restores_stale_registration(self):
+        args = self.kasm_args(); old = self.prior_boot_registration(); self.write(old)
+        current = self.kasm_preflight(); calls = []; count = 0
+        def worker(_worker, operation, argument):
+            nonlocal count
+            calls.append(operation); count += 1
+            if count == 3:
+                raise self.m.E('official_client_candidate_count:1')
+            Path(argument).write_text(json.dumps(current)); Path(argument).chmod(0o600)
+        with mock.patch.object(self.m, '_worker', side_effect=worker), mock.patch.object(self.m, '_lease', return_value=2):
+            with self.assertRaisesRegex(self.m.E, 'official_client_candidate_count'):
+                self.m._boot_epoch_registration_invalidate(args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 2)
+        self.assertFalse(self.m.REG.exists())
+        self.assertEqual(calls, ['preflight', 'preflight', 'preflight'])
 
     def test_kasm_bootstrap_parser_accepts_worker_and_probe_shape(self):
         args = self.kasm_args()

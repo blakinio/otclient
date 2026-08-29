@@ -1,7 +1,7 @@
 # 2026-08-29 independent V4 host waiting checkpoint
 
-Checkpoint time: `2026-08-29T19:25:29+02:00`  
-Track: `official-client-re`  
+Checkpoint time: `2026-08-29T19:25:29+02:00`
+Track: `official-client-re`
 Task: `OTC-20260828-current-login-field6-runtime`
 
 ## Trusted repository state

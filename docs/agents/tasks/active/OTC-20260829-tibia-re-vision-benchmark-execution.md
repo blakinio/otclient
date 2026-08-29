@@ -14,7 +14,7 @@ base_branch: main
 base_sha: f208a20cb4517e8b57bef91983337145d379267c
 related_pr: 790
 created: 2026-08-29T08:08:53+02:00
-updated: 2026-08-29T08:41:57+02:00
+updated: 2026-08-29T09:00:00+02:00
 risk: high
 execution_mode: local_owner_pc
 execution_reason: deterministic harness plus local real-model benchmark on verified Molehill-PC
@@ -184,8 +184,8 @@ validation:
     result: PASS
     evidence: docs/agents/evidence/OTC-20260829-tibia-re-vision-benchmark-execution/20260829-independent-audit.md; audited head 7621916c76c19aa0951384538a8387c02cafcd04; material findings open 0
 blockers:
-  - final exact-head GitHub CI and Track A governance remain to be consumed after the audit-record commit
-next_action: commit and push the independent audit record, then freeze the exact final head, mark PR 790 ready, consume final CI/governance and review hygiene, squash-merge, and archive the task
+  - final exact-head GitHub CI and Track A governance remain to be consumed after the closeout-checkpoint commit
+next_action: commit and push the audit-closeout checkpoint, mark PR 790 ready, consume exact-final-head CI/governance and review hygiene, then squash-merge and archive the task
 ```
 
 ## Recovery checkpoint
@@ -193,7 +193,7 @@ next_action: commit and push the independent audit record, then freeze the exact
 ```yaml
 status: active
 branch: feat/OTC-20260829-tibia-re-vision-benchmark-execution
-head: pending-terminal-report-commit
+head: b8363b2109685ebc348b43bc5ac72ca4518a5d3d
 worktree: C:/Users/barte/otclient-vision-benchmark
 active_operation: P1 deterministic harness followed by P2 bounded real-model smoke
 operation_started_at: null
@@ -201,5 +201,5 @@ external_run_ids: []
 last_verified_state: fresh independent audit PASS_BOUNDED on implementation head 7621916c76c19aa0951384538a8387c02cafcd04; benchmark remains PARTIAL/INCONCLUSIVE; no Track B screenshot handoff; all model residency empty
 resume_condition: current task branch still owns the declared paths and Ollama residency is empty or exact target only
 failure_handling: if a model/backend pull or inference fails, persist the typed failure and do not switch to cloud or a different undeclared provider
-next_action: commit/push audit evidence, freeze final head, mark PR 790 ready, consume exact-head CI/governance/reviews, merge and archive
+next_action: commit/push the audit-closeout checkpoint, mark PR 790 ready, consume exact-final-head CI/governance/reviews, merge and archive
 ```

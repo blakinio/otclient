@@ -1,0 +1,28 @@
+name: Track B vision orchestrator contract
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/scripts/test_track_b_vision_orchestrator_prompt.py'
+      - '.github/workflows/track-b-vision-orchestrator-contract.yml'
+      - 'docs/agents/SHORT_COMMANDS.md'
+      - 'docs/agents/prompts/OTCLIENT_TIBIA_GLOBAL_LOGIN_FINAL_CONTINUE.md'
+      - 'docs/agents/tasks/active/OTC-20260829-track-b-vision-orchestrator.md'
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    name: Single-window Track B/Vision contract
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact pull request head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Validate orchestrator prompt contract
+        run: python3 .github/scripts/test_track_b_vision_orchestrator_prompt.py

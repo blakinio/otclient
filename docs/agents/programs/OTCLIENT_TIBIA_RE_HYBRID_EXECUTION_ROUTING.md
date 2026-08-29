@@ -1,7 +1,7 @@
 # OTCLIENT-TIBIA-RE hybrid execution routing
 
 ```yaml
-routing_contract_version: 1.0.0
+routing_contract_version: 1.1.0
 programme: OTCLIENT-TIBIA-RE
 track: official-client-re
 status: normative_execution_routing
@@ -9,6 +9,7 @@ adopted_after_pr: 331
 runner_boundary:
   github_hosted: deterministic_disposable_validation
   synology: physical_persistent_runtime
+  independent_ephemeral_physical_runtime: security_disqualification_fallback_one_job_physical
 canonical_synology_runner: synology-otclient-01
 canonical_state_root: /home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime
 ```
@@ -58,6 +59,24 @@ Use `synology-otclient-01` for work that genuinely depends on the controlled phy
 - final physical runtime E2E when a gate requires it.
 
 Synology is a scarce serialized runtime resource, not the default static-analysis executor.
+
+### Independent ephemeral physical runtime — security fallback only
+
+`execution_class: independent_ephemeral_physical_runtime` is a narrow security fallback, not a second canonical runtime and not a new default. It may be used only when durable trusted-main evidence explicitly disqualifies the normal Synology host for a secret-bearing **ephemeral** physical experiment and the task does not require canonical/Kasm/Synology-local retained state.
+
+A valid fallback task MUST:
+
+- remain `runtime_access: ephemeral_isolated` with a task-owned unique namespace;
+- keep `physical_e2e_required: true` when physical proof is required;
+- use `persistent_session_role: none`;
+- run on a physically separate owner-controlled Linux guest created fresh for one job;
+- obey `docs/agents/contracts/TRACK_A_INDEPENDENT_EPHEMERAL_PHYSICAL_RUNTIME_V1.md` in addition to the ordinary runtime-admission and secret-runner contracts;
+- prove image hash, host/guest isolation, no prior repository/runner state, no host Docker socket/privileged mount, exact one-time job routing and post-job guest destruction before any secret-bearing action;
+- use an ephemeral GitHub runner with no generic default scheduling labels.
+
+The initial approved consumer class is the current-login field6 V4 only after its own consumer PR is separately restacked and merged. This routing document does not authorize that V4 run by itself.
+
+All `canonical_reuse_or_mutation`, `canonical_bootstrap`, `canonical_rebind`, `canonical_recovery` and `canonical_boot_epoch_recovery` operations remain `synology_physical_runtime`. An independent guest never creates, adopts, reads as authoritative, rebinds or mutates the canonical registration/lease/Kasm runtime.
 
 ## Persistent-session model
 
@@ -119,13 +138,15 @@ Real persistent-session attach/reacquisition/liveness validation is coordinated 
 
 ### RUNTIME
 
-Execution: **Synology/self-hosted** for physical runtime work.
+Default physical execution: **Synology/self-hosted**.
 
 RUNTIME is the primary owner/provider of real login/display/input/gameplay/restart-relogin evidence. Its first action at every claim/resume is runtime admission and live ownership reconciliation.
 
 RUNTIME should prefer reuse of the one registered persistent session when Gate A + any required rebind + Gate B pass. It may perform bootstrap only through a reviewed current implementation and separate live authorization. It must never create a second logged-in Global session merely to unblock another lane.
 
-RUNTIME may run supporting deterministic hosted jobs for analysis of its artifacts, but physical state mutation remains on Synology.
+When trusted-main security evidence disqualifies Synology for a secret-bearing task that is genuinely independent/ephemeral and needs no canonical/Kasm/Synology-local state, RUNTIME may instead use `independent_ephemeral_physical_runtime` only under its dedicated merged contract and task-specific admission. This exception does not apply to canonical or persistent operations.
+
+RUNTIME may run supporting deterministic hosted jobs for analysis of its artifacts, but physical state mutation remains on an admitted physical execution class.
 
 ### COVERAGE-AUDIT
 
@@ -139,7 +160,7 @@ Before dispatching or refreshing any Track A researcher, the coordinator must ad
 
 ```yaml
 ROUTING_CONTRACT: docs/agents/programs/OTCLIENT_TIBIA_RE_HYBRID_EXECUTION_ROUTING.md
-EXECUTION_CLASS: github_hosted | synology_physical_runtime
+EXECUTION_CLASS: github_hosted | synology_physical_runtime | independent_ephemeral_physical_runtime
 RUNTIME_ACCESS: none | read_only | ephemeral_isolated | canonical_reuse_or_mutation | canonical_bootstrap | canonical_rebind | canonical_recovery | canonical_boot_epoch_recovery
 PERSISTENT_SESSION_ROLE: none | consumer_of_runtime_evidence | canonical_runtime_owner
 PHYSICAL_E2E_REQUIRED: true | false
@@ -148,12 +169,14 @@ PHYSICAL_E2E_REQUIRED: true | false
 Rules:
 
 1. `P2-NETWORK`, `P0-STATE`, `P1-BRIDGE` and `COVERAGE-AUDIT` default to `EXECUTION_CLASS: github_hosted` and `RUNTIME_ACCESS: none`.
-2. `RUNTIME` uses `EXECUTION_CLASS: synology_physical_runtime` for physical work and must persist the full runtime-admission record.
-3. A non-RUNTIME lane may receive `read_only` access only when the admission contract's uniqueness/ownership/non-invasiveness gates are freshly proven and the coordinator can show why RUNTIME-provided durable evidence is insufficient.
-4. No lane gets an independent logged-in persistent session by default.
-5. Hosted `Xvfb` startup smoke is not physical E2E and cannot satisfy a task whose `PHYSICAL_E2E_REQUIRED` is true.
-6. Synology physical operations are serialized through current runtime ownership/lease/registration governance; parallel research does not mean parallel mutation of the one physical session.
-7. If a dispatch was prepared from a base before the merged hybrid boundary or lacks the fields above, refresh it before mutation.
+2. RUNTIME physical/persistent work defaults to `EXECUTION_CLASS: synology_physical_runtime` and must persist full runtime admission.
+3. `independent_ephemeral_physical_runtime` is legal only for task-owned `ephemeral_isolated` RUNTIME work after durable Synology disqualification and a merged task-specific independent-runtime contract; it requires `PERSISTENT_SESSION_ROLE: none`.
+4. Every canonical runtime access class remains `synology_physical_runtime`; the independent fallback cannot satisfy Gate A/rebind/Gate B/bootstrap/recovery requirements.
+5. A non-RUNTIME lane may receive `read_only` access only when the admission contract's uniqueness/ownership/non-invasiveness gates are freshly proven and the coordinator can show why RUNTIME-provided durable evidence is insufficient.
+6. No lane gets an independent logged-in persistent session by default.
+7. Hosted `Xvfb` startup smoke is not physical E2E and cannot satisfy a task whose `PHYSICAL_E2E_REQUIRED` is true.
+8. Synology physical operations are serialized through current runtime ownership/lease/registration governance; parallel research does not mean parallel mutation of the one physical session.
+9. If a dispatch was prepared from a base before the current routing boundary or lacks the fields above, refresh it before mutation.
 
 ## Task refresh matrix
 
@@ -162,7 +185,7 @@ Rules:
 | P2-NETWORK | GitHub-hosted | no ownership | only via RUNTIME if needed | keep static/synthetic work hosted; request bounded real stimulus instead of taking session |
 | P0-STATE | GitHub-hosted | evidence consumer | via RUNTIME for causal reads | discover hosted; validate semantics against RUNTIME evidence |
 | P1-BRIDGE | GitHub-hosted | evidence consumer | via RUNTIME for reacquisition/restart | build/test hosted; fail closed without canonical identity |
-| RUNTIME | Synology | canonical runtime owner/provider | yes | establish/reuse one registered persistent session under admission gates |
+| RUNTIME | Synology; independent ephemeral fallback only after security disqualification | canonical only on Synology | yes | establish/reuse canonical state on Synology; use independent one-job guest only for separately contracted ephemeral work |
 | COVERAGE-AUDIT | GitHub-hosted | none | no | consume durable runtime evidence only |
 
 ## Evidence boundary
@@ -175,10 +198,11 @@ HOSTED_LINUX_BUILD
 HOSTED_XVFB_STARTUP_SMOKE
 SYNOLOGY_RUNTIME_READ_ONLY
 SYNOLOGY_PHYSICAL_RUNTIME_E2E
+INDEPENDENT_EPHEMERAL_PHYSICAL_RUNTIME_E2E
 CANONICAL_PERSISTENT_SESSION_PROOF
 ```
 
-Do not collapse these categories. A lower class cannot satisfy a higher physical-runtime gate.
+Do not collapse these categories. A lower class cannot satisfy a higher physical-runtime gate, and `INDEPENDENT_EPHEMERAL_PHYSICAL_RUNTIME_E2E` can never be promoted to canonical persistent-session proof.
 
 ## Mandatory related contracts
 
@@ -188,6 +212,7 @@ Every Track A worker must continue to obey current versions of:
 - `docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md`;
 - `docs/agents/decisions/ADR-0001-track-a-canonical-live-runtime.md`;
 - `docs/agents/contracts/TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md`;
+- `docs/agents/contracts/TRACK_A_INDEPENDENT_EPHEMERAL_PHYSICAL_RUNTIME_V1.md` when the independent fallback is selected;
 - `docs/agents/prompts/OTCLIENT_TIBIA_RE_CANONICAL.md`;
 - `docs/agents/programs/OTCLIENT_TIBIA_RE_PARALLEL_RESEARCH_COORDINATION.md` when parallel research is active;
 - current task/PR/ownership state.

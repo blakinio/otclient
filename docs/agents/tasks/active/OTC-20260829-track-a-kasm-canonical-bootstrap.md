@@ -7,7 +7,7 @@ project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: infrastructure
-phase: planning
+phase: implementation_prior_boot_invalidation
 branch: feat/OTC-20260829-track-a-kasm-canonical-bootstrap-v2
 base_branch: main
 base_main: 08c31195fd2f44224badf1b6bdff85192495898b
@@ -47,6 +47,8 @@ owned_paths:
   - .github/scripts/tibia-official-client-re-canonical-live-transition.py
   - .github/scripts/test_tibia_official_client_re_canonical_live_transition.py
   - .github/scripts/test_track_a_kasm_canonical_bootstrap_workflow.py
+  - .github/scripts/test_track_a_agent_runtime_governance.py
+  - docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
   - .github/workflows/track-a-kasm-canonical-bootstrap.yml
   - docs/agents/tasks/active/OTC-20260829-track-a-kasm-canonical-bootstrap.md
   - docs/agents/evidence/OTC-20260829-track-a-kasm-canonical-bootstrap/**
@@ -67,8 +69,8 @@ depends_on:
   - docs/superpowers/specs/2026-08-29-track-a-kasm-canonical-bootstrap-design.md
 blocks:
   - LIVE_GAME_WINDOW_STATE_CAUSAL_VALIDATION
-current_blocker: NONE
-next_action: persist the implementation plan, then start TDD with a failing deterministic Kasm bootstrap worker contract test
+current_blocker: PRIOR_BOOT_REGISTRATION_PRESENT_ZERO_CLIENT
+next_action: TDD the approved metadata-only boot-epoch-registration-invalidate addendum, then resume the guarded two-phase live workflow
 ---
 
 # Track A Kasm canonical bootstrap implementation

@@ -4,7 +4,7 @@
 
 **Goal:** Add a reviewed KasmVNC-aware `create_new` canonical bootstrap that can create exactly one current official Tibia client inside `otclient-track-a-kasmvnc`, register it atomically under the existing Track A canonical authority model, and roll back only the exact process created by the transaction.
 
-**Architecture:** Keep the legacy host/process-group bootstrap unchanged. Add a narrow Docker/Kasm worker for zero-client preflight, exact detached launch and identity-bound rollback; add a separate `kasm-bootstrap` operation to the existing canonical transition so the canonical flock remains continuously held through final absence proof, launch, repeated Kasm proof, atomic registration commit and safe detach. Add a main-only owner-dispatch workflow whose PR path is hosted/static only; the implementation PR remains `runtime_access: none`, and live execution is admitted only by a separate post-merge RUNTIME task.
+**Architecture:** Keep the legacy host/process-group bootstrap unchanged. Extend the narrow Docker/Kasm worker preflight with current boot identity; add a metadata-only `boot-epoch-registration-invalidate` recovery transition for the proven PRESENT-registration/zero-client prior-boot state; then retain the separate `kasm-bootstrap` create-new operation for registration-ABSENT launch/commit/safe-detach. The owner-only live workflow uses two sequential task authorities/leases (recovery, then bootstrap), while PR validation stays GitHub-hosted and the implementation PR remains `runtime_access: none`.
 
 **Tech Stack:** Python 3 standard library, Docker CLI invoked through `subprocess`, existing Track A lease/guard/transition code, existing Kasm read-only adoption probe, GitHub Actions YAML, Python `unittest`/`mock`.
 
@@ -23,7 +23,7 @@
 - No `pkill`, `killall`, Docker stop/restart/rm, display cleanup, volume cleanup or broad process targeting.
 - Kasm registration must reuse the existing Docker/adoption proof fields and force semantic `state: UNKNOWN`; only additive `bootstrap_provenance: kasm_create_new_v1` is new.
 - PR-triggered validation is GitHub-hosted only. A self-hosted job must be syntactically gated so `pull_request` cannot schedule it.
-- Physical workflow must require repository owner + `workflow_dispatch` + `refs/heads/main` + exact authorization + `GITHUB_RUN_ATTEMPT == 1` before lease acquisition or any process control.
+- Physical workflow must require repository owner + `workflow_dispatch` + `refs/heads/main` + exact authorization + `GITHUB_RUN_ATTEMPT == 1`; it uses a metadata-only recovery lease first and a separate bootstrap lease only after registration absence is proven.
 - Live execution is a separate post-merge task/admission and cannot be authorized by the implementation branch itself.
 
 ---
@@ -395,6 +395,107 @@ git commit -m "feat(track-a): add Kasm canonical bootstrap transition"
 
 ---
 
+### Task 2A: Prior-boot zero-client registration invalidation
+
+**Files:**
+- Modify: `.github/scripts/tibia-official-client-re-kasm-bootstrap-worker.py`
+- Modify: `.github/scripts/test_tibia_official_client_re_kasm_bootstrap_worker.py`
+- Modify: `.github/scripts/tibia-official-client-re-canonical-live-transition.py`
+- Modify: `.github/scripts/test_tibia_official_client_re_canonical_live_transition.py`
+- Modify: `.github/scripts/test_track_a_agent_runtime_governance.py`
+- Modify: `docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md`
+
+**Interfaces:**
+- Kasm preflight adds required `boot_id_sha256: str` (64 lowercase hex) and includes it in `preflight_fingerprint`.
+- Controller adds `boot-epoch-registration-invalidate --task-id ... --session-id ... --token-file ... --worker ... --worker-timeout ...`.
+- Governance adds `canonical_recovery` mode `prior_boot_zero_client_invalidation_v1`; this mode is metadata-only and requires canonical registration PRESENT.
+- The invalidation operation never invokes `launch`, `rollback`, `_kill`, Docker stop/restart/rm, GUI input, credentials or memory observation.
+
+- [ ] **Step 1: Write failing worker boot-identity tests**
+
+Extend positive preflight fixtures to return a deterministic current container boot id and require:
+
+```python
+payload = module.collect_preflight(runner=fake)
+self.assertRegex(payload['boot_id_sha256'], r'^[0-9a-f]{64}$')
+unsigned = dict(payload); fingerprint = unsigned.pop('preflight_fingerprint')
+self.assertEqual(fingerprint, module._fingerprint(unsigned))
+```
+
+Add negatives for unreadable/malformed boot id. Run worker tests and observe RED before implementation.
+
+- [ ] **Step 2: Implement boot identity in Kasm preflight and confirm GREEN**
+
+Read `/proc/sys/kernel/random/boot_id` inside the exact target container and SHA-256 the normalized UUID text. Do not use host boot identity. Include the hash in the persisted preflight record and fingerprint.
+
+- [ ] **Step 3: Write failing invalidation transaction tests**
+
+Add deterministic transition tests requiring all of:
+
+```text
+registration PRESENT and exact-current-fenced
+proof_kind == existing_runtime_adoption_v1
+state == UNKNOWN
+state_evidence in approved fail-closed values
+current lease generation > registration lease generation
+worker preflight #1 => exact target + current boot != registered boot + 0 candidates + 0 windows
+lease/current-registration revalidation
+worker preflight #2 => identical stable signature
+_remove(old) only
+lease revalidation
+worker preflight #3 => still 0 candidates/windows on same current boot/container/package
+registration ABSENT
+```
+
+Negative cases: same boot epoch, registration absent, legacy/non-adoption registration, non-fail-closed state, old/current lease generation not newer, runtime-locator namespace mismatch, current container id incompatible with registered locator, preflight drift, candidate/window presence, registration race, and candidate appearance after deletion. Assert no launch/rollback/process signal occurs.
+
+- [ ] **Step 4: Implement `boot-epoch-registration-invalidate` minimally**
+
+Reuse the worker `preflight` operation, existing `_read()`, `_remove(old)`, `_lease()` and cancellation checks. Compare registration locator `docker:otclient-track-a-kasmvnc:<recorded-id>` against the preflight full id; accept only exact full-id equality or an unambiguous recorded hex prefix of at least 12 characters. Never restore the prior-boot registration after successful `_remove(old)`.
+
+- [ ] **Step 5: Add governance mode under existing `canonical_recovery`**
+
+Add constant `PRIOR_BOOT_ZERO_CLIENT_INVALIDATION_MODE = 'prior_boot_zero_client_invalidation_v1'`. Require:
+
+```yaml
+runtime_access: canonical_recovery
+canonical_registration: PRESENT
+generation_rebind: NOT_APPLICABLE
+gate_b: NOT_APPLICABLE
+bootstrap: NOT_APPLICABLE
+mutation_authorized: false
+recovery_mode: prior_boot_zero_client_invalidation_v1
+gate_a: REQUIRED_NOT_PROVEN  # or PASS after live acquisition
+target_uniqueness: UNKNOWN   # zero-client proof is established by the transition, not a singleton target claim
+```
+
+For pending admission allow `canonical_lease_generation: UNKNOWN` and require a positive known `registration_lease_generation`; after Gate A PASS require a newer positive current generation. Document that this recovery mode can only invalidate a prior-boot fail-closed registration after the reviewed zero-client proof; it cannot replace/rebind/register/launch a client.
+
+- [ ] **Step 6: Run focused GREEN regression**
+
+```bash
+python3 .github/scripts/test_tibia_official_client_re_kasm_bootstrap_worker.py -v
+python3 .github/scripts/test_tibia_official_client_re_canonical_live_transition.py -v
+python3 .github/scripts/test_track_a_agent_runtime_governance.py
+python3 -m py_compile .github/scripts/tibia-official-client-re-kasm-bootstrap-worker.py .github/scripts/tibia-official-client-re-canonical-live-transition.py .github/scripts/test_track_a_agent_runtime_governance.py
+```
+
+Expected: all new invalidation tests and all existing bootstrap/adoption/rebind/recovery/Gate-B regressions PASS.
+
+- [ ] **Step 7: Commit Task 2A**
+
+```bash
+git add .github/scripts/tibia-official-client-re-kasm-bootstrap-worker.py \
+        .github/scripts/test_tibia_official_client_re_kasm_bootstrap_worker.py \
+        .github/scripts/tibia-official-client-re-canonical-live-transition.py \
+        .github/scripts/test_tibia_official_client_re_canonical_live_transition.py \
+        .github/scripts/test_track_a_agent_runtime_governance.py \
+        docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
+git commit -m "feat(track-a): invalidate prior-boot zero-client registration"
+```
+
+---
+
 ### Task 3: Main-only physical workflow and deterministic security contract
 
 **Files:**
@@ -403,7 +504,8 @@ git commit -m "feat(track-a): add Kasm canonical bootstrap transition"
 
 **Interfaces:**
 - PR event produces only hosted contract validation.
-- `workflow_dispatch` live job requires exact input `CREATE_NEW_KASM_CANONICAL_BOOTSTRAP`.
+- `workflow_dispatch` live job requires exact input `RECOVER_PRIOR_BOOT_AND_CREATE_NEW_KASM_CANONICAL`.
+- Live execution consumes two task checkpoints: `OTC-20260829-track-a-kasm-prior-boot-registration-invalidation` (metadata-only canonical recovery) and `OTC-20260829-track-a-kasm-canonical-bootstrap-live` (create-new bootstrap).
 - Live job consumes a separate future task `docs/agents/tasks/active/OTC-20260829-track-a-kasm-canonical-bootstrap-live.md`; this implementation PR does not create that file.
 - Live job invokes the merged controller operation `kasm-bootstrap` directly after acquiring the canonical lease, then releases the lease in a cleanup trap.
 
@@ -514,7 +616,7 @@ Before lease acquisition:
 - require the separate live task file and validate it with `test_track_a_agent_runtime_governance.py` plus an exact frontmatter dictionary check for every field above;
 - reject empty/UNKNOWN/NONE `live_runtime_authorization_source`.
 
-No secret access appears anywhere in this workflow.
+No secret access appears anywhere in this workflow. The live job first validates/runs the metadata-only prior-boot invalidation task under its own recovery lease, releases it, proves `runtime-registration.json` is absent, then acquires a new lease for the bootstrap task and invokes `python3 "$transition" kasm-bootstrap` exactly once.
 
 - [ ] **Step 6: Implement lease + transition + release**
 
@@ -631,7 +733,7 @@ Archive the implementation task with ownership released, physical E2E `NOT_APPLI
 
 ---
 
-### Task 5: Post-merge live admission and return to `gameWindowState`
+### Task 5: Post-merge two-phase live admission and return to `gameWindowState`
 
 **Files:**
 - Separate follow-up PR/task only after Task 4 is terminal. Do not include it in the implementation PR.
@@ -647,7 +749,7 @@ Require current Kasm container locator and exact zero-client condition. If an ex
 
 - [ ] **Step 2: Create/review/merge one-shot live admission task**
 
-Persist the exact frontmatter required by Task 3's workflow contract, including a concrete owner authorization source referring to the owner's approval of this recovery continuation. The live task is a control-plane authority record; do not weaken implementation workflow checks.
+Create and merge two separate live authority records required by Task 3: (1) `OTC-20260829-track-a-kasm-prior-boot-registration-invalidation` using `canonical_recovery` + `recovery_mode: prior_boot_zero_client_invalidation_v1`, PRESENT registration and zero physical action budget; (2) `OTC-20260829-track-a-kasm-canonical-bootstrap-live` using `canonical_bootstrap` + `create_new`, ABSENT registration checkpoint and one launch budget. Bind both to the owner's approval of this recovery continuation. Do not weaken implementation workflow checks.
 
 - [ ] **Step 3: Dispatch exactly one main workflow attempt**
 

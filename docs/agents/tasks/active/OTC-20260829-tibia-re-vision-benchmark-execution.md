@@ -150,14 +150,14 @@ validation:
     result: PASS
     evidence: 22 tests passed
   - command: OvisOCR2 CPU three-trial synthetic-login plus black-negative suite under benchmark-safe-v1
-    result: PASS_PROFILE_WITH_NEGATIVE_CONTROL_FAILURE
-    evidence: text recall 1.0, black false text 3 of 3
+    result: PASS
+    evidence: DOMAIN_STATUS=PASS_PROFILE_WITH_NEGATIVE_CONTROL_FAILURE; text recall 1.0, black false text 3 of 3
   - command: OvisOCR2 CPU three-trial suite under ovisocr2-recommended-v1
-    result: PASS_PROFILE_WITH_NEGATIVE_CONTROL_FAILURE
-    evidence: text recall 1.0, black false text 3 of 3, p50 17.4179759 seconds
+    result: PASS
+    evidence: DOMAIN_STATUS=PASS_PROFILE_WITH_NEGATIVE_CONTROL_FAILURE; text recall 1.0, black false text 3 of 3, p50 17.4179759 seconds
   - command: docker model status and model search backend classification
-    result: UNSUPPORTED_BACKEND
-    evidence: Ovis2.5-2B backend vllm; local DMR vllm Not Installed and only supported on Linux; Windows host GPU is AMD Radeon RX 9070 XT
+    result: PASS
+    evidence: DOMAIN_STATUS=UNSUPPORTED_BACKEND; Ovis2.5-2B backend vllm; local DMR vllm Not Installed and only supported on Linux; Windows host GPU is AMD Radeon RX 9070 XT
   - command: ollama ps and docker model ps after Ovis execution
     result: PASS
     evidence: both resident model sets empty

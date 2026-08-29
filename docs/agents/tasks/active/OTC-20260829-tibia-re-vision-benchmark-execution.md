@@ -116,7 +116,7 @@ P1/P2 and backend compatibility work are READY offline. P3-P7 project-specific s
 ```yaml
 checkpoint_version: 1
 updated_at: 2026-08-29T08:41:57+02:00
-head: pending-terminal-report-commit
+head: pending-independent-audit-record-commit
 branch: feat/OTC-20260829-tibia-re-vision-benchmark-execution
 pr: 790
 status: validating
@@ -141,6 +141,7 @@ proven:
   - no Track B or official-client E2E was triggered for screenshot collection
   - closeout audit rejected the System.Drawing fixture generator as a reproducer because regenerated pixels differed from the already-scored frozen PNG; the generator is removed and the committed PNG plus SHA-256 remain the canonical immutable input
   - final benchmark decision is PARTIAL with primary_model null, ocr_fallback_model null and research_value_verdict INCONCLUSIVE
+  - fresh independent audit of implementation head 7621916c76c19aa0951384538a8387c02cafcd04 is PASS_BOUNDED with zero open material findings after seven remediated findings
 derived:
   - bounded Qwen is the leading profile to test first when representative Track B screenshots become legally available
   - Vision is likely useful as an additive diagnostic sensor but does not remove the current native outbound-sequence blocker
@@ -179,9 +180,12 @@ validation:
   - command: PR 284 comment and changed-file inventory
     result: PASS
     evidence: vision request comment 5460730478 exists; no subsequent accepted screenshot handoff and no Track B evidence screenshot/keyframe dataset path exists
+  - command: fresh independent post-implementation audit
+    result: PASS
+    evidence: docs/agents/evidence/OTC-20260829-tibia-re-vision-benchmark-execution/20260829-independent-audit.md; audited head 7621916c76c19aa0951384538a8387c02cafcd04; material findings open 0
 blockers:
-  - repository-mandated fresh independent post-implementation audit is still required before completion/merge; implementer session cannot self-approve material work
-next_action: run full focused validation and exact-scope checks on the terminal report head, push it, consume exact-head CI/governance and review hygiene, then stop at REQUIRED_FRESH_INDEPENDENT_POST_IMPLEMENTATION_AUDIT if no separate validator session is available
+  - final exact-head GitHub CI and Track A governance remain to be consumed after the audit-record commit
+next_action: commit and push the independent audit record, then freeze the exact final head, mark PR 790 ready, consume final CI/governance and review hygiene, squash-merge, and archive the task
 ```
 
 ## Recovery checkpoint
@@ -194,8 +198,8 @@ worktree: C:/Users/barte/otclient-vision-benchmark
 active_operation: P1 deterministic harness followed by P2 bounded real-model smoke
 operation_started_at: null
 external_run_ids: []
-last_verified_state: terminal benchmark PARTIAL/INCONCLUSIVE report prepared; bounded Qwen leading profile; no Track B screenshot handoff; Track B blocker unchanged; all local model residency empty
+last_verified_state: fresh independent audit PASS_BOUNDED on implementation head 7621916c76c19aa0951384538a8387c02cafcd04; benchmark remains PARTIAL/INCONCLUSIVE; no Track B screenshot handoff; all model residency empty
 resume_condition: current task branch still owns the declared paths and Ollama residency is empty or exact target only
 failure_handling: if a model/backend pull or inference fails, persist the typed failure and do not switch to cloud or a different undeclared provider
-next_action: full final focused validation plus exact-head CI/governance/review checks, then separate fresh audit or explicit audit blocker
+next_action: commit/push audit evidence, freeze final head, mark PR 790 ready, consume exact-head CI/governance/reviews, merge and archive
 ```

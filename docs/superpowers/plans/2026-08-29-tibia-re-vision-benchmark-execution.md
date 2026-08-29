@@ -41,7 +41,6 @@
 **Files:**
 - Modify: `tools/tibia-re-vision-benchmark/vision_benchmark.py`
 - Create: `tools/tibia-re-vision-benchmark/tests/test_ollama_adapter.py`
-- Create: `tools/tibia-re-vision-benchmark/make_synthetic_fixture.ps1`
 - Create: `tools/tibia-re-vision-benchmark/fixtures/synthetic-login-smoke.png`
 - Create: `tools/tibia-re-vision-benchmark/fixtures/synthetic-login-smoke.json`
 
@@ -51,7 +50,7 @@
 - [x] **Step 1: Write failing adapter tests** using a local fake HTTP server for `/api/ps` and `/api/chat`; prove loopback-only endpoint rejection, invalid JSON propagation, `keep_alive=0`, and residency refusal.
 - [x] **Step 2: Run focused tests and verify RED.**
 - [x] **Step 3: Implement the minimal loopback-only Ollama adapter** with urllib and base64 image transport; never send a request to a non-loopback endpoint.
-- [x] **Step 4: Generate the deterministic synthetic PNG** with .NET drawing: title `TIBIA VISION SAFE FIXTURE`, state text `ACCOUNT LOGIN`, field labels without credentials, and footer `NO SECRET DATA`.
+- [x] **Step 4: Produce the secret-safe synthetic PNG once, visually verify it, and freeze its exact committed bytes plus SHA-256.** A later closeout audit proved the original .NET drawing helper was not bitwise/pixel-reproducible against the already-scored committed fixture, so the helper is not retained as a false reproducer; the frozen PNG+manifest are canonical inputs.
 - [x] **Step 5: Hash the PNG into the JSON manifest, run all focused tests, and commit.**
 
 ### Task 3: Qwen3-VL local real-model smoke

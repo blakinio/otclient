@@ -1,4 +1,4 @@
-﻿from pathlib import Path
+from pathlib import Path
 import sys
 import tempfile
 import unittest
@@ -12,6 +12,7 @@ from vision_benchmark import (  # noqa: E402
     score_profile,
     sha256_file,
     normalize_ocr_transcription,
+    validate_input_manifest,
     validate_visual_evidence,
 )
 
@@ -95,6 +96,11 @@ class HardGateTests(unittest.TestCase):
         self.assertTrue(result["eligible"])
         self.assertTrue(all(v for k, v in result.items() if k != "failure_reasons"))
 
+    def test_empty_trial_set_is_ineligible(self):
+        result = evaluate_hard_gates([])
+        self.assertFalse(result["eligible"])
+        self.assertIn("no_trials", result["failure_reasons"])
+
 
 class ResidencyTests(unittest.TestCase):
     def test_empty_residency_admits_target(self):
@@ -154,6 +160,32 @@ class OcrNormalizationTests(unittest.TestCase):
             "invented text", evidence_ref="fixture:black", capture_sha256="d" * 64, model_profile_id="ocr-profile"
         )
         self.assertEqual(result["observation"]["visible_text"], ["invented text"])
+
+
+class InputManifestTests(unittest.TestCase):
+    def test_unsafe_manifest_is_rejected(self):
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "frame.png"
+            path.write_bytes(b"safe-bytes")
+            with self.assertRaises(Exception):
+                validate_input_manifest({"secret_safe": False, "reason": "secret possible", "sha256": "0" * 64}, path)
+
+    def test_wrong_manifest_hash_is_rejected(self):
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "frame.png"
+            path.write_bytes(b"safe-bytes")
+            with self.assertRaises(ValueError):
+                validate_input_manifest({"secret_safe": True, "reason": "synthetic", "sha256": "0" * 64}, path)
+
+    def test_valid_manifest_returns_bound_digest(self):
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "frame.png"
+            path.write_bytes(b"safe-bytes")
+            digest = sha256_file(path)
+            self.assertEqual(
+                validate_input_manifest({"secret_safe": True, "reason": "synthetic", "sha256": digest}, path),
+                digest,
+            )
 
 
 class HashTests(unittest.TestCase):

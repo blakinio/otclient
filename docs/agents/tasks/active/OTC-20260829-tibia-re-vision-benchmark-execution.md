@@ -139,6 +139,7 @@ proven:
   - PR 284 comment 5460730478 is the latest vision coordination comment and no later accepted screenshot handoff exists
   - Track B branch contains no repo-owned screenshot or keyframe evidence dataset suitable for the benchmark; static product image assets do not qualify
   - no Track B or official-client E2E was triggered for screenshot collection
+  - closeout audit rejected the System.Drawing fixture generator as a reproducer because regenerated pixels differed from the already-scored frozen PNG; the generator is removed and the committed PNG plus SHA-256 remain the canonical immutable input
   - final benchmark decision is PARTIAL with primary_model null, ocr_fallback_model null and research_value_verdict INCONCLUSIVE
 derived:
   - bounded Qwen is the leading profile to test first when representative Track B screenshots become legally available
@@ -154,6 +155,7 @@ rejected_hypotheses:
   - synthetic smoke is sufficient for a formal winner claim
   - Vision can prove or recover the native pre-login outbound sequence
   - OvisOCR2 can be promoted as fallback despite repeatable black-negative hallucination
+  - System.Drawing fixture regeneration is bitwise and pixel-identical to the frozen scored fixture
 changed_paths:
   - docs/agents/reports/OTCLIENT-20260829-tibia-re-vision-benchmark-execution.md
   - docs/agents/tasks/active/OTC-20260829-tibia-re-vision-benchmark-execution.md
@@ -161,7 +163,7 @@ changed_paths:
 validation:
   - command: python -m unittest discover -s tools/tibia-re-vision-benchmark/tests -v
     result: PASS
-    evidence: 22 tests passed on terminal report worktree
+    evidence: 32 tests passed on post-remediation worktree
   - command: python tools/agents/checkpoint.py docs/agents/tasks/active/OTC-20260829-tibia-re-vision-benchmark-execution.md --require-checkpoint
     result: PASS
     evidence: current task checkpoint validated

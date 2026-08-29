@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import argparse
 import gc
@@ -12,7 +12,7 @@ import torch
 from PIL import Image
 from transformers import AutoModelForMultimodalLM, AutoProcessor
 
-from vision_benchmark import normalize_ocr_transcription, sha256_file
+from vision_benchmark import normalize_ocr_transcription, validate_input_manifest
 
 
 def norm(text: str) -> str:
@@ -34,10 +34,8 @@ def main() -> int:
 
     login_manifest = json.loads(args.login_manifest.read_text(encoding="utf-8-sig"))
     negative_manifest = json.loads(args.negative_manifest.read_text(encoding="utf-8-sig"))
-    assert login_manifest.get("secret_safe") is True
-    assert negative_manifest.get("secret_safe") is True
-    assert sha256_file(args.login_image) == login_manifest["sha256"]
-    assert sha256_file(args.negative_image) == negative_manifest["sha256"]
+    validate_input_manifest(login_manifest, args.login_image)
+    validate_input_manifest(negative_manifest, args.negative_image)
 
     package_versions = {
         "python": __import__("sys").version.split()[0],

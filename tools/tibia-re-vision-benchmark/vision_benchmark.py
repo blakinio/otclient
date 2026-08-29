@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import base64
 import hashlib
@@ -160,6 +160,19 @@ def normalize_ocr_transcription(
 
 def evaluate_hard_gates(trials: Iterable[dict[str, Any]]) -> dict[str, Any]:
     trials = list(trials)
+    if not trials:
+        return {
+            "schema_valid_100_percent": False,
+            "zero_secret_leakage": False,
+            "zero_false_in_game_on_login_or_character_select": False,
+            "zero_runtime_action_authority": False,
+            "zero_model_authored_executable_action_parameters": False,
+            "single_model_residency_preserved": False,
+            "zero_silent_cloud_fallback": False,
+            "required_provenance_complete": False,
+            "eligible": False,
+            "failure_reasons": ["no_trials"],
+        }
     gates = {
         "schema_valid_100_percent": all(not validate_visual_evidence(t.get("visual_evidence")) for t in trials),
         "zero_secret_leakage": all(t.get("secret_leakage") is False for t in trials),
@@ -230,6 +243,19 @@ def ensure_secret_safe(metadata: Any) -> bool:
     return True
 
 
+def validate_input_manifest(metadata: Any, image_path: str | Path) -> str:
+    ensure_secret_safe(metadata)
+    digest = metadata.get("sha256") if isinstance(metadata, dict) else None
+    if not isinstance(digest, str) or len(digest) != 64 or any(
+        c not in "0123456789abcdefABCDEF" for c in digest
+    ):
+        raise ValueError("manifest sha256 invalid")
+    actual = sha256_file(image_path)
+    if actual.lower() != digest.lower():
+        raise ValueError("manifest sha256 does not match image bytes")
+    return actual
+
+
 def _loopback_base(endpoint: str) -> str:
     parsed = urlparse(endpoint)
     if parsed.scheme != "http" or parsed.hostname not in {"127.0.0.1", "localhost", "::1"}:
@@ -266,6 +292,60 @@ def query_ollama_ps(endpoint: str = "http://127.0.0.1:11434", timeout: float = 5
             raise ValueError("Ollama /api/ps model name invalid")
         names.append(name)
     return names
+
+
+def query_ollama_model_digest(
+    endpoint: str, model: str, timeout: float = 5.0
+) -> str:
+    if not isinstance(model, str) or not model:
+        raise ValueError("model invalid")
+    response = _local_json_request(endpoint, "/api/tags", timeout=timeout)
+    models = response.get("models")
+    if not isinstance(models, list):
+        raise ValueError("Ollama /api/tags models missing")
+    matches = []
+    for entry in models:
+        if not isinstance(entry, dict):
+            raise ValueError("Ollama /api/tags model entry invalid")
+        name = entry.get("name") or entry.get("model")
+        if name == model:
+            matches.append(entry)
+    if len(matches) != 1:
+        raise ValueError(f"installed model identity not unique: {model}")
+    digest = matches[0].get("digest")
+    if not isinstance(digest, str) or len(digest) != 64 or any(
+        c not in "0123456789abcdefABCDEF" for c in digest
+    ):
+        raise ValueError("installed model digest invalid")
+    return digest.lower()
+
+
+def unload_ollama_model(
+    endpoint: str, model: str, timeout: float = 30.0
+) -> list[str]:
+    if not isinstance(model, str) or not model:
+        raise ValueError("model invalid")
+    _local_json_request(
+        endpoint,
+        "/api/generate",
+        payload={"model": model, "stream": False, "keep_alive": 0},
+        timeout=timeout,
+    )
+    resident = query_ollama_ps(endpoint, timeout=min(timeout, 5.0))
+    if resident:
+        raise RuntimeError(f"MODEL_UNLOAD_NOT_VERIFIED:{resident}")
+    return resident
+
+
+def release_ollama_model_if_owned(
+    endpoint: str, model: str, timeout: float = 30.0
+) -> list[str]:
+    resident = query_ollama_ps(endpoint, timeout=min(timeout, 5.0))
+    if not resident:
+        return []
+    if resident != [model]:
+        raise RuntimeError(f"MODEL_SLOT_NOT_EXCLUSIVE_AT_CLEANUP:{resident}")
+    return unload_ollama_model(endpoint, model, timeout=timeout)
 
 
 def run_ollama_trial(
@@ -305,6 +385,9 @@ def run_ollama_trial(
         raise ValueError("num_predict invalid")
 
     image = Path(image_path)
+    actual_sha256 = sha256_file(image)
+    if actual_sha256.lower() != capture_sha256.lower():
+        raise ValueError("capture_sha256 does not match image bytes")
     encoded = base64.b64encode(image.read_bytes()).decode("ascii")
     request = {
         "model": model,

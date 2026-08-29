@@ -1,6 +1,7 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import argparse
+import atexit
 import json
 import math
 import statistics
@@ -12,7 +13,14 @@ ROOT = Path(__file__).resolve().parents[2]
 BENCH = Path(__file__).resolve().parent
 sys.path.insert(0, str(BENCH))
 
-from vision_benchmark import ensure_secret_safe, evaluate_hard_gates, query_ollama_ps, run_ollama_trial, sha256_file
+from vision_benchmark import (
+    evaluate_hard_gates,
+    query_ollama_model_digest,
+    query_ollama_ps,
+    release_ollama_model_if_owned,
+    run_ollama_trial,
+    validate_input_manifest,
+)
 
 
 def percentile(values: list[float], p: float) -> float | None:
@@ -48,14 +56,29 @@ def main() -> int:
         "black-negative": json.loads(args.negative_manifest.read_text(encoding="utf-8-sig")),
     }
     for manifest in manifests.values():
-        ensure_secret_safe(manifest)
         image_path = ROOT / manifest["image"]
-        if sha256_file(image_path) != manifest["sha256"]:
-            raise SystemExit(f"fixture hash mismatch: {image_path}")
+        validate_input_manifest(manifest, image_path)
 
     initial = query_ollama_ps(args.endpoint)
     if initial not in ([], [args.model]):
         raise SystemExit(f"MODEL_SLOT_NOT_EXCLUSIVE:{initial}")
+    installed_digest = query_ollama_model_digest(args.endpoint, args.model)
+    if installed_digest != args.digest.lower():
+        raise SystemExit(
+            f"MODEL_DIGEST_MISMATCH:expected={args.digest.lower()}:actual={installed_digest}"
+        )
+
+    cleanup_state = {"done": False}
+    def best_effort_cleanup() -> None:
+        if cleanup_state["done"]:
+            return
+        try:
+            release_ollama_model_if_owned(args.endpoint, args.model)
+        except Exception:
+            pass
+        finally:
+            cleanup_state["done"] = True
+    atexit.register(best_effort_cleanup)
 
     profile_id = f"ollama:{args.model}@sha256:{args.digest}"
     prompt = (
@@ -178,17 +201,25 @@ def main() -> int:
         "cold_load_s": results[0]["result"]["telemetry"]["load_duration"] / 1e9 if results and results[0]["result"] else None,
         "hard_gates": hard_gates,
     }
+    residency_before_unload = query_ollama_ps(args.endpoint)
+    final_residency = release_ollama_model_if_owned(args.endpoint, args.model)
+    cleanup_state["done"] = True
     record = {
         "schema_version": 1,
         "evidence_kind": "synthetic_state_ocr_negative_repeatability_suite",
         "execution_host": "MOLEHILL-PC",
         "backend": {"name": "ollama", "version": "0.32.14", "endpoint": args.endpoint, "cloud_fallback": False},
-        "model_profile": {"ollama_name": args.model, "digest_sha256": args.digest, "quantization": "Q4_K_M", "num_ctx": 4096, "num_predict": 256, "temperature": 0},
+        "model_profile": {"ollama_name": args.model, "digest_sha256": installed_digest, "quantization": "Q4_K_M", "num_ctx": 4096, "num_predict": 256, "temperature": 0},
         "initial_residency": initial,
         "input_manifests": manifests,
         "results": results,
         "summary": summary,
-        "residency_before_explicit_unload": query_ollama_ps(args.endpoint),
+        "residency_before_explicit_unload": residency_before_unload,
+        "explicit_unload": {
+            "method": "ollama_api_keep_alive_zero",
+            "result": "PASS",
+            "final_ollama_residency": final_residency,
+        },
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(record, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")

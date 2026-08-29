@@ -199,6 +199,8 @@ Audit evidence before this remediation:
 - direct contract checks for prompt/alias v1.0.0, `visual_only`, `structural_authority: false`, no-cloud, one-model residency and `NO_WINNER`: PASS;
 - deterministic checkpoint validator initially failed only on stale checkpoint schema (`VISION-DOC-AUD-001`); after the task-only remediation it passes.
 
+Fresh independent audit result after remediation: **PASS_BOUNDED** (`fresh_coordinator_session`), `VISION-DOC-AUD-001` resolved, material findings open: **0**. Exact-final-head GitHub checks remain a separate closeout gate.
+
 ## Context checkpoint
 
 ```yaml
@@ -222,6 +224,7 @@ proven:
   - PR 787 changed exactly the five declared documentation paths and was mergeable with zero review comments or threads
   - prompt, alias, spec and plan preserve visual_only non-authoritative evidence, no cloud fallback and one-model residency
   - current owner invocation verified Molehill-PC benchmark readiness without local model inference or official-client runtime access
+  - fresh independent documentation audit PASS_BOUNDED with VISION-DOC-AUD-001 resolved and zero open material findings
 derived:
   - documentation programme is closeout-ready after this checkpoint-schema remediation if exact-final-head validation remains green
 unknown:
@@ -245,11 +248,6 @@ validation:
   - command: python tools/agents/checkpoint.py docs/agents/tasks/active/OTC-20260829-tibia-re-vision-benchmark.md --require-checkpoint
     result: PASS
     evidence: remediation restores the current normative version-1 checkpoint shape; historical VISION-DOC-AUD-001 is resolved
-audit:
-  result: PASS_BOUNDED
-  independent_validator: fresh_coordinator_session
-  finding_VIS_DOC_AUD_001: RESOLVED
-  material_findings_open: 0
 blockers: []
 next_action: run the deterministic checkpoint validator and full fresh independent diff audit on the remediation head, then commit/push and verify exact-final-head GitHub checks before merge
 ```

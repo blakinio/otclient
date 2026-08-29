@@ -279,6 +279,8 @@ def run_ollama_trial(
     model_profile_id: str,
     source_monotonic_ns: int | None = None,
     keep_alive: str = "0s",
+    num_ctx: int = 4096,
+    num_predict: int = 256,
     timeout: float = 120.0,
 ) -> dict[str, Any]:
     resident = query_ollama_ps(endpoint)
@@ -297,6 +299,10 @@ def run_ollama_trial(
         not isinstance(source_monotonic_ns, int) or isinstance(source_monotonic_ns, bool)
     ):
         raise ValueError("source_monotonic_ns invalid")
+    if not isinstance(num_ctx, int) or isinstance(num_ctx, bool) or num_ctx <= 0:
+        raise ValueError("num_ctx invalid")
+    if not isinstance(num_predict, int) or isinstance(num_predict, bool) or num_predict <= 0:
+        raise ValueError("num_predict invalid")
 
     image = Path(image_path)
     encoded = base64.b64encode(image.read_bytes()).decode("ascii")
@@ -306,7 +312,7 @@ def run_ollama_trial(
         "format": "json",
         "stream": False,
         "keep_alive": keep_alive,
-        "options": {"temperature": 0},
+        "options": {"temperature": 0, "num_ctx": num_ctx, "num_predict": num_predict},
     }
     response = _local_json_request(endpoint, "/api/chat", payload=request, timeout=timeout)
     message = response.get("message")

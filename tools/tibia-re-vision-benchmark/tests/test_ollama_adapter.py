@@ -97,6 +97,8 @@ class OllamaAdapterTests(unittest.TestCase):
         self.assertEqual(sent["keep_alive"], "0s")
         self.assertFalse(sent["stream"])
         self.assertEqual(sent["options"]["temperature"], 0)
+        self.assertEqual(sent["options"]["num_ctx"], 4096)
+        self.assertEqual(sent["options"]["num_predict"], 256)
         self.assertTrue(sent["messages"][0]["images"])
         self.assertEqual(result["visual_evidence"]["observation"]["screen_class"], "LOGIN_SCREEN")
         self.assertEqual(result["visual_evidence"]["capture"]["sha256"], "b" * 64)

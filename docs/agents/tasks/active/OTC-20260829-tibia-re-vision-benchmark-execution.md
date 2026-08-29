@@ -12,8 +12,9 @@ phase: implement
 branch: feat/OTC-20260829-tibia-re-vision-benchmark-execution
 base_branch: main
 base_sha: f208a20cb4517e8b57bef91983337145d379267c
+related_pr: 790
 created: 2026-08-29T08:08:53+02:00
-updated: 2026-08-29T08:12:04+02:00
+updated: 2026-08-29T08:18:46+02:00
 risk: high
 execution_mode: local_owner_pc
 execution_reason: deterministic harness plus local real-model benchmark on verified Molehill-PC
@@ -94,10 +95,10 @@ P1/P2 and backend compatibility work are READY offline. P3-P7 project-specific s
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-29T08:12:04+02:00
-head: pending-p1-harness-fixture-commit
+updated_at: 2026-08-29T08:18:46+02:00
+head: pending-qwen-smoke-evidence-commit
 branch: feat/OTC-20260829-tibia-re-vision-benchmark-execution
-pr: none
+pr: 790
 status: implementing
 context_routes:
   - local-model-benchmark
@@ -110,46 +111,47 @@ owned_paths:
   - docs/agents/tasks/active/OTC-20260829-tibia-re-vision-benchmark-execution.md
   - docs/superpowers/plans/2026-08-29-tibia-re-vision-benchmark-execution.md
 proven:
-  - P1 deterministic VisualEvidence schema, hard-gate, scoring, file-hash and residency helpers are implemented with 14 focused core tests
-  - loopback-only Ollama adapter, strict model JSON handling and secret-input rejection are implemented with five adapter tests
-  - focused unittest suite is 19 of 19 PASS
-  - deterministic synthetic LOGIN_SCREEN smoke fixture exists, is visually verified secret-safe, and hashes to 2dea29719c3e6f7c84c40717ead27bd56cfaacb69b06c4f19f0975b231bc47a6
-  - no model inference, official-client access, Track B runtime access or credential access has occurred
+  - deterministic harness tests are 20 of 20 PASS after moving provenance and authority metadata out of untrusted model output
+  - exact Qwen profile is ollama qwen3-vl:4b-instruct-q4_K_M digest ee4b975b58c17ce268cd19d40db35d5edc64603035d2ffc1fee1968eb0947f7b, GGUF Q4_K_M, qwen3vl 4.4B
+  - observed Qwen runtime residency used 3527545978 bytes model size and 3527545978 bytes VRAM at 100 percent GPU
+  - three identical synthetic smoke trials are schema-valid 3 of 3 and LOGIN_SCREEN exact 3 of 3
+  - expected visible-text set recall is 1.0 on all three trials and screen classification is repeatable
+  - Qwen smoke API total durations are 18663.2486 ms, 15769.5473 ms and 16360.7091 ms; p50 16360.7091 ms and three-sample interpolated p95 18432.99465 ms
+  - all Qwen smoke hard gates pass and final Ollama residency is empty
+  - Qwen evidence is synthetic_smoke_only and selection_quality false, so it cannot support a winner claim
 derived:
-  - P1 is complete and P2 Qwen3-VL real-model smoke is READY after a fresh residency check
+  - Qwen3-VL Q4_K_M is a viable local first-pass profile on Molehill-PC for the tested schema/OCR/state smoke
+  - Ovis backend compatibility can now be tested only after cross-provider shared-GPU residency remains empty
 unknown:
-  - Qwen3-VL exact local profile smoke outcome
+  - Qwen performance and hallucination resistance on representative secret-safe Tibia frames
   - Ovis2.5-2B local backend compatibility on this Windows/AMD host
   - OvisOCR2 local backend compatibility on this Windows/AMD host
   - Track B project-specific P3-P7 research-value result until screenshot handoff exists
 conflicts: []
 first_failure:
-  marker: SYNTHETIC_FIXTURE_FONT_CONSTRUCTOR_AMBIGUOUS
-  evidence: initial PowerShell New-Object Font three-argument overload was ambiguous; explicit four-argument Font constructor was proven and regenerated fixture hash is recorded
+  marker: none_current_gate
+  evidence: Qwen synthetic smoke completed without inference failure
 rejected_hypotheses:
-  - existing trusted-main executable vision harness can be reused
-  - initial synthetic PNG generated after Font constructor errors is usable benchmark input
+  - model should author capture/model/authority provenance fields
+  - Qwen synthetic smoke failure on this host profile
 changed_paths:
   - tools/tibia-re-vision-benchmark/vision_benchmark.py
-  - tools/tibia-re-vision-benchmark/tests/test_vision_benchmark.py
   - tools/tibia-re-vision-benchmark/tests/test_ollama_adapter.py
-  - tools/tibia-re-vision-benchmark/make_synthetic_fixture.ps1
-  - tools/tibia-re-vision-benchmark/fixtures/synthetic-login-smoke.png
-  - tools/tibia-re-vision-benchmark/fixtures/synthetic-login-smoke.json
+  - docs/agents/evidence/OTC-20260829-tibia-re-vision-benchmark-execution/qwen3-vl-4b-instruct-smoke.json
   - docs/agents/tasks/active/OTC-20260829-tibia-re-vision-benchmark-execution.md
   - docs/superpowers/plans/2026-08-29-tibia-re-vision-benchmark-execution.md
 validation:
   - command: python -m unittest discover -s tools/tibia-re-vision-benchmark/tests -v
     result: PASS
-    evidence: 19 tests passed
-  - command: git diff --check
+    evidence: 20 tests passed
+  - command: three local Ollama Qwen3-VL synthetic smoke trials
     result: PASS
-    evidence: no whitespace errors before P1 checkpoint commit
-  - command: synthetic fixture visual inspection and SHA-256
+    evidence: 3 of 3 schema-valid LOGIN_SCREEN exact, visible text recall 1.0, hard gates eligible true
+  - command: ollama ps after each trial and final check
     result: PASS
-    evidence: labels only, empty fields, NO SECRET DATA; sha256 2dea29719c3e6f7c84c40717ead27bd56cfaacb69b06c4f19f0975b231bc47a6
+    evidence: each trial after_residency empty and final resident model set empty
 blockers: []
-next_action: verify Ollama residency is still empty, resolve the exact qwen3-vl:4b-instruct local digest, then run three strict synthetic smoke trials with keep_alive zero and verify unload
+next_action: verify Ollama and Docker Model Runner shared-GPU residency are both empty, then perform bounded local compatibility probes for Ovis2.5-2B and OvisOCR2 without cloud inference or undeclared model substitution
 ```
 
 ## Recovery checkpoint
@@ -157,13 +159,13 @@ next_action: verify Ollama residency is still empty, resolve the exact qwen3-vl:
 ```yaml
 status: active
 branch: feat/OTC-20260829-tibia-re-vision-benchmark-execution
-head: pending-p1-harness-fixture-commit
+head: pending-qwen-smoke-evidence-commit
 worktree: C:/Users/barte/otclient-vision-benchmark
 active_operation: P1 deterministic harness followed by P2 bounded real-model smoke
 operation_started_at: null
 external_run_ids: []
-last_verified_state: P1 harness and synthetic secret-safe fixture complete; Ollama resident set was empty at latest preflight; no model inference or official-client/Track B runtime access yet
+last_verified_state: Qwen3-VL Q4_K_M synthetic smoke 3 of 3 PASS; all hard gates pass; Ollama final residency empty; no official-client or Track B runtime access
 resume_condition: current task branch still owns the declared paths and Ollama residency is empty or exact target only
 failure_handling: if a model/backend pull or inference fails, persist the typed failure and do not switch to cloud or a different undeclared provider
-next_action: fresh Ollama residency check, then exact qwen3-vl:4b-instruct resolve/pull and three-trial P2 smoke with deterministic unload
+next_action: cross-provider empty-residency preflight, then bounded Ovis2.5-2B and OvisOCR2 local backend compatibility probes
 ```

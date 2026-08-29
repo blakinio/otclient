@@ -64,11 +64,11 @@
 - Consumes: exact Ollama residency state and synthetic fixture hash.
 - Produces: exact local model profile, load/inference timings, schema result, visible text/state result, and verified unload.
 
-- [ ] **Step 1: Verify `ollama ps` is empty and record Ollama/host/GPU facts.**
-- [ ] **Step 2: Resolve/pull only the intended `qwen3-vl:4b-instruct` local profile, record the exact digest, and re-check residency before inference.**
-- [ ] **Step 3: Run three identical synthetic-login trials through the harness** with strict JSON output and bounded `keep_alive=0`; persist sanitized results and durations only.
-- [ ] **Step 4: Verify `ollama ps` is empty after the profile and classify `PASS_PROFILE`, `FAIL_HARD_GATE`, `INVALID_OUTPUT`, or a typed backend/resource failure.**
-- [ ] **Step 5: Run focused tests and commit the Qwen evidence/checkpoint.**
+- [x] **Step 1: Verify `ollama ps` is empty and record Ollama/host/GPU facts.**
+- [x] **Step 2: Resolve/pull only the intended `qwen3-vl:4b-instruct` local profile, record the exact digest, and re-check residency before inference.**
+- [x] **Step 3: Run three identical synthetic-login trials through the harness** with strict JSON output and bounded `keep_alive=0`; persist sanitized results and durations only.
+- [x] **Step 4: Verify `ollama ps` is empty after the profile and classify `PASS_PROFILE`, `FAIL_HARD_GATE`, `INVALID_OUTPUT`, or a typed backend/resource failure.**
+- [x] **Step 5: Run focused tests and commit the Qwen evidence/checkpoint.**
 
 ### Task 4: Ovis first-pass backend compatibility
 

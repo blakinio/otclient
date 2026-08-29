@@ -5,6 +5,7 @@ import argparse
 from pathlib import Path
 import re
 import subprocess
+import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 TRACK_A = "official-client-re"
@@ -426,6 +427,54 @@ def audit_changed_tasks(base: str, expected_branch: str | None = None) -> None:
     print(f"TRACK_A_AGENT_RUNTIME_BRANCH_BOUND_TASKS={branch_bound_tasks}")
 
 
+def prior_boot_zero_client_invalidation_mode_self_test() -> None:
+    def task_text(**overrides: str) -> str:
+        values = {
+            "task_id": "OTC-TEST-PRIOR-BOOT-INVALIDATION",
+            "track_id": TRACK_A,
+            "runtime_access": "canonical_recovery",
+            "runtime_owner_task": "OTC-TEST-PRIOR-BOOT-INVALIDATION",
+            "runtime_namespace": CANONICAL_NAMESPACE,
+            "canonical_registration": "PRESENT",
+            "canonical_lease_generation": "UNKNOWN",
+            "registration_lease_generation": "7",
+            "gate_a": "REQUIRED_NOT_PROVEN",
+            "generation_rebind": "NOT_APPLICABLE",
+            "gate_b": "NOT_APPLICABLE",
+            "bootstrap": "NOT_APPLICABLE",
+            "target_uniqueness": "UNKNOWN",
+            "mutation_authorized": "false",
+            "recovery_mode": "prior_boot_zero_client_invalidation_v1",
+        }
+        values.update(overrides)
+        body = "\n".join(f"{key}: {value}" for key, value in values.items())
+        return f"---\n{body}\n---\nfixture\n"
+
+    def validate_fixture(**overrides: str) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "task.md"
+            path.write_text(task_text(**overrides), encoding="utf-8")
+            if not validate_track_a_task(path):
+                raise SystemExit("prior-boot invalidation fixture unexpectedly non-Track-A")
+
+    validate_fixture()
+    validate_fixture(
+        canonical_lease_generation="8",
+        gate_a="PASS",
+    )
+
+    for label, overrides in (
+        ("not-newer", {"canonical_lease_generation": "7", "gate_a": "PASS"}),
+        ("singleton-claim", {"target_uniqueness": "PROVEN"}),
+        ("mutation", {"mutation_authorized": "true"}),
+    ):
+        try:
+            validate_fixture(**overrides)
+        except SystemExit:
+            continue
+        raise SystemExit(f"prior-boot invalidation self-test failed to reject {label}")
+
+
 def static_policy_audit() -> None:
     readme = read("docs/agents/README.md")
     agents = read("docs/agents/AGENTS.md")
@@ -605,6 +654,7 @@ def main() -> int:
     parser.add_argument("--expected-branch", help="require runtime-sensitive admission task to match this PR head branch")
     args = parser.parse_args()
 
+    prior_boot_zero_client_invalidation_mode_self_test()
     static_policy_audit()
     if args.changed_from:
         audit_changed_tasks(args.changed_from, args.expected_branch)

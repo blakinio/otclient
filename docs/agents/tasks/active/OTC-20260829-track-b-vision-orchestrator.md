@@ -12,7 +12,7 @@ branch: docs/OTC-20260829-track-b-vision-orchestrator
 base_branch: main
 related_pr: 792
 created: 2026-08-29T14:46:00+02:00
-updated: 2026-08-29T14:53:00+02:00
+updated: 2026-08-29T14:57:00+02:00
 risk: low
 execution_mode: github_hosted
 run_scope: bounded_change
@@ -52,8 +52,8 @@ This task does not modify PR #284, does not trigger an E2E, and grants no additi
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-29T14:53:00+02:00
-head: fba47ea32fc21cc2f1eca38bf50b87dcd8977c74
+updated_at: 2026-08-29T14:57:00+02:00
+head: cb1844c6091450cb504eabdc67fd36c5aefe0974
 branch: docs/OTC-20260829-track-b-vision-orchestrator
 pr: 792
 status: validating
@@ -68,14 +68,17 @@ owned_paths:
   - docs/agents/tasks/active/OTC-20260829-track-b-vision-orchestrator.md
 proven:
   - PR 284 remains the canonical active Track B lane
-  - merged Vision benchmark provides a bounded local Qwen leading profile but cannot authorize protocol mutation
   - current Track B blocker is BLOCKED_REQUIRED_CURRENT_NATIVE_PRE_LOGIN_OUTBOUND_SEQUENCE_EVIDENCE
   - no additional official-service E2E is authorized merely for screenshots
-  - hosted RED run 33253537309 job 99103214915 failed exactly because the canonical single-window prompt was absent
-  - the new prompt requires same-invocation local Qwen post-processing only for accepted secret-safe keyframes and otherwise explicit skip/block statuses without retrying E2E
-  - the short-command registry now maps OTCLIENT-TIBIA-GLOBAL-LOGIN-FINAL-CONTINUE to the canonical coordinator prompt
+  - TDD RED run 33253537309 job 99103214915 failed exactly because the canonical prompt was absent
+  - GREEN Track B vision orchestrator contract run 33253685161 job 99103616963 passed
+  - Track A runtime governance run 33253685085 passed on the same GREEN head
+  - CI run 33253685193 reached CI / Required success on the same GREEN head
+  - the canonical prompt requires same-invocation local Qwen post-processing only for accepted secret-safe keyframes
+  - no-keyframe and local-model-host-unavailable paths explicitly continue structural Track B work without another E2E
+  - the short-command registry maps OTCLIENT-TIBIA-GLOBAL-LOGIN-FINAL-CONTINUE to the canonical coordinator prompt
 derived:
-  - the safest integration point is the owner-facing coordinator prompt on main, not a Track B runtime/workflow mutation
+  - owner no longer needs a second Vision chat/window; the Track B coordinator owns the optional post-processing subflow
 unknown:
   - whether the next independently legal Track B E2E will yield accepted secret-safe keyframes
 conflicts: []
@@ -95,7 +98,16 @@ changed_paths:
 validation:
   - command: python3 .github/scripts/test_track_b_vision_orchestrator_prompt.py
     result: FAIL
-    evidence: TDD RED run 33253537309 job 99103214915 failed exactly on the missing canonical prompt before implementation
+    evidence: expected TDD RED run 33253537309 job 99103214915 before implementation
+  - command: Track B vision orchestrator contract
+    result: PASS
+    evidence: run 33253685161 job 99103616963 on cb1844c6091450cb504eabdc67fd36c5aefe0974
+  - command: Track A agent runtime governance
+    result: PASS
+    evidence: run 33253685085 on cb1844c6091450cb504eabdc67fd36c5aefe0974
+  - command: CI / Required
+    result: PASS
+    evidence: run 33253685193 on cb1844c6091450cb504eabdc67fd36c5aefe0974
 blockers: []
-next_action: consume exact-head GREEN contract, CI and governance for PR 792; repair only concrete failures, then merge/archive if all repository gates pass
+next_action: consume exact-head checks after this checkpoint-only commit, mark PR 792 ready, verify review hygiene, merge, then archive this task on main
 ```

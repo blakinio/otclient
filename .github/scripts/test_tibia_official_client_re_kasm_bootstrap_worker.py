@@ -215,6 +215,9 @@ class Tests(unittest.TestCase):
     def test_launch_rejects_stale_preflight_or_preexisting_client(self):
         preflight = self.write_preflight()
         preflight['container_id'] = OTHER_ID
+        unsigned = dict(preflight)
+        unsigned.pop('preflight_fingerprint')
+        preflight['preflight_fingerprint'] = self.m._fingerprint(unsigned)
         self.m.write_record(self.record, preflight)
         with self.assertRaisesRegex(self.m.WorkerError, 'preflight_drift'):
             self.m.launch_from_preflight(self.record, runner=self.fake, sleeper=lambda _: None)

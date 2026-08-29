@@ -1,0 +1,17 @@
+﻿{
+    "image":  "tools/tibia-re-vision-benchmark/fixtures/synthetic-login-smoke.png",
+    "schema_version":  1,
+    "selection_quality":  false,
+    "sha256":  "2dea29719c3e6f7c84c40717ead27bd56cfaacb69b06c4f19f0975b231bc47a6",
+    "expected_visible_text":  [
+                                  "TIBIA VISION SAFE FIXTURE",
+                                  "ACCOUNT LOGIN",
+                                  "EMAIL",
+                                  "PASSWORD",
+                                  "NO SECRET DATA"
+                              ],
+    "secret_safe":  true,
+    "reason":  "generated synthetic fixture with labels only and no credential/session values",
+    "dataset_kind":  "synthetic_smoke_only",
+    "expected_screen_class":  "LOGIN_SCREEN"
+}

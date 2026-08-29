@@ -1,0 +1,459 @@
+{
+  "schema_version": 1,
+  "evidence_kind": "synthetic_state_ocr_negative_repeatability_suite",
+  "execution_host": "MOLEHILL-PC",
+  "backend": {
+    "name": "ollama",
+    "version": "0.32.14",
+    "endpoint": "http://127.0.0.1:11434",
+    "cloud_fallback": false
+  },
+  "model_profile": {
+    "ollama_name": "qwen3-vl:4b-instruct-q4_K_M",
+    "digest_sha256": "ee4b975b58c17ce268cd19d40db35d5edc64603035d2ffc1fee1968eb0947f7b",
+    "quantization": "Q4_K_M",
+    "num_ctx": 4096,
+    "num_predict": 256,
+    "temperature": 0
+  },
+  "initial_residency": [],
+  "input_manifests": {
+    "synthetic-login": {
+      "image": "tools/tibia-re-vision-benchmark/fixtures/synthetic-login-smoke.png",
+      "schema_version": 1,
+      "selection_quality": false,
+      "sha256": "2dea29719c3e6f7c84c40717ead27bd56cfaacb69b06c4f19f0975b231bc47a6",
+      "expected_visible_text": [
+        "TIBIA VISION SAFE FIXTURE",
+        "ACCOUNT LOGIN",
+        "EMAIL",
+        "PASSWORD",
+        "NO SECRET DATA"
+      ],
+      "secret_safe": true,
+      "reason": "generated synthetic fixture with labels only and no credential/session values",
+      "dataset_kind": "synthetic_smoke_only",
+      "expected_screen_class": "LOGIN_SCREEN"
+    },
+    "black-negative": {
+      "image": "tools/tibia-re-vision-benchmark/fixtures/black-negative.png",
+      "schema_version": 1,
+      "reason": "solid black generated image with no text or secret material",
+      "expected_visible_text": [],
+      "secret_safe": true,
+      "dataset_kind": "synthetic_negative_control",
+      "selection_quality": false,
+      "sha256": "c2885cde31402fef5a8f5d15ae4aef757a2053f5a7acb77e1d61d034693016c2"
+    }
+  },
+  "results": [
+    {
+      "request_index": 1,
+      "trial": 1,
+      "case": "synthetic-login",
+      "temperature": 0,
+      "residency_before": [],
+      "residency_after": [
+        "qwen3-vl:4b-instruct-q4_K_M"
+      ],
+      "status": "PASS_PROFILE",
+      "error": null,
+      "wall_s": 5.329412599909119,
+      "required_text_found": 5,
+      "required_text_n": 5,
+      "negative_control_visible_text_nonempty": false,
+      "negative_control_false_in_game": false,
+      "result": {
+        "visual_evidence": {
+          "schema_version": 1,
+          "capture": {
+            "evidence_ref": "synthetic-login",
+            "sha256": "2dea29719c3e6f7c84c40717ead27bd56cfaacb69b06c4f19f0975b231bc47a6",
+            "source_monotonic_ns": null
+          },
+          "model": {
+            "model_profile_id": "ollama:qwen3-vl:4b-instruct-q4_K_M@sha256:ee4b975b58c17ce268cd19d40db35d5edc64603035d2ffc1fee1968eb0947f7b"
+          },
+          "observation": {
+            "screen_class": "LOGIN_SCREEN",
+            "visible_text": [
+              "TIBIA VISION SAFE FIXTURE",
+              "ACCOUNT LOGIN",
+              "EMAIL",
+              "PASSWORD",
+              "NO SECRET DATA"
+            ],
+            "ui_objects": [],
+            "appeared": [],
+            "disappeared": [],
+            "changed": []
+          },
+          "quality": {
+            "schema_valid": true,
+            "visual_only": true,
+            "structural_authority": false,
+            "unknown_fields": []
+          }
+        },
+        "schema_errors": [],
+        "telemetry": {
+          "total_duration": 5268539500,
+          "load_duration": 3854692300,
+          "prompt_eval_duration": 794916000,
+          "eval_duration": 581137000,
+          "prompt_eval_count": 1245,
+          "eval_count": 72
+        },
+        "residency_admission": "EMPTY_SLOT"
+      }
+    },
+    {
+      "request_index": 2,
+      "trial": 1,
+      "case": "black-negative",
+      "temperature": 0,
+      "residency_before": [
+        "qwen3-vl:4b-instruct-q4_K_M"
+      ],
+      "residency_after": [
+        "qwen3-vl:4b-instruct-q4_K_M"
+      ],
+      "status": "PASS_PROFILE",
+      "error": null,
+      "wall_s": 1.2840747999725863,
+      "required_text_found": 0,
+      "required_text_n": 0,
+      "negative_control_visible_text_nonempty": false,
+      "negative_control_false_in_game": false,
+      "result": {
+        "visual_evidence": {
+          "schema_version": 1,
+          "capture": {
+            "evidence_ref": "black-negative",
+            "sha256": "c2885cde31402fef5a8f5d15ae4aef757a2053f5a7acb77e1d61d034693016c2",
+            "source_monotonic_ns": null
+          },
+          "model": {
+            "model_profile_id": "ollama:qwen3-vl:4b-instruct-q4_K_M@sha256:ee4b975b58c17ce268cd19d40db35d5edc64603035d2ffc1fee1968eb0947f7b"
+          },
+          "observation": {
+            "screen_class": "UNKNOWN",
+            "visible_text": [],
+            "ui_objects": [],
+            "appeared": [],
+            "disappeared": [],
+            "changed": []
+          },
+          "quality": {
+            "schema_valid": true,
+            "visual_only": true,
+            "structural_authority": false,
+            "unknown_fields": []
+          }
+        },
+        "schema_errors": [],
+        "telemetry": {
+          "total_duration": 1226944500,
+          "load_duration": 107800000,
+          "prompt_eval_duration": 731676000,
+          "eval_duration": 313007000,
+          "prompt_eval_count": 1245,
+          "eval_count": 39
+        },
+        "residency_admission": "EXACT_TARGET_ONLY"
+      }
+    },
+    {
+      "request_index": 3,
+      "trial": 2,
+      "case": "synthetic-login",
+      "temperature": 0,
+      "residency_before": [
+        "qwen3-vl:4b-instruct-q4_K_M"
+      ],
+      "residency_after": [
+        "qwen3-vl:4b-instruct-q4_K_M"
+      ],
+      "status": "PASS_PROFILE",
+      "error": null,
+      "wall_s": 0.8327619000338018,
+      "required_text_found": 5,
+      "required_text_n": 5,
+      "negative_control_visible_text_nonempty": false,
+      "negative_control_false_in_game": false,
+      "result": {
+        "visual_evidence": {
+          "schema_version": 1,
+          "capture": {
+            "evidence_ref": "synthetic-login",
+            "sha256": "2dea29719c3e6f7c84c40717ead27bd56cfaacb69b06c4f19f0975b231bc47a6",
+            "source_monotonic_ns": null
+          },
+          "model": {
+            "model_profile_id": "ollama:qwen3-vl:4b-instruct-q4_K_M@sha256:ee4b975b58c17ce268cd19d40db35d5edc64603035d2ffc1fee1968eb0947f7b"
+          },
+          "observation": {
+            "screen_class": "LOGIN_SCREEN",
+            "visible_text": [
+              "TIBIA VISION SAFE FIXTURE",
+              "ACCOUNT LOGIN",
+              "EMAIL",
+              "PASSWORD",
+              "NO SECRET DATA"
+            ],
+            "ui_objects": [],
+            "appeared": [],
+            "disappeared": [],
+            "changed": []
+          },
+          "quality": {
+            "schema_valid": true,
+            "visual_only": true,
+            "structural_authority": false,
+            "unknown_fields": []
+          }
+        },
+        "schema_errors": [],
+        "telemetry": {
+          "total_duration": 799854100,
+          "load_duration": 108454900,
+          "prompt_eval_duration": 11104000,
+          "eval_duration": 583156000,
+          "prompt_eval_count": 1245,
+          "eval_count": 72
+        },
+        "residency_admission": "EXACT_TARGET_ONLY"
+      }
+    },
+    {
+      "request_index": 4,
+      "trial": 2,
+      "case": "black-negative",
+      "temperature": 0,
+      "residency_before": [
+        "qwen3-vl:4b-instruct-q4_K_M"
+      ],
+      "residency_after": [
+        "qwen3-vl:4b-instruct-q4_K_M"
+      ],
+      "status": "PASS_PROFILE",
+      "error": null,
+      "wall_s": 0.5729645000537857,
+      "required_text_found": 0,
+      "required_text_n": 0,
+      "negative_control_visible_text_nonempty": false,
+      "negative_control_false_in_game": false,
+      "result": {
+        "visual_evidence": {
+          "schema_version": 1,
+          "capture": {
+            "evidence_ref": "black-negative",
+            "sha256": "c2885cde31402fef5a8f5d15ae4aef757a2053f5a7acb77e1d61d034693016c2",
+            "source_monotonic_ns": null
+          },
+          "model": {
+            "model_profile_id": "ollama:qwen3-vl:4b-instruct-q4_K_M@sha256:ee4b975b58c17ce268cd19d40db35d5edc64603035d2ffc1fee1968eb0947f7b"
+          },
+          "observation": {
+            "screen_class": "UNKNOWN",
+            "visible_text": [],
+            "ui_objects": [],
+            "appeared": [],
+            "disappeared": [],
+            "changed": []
+          },
+          "quality": {
+            "schema_valid": true,
+            "visual_only": true,
+            "structural_authority": false,
+            "unknown_fields": []
+          }
+        },
+        "schema_errors": [],
+        "telemetry": {
+          "total_duration": 541080500,
+          "load_duration": 119544500,
+          "prompt_eval_duration": 10080000,
+          "eval_duration": 315665000,
+          "prompt_eval_count": 1245,
+          "eval_count": 39
+        },
+        "residency_admission": "EXACT_TARGET_ONLY"
+      }
+    },
+    {
+      "request_index": 5,
+      "trial": 3,
+      "case": "synthetic-login",
+      "temperature": 0,
+      "residency_before": [
+        "qwen3-vl:4b-instruct-q4_K_M"
+      ],
+      "residency_after": [
+        "qwen3-vl:4b-instruct-q4_K_M"
+      ],
+      "status": "PASS_PROFILE",
+      "error": null,
+      "wall_s": 0.8424069000175223,
+      "required_text_found": 5,
+      "required_text_n": 5,
+      "negative_control_visible_text_nonempty": false,
+      "negative_control_false_in_game": false,
+      "result": {
+        "visual_evidence": {
+          "schema_version": 1,
+          "capture": {
+            "evidence_ref": "synthetic-login",
+            "sha256": "2dea29719c3e6f7c84c40717ead27bd56cfaacb69b06c4f19f0975b231bc47a6",
+            "source_monotonic_ns": null
+          },
+          "model": {
+            "model_profile_id": "ollama:qwen3-vl:4b-instruct-q4_K_M@sha256:ee4b975b58c17ce268cd19d40db35d5edc64603035d2ffc1fee1968eb0947f7b"
+          },
+          "observation": {
+            "screen_class": "LOGIN_SCREEN",
+            "visible_text": [
+              "TIBIA VISION SAFE FIXTURE",
+              "ACCOUNT LOGIN",
+              "EMAIL",
+              "PASSWORD",
+              "NO SECRET DATA"
+            ],
+            "ui_objects": [],
+            "appeared": [],
+            "disappeared": [],
+            "changed": []
+          },
+          "quality": {
+            "schema_valid": true,
+            "visual_only": true,
+            "structural_authority": false,
+            "unknown_fields": []
+          }
+        },
+        "schema_errors": [],
+        "telemetry": {
+          "total_duration": 811405600,
+          "load_duration": 110246900,
+          "prompt_eval_duration": 11477000,
+          "eval_duration": 585439000,
+          "prompt_eval_count": 1245,
+          "eval_count": 72
+        },
+        "residency_admission": "EXACT_TARGET_ONLY"
+      }
+    },
+    {
+      "request_index": 6,
+      "trial": 3,
+      "case": "black-negative",
+      "temperature": 0,
+      "residency_before": [
+        "qwen3-vl:4b-instruct-q4_K_M"
+      ],
+      "residency_after": [
+        "qwen3-vl:4b-instruct-q4_K_M"
+      ],
+      "status": "PASS_PROFILE",
+      "error": null,
+      "wall_s": 0.5527819999260828,
+      "required_text_found": 0,
+      "required_text_n": 0,
+      "negative_control_visible_text_nonempty": false,
+      "negative_control_false_in_game": false,
+      "result": {
+        "visual_evidence": {
+          "schema_version": 1,
+          "capture": {
+            "evidence_ref": "black-negative",
+            "sha256": "c2885cde31402fef5a8f5d15ae4aef757a2053f5a7acb77e1d61d034693016c2",
+            "source_monotonic_ns": null
+          },
+          "model": {
+            "model_profile_id": "ollama:qwen3-vl:4b-instruct-q4_K_M@sha256:ee4b975b58c17ce268cd19d40db35d5edc64603035d2ffc1fee1968eb0947f7b"
+          },
+          "observation": {
+            "screen_class": "UNKNOWN",
+            "visible_text": [],
+            "ui_objects": [],
+            "appeared": [],
+            "disappeared": [],
+            "changed": []
+          },
+          "quality": {
+            "schema_valid": true,
+            "visual_only": true,
+            "structural_authority": false,
+            "unknown_fields": []
+          }
+        },
+        "schema_errors": [],
+        "telemetry": {
+          "total_duration": 520978600,
+          "load_duration": 104621400,
+          "prompt_eval_duration": 10567000,
+          "eval_duration": 313047000,
+          "prompt_eval_count": 1245,
+          "eval_count": 39
+        },
+        "residency_admission": "EXACT_TARGET_ONLY"
+      }
+    }
+  ],
+  "summary": {
+    "status": "PASS_PROFILE",
+    "selection_quality": false,
+    "requests": 6,
+    "login_screen_exact_trials": 3,
+    "login_trials": 3,
+    "login_expected_text_recall": 1.0,
+    "black_negative_visible_text_false_count": 0,
+    "black_negative_false_in_game_count": 0,
+    "black_negative_trials": 3,
+    "warm_api_p50_s": 0.7998541,
+    "warm_api_p95_s": 1.14383672,
+    "cold_api_total_s": 5.2685395,
+    "cold_load_s": 3.8546923,
+    "hard_gates": {
+      "schema_valid_100_percent": true,
+      "zero_secret_leakage": true,
+      "zero_false_in_game_on_login_or_character_select": true,
+      "zero_runtime_action_authority": true,
+      "zero_model_authored_executable_action_parameters": true,
+      "single_model_residency_preserved": true,
+      "zero_silent_cloud_fallback": true,
+      "required_provenance_complete": true,
+      "eligible": true,
+      "failure_reasons": []
+    }
+  },
+  "residency_before_explicit_unload": [
+    "qwen3-vl:4b-instruct-q4_K_M"
+  ],
+  "resource_observation_before_unload_api": {
+    "name": "qwen3-vl:4b-instruct-q4_K_M",
+    "model": "qwen3-vl:4b-instruct-q4_K_M",
+    "size": 3527545978,
+    "digest": "ee4b975b58c17ce268cd19d40db35d5edc64603035d2ffc1fee1968eb0947f7b",
+    "details": {
+      "parent_model": "",
+      "format": "gguf",
+      "family": "qwen3vl",
+      "families": [
+        "qwen3vl"
+      ],
+      "parameter_size": "4.4B",
+      "quantization_level": "Q4_K_M"
+    },
+    "expires_at": "2026-08-29T08:48:28.7851003+02:00",
+    "size_vram": 3527545978,
+    "context_length": 4096
+  },
+  "performance_profile_valid": true,
+  "explicit_unload": {
+    "command": "ollama stop qwen3-vl:4b-instruct-q4_K_M",
+    "result": "PASS",
+    "final_ollama_residency": [],
+    "final_docker_model_residency": []
+  }
+}

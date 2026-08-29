@@ -1,0 +1,227 @@
+{
+  "schema_version": 1,
+  "evidence_kind": "synthetic_smoke_only",
+  "selection_quality": false,
+  "execution_host": "MOLEHILL-PC",
+  "backend": {
+    "name": "ollama",
+    "version": "0.32.14",
+    "endpoint": "http://127.0.0.1:11434",
+    "cloud_fallback": false
+  },
+  "model_profile": {
+    "model_id": "Qwen/Qwen3-VL-4B-Instruct",
+    "ollama_name": "qwen3-vl:4b-instruct-q4_K_M",
+    "digest_sha256": "ee4b975b58c17ce268cd19d40db35d5edc64603035d2ffc1fee1968eb0947f7b",
+    "format": "gguf",
+    "architecture": "qwen3vl",
+    "parameter_size": "4.4B",
+    "quantization": "Q4_K_M",
+    "observed_runtime_size_bytes": 3527545978,
+    "observed_runtime_size_vram_bytes": 3527545978,
+    "model_context_length": 262144,
+    "observed_runtime_context_length": 4096
+  },
+  "input_manifest": {
+    "image": "tools/tibia-re-vision-benchmark/fixtures/synthetic-login-smoke.png",
+    "schema_version": 1,
+    "selection_quality": false,
+    "sha256": "2dea29719c3e6f7c84c40717ead27bd56cfaacb69b06c4f19f0975b231bc47a6",
+    "expected_visible_text": [
+      "TIBIA VISION SAFE FIXTURE",
+      "ACCOUNT LOGIN",
+      "EMAIL",
+      "PASSWORD",
+      "NO SECRET DATA"
+    ],
+    "secret_safe": true,
+    "reason": "generated synthetic fixture with labels only and no credential/session values",
+    "dataset_kind": "synthetic_smoke_only",
+    "expected_screen_class": "LOGIN_SCREEN"
+  },
+  "initial_residency": [
+    "qwen3-vl:4b-instruct-q4_K_M"
+  ],
+  "prompt_contract": "observation-only-v1; trusted capture/model/authority metadata added by harness",
+  "trials": [
+    {
+      "trial": 1,
+      "status": "PASS_PROFILE",
+      "error": null,
+      "wall_ms": 18696.338,
+      "before_residency": [
+        "qwen3-vl:4b-instruct-q4_K_M"
+      ],
+      "after_residency": [],
+      "result": {
+        "visual_evidence": {
+          "schema_version": 1,
+          "capture": {
+            "evidence_ref": "synthetic-login-smoke",
+            "sha256": "2dea29719c3e6f7c84c40717ead27bd56cfaacb69b06c4f19f0975b231bc47a6",
+            "source_monotonic_ns": null
+          },
+          "model": {
+            "model_profile_id": "ollama:qwen3-vl:4b-instruct-q4_K_M@sha256:ee4b975b58c17ce268cd19d40db35d5edc64603035d2ffc1fee1968eb0947f7b"
+          },
+          "observation": {
+            "screen_class": "LOGIN_SCREEN",
+            "visible_text": [
+              "TIBIA VISION SAFE FIXTURE",
+              "ACCOUNT LOGIN",
+              "EMAIL",
+              "PASSWORD",
+              "NO SECRET DATA"
+            ],
+            "ui_objects": [],
+            "appeared": [],
+            "disappeared": [],
+            "changed": []
+          },
+          "quality": {
+            "schema_valid": true,
+            "visual_only": true,
+            "structural_authority": false,
+            "unknown_fields": []
+          }
+        },
+        "schema_errors": [],
+        "telemetry": {
+          "total_duration": 18663248600,
+          "load_duration": 12850218700,
+          "prompt_eval_duration": 2343684000,
+          "eval_duration": 3429288000,
+          "prompt_eval_count": 1245,
+          "eval_count": 72
+        },
+        "residency_admission": "EXACT_TARGET_ONLY"
+      }
+    },
+    {
+      "trial": 2,
+      "status": "PASS_PROFILE",
+      "error": null,
+      "wall_ms": 15840.167,
+      "before_residency": [],
+      "after_residency": [],
+      "result": {
+        "visual_evidence": {
+          "schema_version": 1,
+          "capture": {
+            "evidence_ref": "synthetic-login-smoke",
+            "sha256": "2dea29719c3e6f7c84c40717ead27bd56cfaacb69b06c4f19f0975b231bc47a6",
+            "source_monotonic_ns": null
+          },
+          "model": {
+            "model_profile_id": "ollama:qwen3-vl:4b-instruct-q4_K_M@sha256:ee4b975b58c17ce268cd19d40db35d5edc64603035d2ffc1fee1968eb0947f7b"
+          },
+          "observation": {
+            "screen_class": "LOGIN_SCREEN",
+            "visible_text": [
+              "TIBIA VISION SAFE FIXTURE",
+              "ACCOUNT LOGIN",
+              "EMAIL",
+              "PASSWORD",
+              "NO SECRET DATA"
+            ],
+            "ui_objects": [],
+            "appeared": [],
+            "disappeared": [],
+            "changed": []
+          },
+          "quality": {
+            "schema_valid": true,
+            "visual_only": true,
+            "structural_authority": false,
+            "unknown_fields": []
+          }
+        },
+        "schema_errors": [],
+        "telemetry": {
+          "total_duration": 15769547300,
+          "load_duration": 9858999700,
+          "prompt_eval_duration": 2411679000,
+          "eval_duration": 3448957000,
+          "prompt_eval_count": 1245,
+          "eval_count": 72
+        },
+        "residency_admission": "EMPTY_SLOT"
+      }
+    },
+    {
+      "trial": 3,
+      "status": "PASS_PROFILE",
+      "error": null,
+      "wall_ms": 16417.446,
+      "before_residency": [],
+      "after_residency": [],
+      "result": {
+        "visual_evidence": {
+          "schema_version": 1,
+          "capture": {
+            "evidence_ref": "synthetic-login-smoke",
+            "sha256": "2dea29719c3e6f7c84c40717ead27bd56cfaacb69b06c4f19f0975b231bc47a6",
+            "source_monotonic_ns": null
+          },
+          "model": {
+            "model_profile_id": "ollama:qwen3-vl:4b-instruct-q4_K_M@sha256:ee4b975b58c17ce268cd19d40db35d5edc64603035d2ffc1fee1968eb0947f7b"
+          },
+          "observation": {
+            "screen_class": "LOGIN_SCREEN",
+            "visible_text": [
+              "TIBIA VISION SAFE FIXTURE",
+              "ACCOUNT LOGIN",
+              "EMAIL",
+              "PASSWORD",
+              "NO SECRET DATA"
+            ],
+            "ui_objects": [],
+            "appeared": [],
+            "disappeared": [],
+            "changed": []
+          },
+          "quality": {
+            "schema_valid": true,
+            "visual_only": true,
+            "structural_authority": false,
+            "unknown_fields": []
+          }
+        },
+        "schema_errors": [],
+        "telemetry": {
+          "total_duration": 16360709100,
+          "load_duration": 9681865900,
+          "prompt_eval_duration": 2599648000,
+          "eval_duration": 4025962000,
+          "prompt_eval_count": 1245,
+          "eval_count": 72
+        },
+        "residency_admission": "EMPTY_SLOT"
+      }
+    }
+  ],
+  "summary": {
+    "trial_count": 3,
+    "schema_valid_trials": 3,
+    "login_screen_exact_trials": 3,
+    "screen_class_repeatable": true,
+    "visible_text_expected_set_recall_mean": 1.0,
+    "api_total_duration_ms": [
+      18663.2486,
+      15769.5473,
+      16360.7091
+    ],
+    "hard_gates": {
+      "schema_valid_100_percent": true,
+      "zero_secret_leakage": true,
+      "zero_false_in_game_on_login_or_character_select": true,
+      "zero_runtime_action_authority": true,
+      "zero_model_authored_executable_action_parameters": true,
+      "single_model_residency_preserved": true,
+      "zero_silent_cloud_fallback": true,
+      "required_provenance_complete": true,
+      "eligible": true,
+      "failure_reasons": []
+    }
+  }
+}

@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "evidence_kind": "local_backend_compatibility",
+  "execution_host": "MOLEHILL-PC",
+  "host": {
+    "os": "Windows amd64",
+    "gpu": "AMD Radeon RX 9070 XT",
+    "dedicated_vram_bytes_vulkan_heap": 17095983104,
+    "system_ram_bytes": 68719476736
+  },
+  "shared_model_pool_final_state": {
+    "ollama_resident_models": [],
+    "docker_model_resident_models": []
+  },
+  "candidates": {
+    "ATH-MaaS/Ovis2.5-2B": {
+      "revision": "393c932b2a03e28eb9aaa503e3c4ab3ad384d958",
+      "status": "UNSUPPORTED_BACKEND",
+      "inference_performed": false,
+      "reason": "Exact current candidate is published to Docker Model Runner as vllm/Safetensors; local Docker Model Runner reports vllm Not Installed and only supported on Linux, while this Windows host has AMD rather than NVIDIA CUDA. The model-card quick path also requires CUDA/flash-attn. No cloud or undeclared model substitution was used.",
+      "local_direct_evidence": {
+        "docker_model_version": "1.2.5",
+        "docker_model_server_engine": "Docker Desktop",
+        "docker_model_search_backend": "vllm",
+        "docker_model_search_size": "5.16GB",
+        "docker_model_status_vllm": "Not Installed; only supported on Linux",
+        "windows_python_versions": [
+          "3.12"
+        ],
+        "wsl_python": "3.14.4",
+        "windows_torch_default": "not installed",
+        "windows_transformers_default": "not installed",
+        "wsl_rocm": "not installed",
+        "windows_cuda_gpu": false,
+        "flash_attn_2_7_0_post2_windows_binary_probe": "NO_MATCHING_DISTRIBUTION"
+      },
+      "official_profile_requirements": {
+        "torch": "2.4.0",
+        "transformers": "4.51.3",
+        "numpy": "1.25.0",
+        "pillow": "10.3.0",
+        "moviepy": "1.0.3",
+        "flash_attn": "2.7.0.post2",
+        "quick_path_device": "cuda"
+      },
+      "sources": [
+        "https://huggingface.co/ATH-MaaS/Ovis2.5-2B",
+        "https://docs.docker.com/ai/model-runner/inference-engines/"
+      ]
+    },
+    "ATH-MaaS/OvisOCR2": {
+      "revision": "1fc9221b7823a371d6e97f92d527cc847e24e107",
+      "status": "PASS_PROFILE",
+      "inference_performed": true,
+      "backend": "transformers-cpu",
+      "runtime_packages": {
+        "python": "3.12.0",
+        "torch": "2.13.0+cpu",
+        "transformers": "5.16.1",
+        "pillow": "12.3.0",
+        "numpy": "2.5.2"
+      },
+      "device": "cpu",
+      "dtype": "torch.bfloat16",
+      "selection_quality": false,
+      "prompt_profiles": [
+        {
+          "prompt_profile": "benchmark-safe-v1",
+          "load_s": 0.5064183999784291,
+          "text_expected_set_recall": 1.0,
+          "negative_control_false_text_count": 3,
+          "negative_control_trials": 3,
+          "latency_p50_s": 17.315829600032885,
+          "peak_rss_bytes": 2294386688,
+          "evidence_file": "ovisocr2-cpu-smoke.json"
+        },
+        {
+          "prompt_profile": "ovisocr2-recommended-v1",
+          "load_s": 0.5289577000075951,
+          "text_expected_set_recall": 1.0,
+          "negative_control_false_text_count": 3,
+          "negative_control_trials": 3,
+          "latency_p50_s": 17.417975899996236,
+          "peak_rss_bytes": 2295803904,
+          "evidence_file": "ovisocr2-cpu-recommended-prompt-smoke.json"
+        }
+      ],
+      "finding": "Exact synthetic text recall was 1.0 in both tested prompt profiles, but a solid-black no-text control produced non-empty fabricated text in 3/3 trials for both prompt profiles. This materially lowers hallucination-resistance and prevents an unqualified OCR-fallback recommendation.",
+      "sources": [
+        "https://huggingface.co/ATH-MaaS/OvisOCR2",
+        "https://docs.docker.com/ai/model-runner/inference-engines/"
+      ]
+    }
+  }
+}

@@ -1,0 +1,12 @@
+﻿{
+    "image":  "tools/tibia-re-vision-benchmark/fixtures/black-negative.png",
+    "schema_version":  1,
+    "reason":  "solid black generated image with no text or secret material",
+    "expected_visible_text":  [
+
+                              ],
+    "secret_safe":  true,
+    "dataset_kind":  "synthetic_negative_control",
+    "selection_quality":  false,
+    "sha256":  "c2885cde31402fef5a8f5d15ae4aef757a2053f5a7acb77e1d61d034693016c2"
+}

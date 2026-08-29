@@ -52,7 +52,7 @@ class Tests(unittest.TestCase):
         launch = live.index('kasm-bootstrap')
         self.assertLess(attempt, lease)
         self.assertLess(attempt, launch)
-        self.assertEqual(live.count('kasm-bootstrap'), 1)
+        self.assertEqual(live.count('python3 "$transition" kasm-bootstrap'), 1)
         self.assertNotIn('docker exec -d', live)
         self.assertNotIn('docker stop', live)
         self.assertNotIn('docker restart', live)

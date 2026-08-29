@@ -117,11 +117,11 @@ Run the worker test module. Expected: all preflight positive/negative cases PASS
 Require launch to re-run `collect_preflight`, require its fingerprint and bound target to match the persisted preflight, then issue exactly one direct detached command shaped as:
 
 ```text
-docker exec -d -u kasm-user -w <PACKAGE_DIR>
-  -e HOME=/home/kasm-user -e DISPLAY=:1 <FULL_CONTAINER_ID>
+docker exec -d -u kasm-user -w "$PACKAGE_DIR"
+  -e HOME=/home/kasm-user -e DISPLAY=:1 "$FULL_CONTAINER_ID"
   /usr/bin/env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD
   -u TRACK_A_CANONICAL_LEASE_TOKEN -u TRACK_A_CANONICAL_LEASE_TOKEN_FILE
-  <CLIENT_PATH>
+  "$CLIENT_PATH"
 ```
 
 Do not use `sh -c` for the actual launch. After launch, bounded polling must find exactly one exact current client in the same full container and return:
@@ -155,13 +155,13 @@ Run worker tests before implementation and observe failure. Implement only the t
 Require rollback to re-read the launch record and re-prove exact container full ID/name plus exact PID/start/path/size/SHA before any signal. Positive path may issue only:
 
 ```text
-docker exec <FULL_CONTAINER_ID> /bin/kill -TERM <PID>
+docker exec "$FULL_CONTAINER_ID" /bin/kill -TERM "$PID"
 ```
 
 After a bounded wait, if the process is still alive and remains exactly the same identity, it may issue:
 
 ```text
-docker exec <FULL_CONTAINER_ID> /bin/kill -KILL <PID>
+docker exec "$FULL_CONTAINER_ID" /bin/kill -KILL "$PID"
 ```
 
 Add negative tests for PID reuse/start drift, full container ID drift, path drift, size/SHA drift and missing/invalid launch record. Assert no command contains `pkill`, `killall`, `docker stop`, `docker restart`, `docker rm` or process-name targeting.
@@ -200,8 +200,8 @@ git commit -m "feat(track-a): add Kasm bootstrap worker"
 
 **Interfaces:**
 - Consumes worker `preflight/launch/rollback` records from Task 1.
-- Consumes existing Kasm probe operation `probe <output>` and its `existing_runtime_adoption_v1` manifest.
-- Produces new controller operation `kasm-bootstrap --task-id ... --session-id ... --token-file ... --worker ... --probe ... --worker-timeout ...`.
+- Consumes existing Kasm probe operation `probe "$OUTPUT_PATH"` and its `existing_runtime_adoption_v1` manifest.
+- Produces new controller operation `kasm-bootstrap --task-id "$TASK_ID" --session-id "$SESSION_ID" --token-file "$TOKEN_FILE" --worker "$WORKER_PATH" --probe "$PROBE_PATH" --worker-timeout 90`.
 - Produces canonical schema-v1 registration with the existing Kasm/adoption proof fields plus `bootstrap_provenance: 'kasm_create_new_v1'` and `state: 'UNKNOWN'`.
 
 - [ ] **Step 1: Add failing parser/dispatch tests**
@@ -451,7 +451,7 @@ python3 .github/scripts/test_track_a_kasm_canonical_bootstrap_workflow.py -v
 python3 .github/scripts/test_track_a_agent_runtime_governance.py \
   --changed-from "$BASE_SHA" --expected-branch "$HEAD_BRANCH"
 python3 .github/scripts/audit_track_a_selfhosted_pr_boundary.py --base "$BASE_SHA"...HEAD
-python3 -m py_compile <new/changed Python files>
+python3 -m py_compile .github/scripts/tibia-official-client-re-kasm-bootstrap-worker.py .github/scripts/test_tibia_official_client_re_kasm_bootstrap_worker.py .github/scripts/tibia-official-client-re-canonical-live-transition.py .github/scripts/test_tibia_official_client_re_canonical_live_transition.py .github/scripts/test_track_a_kasm_canonical_bootstrap_workflow.py
 git diff --check "$BASE_SHA"...HEAD
 ```
 
@@ -524,12 +524,12 @@ Run:
 ```bash
 python3 .github/scripts/test_track_a_kasm_canonical_bootstrap_workflow.py -v
 python3 .github/scripts/test_track_a_selfhosted_pr_boundary.py
-python3 .github/scripts/audit_track_a_selfhosted_pr_boundary.py --base <exact-base>...HEAD
+python3 .github/scripts/audit_track_a_selfhosted_pr_boundary.py --base "$BASE_SHA"...HEAD
 python3 .github/scripts/test_track_a_agent_runtime_governance.py \
-  --changed-from <exact-base> --expected-branch feat/OTC-20260829-track-a-kasm-canonical-bootstrap-v2
+  --changed-from "$BASE_SHA" --expected-branch feat/OTC-20260829-track-a-kasm-canonical-bootstrap-v2
 ruby -e 'require "yaml"; YAML.load_file(ARGV[0]); puts "YAML_PARSE=PASS"' \
   .github/workflows/track-a-kasm-canonical-bootstrap.yml
-git diff --check <exact-base>...HEAD
+git diff --check "$BASE_SHA"...HEAD
 ```
 
 Expected: PASS; self-hosted job cannot be scheduled by a PR.

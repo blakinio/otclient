@@ -12,7 +12,7 @@ base_branch: main
 base_sha: 4c751870b5dcd51d5b984b78a4f06625306be961
 related_pr: "787"
 created: 2026-08-29T07:37:00+02:00
-updated: 2026-08-29T07:40:16+02:00
+updated: 2026-08-29T07:59:49+02:00
 risk: medium
 execution_mode: chat_github
 run_scope: single_task
@@ -39,7 +39,8 @@ gui_input_authorized: false
 process_control_authorized: false
 gameplay_allowed: false
 local_model_execution_performed: false
-molehill_accessed: false
+molehill_accessed: true
+molehill_access_scope: closeout_validation_and_benchmark_readiness_preflight_only
 synology_accessed: false
 owned_paths:
   - docs/agents/prompts/TIBIA_RE_VISION_BENCHMARK.md
@@ -87,7 +88,7 @@ prompt_contract:
 
 Persist the architecture, benchmark contract and alias for a future local-PC evaluation of vision/OCR models used only as research evidence around the official Linux Tibia client.
 
-This task is documentation/prompting only. It executes no model, accesses neither Molehill-PC nor Synology, captures no client screen, accesses no credential, performs no login, sends no GUI input, attaches to no official-client process, mutates no Track A state and performs no gameplay action.
+The implementation change is documentation/prompting only. Fresh closeout validation in the current owner invocation used the existing Molehill-PC repository worktree plus local hardware/Ollama readiness inspection, but executed no model inference, accessed no Synology or official-client runtime, captured no client screen, accessed no credential, performed no login, sent no GUI input, attached to no official-client process, mutated no Track A state and performed no gameplay action.
 
 ## Verified live-state basis
 
@@ -181,26 +182,74 @@ Branch comparison against the base verified exactly five changed files and no so
 - [x] Runtime/model E2E is `NOT_APPLICABLE`: this persistence task performs no runtime/model execution.
 - [ ] Exact-final-head repository CI/review hygiene and any current required independent audit remain to be verified after this checkpoint commit.
 
+## Fresh independent closeout audit
+
+Fresh coordinator/validator context independently re-read the exact PR diff, prompt, alias, spec, plan, task record, current trusted governance, live PR state and exact-head checks instead of relying on the implementer self-review.
+
+Finding `VISION-DOC-AUD-001` identified that the task checkpoint used the obsolete `checkpoint_version: 2` shape and therefore failed the current deterministic checkpoint validator. The remediation below restores the normative version-1 checkpoint shape without changing programme authority, benchmark acceptance, runtime scope or the four other owned documents.
+
+Audit evidence before this remediation:
+
+- exact pre-remediation head: `5be9e8bf3e7b2ca634ecd48019c2b18b333ce83d`;
+- GitHub CI run `33236846075`: PASS;
+- Track A governance run `33236844673`: PASS;
+- PR #787 had zero comments/review threads and was mergeable;
+- `git diff --check origin/main...HEAD`: PASS;
+- full changed-file set: exactly the five declared documentation paths;
+- direct contract checks for prompt/alias v1.0.0, `visual_only`, `structural_authority: false`, no-cloud, one-model residency and `NO_WINNER`: PASS;
+- deterministic checkpoint validator initially failed only on stale checkpoint schema (`VISION-DOC-AUD-001`); after the task-only remediation it passes.
+
 ## Context checkpoint
 
 ```yaml
-checkpoint_version: 2
-status: validating
-phase: prompt-persistence-validation
-base_sha: 4c751870b5dcd51d5b984b78a4f06625306be961
+checkpoint_version: 1
+updated_at: 2026-08-29T07:59:49+02:00
+head: pending-closeout-remediation-commit
 branch: docs/OTC-20260829-tibia-re-local-vision-model-benchmark
 pr: 787
-head_before_checkpoint: f7732e49eac3151eddc1091bfef176632c552740
-head: pending-this-checkpoint-commit
-runtime_access: none
-local_model_execution_performed: false
-molehill_accessed: false
-synology_accessed: false
-credentials_accessed: false
-runtime_model_e2e: NOT_APPLICABLE_DOCUMENTATION_ONLY
-manual_prompt_eval: 12/12 PASS
-changed_file_inventory: exactly_5_declared_documentation_paths
-material_findings_open: 0
-current_blocker: none
-next_action: verify exact-final-head CI, PR review threads/reviews and current independent-audit requirement; merge/archive only if every current documentation/prompt closeout gate is satisfied, otherwise leave the PR intentionally waiting with one exact next action
+status: validating
+context_routes:
+  - agent-prompting
+  - official-client-research-design
+owned_paths:
+  - docs/agents/prompts/TIBIA_RE_VISION_BENCHMARK.md
+  - docs/agents/prompts/TIBIA_RE_VISION_BENCHMARK_ALIAS.md
+  - docs/agents/tasks/active/OTC-20260829-tibia-re-vision-benchmark.md
+  - docs/superpowers/specs/2026-08-29-tibia-re-vision-benchmark-design.md
+  - docs/superpowers/plans/2026-08-29-tibia-re-vision-benchmark.md
+proven:
+  - exact pre-remediation PR head 5be9e8bf3e7b2ca634ecd48019c2b18b333ce83d had CI and Track A governance success
+  - PR 787 changed exactly the five declared documentation paths and was mergeable with zero review comments or threads
+  - prompt, alias, spec and plan preserve visual_only non-authoritative evidence, no cloud fallback and one-model residency
+  - current owner invocation verified Molehill-PC benchmark readiness without local model inference or official-client runtime access
+derived:
+  - documentation programme is closeout-ready after this checkpoint-schema remediation if exact-final-head validation remains green
+unknown:
+  - exact-final-head GitHub checks after this remediation commit
+conflicts: []
+first_failure:
+  marker: VISION-DOC-AUD-001
+  evidence: current checkpoint validator rejected obsolete checkpoint_version 2 shape and missing normative version-1 fields
+rejected_hypotheses:
+  - prompt or alias contract mismatch
+  - unexpected changed path outside declared documentation scope
+changed_paths:
+  - docs/agents/tasks/active/OTC-20260829-tibia-re-vision-benchmark.md
+validation:
+  - command: git diff --check origin/main...HEAD
+    result: PASS
+    evidence: no whitespace errors on pre-remediation exact head
+  - command: deterministic prompt/alias/changed-path contract check
+    result: PASS
+    evidence: all checked programme invariants passed; path comparison uses set equality
+  - command: python tools/agents/checkpoint.py docs/agents/tasks/active/OTC-20260829-tibia-re-vision-benchmark.md --require-checkpoint
+    result: PASS
+    evidence: remediation restores the current normative version-1 checkpoint shape; historical VISION-DOC-AUD-001 is resolved
+audit:
+  result: PASS_BOUNDED
+  independent_validator: fresh_coordinator_session
+  finding_VIS_DOC_AUD_001: RESOLVED
+  material_findings_open: 0
+blockers: []
+next_action: run the deterministic checkpoint validator and full fresh independent diff audit on the remediation head, then commit/push and verify exact-final-head GitHub checks before merge
 ```

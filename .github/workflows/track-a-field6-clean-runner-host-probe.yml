@@ -1,0 +1,91 @@
+name: Track A field6 clean-runner host probe
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  TASK_ID: OTC-20260829-field6-clean-runner-host-probe
+
+jobs:
+  probe-host-control:
+    if: github.actor == github.repository_owner && github.ref == 'refs/heads/main'
+    name: Read-only clean-runner host-control probe
+    runs-on: [otclient, synology]
+    timeout-minutes: 5
+    concurrency:
+      group: track-a-field6-clean-runner-host-probe
+      cancel-in-progress: false
+    steps:
+      - name: Checkout exact trusted main
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          ref: main
+          fetch-depth: 2
+
+      - name: Prove read-only probe admission
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "${GITHUB_RUN_ATTEMPT:?}" = "1"
+          test "${RUNNER_NAME:?}" = "synology-otclient-01"
+          test "$(git rev-parse HEAD)" = "$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          task="docs/agents/tasks/active/$TASK_ID.md"
+          test -f "$task"
+          grep -Fqx 'status: ready' "$task"
+          grep -Fqx 'execution_class: synology_physical_runtime' "$task"
+          grep -Fqx 'runtime_access: read_only' "$task"
+          grep -Fqx 'mutation_authorized: false' "$task"
+          grep -Fqx 'credentials_allowed: false' "$task"
+          grep -Fqx 'login_allowed: false' "$task"
+          grep -Fqx 'process_control_authorized: false' "$task"
+          grep -Fqx 'physical_action_budget: 0' "$task"
+          grep -Fqx 'physical_action_count: 0' "$task"
+          echo TRACK_A_FIELD6_HOST_PROBE_ADMISSION=PASS
+
+      - name: Probe host-control capability without secrets or mutation
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          docker_cli=false
+          docker_socket=false
+          docker_socket_rw=false
+          docker_server=false
+          sudo_docker=false
+          inside_container=false
+          remote_control_match_count=0
+
+          command -v docker >/dev/null 2>&1 && docker_cli=true
+          test -S /var/run/docker.sock && docker_socket=true
+          test -r /var/run/docker.sock && test -w /var/run/docker.sock && docker_socket_rw=true
+          test -f /.dockerenv && inside_container=true
+
+          if $docker_cli && timeout 5 docker version --format '{{.Server.Version}}' >/dev/null 2>&1; then
+            docker_server=true
+          fi
+          if command -v sudo >/dev/null 2>&1 && sudo -n docker version --format '{{.Server.Version}}' >/dev/null 2>&1; then
+            sudo_docker=true
+          fi
+
+          if $docker_server; then
+            remote_control_match_count="$(timeout 5 docker ps -a --format '{{.Names}}' 2>/dev/null | awk 'BEGIN{IGNORECASE=1} /desktop|commander/{n++} END{print n+0}')"
+          elif $sudo_docker; then
+            remote_control_match_count="$(sudo -n docker ps -a --format '{{.Names}}' 2>/dev/null | awk 'BEGIN{IGNORECASE=1} /desktop|commander/{n++} END{print n+0}')"
+          fi
+
+          case "$remote_control_match_count" in
+            ''|*[!0-9]*) exit 21 ;;
+          esac
+          printf 'RUNNER_PROBE_DOCKER_CLI=%s\n' "$docker_cli"
+          printf 'RUNNER_PROBE_DOCKER_SOCKET=%s\n' "$docker_socket"
+          printf 'RUNNER_PROBE_DOCKER_SOCKET_RW=%s\n' "$docker_socket_rw"
+          printf 'RUNNER_PROBE_DOCKER_SERVER=%s\n' "$docker_server"
+          printf 'RUNNER_PROBE_SUDO_DOCKER=%s\n' "$sudo_docker"
+          printf 'RUNNER_PROBE_INSIDE_CONTAINER=%s\n' "$inside_container"
+          printf 'RUNNER_PROBE_REMOTE_CONTROL_MATCH_COUNT=%s\n' "$remote_control_match_count"
+          echo TRACK_A_FIELD6_HOST_PROBE_MUTATION=false
+          echo TRACK_A_FIELD6_HOST_PROBE_SECRETS=false
+          echo TRACK_A_FIELD6_HOST_PROBE=PASS

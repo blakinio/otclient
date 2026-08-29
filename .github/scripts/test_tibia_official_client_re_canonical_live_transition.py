@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib.util
 import json
 import os
@@ -14,6 +15,9 @@ from unittest import mock
 
 SCRIPT = Path(__file__).with_name('tibia-official-client-re-canonical-live-transition.py')
 WORKER = Path(__file__).with_name('tibia-official-client-re-canonical-live-session.sh')
+KASM_WORKER = Path(__file__).with_name('tibia-official-client-re-kasm-bootstrap-worker.py')
+KASM_PROBE = Path(__file__).with_name('tibia-official-client-re-kasm-existing-runtime-probe.py')
+KASM_CONTAINER_ID = 'a' * 64
 
 
 def load():
@@ -541,6 +545,74 @@ class Tests(unittest.TestCase):
             'candidate_fingerprint': 'c' * 64,
         }
 
+    def kasm_args(self):
+        return argparse.Namespace(
+            task_id='OTC-TEST', session_id='s', token_file=Path(self.temp.name) / 'tok',
+            worker=KASM_WORKER, probe=KASM_PROBE, worker_timeout=2,
+            request_file=self.args.request_file, input_lock_timeout=0.2,
+        )
+
+    def kasm_preflight(self):
+        data = {
+            'schema': 'otclient.track-a.kasm-bootstrap.preflight.v1',
+            'container_name': 'otclient-track-a-kasmvnc',
+            'container_id': KASM_CONTAINER_ID,
+            'display': ':1',
+            'package_dir': '/home/kasm-user/.local/share/CipSoft GmbH/Tibia/packages/Tibia',
+            'client_path': '/home/kasm-user/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client',
+            'client_size': self.m.SIZE,
+            'client_sha256': self.m.SHA,
+            'candidate_count': 0,
+            'main_window_count': 0,
+        }
+        data['preflight_fingerprint'] = hashlib.sha256(
+            json.dumps(data, sort_keys=True, separators=(',', ':')).encode()
+        ).hexdigest()
+        return data
+
+    def kasm_launch(self):
+        preflight = self.kasm_preflight()
+        return {
+            'schema': 'otclient.track-a.kasm-bootstrap.launch.v1',
+            'preflight_fingerprint': preflight['preflight_fingerprint'],
+            'container_name': 'otclient-track-a-kasmvnc',
+            'container_id': KASM_CONTAINER_ID,
+            'display': ':1',
+            'package_dir': '/home/kasm-user/.local/share/CipSoft GmbH/Tibia/packages/Tibia',
+            'client_path': '/home/kasm-user/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client',
+            'client_size': self.m.SIZE,
+            'client_sha256': self.m.SHA,
+            'pid': 4242,
+            'process_start_ticks': self.identity['process_start_ticks'],
+            'launch_method': 'docker_exec_detached_direct_env',
+            'bootstrap_helper_residue': False,
+        }
+
+    def kasm_manifest(self):
+        data = self.adoption_manifest()
+        data['runtime_locator'] = 'docker:otclient-track-a-kasmvnc:' + KASM_CONTAINER_ID
+        data['candidate_fingerprint'] = hashlib.sha256(
+            f"{data['runtime_locator']}:{data['pid']}:{data['process_start_ticks']}:"
+            f"{data['client_size']}:{data['client_sha256']}".encode()
+        ).hexdigest()
+        return data
+
+    def _kasm_worker_writer(self, calls, preflight=None, launch=None):
+        preflight = dict(preflight or self.kasm_preflight())
+        launch = dict(launch or self.kasm_launch())
+        def worker(_worker, operation, argument):
+            calls.append(operation)
+            path = Path(argument)
+            if operation == 'preflight':
+                path.write_text(json.dumps(preflight))
+                path.chmod(0o600)
+            elif operation == 'launch':
+                path.write_text(json.dumps(launch))
+                path.chmod(0o600)
+            elif operation != 'rollback':
+                raise AssertionError(operation)
+        return worker
+
     def recovery_pair(self):
         old = self.adoption_manifest()
         old.update({
@@ -567,6 +639,88 @@ class Tests(unittest.TestCase):
         })
         fresh['candidate_fingerprint'] = self.m._recovery_candidate_fingerprint(fresh)
         return old, fresh
+
+    def test_kasm_bootstrap_parser_accepts_worker_and_probe_shape(self):
+        args = self.kasm_args()
+        parsed = self.m.parser().parse_args([
+            'kasm-bootstrap', '--task-id', args.task_id, '--session-id', args.session_id,
+            '--token-file', str(args.token_file), '--worker', str(args.worker),
+            '--probe', str(args.probe), '--worker-timeout', '90',
+        ])
+        self.assertEqual(parsed.operation, 'kasm-bootstrap')
+        self.assertEqual(parsed.worker, KASM_WORKER)
+        self.assertEqual(parsed.probe, KASM_PROBE)
+        self.assertEqual(parsed.worker_timeout, 90)
+
+    def test_kasm_bootstrap_commits_adoption_compatible_unknown_registration(self):
+        calls = []
+        manifest = self.kasm_manifest()
+        args = self.kasm_args()
+        with mock.patch.object(self.m, '_worker', side_effect=self._kasm_worker_writer(calls)), \
+                mock.patch.object(self.m, '_probe', side_effect=[dict(manifest), dict(manifest), dict(manifest)]), \
+                mock.patch.object(self.m, '_lease', return_value=1), \
+                mock.patch.object(self.m, '_kill') as killed:
+            self.m._kasm_bootstrap(args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 1)
+        data = self.m._read()
+        self.assertEqual(calls, ['preflight', 'launch'])
+        self.assertEqual(data['proof_kind'], self.m.ADOPTION_PROOF_KIND)
+        self.assertEqual(data['runtime_locator'], manifest['runtime_locator'])
+        self.assertEqual(data['candidate_fingerprint'], manifest['candidate_fingerprint'])
+        self.assertEqual(data['state'], 'UNKNOWN')
+        self.assertEqual(data['bootstrap_provenance'], 'kasm_create_new_v1')
+        self.assertEqual(data['lease_generation'], 1)
+        killed.assert_not_called()
+
+    def test_kasm_bootstrap_refuses_preexisting_registration_before_worker(self):
+        self.write(self.registration())
+        args = self.kasm_args()
+        with mock.patch.object(self.m, '_worker') as worker:
+            with self.assertRaisesRegex(self.m.E, 'registration_already_present'):
+                self.m._kasm_bootstrap(args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 1)
+        worker.assert_not_called()
+
+    def test_kasm_bootstrap_launch_probe_mismatch_rolls_exact_worker_only(self):
+        calls = []
+        manifest = dict(self.kasm_manifest(), pid=4243)
+        args = self.kasm_args()
+        with mock.patch.object(self.m, '_worker', side_effect=self._kasm_worker_writer(calls)), \
+                mock.patch.object(self.m, '_probe', return_value=manifest), \
+                mock.patch.object(self.m, '_lease', return_value=1), \
+                mock.patch.object(self.m, '_kill') as killed:
+            with self.assertRaisesRegex(self.m.E, 'kasm_bootstrap_manifest_pid_mismatch'):
+                self.m._kasm_bootstrap(args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 1)
+        self.assertEqual(calls, ['preflight', 'launch', 'rollback'])
+        self.assertFalse(self.m.REG.exists())
+        killed.assert_not_called()
+
+    def test_kasm_bootstrap_final_probe_failure_removes_own_registration_and_rolls_back(self):
+        calls = []
+        manifest = self.kasm_manifest()
+        args = self.kasm_args()
+        with mock.patch.object(self.m, '_worker', side_effect=self._kasm_worker_writer(calls)), \
+                mock.patch.object(self.m, '_probe', side_effect=[dict(manifest), dict(manifest), self.m.E('final_probe_failed')]), \
+                mock.patch.object(self.m, '_lease', return_value=1), \
+                mock.patch.object(self.m, '_kill') as killed:
+            with self.assertRaisesRegex(self.m.E, 'final_probe_failed'):
+                self.m._kasm_bootstrap(args, self.guard, Lease, Manager(self.m.STATE), ('t', 's'), 1)
+        self.assertEqual(calls, ['preflight', 'launch', 'rollback'])
+        self.assertFalse(self.m.REG.exists())
+        killed.assert_not_called()
+
+    def test_kasm_bootstrap_provenance_is_additive_and_validated(self):
+        manifest = self.kasm_manifest()
+        registration = dict(manifest)
+        registration.update({
+            'schema_version': 1, 'runtime_id': self.m.RID, 'registration_generation': 1,
+            'lease_generation': 1, 'registered_at': 1, 'state': 'UNKNOWN',
+            'bootstrap_provenance': 'kasm_create_new_v1', 'source_task': 'new', 'source_run': 'new',
+        })
+        self.write(registration)
+        self.assertEqual(self.m._read()['bootstrap_provenance'], 'kasm_create_new_v1')
+        registration['bootstrap_provenance'] = 'wrong'
+        self.write(registration)
+        with self.assertRaisesRegex(self.m.E, 'kasm_bootstrap_provenance_invalid'):
+            self.m._read()
 
     def test_adopt_existing_commits_without_process_mutation(self):
         manifest = self.adoption_manifest()

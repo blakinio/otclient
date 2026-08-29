@@ -7,6 +7,7 @@ on:
       - '.github/workflows/**'
       - '.github/scripts/test_track_a_selfhosted_pr_boundary.py'
       - '.github/scripts/audit_track_a_selfhosted_pr_boundary.py'
+      - '.github/scripts/test_track_a_selfhosted_pr_boundary_audit_reuse.py'
       - '.github/scripts/test_track_a_selfhosted_pr_review_regressions.py'
 
 permissions:
@@ -49,5 +50,6 @@ jobs:
           set -Eeuo pipefail
           test -n "$BASE_SHA"
           python3 .github/scripts/audit_track_a_selfhosted_pr_boundary.py --base "$BASE_SHA"
+          python3 .github/scripts/test_track_a_selfhosted_pr_boundary_audit_reuse.py
           python3 -m py_compile .github/scripts/audit_track_a_selfhosted_pr_boundary.py
           git diff --check "$BASE_SHA"...HEAD

@@ -13,18 +13,6 @@ CANONICAL = ROOT / ".github/workflows/tibia-official-client-re-canonical-live-le
 TASK = ROOT / "docs/agents/tasks/active/OTC-20260829-track-a-selfhosted-pr-boundary.md"
 CONTRACT = ROOT / "docs/agents/contracts/TRACK_A_SELF_HOSTED_SECRET_RUNNER_V1.md"
 
-ALLOWED_PATHS = {
-    ".github/scripts/audit_track_a_selfhosted_pr_boundary.py",
-    ".github/scripts/test_track_a_selfhosted_pr_boundary.py",
-    ".github/scripts/test_track_a_selfhosted_pr_review_regressions.py",
-    ".github/workflows/tibia-official-client-re-canonical-live-lease.yml",
-    ".github/workflows/track-a-selfhosted-pr-boundary.yml",
-    "docs/agents/contracts/TRACK_A_SELF_HOSTED_SECRET_RUNNER_V1.md",
-    "docs/agents/reports/OTC-20260829-selfhosted-pr-boundary-v2.md",
-    "docs/agents/tasks/active/OTC-20260829-track-a-selfhosted-pr-boundary.md",
-    "docs/superpowers/plans/2026-08-29-selfhosted-pr-boundary.md",
-}
-
 
 def fail(finding_id: str, message: str) -> None:
     raise SystemExit(f"{finding_id}: {message}")
@@ -39,10 +27,14 @@ def load_scanner():
     return module
 
 
-def verify_changed_paths(base: str) -> None:
+def verify_changed_paths(base: str) -> set[str]:
+    # This is a reusable current-tree security audit, not a historical #795
+    # patch allowlist. Future PRs may legitimately change unrelated files;
+    # the repo-wide scanner below decides whether their self-hosted jobs are
+    # safe. Keep only exact diff readability/non-empty hygiene here.
     try:
         output = subprocess.check_output(
-            ["git", "diff", "--name-only", f"{base}...HEAD"],
+            ["git", "diff", "--name-only", base],
             cwd=ROOT,
             text=True,
             encoding="utf-8",
@@ -50,20 +42,9 @@ def verify_changed_paths(base: str) -> None:
     except subprocess.CalledProcessError as exc:
         fail("AUDIT-F002", f"cannot enumerate exact diff from {base}: {exc}")
     changed = {line.strip().replace("\\", "/") for line in output.splitlines() if line.strip()}
-    unexpected = sorted(changed - ALLOWED_PATHS)
-    if unexpected:
-        fail("AUDIT-F003", "unexpected changed paths: " + ", ".join(unexpected))
-    required = {
-        ".github/scripts/test_track_a_selfhosted_pr_boundary.py",
-        ".github/scripts/test_track_a_selfhosted_pr_review_regressions.py",
-        ".github/workflows/tibia-official-client-re-canonical-live-lease.yml",
-        ".github/workflows/track-a-selfhosted-pr-boundary.yml",
-        "docs/agents/contracts/TRACK_A_SELF_HOSTED_SECRET_RUNNER_V1.md",
-        "docs/agents/tasks/active/OTC-20260829-track-a-selfhosted-pr-boundary.md",
-    }
-    missing = sorted(required - changed)
-    if missing:
-        fail("AUDIT-F004", "required repair paths absent from exact diff: " + ", ".join(missing))
+    if not changed:
+        fail("AUDIT-F003", "pull-request audit received an empty exact diff")
+    return changed
 
 
 def verify_predicate_counterexamples(module) -> None:

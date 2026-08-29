@@ -1,0 +1,62 @@
+name: Track A independent ephemeral physical runtime contract
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/scripts/audit_track_a_independent_ephemeral_physical_runtime_contract.py
+      - .github/scripts/test_track_a_independent_ephemeral_physical_runtime_contract.py
+      - .github/workflows/track-a-independent-ephemeral-physical-runtime-contract.yml
+      - docs/agents/contracts/TRACK_A_INDEPENDENT_EPHEMERAL_PHYSICAL_RUNTIME_V1.md
+      - docs/agents/programs/OTCLIENT_TIBIA_RE_HYBRID_EXECUTION_ROUTING.md
+      - docs/agents/tasks/active/OTC-20260829-field6-independent-clean-runner.md
+      - docs/superpowers/specs/2026-08-29-track-a-independent-clean-physical-runtime-design.md
+      - docs/superpowers/plans/2026-08-29-track-a-independent-clean-physical-runtime.md
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+      - name: Validate independent physical runtime governance
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 .github/scripts/test_track_a_independent_ephemeral_physical_runtime_contract.py
+          python3 .github/scripts/test_track_a_agent_runtime_governance.py \
+            --changed-from HEAD^1 \
+            --expected-branch "$GITHUB_HEAD_REF"
+          git diff --check HEAD^1 HEAD
+          echo TRACK_A_INDEPENDENT_EPHEMERAL_PHYSICAL_RUNTIME_HOSTED_CONTRACT=PASS
+
+  fresh-audit:
+    name: Fresh independent physical routing audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      BASE_SHA: ${{ github.event.pull_request.base.sha }}
+    steps:
+      - name: Checkout exact PR head with base history
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Falsify independent physical routing completion
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test -n "$BASE_SHA"
+          python3 .github/scripts/audit_track_a_independent_ephemeral_physical_runtime_contract.py --base "$BASE_SHA"
+          python3 .github/scripts/test_track_a_independent_ephemeral_physical_runtime_contract.py
+          python3 -m py_compile \
+            .github/scripts/audit_track_a_independent_ephemeral_physical_runtime_contract.py \
+            .github/scripts/test_track_a_independent_ephemeral_physical_runtime_contract.py
+          git diff --check "$BASE_SHA"...HEAD

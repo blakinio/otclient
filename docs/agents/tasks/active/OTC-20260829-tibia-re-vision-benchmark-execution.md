@@ -13,7 +13,7 @@ branch: feat/OTC-20260829-tibia-re-vision-benchmark-execution
 base_branch: main
 base_sha: f208a20cb4517e8b57bef91983337145d379267c
 created: 2026-08-29T08:08:53+02:00
-updated: 2026-08-29T08:08:53+02:00
+updated: 2026-08-29T08:12:04+02:00
 risk: high
 execution_mode: local_owner_pc
 execution_reason: deterministic harness plus local real-model benchmark on verified Molehill-PC
@@ -94,8 +94,8 @@ P1/P2 and backend compatibility work are READY offline. P3-P7 project-specific s
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-29T08:08:53+02:00
-head: pending-initial-task-plan-commit
+updated_at: 2026-08-29T08:12:04+02:00
+head: pending-p1-harness-fixture-commit
 branch: feat/OTC-20260829-tibia-re-vision-benchmark-execution
 pr: none
 status: implementing
@@ -110,13 +110,13 @@ owned_paths:
   - docs/agents/tasks/active/OTC-20260829-tibia-re-vision-benchmark-execution.md
   - docs/superpowers/plans/2026-08-29-tibia-re-vision-benchmark-execution.md
 proven:
-  - exact trusted main includes merged and archived TIBIA-RE-VISION-BENCHMARK programme
-  - Molehill-PC host/GPU/RAM/Ollama profile verified in current invocation
-  - Ollama resident set is empty at P0 preflight
-  - no trusted-main executable vision benchmark harness exists; blocked PR 615 remains discovery input only
-  - Track B remains blocked from another official-service E2E and received only a no-retry secret-safe screenshot coordination request
+  - P1 deterministic VisualEvidence schema, hard-gate, scoring, file-hash and residency helpers are implemented with 14 focused core tests
+  - loopback-only Ollama adapter, strict model JSON handling and secret-input rejection are implemented with five adapter tests
+  - focused unittest suite is 19 of 19 PASS
+  - deterministic synthetic LOGIN_SCREEN smoke fixture exists, is visually verified secret-safe, and hashes to 2dea29719c3e6f7c84c40717ead27bd56cfaacb69b06c4f19f0975b231bc47a6
+  - no model inference, official-client access, Track B runtime access or credential access has occurred
 derived:
-  - deterministic harness plus synthetic real-model smoke can proceed without Track A or Track B runtime ownership
+  - P1 is complete and P2 Qwen3-VL real-model smoke is READY after a fresh residency check
 unknown:
   - Qwen3-VL exact local profile smoke outcome
   - Ovis2.5-2B local backend compatibility on this Windows/AMD host
@@ -124,22 +124,32 @@ unknown:
   - Track B project-specific P3-P7 research-value result until screenshot handoff exists
 conflicts: []
 first_failure:
-  marker: none
-  evidence: none
+  marker: SYNTHETIC_FIXTURE_FONT_CONSTRUCTOR_AMBIGUOUS
+  evidence: initial PowerShell New-Object Font three-argument overload was ambiguous; explicit four-argument Font constructor was proven and regenerated fixture hash is recorded
 rejected_hypotheses:
   - existing trusted-main executable vision harness can be reused
+  - initial synthetic PNG generated after Font constructor errors is usable benchmark input
 changed_paths:
+  - tools/tibia-re-vision-benchmark/vision_benchmark.py
+  - tools/tibia-re-vision-benchmark/tests/test_vision_benchmark.py
+  - tools/tibia-re-vision-benchmark/tests/test_ollama_adapter.py
+  - tools/tibia-re-vision-benchmark/make_synthetic_fixture.ps1
+  - tools/tibia-re-vision-benchmark/fixtures/synthetic-login-smoke.png
+  - tools/tibia-re-vision-benchmark/fixtures/synthetic-login-smoke.json
   - docs/agents/tasks/active/OTC-20260829-tibia-re-vision-benchmark-execution.md
   - docs/superpowers/plans/2026-08-29-tibia-re-vision-benchmark-execution.md
 validation:
-  - command: ollama ps
+  - command: python -m unittest discover -s tools/tibia-re-vision-benchmark/tests -v
     result: PASS
-    evidence: empty resident model set at current P0 preflight
-  - command: environment capability inventory
+    evidence: 19 tests passed
+  - command: git diff --check
     result: PASS
-    evidence: host/GPU/RAM/Ollama/Python state recorded above
+    evidence: no whitespace errors before P1 checkpoint commit
+  - command: synthetic fixture visual inspection and SHA-256
+    result: PASS
+    evidence: labels only, empty fields, NO SECRET DATA; sha256 2dea29719c3e6f7c84c40717ead27bd56cfaacb69b06c4f19f0975b231bc47a6
 blockers: []
-next_action: write the Task 1 RED tests for VisualEvidence schema, hard gates, scoring and single-model residency, then run them and require the expected import failure
+next_action: verify Ollama residency is still empty, resolve the exact qwen3-vl:4b-instruct local digest, then run three strict synthetic smoke trials with keep_alive zero and verify unload
 ```
 
 ## Recovery checkpoint
@@ -147,13 +157,13 @@ next_action: write the Task 1 RED tests for VisualEvidence schema, hard gates, s
 ```yaml
 status: active
 branch: feat/OTC-20260829-tibia-re-vision-benchmark-execution
-head: pending-initial-task-plan-commit
+head: pending-p1-harness-fixture-commit
 worktree: C:/Users/barte/otclient-vision-benchmark
 active_operation: P1 deterministic harness followed by P2 bounded real-model smoke
 operation_started_at: null
 external_run_ids: []
-last_verified_state: Ollama resident set empty; no model inference started; no official-client or Track B runtime accessed
+last_verified_state: P1 harness and synthetic secret-safe fixture complete; Ollama resident set was empty at latest preflight; no model inference or official-client/Track B runtime access yet
 resume_condition: current task branch still owns the declared paths and Ollama residency is empty or exact target only
 failure_handling: if a model/backend pull or inference fails, persist the typed failure and do not switch to cloud or a different undeclared provider
-next_action: continue from Task 1 RED tests; before each real model verify residency and after each model verify unload
+next_action: fresh Ollama residency check, then exact qwen3-vl:4b-instruct resolve/pull and three-trial P2 smoke with deterministic unload
 ```

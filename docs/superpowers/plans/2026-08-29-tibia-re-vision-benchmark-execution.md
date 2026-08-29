@@ -30,11 +30,11 @@
 **Interfaces:**
 - Produces: `validate_visual_evidence(payload) -> list[str]`, `evaluate_hard_gates(trials) -> dict`, `score_profile(metrics) -> float`, `admit_residency(resident_models, target) -> tuple[bool,str]`, `sha256_file(path) -> str`.
 
-- [ ] **Step 1: Write failing unittest cases** for schema validity, forced `visual_only`, forced non-authority, false `IN_GAME_VISUAL` hard gates, missing provenance, empty/exact/different/multiple residency, and weighted score calculation.
-- [ ] **Step 2: Run** `python -m unittest discover -s tools/tibia-re-vision-benchmark/tests -v` **and verify RED** because `vision_benchmark` does not exist.
-- [ ] **Step 3: Implement minimal stdlib core** with explicit enums/required keys and hard-gate precedence; do not repair malformed model JSON.
-- [ ] **Step 4: Re-run the focused unittest suite and require GREEN.**
-- [ ] **Step 5: Commit** core + tests + current task/plan checkpoint.
+- [x] **Step 1: Write failing unittest cases** for schema validity, forced `visual_only`, forced non-authority, false `IN_GAME_VISUAL` hard gates, missing provenance, empty/exact/different/multiple residency, and weighted score calculation.
+- [x] **Step 2: Run** `python -m unittest discover -s tools/tibia-re-vision-benchmark/tests -v` **and verify RED** because `vision_benchmark` does not exist.
+- [x] **Step 3: Implement minimal stdlib core** with explicit enums/required keys and hard-gate precedence; do not repair malformed model JSON.
+- [x] **Step 4: Re-run the focused unittest suite and require GREEN.**
+- [x] **Step 5: Commit** core + tests + current task/plan checkpoint.
 
 ### Task 2: Local Ollama adapter and synthetic fixture
 
@@ -48,11 +48,11 @@
 **Interfaces:**
 - Produces: `query_ollama_ps(endpoint)`, `run_ollama_trial(endpoint, model, image_path, prompt, keep_alive='0s')`, deterministic fixture manifest with expected `LOGIN_SCREEN` and visible synthetic text.
 
-- [ ] **Step 1: Write failing adapter tests** using a local fake HTTP server for `/api/ps` and `/api/chat`; prove loopback-only endpoint rejection, invalid JSON propagation, `keep_alive=0`, and residency refusal.
-- [ ] **Step 2: Run focused tests and verify RED.**
-- [ ] **Step 3: Implement the minimal loopback-only Ollama adapter** with urllib and base64 image transport; never send a request to a non-loopback endpoint.
-- [ ] **Step 4: Generate the deterministic synthetic PNG** with .NET drawing: title `TIBIA VISION SAFE FIXTURE`, state text `ACCOUNT LOGIN`, field labels without credentials, and footer `NO SECRET DATA`.
-- [ ] **Step 5: Hash the PNG into the JSON manifest, run all focused tests, and commit.**
+- [x] **Step 1: Write failing adapter tests** using a local fake HTTP server for `/api/ps` and `/api/chat`; prove loopback-only endpoint rejection, invalid JSON propagation, `keep_alive=0`, and residency refusal.
+- [x] **Step 2: Run focused tests and verify RED.**
+- [x] **Step 3: Implement the minimal loopback-only Ollama adapter** with urllib and base64 image transport; never send a request to a non-loopback endpoint.
+- [x] **Step 4: Generate the deterministic synthetic PNG** with .NET drawing: title `TIBIA VISION SAFE FIXTURE`, state text `ACCOUNT LOGIN`, field labels without credentials, and footer `NO SECRET DATA`.
+- [x] **Step 5: Hash the PNG into the JSON manifest, run all focused tests, and commit.**
 
 ### Task 3: Qwen3-VL local real-model smoke
 

@@ -30,10 +30,22 @@ jobs:
           python3 .github/scripts/test_tibia_official_client_re_canonical_live_guard.py
 
   isolated-selfhosted:
+    if: github.event_name == 'workflow_dispatch' && github.actor == github.repository_owner
     runs-on: [otclient, synology]
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout exact trusted main
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          ref: main
+          fetch-depth: 2
+      - name: Prove trusted main before physical lease test
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$(git rev-parse HEAD)" = "$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          echo TRACK_A_CANONICAL_LEASE_TRUSTED_MAIN=PASS
       - name: Exercise lease transitions in task-owned state only
         shell: bash
         run: |

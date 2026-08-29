@@ -1,0 +1,28 @@
+name: Track A self-hosted PR boundary
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/**'
+      - '.github/scripts/test_track_a_selfhosted_pr_boundary.py'
+
+permissions:
+  contents: read
+
+jobs:
+  boundary:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+      - name: Reject PR-controlled self-hosted jobs
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 .github/scripts/test_track_a_selfhosted_pr_boundary.py
+          git diff --check HEAD^1 HEAD

@@ -10,14 +10,21 @@ ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW = ROOT / ".github/workflows/track-a-current-login-field6-runtime.yml"
 TASK = ROOT / "docs/agents/tasks/active/OTC-20260828-current-login-field6-runtime.md"
 HELPER = ROOT / ".github/scripts/track_a_current_login_field6_runtime.sh"
+ACQUIRE = ROOT / ".github/scripts/track_a_current_client_package_acquire.sh"
 SECRET_RUNNER_CONTRACT = ROOT / "docs/agents/contracts/TRACK_A_SELF_HOSTED_SECRET_RUNNER_V1.md"
+INDEPENDENT_CONTRACT = ROOT / "docs/agents/contracts/TRACK_A_INDEPENDENT_EPHEMERAL_PHYSICAL_RUNTIME_V1.md"
+
+RUNNER = "molehill-otclient-v4-01"
+GUEST = "OTClientV4Clean"
+ROOTFS_URL = "https://cloud-images.ubuntu.com/releases/noble/release-20260801/ubuntu-24.04-server-cloudimg-amd64-root.tar.xz"
+ROOTFS_SHA = "915b4be62933475c3fb5f5031aa2e159294db95fb32aaa9e8b317aadcb6c065d"
 
 ALLOWED_PATHS = {
     ".github/scripts/audit_track_a_current_login_field6_admission.py",
     ".github/scripts/test_track_a_current_login_field6_security_contract.py",
+    ".github/scripts/track_a_current_client_package_acquire.sh",
     ".github/scripts/track_a_current_login_field6_runtime.sh",
     ".github/workflows/track-a-current-login-field6-runtime.yml",
-    "docs/agents/reports/OTC-20260829-field6-v4-admission-v2.md",
     "docs/agents/tasks/active/OTC-20260828-current-login-field6-runtime.md",
 }
 
@@ -43,10 +50,10 @@ def require_task_fences(task: str, base: str) -> None:
     header = task.split("---", 2)[1]
     required = (
         f"base_main: {base}",
-        "branch: fix/OTC-20260829-field6-v4-admission-v2",
-        "execution_class: synology_physical_runtime",
-        "execution_mode: github_actions_ephemeral_isolated",
-        "persistent_session_role: canonical_runtime_owner",
+        "branch: fix/OTC-20260829-field6-v4-independent-runner",
+        "execution_class: independent_ephemeral_physical_runtime",
+        "execution_mode: github_actions_independent_ephemeral_physical",
+        "persistent_session_role: none",
         "physical_e2e_required: true",
         "runtime_access: ephemeral_isolated",
         "target_uniqueness: PROVEN",
@@ -61,18 +68,25 @@ def require_task_fences(task: str, base: str) -> None:
         "physical_action_budget: 1",
         "physical_action_count: 0",
         "live_runtime_authorization_source: PR_758_COMMENT_5457904227",
+        f"independent_guest_name: {GUEST}",
+        f"independent_runner_name: {RUNNER}",
+        f"independent_rootfs_url: {ROOTFS_URL}",
+        f"independent_rootfs_sha256: {ROOTFS_SHA}",
+        "independent_runner_provenance: /etc/otclient-field6-runner-provenance",
     )
     missing = [item for item in required if item not in header]
     if missing:
         fail("FIELD6-AUDIT-F002", "task admission fence missing: " + ", ".join(missing))
     for text in (
-        "merged PR #795 self-hosted secret-runner boundary and independent audit",
-        "If that clean-runner provenance cannot be proven, credentials/login remain forbidden",
-        "GITHUB_RUN_ATTEMPT != 1",
-        "exact V4 trigger MUST NOT be posted",
+        "Trusted-main host probe run `33261106292`, job `99123092884`",
+        "Merged PR #804",
+        "the one-time label `field6-v4-<comment_id>`",
+        "That comment ID becomes the one-time runner label.",
+        "The exact V4 trigger remains unposted.",
+        "an identical V4 retry is forbidden",
     ):
         if text not in task:
-            fail("FIELD6-AUDIT-F003", f"task missing clean-runner/rerun invariant: {text}")
+            fail("FIELD6-AUDIT-F003", f"task missing independent-runner invariant: {text}")
 
 
 def require_live_job(workflow: str) -> str:
@@ -85,83 +99,128 @@ def require_live_job(workflow: str) -> str:
         "github.event.issue.number == 758",
         "github.event.comment.user.login == github.repository_owner",
         "github.event.comment.body == 'AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V4 once=true'",
-        "runs-on: [otclient, synology]",
+        "runs-on: ${{ format('field6-v4-{0}', github.event.comment.id) }}",
+        f"EXPECTED_INDEPENDENT_RUNNER_NAME: {RUNNER}",
+        f"EXPECTED_INDEPENDENT_GUEST_NAME: {GUEST}",
+        f"EXPECTED_INDEPENDENT_ROOTFS_URL: {ROOTFS_URL}",
+        f"EXPECTED_INDEPENDENT_ROOTFS_SHA: {ROOTFS_SHA}",
+        "PROVENANCE_FILE: /etc/otclient-field6-runner-provenance",
     )
-    missing = [item for item in required if item not in live]
+    missing = [item for item in required if item not in workflow]
     if missing:
-        fail("FIELD6-AUDIT-F005", "live trigger/runner fence missing: " + ", ".join(missing))
+        fail("FIELD6-AUDIT-F005", "live trigger/runner/provenance fence missing: " + ", ".join(missing))
+    if "runs-on: [otclient, synology]" in live:
+        fail("FIELD6-AUDIT-F006", "V4 live job still targets Synology")
     if "AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V3 once=true" in workflow:
-        fail("FIELD6-AUDIT-F006", "consumed V3 trigger literal remains executable in workflow")
+        fail("FIELD6-AUDIT-F007", "consumed V3 trigger literal remains executable in workflow")
     return live
 
 
 def require_order_and_secret_scope(live: str) -> None:
-    guard = 'test "${GITHUB_RUN_ATTEMPT:?}" = "1"'
+    provenance = "- name: Prove independent clean guest provenance"
+    checkout = "- name: Checkout exact trusted main"
+    admission = "- name: Prove trusted-main live admission and immutable boundaries"
+    materialize = "- name: Materialize exact current package through task-owned WARP"
     auth = "- name: Consume exact owner authorization once"
+    capture = "- name: Capture field6 with protected login inputs"
     email = "TIBIA_TEST_EMAIL: ${{ secrets.TIBIA_TEST_EMAIL }}"
     password = "TIBIA_TEST_PASSWORD: ${{ secrets.TIBIA_TEST_PASSWORD }}"
-    capture = "- name: Capture field6 with protected login inputs"
-    for item, fid in ((guard, "FIELD6-AUDIT-F007"), (auth, "FIELD6-AUDIT-F008"), (capture, "FIELD6-AUDIT-F009"), (email, "FIELD6-AUDIT-F010"), (password, "FIELD6-AUDIT-F011")):
+    guard = 'test "${GITHUB_RUN_ATTEMPT:?}" = "1"'
+    for item, fid in (
+        (provenance, "FIELD6-AUDIT-F008"), (checkout, "FIELD6-AUDIT-F009"),
+        (admission, "FIELD6-AUDIT-F010"), (materialize, "FIELD6-AUDIT-F011"),
+        (auth, "FIELD6-AUDIT-F012"), (capture, "FIELD6-AUDIT-F013"),
+        (email, "FIELD6-AUDIT-F014"), (password, "FIELD6-AUDIT-F015"),
+        (guard, "FIELD6-AUDIT-F016"),
+    ):
         if item not in live:
             fail(fid, f"live job missing {item}")
-    if not live.index(guard) < live.index(auth) < live.index(capture) < live.index(email):
-        fail("FIELD6-AUDIT-F012", "required guard -> authorization -> capture/secret ordering is not fail-closed")
+    if not live.index(provenance) < live.index(checkout) < live.index(admission) < live.index(materialize) < live.index(auth) < live.index(capture) < live.index(email):
+        fail("FIELD6-AUDIT-F017", "provenance -> main -> admission -> package -> authorization -> secret ordering invalid")
     if live.count(email) != 1 or live.count(password) != 1:
-        fail("FIELD6-AUDIT-F013", "login secrets are referenced outside the single protected capture step")
-    if "TRACK_A_FIELD6_RUN_ATTEMPT=1" not in live:
-        fail("FIELD6-AUDIT-F014", "run-attempt proof marker missing")
+        fail("FIELD6-AUDIT-F018", "login secrets are referenced outside the single protected capture step")
+    for marker in (
+        "TRACK_A_FIELD6_INDEPENDENT_PROVENANCE=PASS",
+        "TRACK_A_FIELD6_INDEPENDENT_PROVENANCE_VERIFIED=1",
+        "TRACK_A_FIELD6_SYSTEM_TOOLROOT=1",
+        "TRACK_A_FIELD6_RUN_ATTEMPT=1",
+        'test "${RUNNER_NAME:?}" = "$EXPECTED_INDEPENDENT_RUNNER_NAME"',
+        "FIELD6_PROVENANCE_NOT_ROOT_OWNED",
+        "FIELD6_PROVENANCE_WRITABLE_BY_NONROOT",
+    ):
+        if marker not in live:
+            fail("FIELD6-AUDIT-F019", f"live provenance proof missing {marker}")
 
 
-def require_helper_secret_boundary(helper: str) -> None:
+def require_helper_boundary(helper: str, acquire: str) -> None:
     for secret_name in ("email", "password"):
         if re.search(rf"(?m)^\s*xd\s+type\b[^\n]*\$\{{?{secret_name}\}}?", helper):
-            fail("FIELD6-AUDIT-F015", f"{secret_name} is exposed through direct xdotool argv")
+            fail("FIELD6-AUDIT-F020", f"{secret_name} is exposed through direct xdotool argv")
     for item in (
         '"$XDO" type --window "$1" --delay 12 --file -',
         'printf \'%s\' "$email" | xd_type_stdin "$win"',
         'printf \'%s\' "$password" | xd_type_stdin "$win"',
+        "INDEPENDENT_RUNNER_NAME='molehill-otclient-v4-01'",
+        "TRACK_A_FIELD6_INDEPENDENT_PROVENANCE_VERIFIED",
+        "TRACK_A_FIELD6_SYSTEM_TOOLROOT",
+        "toolroot_ok /",
+        "resolve_proxychains_library",
     ):
         if item not in helper:
-            fail("FIELD6-AUDIT-F016", f"stdin-only credential path missing: {item}")
+            fail("FIELD6-AUDIT-F021", f"helper boundary missing {item}")
+    if "[[ \"${RUNNER_NAME:-}\" == 'synology-otclient-01' ]] || fail wrong_runner" in helper:
+        fail("FIELD6-AUDIT-F022", "runtime helper retains Synology-only runner gate")
+    for item in (
+        "molehill-otclient-v4-01",
+        "TRACK_A_FIELD6_INDEPENDENT_PROVENANCE_VERIFIED",
+        "runner_allowed || fail wrong_runner",
+    ):
+        if item not in acquire:
+            fail("FIELD6-AUDIT-F023", f"package acquisition boundary missing {item}")
+    if "[[ \"${RUNNER_NAME:-}\" == 'synology-otclient-01' ]] || fail wrong_runner" in acquire:
+        fail("FIELD6-AUDIT-F024", "package acquisition retains Synology-only runner gate")
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--base", required=True)
     args = parser.parse_args()
-
     try:
         base_sha = subprocess.check_output(["git", "rev-parse", args.base], cwd=ROOT, text=True, encoding="utf-8").strip()
     except subprocess.CalledProcessError as exc:
-        fail("FIELD6-AUDIT-F021", f"cannot resolve base {args.base}: {exc}")
+        fail("FIELD6-AUDIT-F025", f"cannot resolve base {args.base}: {exc}")
 
     changed = exact_diff(base_sha)
     unexpected = sorted(changed - ALLOWED_PATHS)
     if unexpected:
-        fail("FIELD6-AUDIT-F017", "unexpected changed paths: " + ", ".join(unexpected))
+        fail("FIELD6-AUDIT-F026", "unexpected changed paths: " + ", ".join(unexpected))
     required_changed = {
         ".github/scripts/test_track_a_current_login_field6_security_contract.py",
+        ".github/scripts/audit_track_a_current_login_field6_admission.py",
+        ".github/scripts/track_a_current_client_package_acquire.sh",
         ".github/scripts/track_a_current_login_field6_runtime.sh",
         ".github/workflows/track-a-current-login-field6-runtime.yml",
         "docs/agents/tasks/active/OTC-20260828-current-login-field6-runtime.md",
     }
     missing_changed = sorted(required_changed - changed)
     if missing_changed:
-        fail("FIELD6-AUDIT-F018", "expected admission repair path absent from diff: " + ", ".join(missing_changed))
+        fail("FIELD6-AUDIT-F027", "expected independent runner repair path absent from diff: " + ", ".join(missing_changed))
 
-    if not SECRET_RUNNER_CONTRACT.is_file():
-        fail("FIELD6-AUDIT-F019", "merged #795 secret-runner contract is absent from trusted tree")
-    contract = SECRET_RUNNER_CONTRACT.read_text(encoding="utf-8")
-    if "Repository workflow checks are defense in depth only" not in contract or "fresh one-job environment" not in contract:
-        fail("FIELD6-AUDIT-F020", "trusted clean-runner contract lacks primary boundary language")
+    if not SECRET_RUNNER_CONTRACT.is_file() or not INDEPENDENT_CONTRACT.is_file():
+        fail("FIELD6-AUDIT-F028", "trusted secret/independent runner contract missing")
+    independent = INDEPENDENT_CONTRACT.read_text(encoding="utf-8")
+    for marker in ("physically separate", "--no-default-labels", "field6-v4-<comment_id>", "no host Docker socket"):
+        if marker not in independent:
+            fail("FIELD6-AUDIT-F029", f"independent runner contract missing {marker}")
 
     task = TASK.read_text(encoding="utf-8")
     workflow = WORKFLOW.read_text(encoding="utf-8")
     helper = HELPER.read_text(encoding="utf-8")
+    acquire = ACQUIRE.read_text(encoding="utf-8")
     require_task_fences(task, base_sha)
     live = require_live_job(workflow)
     require_order_and_secret_scope(live)
-    require_helper_secret_boundary(helper)
+    require_helper_boundary(helper, acquire)
 
     print("TRACK_A_CURRENT_LOGIN_FIELD6_ADMISSION_INDEPENDENT_AUDIT=PASS")
     print("AUDIT_RESULT=PASS")

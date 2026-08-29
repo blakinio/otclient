@@ -204,9 +204,24 @@ EOF
   fail warp_egress_not_verified
 }
 
+runner_allowed() {
+  case "${RUNNER_NAME:-}" in
+    synology-otclient-01)
+      return 0
+      ;;
+    molehill-otclient-v4-01)
+      [[ "${TRACK_A_FIELD6_INDEPENDENT_PROVENANCE_VERIFIED:-}" == 1 ]]
+      return
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
 prepare() {
   [[ "${GITHUB_REPOSITORY:-}" == 'blakinio/otclient' ]] || fail wrong_repository
-  [[ "${RUNNER_NAME:-}" == 'synology-otclient-01' ]] || fail wrong_runner
+  runner_allowed || fail wrong_runner
   [[ "$RUN_ID" =~ ^[1-9][0-9]*$ ]] || fail invalid_run_id
   [[ -f "$MATERIALIZER" && ! -L "$MATERIALIZER" ]] || fail materializer_missing_or_symlink
   [[ ! -e "$ROOT" && ! -L "$ROOT" ]] || fail acquisition_root_collision

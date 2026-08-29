@@ -19,3 +19,27 @@ The stale 2026-08-16 Xvfb diagnostic authority is revoked in the same reconcilia
 Exact head `3c754db171492fd6d0ee34d222d9d4498de16260` passed host-probe contract run `33260924525`, governance `33260924519`, reusable self-hosted boundary/audit `33260924524`, and CI `33260924605`. Protected main remained `08c31195fd2f44224badf1b6bdff85192495898b`.
 
 Final one-commit restack and exact-head rerun remain authoritative for merge.
+
+## Terminal physical result
+
+Trusted-main workflow run `33261106292`, job `99123092884`, head `6ea7b6291f6606d04f980dd758b91aa451fc867f`, event `workflow_dispatch`, completed success. Sanitized output:
+
+```text
+TRACK_A_FIELD6_HOST_PROBE_ADMISSION=PASS
+RUNNER_PROBE_DOCKER_CLI=true
+RUNNER_PROBE_DOCKER_SOCKET=true
+RUNNER_PROBE_DOCKER_SOCKET_RW=true
+RUNNER_PROBE_DOCKER_SERVER=true
+RUNNER_PROBE_SUDO_DOCKER=false
+RUNNER_PROBE_INSIDE_CONTAINER=true
+RUNNER_PROBE_REMOTE_CONTROL_MATCH_COUNT=0
+TRACK_A_FIELD6_HOST_PROBE_MUTATION=false
+TRACK_A_FIELD6_HOST_PROBE_SECRETS=false
+TRACK_A_FIELD6_HOST_PROBE=PASS
+```
+
+## Security classification
+
+The historical repository runner had read/write access to the host Docker socket. Repository PR-controlled code therefore had a path to host-equivalent Docker mutation; historical contamination cannot be bounded to runner `_work` or container state. A fresh runner container on this same unverified host is **not** clean secret provenance. The exact V4 trigger remains forbidden and `FIELD6_VALUE=UNKNOWN`; V4 `physical_action_count` remains `0`.
+
+The count of remote-control-name matches was zero; this does not prove absence of host persistence because names are neither exhaustive nor an integrity mechanism.

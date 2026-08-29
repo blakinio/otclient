@@ -13,6 +13,7 @@ from vision_benchmark import (  # noqa: E402
     sha256_file,
     normalize_ocr_transcription,
     validate_input_manifest,
+    validate_trial_count,
     validate_visual_evidence,
 )
 
@@ -100,6 +101,19 @@ class HardGateTests(unittest.TestCase):
         result = evaluate_hard_gates([])
         self.assertFalse(result["eligible"])
         self.assertIn("no_trials", result["failure_reasons"])
+
+
+class TrialCountTests(unittest.TestCase):
+    def test_repeated_trial_count_requires_at_least_three(self):
+        with self.assertRaises(ValueError):
+            validate_trial_count(0)
+        with self.assertRaises(ValueError):
+            validate_trial_count(2)
+        self.assertEqual(validate_trial_count(3), 3)
+
+    def test_trial_count_rejects_bool(self):
+        with self.assertRaises(ValueError):
+            validate_trial_count(True)
 
 
 class ResidencyTests(unittest.TestCase):

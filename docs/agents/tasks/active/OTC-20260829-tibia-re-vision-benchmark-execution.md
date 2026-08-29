@@ -163,7 +163,7 @@ changed_paths:
 validation:
   - command: python -m unittest discover -s tools/tibia-re-vision-benchmark/tests -v
     result: PASS
-    evidence: 32 tests passed on post-remediation worktree
+    evidence: 34 tests passed on post-remediation worktree
   - command: python tools/agents/checkpoint.py docs/agents/tasks/active/OTC-20260829-tibia-re-vision-benchmark-execution.md --require-checkpoint
     result: PASS
     evidence: current task checkpoint validated

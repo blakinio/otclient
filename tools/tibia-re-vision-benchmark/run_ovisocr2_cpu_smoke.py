@@ -12,7 +12,7 @@ import torch
 from PIL import Image
 from transformers import AutoModelForMultimodalLM, AutoProcessor
 
-from vision_benchmark import normalize_ocr_transcription, validate_input_manifest
+from vision_benchmark import normalize_ocr_transcription, validate_input_manifest, validate_trial_count
 
 
 def norm(text: str) -> str:
@@ -31,6 +31,7 @@ def main() -> int:
     parser.add_argument("--trials", type=int, default=3)
     parser.add_argument("--prompt-profile", choices=["benchmark-safe-v1", "ovisocr2-recommended-v1"], default="benchmark-safe-v1")
     args = parser.parse_args()
+    validate_trial_count(args.trials)
 
     login_manifest = json.loads(args.login_manifest.read_text(encoding="utf-8-sig"))
     negative_manifest = json.loads(args.negative_manifest.read_text(encoding="utf-8-sig"))

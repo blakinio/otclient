@@ -20,6 +20,7 @@ from vision_benchmark import (
     release_ollama_model_if_owned,
     run_ollama_trial,
     validate_input_manifest,
+    validate_trial_count,
 )
 
 
@@ -50,6 +51,7 @@ def main() -> int:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--trials", type=int, default=3)
     args = parser.parse_args()
+    validate_trial_count(args.trials)
 
     manifests = {
         "synthetic-login": json.loads(args.login_manifest.read_text(encoding="utf-8-sig")),

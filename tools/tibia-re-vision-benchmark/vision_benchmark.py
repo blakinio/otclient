@@ -198,6 +198,12 @@ def evaluate_hard_gates(trials: Iterable[dict[str, Any]]) -> dict[str, Any]:
     return gates
 
 
+def validate_trial_count(value: Any, minimum: int = 3) -> int:
+    if not isinstance(value, int) or isinstance(value, bool) or value < minimum:
+        raise ValueError(f"trial count must be integer >= {minimum}")
+    return value
+
+
 def score_profile(metrics: dict[str, float]) -> float:
     missing = set(WEIGHTS) - set(metrics)
     extra = set(metrics) - set(WEIGHTS)

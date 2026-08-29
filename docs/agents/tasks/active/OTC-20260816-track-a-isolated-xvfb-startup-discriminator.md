@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260816-track-a-isolated-xvfb-startup-discriminator
-status: ready
+status: completed
 agent: ChatGPT
 session_id: chatgpt-xvfb-discriminator-20260816-1712
 session_role: runtime_observer
@@ -8,12 +8,12 @@ project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: runtime_infrastructure_diagnostic
-phase: coordinator-promotion-ready
+phase: terminal
 branch: ci/OTC-20260816-track-a-isolated-xvfb-startup-discriminator
 base_branch: main
 base_main: 917b8ab943fd9aa1fded50c9a0b8b4e1dfeb5cbb
 risk: low
-updated: 2026-08-16T17:15:00+02:00
+updated: 2026-08-29T17:35:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-isolated-xvfb-startup-discriminator.md
   - docs/agents/evidence/OTC-20260816-track-a-isolated-xvfb-startup-discriminator/**
@@ -38,11 +38,11 @@ track_a_runtime_agent_admission_version: 1
 routing_contract: docs/agents/programs/OTCLIENT_TIBIA_RE_HYBRID_EXECUTION_ROUTING.md
 execution_class: synology_physical_runtime
 runner: synology-otclient-01
-runtime_access: ephemeral_isolated
+runtime_access: none
 persistent_session_role: none
 physical_e2e_required: false
-runtime_owner_task: OTC-20260816-track-a-isolated-xvfb-startup-discriminator
-runtime_namespace: runner-support-xvfb-diagnostic
+runtime_owner_task: NOT_APPLICABLE
+runtime_namespace: NOT_APPLICABLE
 canonical_registration: NOT_APPLICABLE
 canonical_lease_generation: NOT_APPLICABLE
 registration_lease_generation: NOT_APPLICABLE
@@ -50,8 +50,8 @@ gate_a: NOT_APPLICABLE
 generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
-target_uniqueness: PROVEN
-mutation_authorized: true
+target_uniqueness: NOT_APPLICABLE
+mutation_authorized: false
 owner_funded_ai_api_authorized: false
 isolation:
   display: ':199'
@@ -100,9 +100,13 @@ audit:
     - one-shot workflow was removed before durable checkpoint update
     - no official-client, canonical lease/registration/session, VNC, game network/login or credentials were touched
 last_completed_step: reproduced the trusted Xvfb invocation once on isolated display :199, captured exact /usr/bin/xkbcomp missing failure with ldd missing count zero, cleaned the task-owned process/display and removed the one-shot workflow
-next_action: run a separate bounded read-only xkbcomp support inventory for only contained/system helper paths and package metadata; then choose a contained/system support repair or explicit runner-image dependency without retrying canonical bootstrap
+next_action: none; terminal diagnostic authority revoked after cleanup, with any future support inventory requiring a new task
 ---
 
 # Isolated Xvfb startup discriminator
 
 The trusted Xvfb invocation is now understood: the contained Xvfb binary and its shared libraries are valid, but its XKB helper lookup is compiled/configured to execute `/usr/bin/xkbcomp`, which is absent. No X11 socket or canonical client/runtime state was created.
+
+## 2026-08-29 authority reconciliation
+
+The diagnostic workflow had already been removed and cleanup was terminal on 2026-08-16. Its stale active metadata is now explicitly revoked (`status: completed`, `runtime_access: none`, `mutation_authorized: false`) so it cannot collide with the separately admitted V4 field6 runtime. Historical execution/evidence above is unchanged.

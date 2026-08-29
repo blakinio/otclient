@@ -14,7 +14,7 @@ base_branch: main
 base_sha: f208a20cb4517e8b57bef91983337145d379267c
 related_pr: 790
 created: 2026-08-29T08:08:53+02:00
-updated: 2026-08-29T09:00:00+02:00
+updated: 2026-08-29T09:02:00+02:00
 risk: high
 execution_mode: local_owner_pc
 execution_reason: deterministic harness plus local real-model benchmark on verified Molehill-PC
@@ -32,6 +32,17 @@ validation_level: focused
 heavy_validation_runs: 0
 repair_cycles_for_current_gate: 0
 runtime_access: none
+runtime_owner_task: NOT_APPLICABLE
+runtime_namespace: NOT_APPLICABLE
+canonical_registration: NOT_APPLICABLE
+canonical_lease_generation: NOT_APPLICABLE
+registration_lease_generation: NOT_APPLICABLE
+gate_a: NOT_APPLICABLE
+generation_rebind: NOT_APPLICABLE
+gate_b: NOT_APPLICABLE
+bootstrap: NOT_APPLICABLE
+target_uniqueness: NOT_APPLICABLE
+mutation_authorized: false
 execution_host: Molehill-PC
 local_model_authorized: true
 local_model_execution_performed: true
@@ -184,7 +195,7 @@ validation:
     result: PASS
     evidence: docs/agents/evidence/OTC-20260829-tibia-re-vision-benchmark-execution/20260829-independent-audit.md; audited head 7621916c76c19aa0951384538a8387c02cafcd04; material findings open 0
 blockers:
-  - final exact-head GitHub CI and Track A governance remain to be consumed after the closeout-checkpoint commit
+  - exact-head Track A governance failed because the mandatory runtime_access none admission record omitted required NOT_APPLICABLE fields; remediation is now present and must pass on the next exact head
 next_action: commit and push the audit-closeout checkpoint, mark PR 790 ready, consume exact-final-head CI/governance and review hygiene, then squash-merge and archive the task
 ```
 

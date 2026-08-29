@@ -79,11 +79,11 @@
 **Interfaces:**
 - Produces one typed result for each `ATH-MaaS/Ovis2.5-2B` and `ATH-MaaS/OvisOCR2`: `PASS_PROFILE`, `UNSUPPORTED_BACKEND`, `RESOURCE_LIMIT`, or `INVALID_OUTPUT`.
 
-- [ ] **Step 1: Verify no model is resident and inspect current Windows/WSL Python, Torch/Transformers, ROCm/CUDA/Vulkan support without installing a cloud inference client.**
-- [ ] **Step 2: Revalidate current candidate runtime requirements against the exact local environment.**
-- [ ] **Step 3: If a supported local backend exists, create a task-owned virtual environment, pin the required packages, run one then three synthetic trials sequentially, unload/release, and record exact revisions.**
-- [ ] **Step 4: If no supported local backend exists, do not emulate a winner on an unrelated provider; persist `UNSUPPORTED_BACKEND` with the exact missing capability.**
-- [ ] **Step 5: Run focused tests and commit compatibility evidence.**
+- [x] **Step 1: Verify no model is resident and inspect current Windows/WSL Python, Torch/Transformers, ROCm/CUDA/Vulkan support without installing a cloud inference client.**
+- [x] **Step 2: Revalidate current candidate runtime requirements against the exact local environment.**
+- [x] **Step 3: If a supported local backend exists, use a task-owned environment or a fully fingerprinted pre-existing local environment, run bounded synthetic trials sequentially, unload/release, and record exact revisions.**
+- [x] **Step 4: If no supported local backend exists, do not emulate a winner on an unrelated provider; persist `UNSUPPORTED_BACKEND` with the exact missing capability.**
+- [x] **Step 5: Run focused tests and commit compatibility evidence.**
 
 ### Task 5: Track B research-value boundary and terminal decision
 

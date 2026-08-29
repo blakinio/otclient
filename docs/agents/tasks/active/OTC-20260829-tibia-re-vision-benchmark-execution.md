@@ -14,7 +14,7 @@ base_branch: main
 base_sha: f208a20cb4517e8b57bef91983337145d379267c
 related_pr: 790
 created: 2026-08-29T08:08:53+02:00
-updated: 2026-08-29T08:18:46+02:00
+updated: 2026-08-29T08:33:34+02:00
 risk: high
 execution_mode: local_owner_pc
 execution_reason: deterministic harness plus local real-model benchmark on verified Molehill-PC
@@ -34,6 +34,7 @@ repair_cycles_for_current_gate: 0
 runtime_access: none
 execution_host: Molehill-PC
 local_model_authorized: true
+local_model_execution_performed: true
 owner_funded_ai_api_authorized: false
 cloud_model_authorized: false
 credentials_allowed: false
@@ -95,8 +96,8 @@ P1/P2 and backend compatibility work are READY offline. P3-P7 project-specific s
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-29T08:18:46+02:00
-head: pending-qwen-smoke-evidence-commit
+updated_at: 2026-08-29T08:33:34+02:00
+head: pending-ovis-compatibility-evidence-commit
 branch: feat/OTC-20260829-tibia-re-vision-benchmark-execution
 pr: 790
 status: implementing
@@ -111,47 +112,57 @@ owned_paths:
   - docs/agents/tasks/active/OTC-20260829-tibia-re-vision-benchmark-execution.md
   - docs/superpowers/plans/2026-08-29-tibia-re-vision-benchmark-execution.md
 proven:
-  - deterministic harness tests are 20 of 20 PASS after moving provenance and authority metadata out of untrusted model output
-  - exact Qwen profile is ollama qwen3-vl:4b-instruct-q4_K_M digest ee4b975b58c17ce268cd19d40db35d5edc64603035d2ffc1fee1968eb0947f7b, GGUF Q4_K_M, qwen3vl 4.4B
-  - observed Qwen runtime residency used 3527545978 bytes model size and 3527545978 bytes VRAM at 100 percent GPU
-  - three identical synthetic smoke trials are schema-valid 3 of 3 and LOGIN_SCREEN exact 3 of 3
-  - expected visible-text set recall is 1.0 on all three trials and screen classification is repeatable
-  - Qwen smoke API total durations are 18663.2486 ms, 15769.5473 ms and 16360.7091 ms; p50 16360.7091 ms and three-sample interpolated p95 18432.99465 ms
-  - all Qwen smoke hard gates pass and final Ollama residency is empty
-  - Qwen evidence is synthetic_smoke_only and selection_quality false, so it cannot support a winner claim
+  - deterministic harness test suite is 22 of 22 PASS, including OCR normalization that preserves hallucinated text instead of repairing it
+  - Qwen3-VL Q4_K_M synthetic state/OCR smoke remains 3 of 3 PASS with all hard gates green and final Ollama residency empty
+  - OvisOCR2 exact revision 1fc9221b7823a371d6e97f92d527cc847e24e107 loads and runs locally through a fingerprinted Transformers CPU profile
+  - OvisOCR2 found all five expected synthetic login strings in 3 of 3 trials under both benchmark-safe-v1 and model-card recommended prompt profiles
+  - OvisOCR2 emitted non-empty fabricated text on the solid-black no-text control in 3 of 3 trials under both prompt profiles
+  - OvisOCR2 recommended-profile p50 latency is 17.4179759 seconds, peak process RSS 2295803904 bytes, selection_quality false
+  - Ovis2.5-2B current revision 393c932b2a03e28eb9aaa503e3c4ab3ad384d958 is UNSUPPORTED_BACKEND on this host profile: Docker Model Runner exposes it as vllm while local DMR v1.2.5 reports vllm Not Installed and only supported on Linux, and the current Windows AMD host has no NVIDIA CUDA path
+  - no Ovis2.5 inference was performed and no alternative cloud or materially different model profile was substituted
+  - final Ollama and Docker Model Runner residency sets are empty
 derived:
-  - Qwen3-VL Q4_K_M is a viable local first-pass profile on Molehill-PC for the tested schema/OCR/state smoke
-  - Ovis backend compatibility can now be tested only after cross-provider shared-GPU residency remains empty
+  - OvisOCR2 is locally executable as a CPU OCR specialist but cannot currently be recommended unqualified because its negative-control hallucination rate is 3 of 3 in both tested prompt profiles
+  - Ovis2.5-2B cannot enter P3-P6 on the current Windows AMD backend without a materially different supported local runtime profile
 unknown:
-  - Qwen performance and hallucination resistance on representative secret-safe Tibia frames
-  - Ovis2.5-2B local backend compatibility on this Windows/AMD host
-  - OvisOCR2 local backend compatibility on this Windows/AMD host
-  - Track B project-specific P3-P7 research-value result until screenshot handoff exists
+  - Qwen negative-control behavior and warm latency on the frozen synthetic suite
+  - Qwen and OvisOCR2 behavior on accepted secret-safe real Tibia frames from Track B
+  - project-specific P7 research-value result until Track B screenshot handoff exists
 conflicts: []
 first_failure:
-  marker: none_current_gate
-  evidence: Qwen synthetic smoke completed without inference failure
+  marker: OVISOCR2_BLACK_NEGATIVE_FALSE_TEXT
+  evidence: solid-black image produced non-empty prompt-like fabricated text in 3 of 3 trials for both benchmark-safe and model-card recommended prompt profiles
 rejected_hypotheses:
-  - model should author capture/model/authority provenance fields
-  - Qwen synthetic smoke failure on this host profile
+  - the OvisOCR2 negative-control failure is caused only by the benchmark-safe prompt
+  - Ovis2.5 prior scratch AttributeError alone proves unsupported backend
+  - Docker Model Runner vllm can provide an AMD Windows execution path for exact Ovis2.5-2B
 changed_paths:
   - tools/tibia-re-vision-benchmark/vision_benchmark.py
-  - tools/tibia-re-vision-benchmark/tests/test_ollama_adapter.py
-  - docs/agents/evidence/OTC-20260829-tibia-re-vision-benchmark-execution/qwen3-vl-4b-instruct-smoke.json
+  - tools/tibia-re-vision-benchmark/tests/test_vision_benchmark.py
+  - tools/tibia-re-vision-benchmark/run_ovisocr2_cpu_smoke.py
+  - docs/agents/evidence/OTC-20260829-tibia-re-vision-benchmark-execution/ovisocr2-cpu-smoke.json
+  - docs/agents/evidence/OTC-20260829-tibia-re-vision-benchmark-execution/ovisocr2-cpu-recommended-prompt-smoke.json
+  - docs/agents/evidence/OTC-20260829-tibia-re-vision-benchmark-execution/ovis-backend-compatibility.json
   - docs/agents/tasks/active/OTC-20260829-tibia-re-vision-benchmark-execution.md
   - docs/superpowers/plans/2026-08-29-tibia-re-vision-benchmark-execution.md
 validation:
   - command: python -m unittest discover -s tools/tibia-re-vision-benchmark/tests -v
     result: PASS
-    evidence: 20 tests passed
-  - command: three local Ollama Qwen3-VL synthetic smoke trials
+    evidence: 22 tests passed
+  - command: OvisOCR2 CPU three-trial synthetic-login plus black-negative suite under benchmark-safe-v1
+    result: PASS_PROFILE_WITH_NEGATIVE_CONTROL_FAILURE
+    evidence: text recall 1.0, black false text 3 of 3
+  - command: OvisOCR2 CPU three-trial suite under ovisocr2-recommended-v1
+    result: PASS_PROFILE_WITH_NEGATIVE_CONTROL_FAILURE
+    evidence: text recall 1.0, black false text 3 of 3, p50 17.4179759 seconds
+  - command: docker model status and model search backend classification
+    result: UNSUPPORTED_BACKEND
+    evidence: Ovis2.5-2B backend vllm; local DMR vllm Not Installed and only supported on Linux; Windows host GPU is AMD Radeon RX 9070 XT
+  - command: ollama ps and docker model ps after Ovis execution
     result: PASS
-    evidence: 3 of 3 schema-valid LOGIN_SCREEN exact, visible text recall 1.0, hard gates eligible true
-  - command: ollama ps after each trial and final check
-    result: PASS
-    evidence: each trial after_residency empty and final resident model set empty
+    evidence: both resident model sets empty
 blockers: []
-next_action: verify Ollama and Docker Model Runner shared-GPU residency are both empty, then perform bounded local compatibility probes for Ovis2.5-2B and OvisOCR2 without cloud inference or undeclared model substitution
+next_action: run a bounded Qwen synthetic-login plus black-negative warm-residency suite, unload and verify empty residency, then consume Track B screenshot handoff if available or close P3-P7 as blocked/inconclusive with exact missing evidence
 ```
 
 ## Recovery checkpoint
@@ -159,13 +170,13 @@ next_action: verify Ollama and Docker Model Runner shared-GPU residency are both
 ```yaml
 status: active
 branch: feat/OTC-20260829-tibia-re-vision-benchmark-execution
-head: pending-qwen-smoke-evidence-commit
+head: pending-ovis-compatibility-evidence-commit
 worktree: C:/Users/barte/otclient-vision-benchmark
 active_operation: P1 deterministic harness followed by P2 bounded real-model smoke
 operation_started_at: null
 external_run_ids: []
-last_verified_state: Qwen3-VL Q4_K_M synthetic smoke 3 of 3 PASS; all hard gates pass; Ollama final residency empty; no official-client or Track B runtime access
+last_verified_state: Qwen synthetic smoke PASS; OvisOCR2 CPU exact-text smoke PASS with repeatable black-negative false text; Ovis2.5-2B UNSUPPORTED_BACKEND on current Windows AMD vllm path; all local model residency empty
 resume_condition: current task branch still owns the declared paths and Ollama residency is empty or exact target only
 failure_handling: if a model/backend pull or inference fails, persist the typed failure and do not switch to cloud or a different undeclared provider
-next_action: cross-provider empty-residency preflight, then bounded Ovis2.5-2B and OvisOCR2 local backend compatibility probes
+next_action: Qwen warm plus black-negative synthetic suite, deterministic unload, then Track B screenshot handoff check and P7 decision
 ```

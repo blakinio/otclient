@@ -53,6 +53,7 @@ BOOTSTRAP_ARCHIVE = "docs/agents/tasks/archive/OTC-20260816-track-a-canonical-bo
 BOOTSTRAP_MERGE = "d16091ca29ff7c9330115e9ce0fdbfb41646e0dc"
 CLIENT_FENCE_RECOVERY_MODE = "client_fence_reconciliation_v1"
 CLIENT_FENCE_RECOVERY_CONTRACT = "TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_V1"
+PRIOR_BOOT_ZERO_CLIENT_INVALIDATION_MODE = "prior_boot_zero_client_invalidation_v1"
 
 
 def read(path: str) -> str:
@@ -352,6 +353,17 @@ def validate_track_a_task(path: Path) -> bool:
                 lease_generation = positive_generation(path, values, "canonical_lease_generation")
                 if lease_generation <= registration_generation:
                     fail_task(path, "known recovery controller generation must be newer than registration")
+        elif recovery_mode == PRIOR_BOOT_ZERO_CLIENT_INVALIDATION_MODE:
+            registration_generation = positive_generation(path, values, "registration_lease_generation")
+            if values["target_uniqueness"] != "UNKNOWN":
+                fail_task(path, "prior-boot zero-client invalidation requires target_uniqueness=UNKNOWN")
+            if values["gate_a"] == "REQUIRED_NOT_PROVEN":
+                if values["canonical_lease_generation"] != "UNKNOWN":
+                    fail_task(path, "pending prior-boot invalidation requires canonical_lease_generation=UNKNOWN")
+            else:
+                lease_generation = positive_generation(path, values, "canonical_lease_generation")
+                if lease_generation <= registration_generation:
+                    fail_task(path, "prior-boot invalidation requires a newer current controller generation")
         else:
             fail_task(path, f"unsupported canonical recovery_mode={recovery_mode!r}")
 
@@ -550,6 +562,7 @@ def static_policy_audit() -> None:
             "### 7. `canonical_recovery`",
             "### 8. `canonical_boot_epoch_recovery`",
             "client_fence_reconciliation_v1",
+            "prior_boot_zero_client_invalidation_v1",
             "TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_V1",
             "prior-boot registration",
             "stale registered PID shortcut",

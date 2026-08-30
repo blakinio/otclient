@@ -214,7 +214,17 @@ mutation_authorized: false
 
 The only v1 source/target pair and all repeated-probe, continuity, atomic-commit and rollback requirements are defined in `docs/agents/contracts/TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_V1.md`. No other predecessor, mixed tuple, future build, missing registration or arbitrary registration content is covered. A current exact-fence registration is not rewritten by this mode.
 
-Neither recovery mode may launch, login, stop, signal, attach to, inject into, restart, move, click, type into or otherwise mutate the client. Recovery creates no new state root, registration path, lock, lease, token or authority system. Any later reuse, read-only observation or mutation requires a fresh downstream admission after reconciliation. An unmerged task cannot use its own implementation or governance edits as runtime authority.
+#### `prior_boot_zero_client_invalidation_v1`
+
+Use this mode only when the authoritative exact-fenced Kasm registration is still present but fresh all-running-container inventory proves **zero** official-client candidates after a host reboot, so neither ordinary stale-runtime replacement nor `canonical_boot_epoch_recovery` has a current target to bind. The purpose is only to invalidate metadata that cannot describe any process in the current boot epoch; it does not create a client and does not weaken create-bootstrap's mandatory registration-absence gate.
+
+The durable pending checkpoint is fail-closed: `runtime_access: canonical_recovery`, `recovery_mode: prior_boot_zero_client_invalidation_v1`, `canonical_registration: PRESENT`, `canonical_lease_generation: UNKNOWN`, positive `registration_lease_generation`, `gate_a: REQUIRED_NOT_PROVEN`, `generation_rebind: NOT_APPLICABLE`, `gate_b: NOT_APPLICABLE`, `bootstrap: NOT_APPLICABLE`, `target_uniqueness: UNKNOWN`, and `mutation_authorized: false`. After Gate A, the current controller generation must be concrete and strictly newer than the registered generation while `target_uniqueness` remains `UNKNOWN` because the proof is zero-client absence, not singleton ownership.
+
+Under the continuously held canonical guard the reviewed transition must repeatedly prove the exact target Kasm container/display/package fence, a current `boot_id_sha256` different from the registration, zero official-client candidates across all running Docker containers, zero Tibia main windows, stable preflight identity, and byte-for-byte unchanged authoritative registration before deleting it with the canonical `_remove(old)` primitive. It must then repeat the same zero-client proof and confirm `runtime-registration.json` remains absent. Any ambiguity, same-boot result, generation drift, registration race, candidate/window appearance, container drift or post-delete proof failure fails closed. After successful deletion the prior-boot registration is never restored; downstream `create_new` requires a **new** `canonical_bootstrap` admission/lease and re-proves absence independently.
+
+The reviewed implementation is the `boot-epoch-registration-invalidate` operation in `.github/scripts/tibia-official-client-re-canonical-live-transition.py`.
+
+All `canonical_recovery` modes are metadata-only. They may not launch, login, stop, signal, attach to, inject into, restart, move, click, type into or otherwise mutate the client. Recovery creates no new state root, registration path, lock, lease, token or authority system. Any later reuse, read-only observation or mutation requires a fresh downstream admission after reconciliation. An unmerged task cannot use its own implementation or governance edits as runtime authority.
 
 ### 8. `canonical_boot_epoch_recovery`
 

@@ -1,29 +1,29 @@
 ---
 task_id: OTC-20260828-current-login-field6-runtime
-status: validating
+status: ready
 agent: ChatGPT
-session_id: chatgpt-20260829-field6-v4-independent-runner
+session_id: chatgpt-20260830-field6-official-launcher-seed
 session_role: implementer
 policy_version: 2
 project_lane: otclient
 lane: RUNTIME_RESEARCH
 track_id: official-client-re
 task_kind: reverse_engineering_runtime
-phase: live_admission
-branch: fix/OTC-20260829-field6-v4-independent-runner
+phase: implement
+branch: fix/OTC-20260830-field6-official-launcher-seed
 base_branch: main
-base_main: 8c207b38ecad5154a83ec3588e172f096cf2ff29
+base_main: 18ff83053f5c5d85c9bce6debab0f7fef6b79ecd
 created: 2026-08-28T19:00:00+02:00
-updated: 2026-08-29T19:20:00+02:00
+updated: 2026-08-30T10:49:00+02:00
 risk: high
 execution_class: independent_ephemeral_physical_runtime
-execution_mode: github_actions_independent_ephemeral_physical
-execution_reason: one fresh exact-current scalar-only V4 login observation on a physically separate one-job clean Linux guest after terminal Synology secret-boundary disqualification
+execution_mode: repository_only_seed_repair
+execution_reason: V4 terminated before authorization because direct curl package acquisition is Cloudflare-challenged; repair now consumes a hash-pinned package produced by the existing official Linux launcher
 persistent_session_role: none
 physical_e2e_required: true
-runtime_access: ephemeral_isolated
-runtime_owner_task: OTC-20260828-current-login-field6-runtime
-runtime_namespace: field6-runtime-ephemeral-OTC-20260828-v4-display131-port25441
+runtime_access: none
+runtime_owner_task: NOT_APPLICABLE
+runtime_namespace: NOT_APPLICABLE
 canonical_registration: NOT_APPLICABLE
 canonical_lease_generation: NOT_APPLICABLE
 registration_lease_generation: NOT_APPLICABLE
@@ -31,21 +31,21 @@ gate_a: NOT_APPLICABLE
 generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
-target_uniqueness: PROVEN
-mutation_authorized: true
-credentials_allowed: true
-login_allowed: true
+target_uniqueness: NOT_APPLICABLE
+mutation_authorized: false
+credentials_allowed: false
+login_allowed: false
 relogin_allowed: false
 restart_allowed: false
 character_selection_allowed: false
 gameplay_allowed: false
-gui_input_authorized: true
-process_control_authorized: true
+gui_input_authorized: false
+process_control_authorized: false
 network_payload_capture_allowed: false
 physical_action_budget: 1
 physical_action_count: 0
 implementation_authorized: true
-live_runtime_authorization_source: PR_758_COMMENT_5457904227
+live_runtime_authorization_source: NOT_APPLICABLE_V4_TERMINAL_PRE_AUTH
 related_pr: 806
 independent_guest_name: OTClientV4Clean
 independent_runner_name: molehill-otclient-v4-01
@@ -59,15 +59,15 @@ estimate_confidence: medium
 decomposition_decision: phased
 decomposition_reason: field6 proof remains one sequential evidence chain; Track B is a separate consumer phase after scalar promotion
 validation_level: exact_head
-last_completed_step: #805 one-commit candidate passed field6/fresh-audit/materializer/self-hosted/governance/CI; Draft Ready connector failed, #805 closed superseded and ready replacement #806 opened; task pointer updated for final restack
-session_rotation_count: 2
+last_completed_step: V4 run 33300352335/job 99227195253 terminated pre-authorization on Cloudflare-challenged custom package fetch; official launcher exact package seed frozen and causal RED test recorded
+session_rotation_count: 3
 heavy_validation_runs: 0
 stale_takeover_count: 0
 human_interruptions: 0
-invocation_started_at: 2026-08-28T22:50:00+02:00
-last_progress_at: 2026-08-29T19:20:00+02:00
+invocation_started_at: 2026-08-30T09:38:00+02:00
+last_progress_at: 2026-08-30T10:49:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: v4_independent_runner_ready_replacement
+ci_check_generation: official_launcher_seed_repair_red
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -77,6 +77,9 @@ context_reconstruction_attempts: 2
 stall_warnings: 0
 owned_paths:
   - .github/scripts/test_track_a_current_client_package_parallel.py
+  - .github/scripts/test_track_a_current_client_package_seed.py
+  - docs/agents/prompts/OTCLIENT_TIBIA_GLOBAL_LOGIN_FINAL_CONTINUE.md
+  - docs/agents/prompts/OTCLIENT_TIBIA_GLOBAL_LOGIN_FINAL_CONTINUE_ALIAS.md
   - .github/scripts/test_track_a_current_login_field6_runtime.py
   - .github/scripts/test_track_a_current_login_field6_security_contract.py
   - .github/scripts/audit_track_a_current_login_field6_admission.py
@@ -137,7 +140,7 @@ A separate repository-owner admission exists on merged PR #758 as comment `54579
 AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V4 admission=true previous_generation=V3 previous_run=33202129157 previous_physical_action_count=0 scope=one_login_scalar_only physical_action_budget=1 relogin=false restart=false character_selection=false world_entry=false gameplay=false network_payload_capture=false
 ```
 
-This is not the live trigger. The exact V4 trigger remains unposted.
+This is not the live trigger. The V4 trigger was posted once as comment `5467500633`; run `33300352335` / job `99227195253` terminated before authorization consumption and the V4 generation is terminal. It must never be reposted or rerun.
 
 # Synology disqualification and independent fallback
 
@@ -229,20 +232,26 @@ process_environment_retained=false
 raw_memory_retained=false
 ```
 
-# V4 trigger and cleanup
+# V4 terminal trigger state
 
-Only after ready PR #806 is independently audited, exact-head GREEN, clean-restacked and merged, and the fresh guest passes pre-registration provenance may one new top-level owner comment be created on merged PR #758 with body exactly:
+The V4 trigger was posted exactly once as owner comment `5467500633`. Its run `33300352335` / job `99227195253` is terminal and must never be rerun or recreated. The job failed before authorization consumption, secret exposure, client execution or login. The one-time runner deregistered and the V4 guest was destroyed.
 
-```text
-AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V4 once=true
-```
+Consumed archival trigger literal (non-executable): `AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V4 once=true`.
 
-That comment ID becomes the one-time runner label. `GITHUB_RUN_ATTEMPT != 1` fails before authorization/secret/client/physical action. After the one job terminates, the ephemeral runner must deregister/exit and `OTClientV4Clean` must be destroyed. If the login submit occurred but scalar proof failed, an identical V4 retry is forbidden.
+# 2026-08-30 terminal V4 checkpoint and seed repair
+
+V4 trigger comment `5467500633` created run `33300352335` / job `99227195253` on the exact one-time label `field6-v4-5467500633`. Independent provenance and trusted-main gates passed. Package acquisition then failed with `FETCH_FAILED:curl_22` after `TRACK_A_FIELD6_PACKAGE_WARP=PASS attempt=1`; authorization, credentials and login capture steps were skipped. Therefore `physical_action_count=0`, `login_submit_count=0` and `FIELD6_VALUE=UNKNOWN` remain authoritative. The ephemeral runner deregistered and `OTClientV4Clean` was destroyed.
+
+Direct requests for manifest-listed client binaries now receive Cloudflare managed challenge HTTP 403 while the manifest itself remains exact-current. An existing official Linux launcher archive on Molehill-PC was therefore tested in a throwaway isolated guest without credentials/login. The launcher successfully installed `15.32.75d4a0`; its `bin/client` is exactly `52105824` bytes with SHA256 `d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a`.
+
+The complete launcher-installed package is frozen locally as `C:\OTClientV4\tibia-15.32.75d4a0-official-launcher-seed.tar.gz`, size `412272538`, SHA256 `64031ba091884c5b1be71416394b8ada6dac9529cfed60e7b4856c04b7e5b016`. Proprietary bytes are not committed. Durable sanitized evidence is `docs/agents/evidence/OTC-20260828-current-login-field6-runtime/20260830-v4-preauth-failure-official-launcher-seed.md`.
+
+Repository repair branch `fix/OTC-20260830-field6-official-launcher-seed` starts from trusted `main@18ff83053f5c5d85c9bce6debab0f7fef6b79ecd`. RED test `.github/scripts/test_track_a_current_client_package_seed.py` currently fails causally with `FIELD6_SEED_RED: materialize_seed missing`. This checkpoint grants no V5 runtime, credentials or login authority.
 
 # Completion
 
-`FIELD6_VALUE=UNKNOWN` and `physical_action_count=0` remain authoritative. After one terminal V4 run, a separate repository-only evidence PR must return this task to `runtime_access: none`, disarm credential/login/mutation authority, record the actual action count, archive the trigger as consumed, and promote only sanitized scalar/provenance evidence. Track B may consume field6 only after that promotion reaches trusted `main`.
+This task remains incomplete. Current authoritative state is `FIELD6_VALUE=UNKNOWN`, `physical_action_count=0`, `runtime_access:none`, credentials/login/mutation disarmed. Completion requires: trusted-main seed acquisition repair; a separately admitted fresh V5 one-shot observation; sanitized scalar promotion to trusted `main`; then Track B consumption. The V4 generation is archival evidence only.
 
 # Next action
 
-Fold this #806 pointer/checkpoint into the same one-commit six-file tree on fresh `main`, require replacement exact-head field6 security/runtime/fresh audit, materializer, Track A governance, reusable self-hosted boundary and `CI / Required` GREEN with zero material findings, then squash-merge. After merge, provision/attest the fresh `OTClientV4Clean` guest; no V4 trigger or runner registration is legal before that host gate.
+Continue the repository-only seed repair on `fix/OTC-20260830-field6-official-launcher-seed`: finish the RED fixture, implement `materialize_seed` so a hash-pinned official-launcher seed is extracted without executing package content and every package/asset row is revalidated against the embedded manifests plus the exact client fence, then update acquisition/workflow/security contracts for a fresh V5 generation. Require focused GREEN, independent audit and exact-head CI before merge. Only after that repair reaches trusted `main` may a separately admitted fresh V5 one-time trigger/runner be created. Never rerun V4 or reuse comment `5467500633`.

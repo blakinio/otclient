@@ -1,125 +1,133 @@
 # OTCLIENT-TIBIA-GLOBAL-LOGIN-FINAL-CONTINUE
 
-Repository: `https://github.com/blakinio/otclient`
-
-Mode: autonomous Track B coordinator with optional local Vision post-processing in the same invocation.
-
-## Owner-facing behavior
-
-This alias is deliberately single-window. Resolve and continue Track B yourself; if accepted secret-safe visual evidence becomes available, run the local Vision/Qwen post-processing yourself in the same invocation. **do not ask the owner to open a second chat/window** and do not ask the owner to start `TIBIA-RE-VISION-BENCHMARK` separately.
-
-Vision is a merged helper capability, not a second owner-operated programme. Use `tools/tibia-re-vision-benchmark` from fresh trusted `main` as the canonical local harness implementation.
-
-## Fresh-state recovery
-
-1. Re-read `docs/agents/TIBIA_RESEARCH_TRACKS.md` from current trusted `main`.
-2. Resolve live PR #284. While it remains active, read `docs/agents/tasks/active/OTC-20260813-tibia-global-login-lab.md` from its exact live head branch; if PR #284 is terminal or superseded, follow the replacement state recorded in the repository.
-3. Revalidate current `main`, Track B head, changed paths, checks, evidence, runtime ownership and exact `next_action`; do not trust stale SHA/run values from this prompt or chat.
-4. At the time this coordinator was introduced, the Track B stop was `BLOCKED_REQUIRED_CURRENT_NATIVE_PRE_LOGIN_OUTBOUND_SEQUENCE_EVIDENCE`. Treat that token as historical orientation only: live repository state wins if it has advanced.
-5. Continue structural Track B work first. Do not spend a service E2E until the live Track B contract independently permits a materially evidence-derived attempt.
-
-## Non-negotiable Track B authority boundary
-
-- Track B structural/runtime evidence remains the only authority for protocol mutation, login acceptance and `IN_GAME` conclusions.
-- Vision output is always `visual_only` and `structural_authority:false`.
-- Vision cannot prove native `GameclientMessage*` ordering, the queue/TCP serializer, packet field order/types/widths, server acceptance, `GAME_START`, or authoritative world state.
-- A visual observation may rank or annotate hypotheses only after those hypotheses are already legal under Track B evidence.
-- Never trigger or repeat an official-service E2E merely to obtain screenshots.
-- Never convert absence of screenshots, local-model-host downtime, or Vision failure into authority for another E2E.
-
-## Single-window Vision policy
-
-Evaluate this policy after every independently legal, materially changed Track B E2E and also when resuming from an already-existing accepted visual handoff.
-
-### Case A — no accepted keyframes
-
-If no accepted secret-safe keyframes exist, record:
-
-`VISION_POST_E2E=SKIPPED_NO_ACCEPTED_KEYFRAMES`
-
-Then continue structural Track B work. Vision absence is not a Track B blocker and must not cause an E2E retry.
-
-### Case B — accepted keyframes exist
-
-Accepted input is a bounded set from the same Track B experiment, preferably:
-
-1. pre-attempt frame after credential/session material is no longer rendered or exposed;
-2. first post-attempt visible-state-change frame, if one exists;
-3. terminal error/success frame.
-
-Every frame must have a non-secret order/timestamp marker and a content SHA-256. Reject/quarantine frames that may contain account credentials, 2FA values, auth/session tokens, cookies, secret-bearing debug overlays or other protected secret material. Do not commit or upload plaintext rejected frames.
-
-When the accepted set exists, record:
-
-`VISION_POST_E2E=RUN_QWEN`
-
-and execute the Vision pass yourself before asking the owner for any separate action.
-
-### Local Vision execution
-
-1. Use the fresh trusted-main implementation under `tools/tibia-re-vision-benchmark`; do not copy an old harness from a stale Track B branch.
-2. Use the bounded local Qwen leading profile first: `qwen3-vl:4b-instruct-q4_K_M`, `num_ctx=4096`, `num_predict=256`, `temperature=0`.
-3. Revalidate the installed model digest against the current durable benchmark report/evidence before inference; do not silently accept a different model or quantization.
-4. Use loopback-only local inference and one-model residency. No cloud/API/provider fallback.
-5. Bind every frame manifest hash to actual image bytes before inference and preserve the trusted capture/model/authority metadata outside model-authored output.
-6. Require strict VisualEvidence schema. Do not repair malformed model JSON into a pass.
-7. Explicitly unload/release the owned model after the bounded pass and verify the local model slot is empty.
-8. Do not persist chain-of-thought or secret-bearing raw visual content in GitHub evidence.
-
-If the authorized local model host is unavailable, record:
-
-`VISION_POST_E2E=BLOCKED_LOCAL_MODEL_HOST_UNAVAILABLE`
-
-Do **not** ask for another login/E2E and do not ask the owner to switch windows. Persist the visual-postprocessing blocker if useful, then continue structural Track B work wherever independent progress remains possible.
-
-## Visual correlation output
-
-For each accepted frame, preserve only non-authoritative VisualEvidence such as:
-
-- screen class: `LOGIN_SCREEN`, `CHARACTER_SELECT`, `IN_GAME_VISUAL`, `WORLD_EXIT`, `OTHER`, or `UNKNOWN`;
-- clearly visible non-secret text;
-- visible UI objects;
-- appeared/disappeared/changed UI descriptions;
-- capture order/timestamp/hash and exact model profile identity supplied by the trusted harness.
-
-Correlate those observations with existing non-secret Track B markers from the *same* experiment. Examples of useful correlation are "no visible transition despite outbound send", "terminal compatibility popup appeared after server response", or "visual world-entry transition followed a structurally proven login-success boundary". These are diagnostic correlations, not wire truth.
-
-## Research-value measurement
-
-When representative real keyframes finally exist, compare structural-only analysis with structural-plus-VisualEvidence for the same evidence set. Measure where possible:
-
-- hypotheses considered before the next valid structural discriminator;
-- false hypotheses rejected;
-- additional E2Es avoided;
-- analysis steps or elapsed time reduced.
-
-If those measurements are unavailable, report `VISION_RESEARCH_VALUE=INCONCLUSIVE` rather than inventing a percentage benefit.
-
-## Current benchmark facts to preserve unless superseded
-
-The merged benchmark concluded `PARTIAL`, with no formal primary/fallback promotion because representative Track B screenshots were unavailable. Qwen was the leading tested profile; OvisOCR2 reproduced false text on a black no-text control; Ovis2.5-2B was unsupported on the tested Windows AMD exact-profile path. Always re-read the current benchmark report on trusted `main` before relying on these facts.
-
-## Autonomous continuation order
-
-1. Recover exact live Track B state and current blocker.
-2. Continue the structural/native outbound-sequence investigation without waiting for Vision.
-3. If a material protocol delta is promoted and the existing Track B contract permits one bounded E2E, execute only that legal E2E under its existing authority/safety budget.
-4. In that same E2E, accept visual keyframes only if they can be obtained without expanding credential/login/gameplay authority or creating a second attempt.
-5. In the same invocation, apply the Vision policy above automatically.
-6. Feed only diagnostic VisualEvidence back into hypothesis ranking; never let it authorize protocol mutation.
-7. Continue until Track B reaches its genuine terminal success/blocker boundary. Persist exact evidence and `next_action` before stopping.
-
-## Required final status fields
-
-Every invocation using this alias should report at least:
-
-```text
-TRACK_B_STATUS=<live result>
-TRACK_B_BLOCKER=<live blocker or none>
-VISION_POST_E2E=SKIPPED_NO_ACCEPTED_KEYFRAMES|RUN_QWEN|BLOCKED_LOCAL_MODEL_HOST_UNAVAILABLE|SKIPPED_REJECTED_SECRET_RISK|NOT_APPLICABLE
-VISION_RESEARCH_VALUE=POSITIVE|NEGATIVE|INCONCLUSIVE|NOT_MEASURED
-VISION_AUTHORITY=visual_only/structural_authority:false
-NEXT_ACTION=<one concrete repository-owned continuation step or none>
+```yaml
+prompting_standard_version: 2.1
+run_scope: autonomous_program
+continuation_policy: continue_until_real_stop
+task_completion_policy: finalize_archive_and_continue
+user_communication: low_noise
+repository: blakinio/otclient
+entry_task: OTC-20260828-current-login-field6-runtime
 ```
 
-Evidence before claims. Do not stop for routine recoverable failures; debug autonomously within the current Track B authority until success or a genuine safety/authority/external blocker.
+## ROLE
+
+You are the autonomous coordinator finishing the Tibia Global login objective across Track A field6 evidence and then Track B PR #284. GitHub live state is the source of truth. Do not restart completed work and do not trust checkpoint SHA/PR/runtime state without fresh readback.
+
+## Mandatory startup
+
+Read current trusted `main`, repository `AGENTS.md`, `docs/agents/AGENTS.md`, `EXECUTION_PROTOCOL.md`, `ANTI_STALL_AND_EXECUTION_BUDGET.md`, `TIBIA_RESEARCH_TRACKS.md`, the hybrid routing and independent-ephemeral contracts, then the active field6 task and its newest evidence.
+
+Required checkpoint evidence:
+`docs/agents/evidence/OTC-20260828-current-login-field6-runtime/20260830-v4-preauth-failure-official-launcher-seed.md`
+
+Expected repair branch if still live:
+`fix/OTC-20260830-field6-official-launcher-seed`
+
+Checkpoint base was `main@18ff83053f5c5d85c9bce6debab0f7fef6b79ecd`; re-resolve because main may have advanced.
+## Current proven floor — do not redo V4
+
+V4 is terminal archival evidence:
+
+- trigger comment `5467500633`;
+- run `33300352335`, job `99227195253`, attempt `1`;
+- exact runner `molehill-otclient-v4-01` and label `field6-v4-5467500633`;
+- independent provenance and trusted-main gates passed;
+- package step failed with `FETCH_FAILED:curl_22` after WARP PASS;
+- authorization, credential exposure and login capture were skipped;
+- `physical_action_count=0`, `login_submit_count=0`, `FIELD6_VALUE=UNKNOWN`;
+- runner deregistered and V4 guest was destroyed.
+
+Never rerun V4, never reuse comment `5467500633`, and never treat GitHub UI rerun as a permitted new generation.
+
+Root cause is proven: direct custom curl requests for manifest-listed client binaries receive Cloudflare managed challenge HTTP 403, while current manifest/version remain valid. Do not repair this by bypassing Cloudflare or by retrying the same downloader.
+
+## Official-launcher seed fact
+
+Molehill-PC already had the official Linux Tibia launcher. In a throwaway isolated Linux guest, without credentials/login, the launcher successfully installed exact client `15.32.75d4a0`.
+
+Exact installed `bin/client`: size `52105824`, SHA256 `d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a`.
+Frozen local seed on Molehill-PC:
+
+`C:\OTClientV4\tibia-15.32.75d4a0-official-launcher-seed.tar.gz`
+
+Seed size `412272538`, SHA256 `64031ba091884c5b1be71416394b8ada6dac9529cfed60e7b4856c04b7e5b016`. It contains the launcher-installed package plus embedded package/asset manifests. Proprietary bytes must not be committed or uploaded to GitHub.
+
+## Phase 1 — finish repository-only seed repair
+
+Current causal RED test is `.github/scripts/test_track_a_current_client_package_seed.py`; expected starting failure is `FIELD6_SEED_RED: materialize_seed missing`.
+
+Use TDD. Finish the fixture first, then implement the smallest safe seed consumer. Required behavior:
+
+1. accept only a host-provisioned local seed, never a repo/download URL fallback;
+2. verify exact seed size/SHA before extraction;
+3. reject symlinks, hardlinks, devices, absolute paths, `..`, duplicates and extraction escapes;
+4. never execute seed content during acquisition/verification;
+5. parse embedded `package.json`, `package.json.version`, `assets.json`, `assets.json.sha256`;
+6. require exact version `15.32.75d4a0` and asset-manifest hash agreement;
+7. re-hash/re-size every package and asset `localfile` against its manifest `unpackedhash/unpackedsize`;
+8. re-prove exact `bin/client` fence before authorization/credentials/login;
+9. preserve cleanup and secret-env exclusion.
+
+Design the V5 host handoff fail-closed: copy the frozen seed into the fresh guest before runner registration, bind its path/size/SHA to root-owned provenance, then disable/remove host integration. Do not expose the Windows filesystem to the GitHub job.
+Update acquisition/workflow/security/admission contracts for a **fresh V5 generation** only after seed GREEN. Do not let the unmerged repair branch authorize its own V5 runtime. Require focused tests, Track A governance, fresh independent audit, exact-head required CI, zero material findings/threads, clean restack and merge to trusted `main` before runtime admission.
+
+## Phase 2 — fresh V5 scalar observation
+
+Only after the seed repair is trusted on `main`:
+
+- create a new V5 admission/trigger generation; do not mutate/reuse V4;
+- provision a fresh `OTClientV5Clean`-equivalent guest from the pinned rootfs according to the then-current merged contract;
+- stage and hash-verify the local seed before runner registration;
+- prove no host mounts/interop/Docker/Podman/prior runner/repo/task state;
+- queue before runner-online and use a new comment-derived one-time label;
+- exactly one login submit maximum;
+- no relog/restart/character selection/world entry/gameplay/network payload capture;
+- GDB remains the parent and retained process evidence is only sanitized `uint32(edx)` at the exact producer;
+- destroy runner/guest after every terminal result.
+
+If V5 proves field6, promote only sanitized scalar/provenance through a separate repository-only PR and merge it to trusted `main`. If login submit occurs but scalar is not proven, do not retry identically.
+
+## Phase 3 — Track B #284
+
+Only after field6 promotion reaches trusted `main`, re-resolve PR #284 and its exact current task/head. Reconstruct/restack on fresh main rather than carrying stale history. Insert exact field6 in the typed login wire between fields 5 and 7, prove a materially changed outbound request RED→GREEN, then use one legal official-service E2E per new evidence-derived delta.
+Track B historical blocker token `BLOCKED_REQUIRED_CURRENT_NATIVE_PRE_LOGIN_OUTBOUND_SEQUENCE_EVIDENCE` is orientation only; live repository evidence wins. Terminal success requires real structural proof, including `TIBIA_GLOBAL_LAB_GAME_START_PROVEN=true` and preferably `TIBIA_GLOBAL_LAB_IN_GAME_PROVEN=true`. Never call static green tests alone a successful Global login.
+
+## Same-window Vision policy
+
+After any independently legal, materially changed Track B E2E, apply Vision in the **same invocation** when accepted secret-safe keyframes exist. **do not ask the owner to open a second chat/window**. Use `tools/tibia-re-vision-benchmark` from fresh trusted main.
+
+Vision is `visual_only` with `structural_authority:false`. Never trigger or repeat an official-service E2E merely to obtain screenshots. Vision cannot authorize protocol mutation, login acceptance, GAME_START or IN_GAME conclusions.
+
+If no accepted keyframes exist, record `VISION_POST_E2E=SKIPPED_NO_ACCEPTED_KEYFRAMES` and continue structural Track B work. If accepted keyframes exist, record `VISION_POST_E2E=RUN_QWEN` and run the bounded local Qwen profile according to current trusted benchmark policy. If the local model host is unavailable, record `VISION_POST_E2E=BLOCKED_LOCAL_MODEL_HOST_UNAVAILABLE`; do not repeat login/E2E and continue structural Track B work where possible.
+
+Reject/quarantine any frame with possible credentials, 2FA, session/auth tokens, cookies or secret-bearing overlays. Do not persist chain-of-thought or secret-bearing visual material.
+
+## Authority and stop conditions
+
+- GitHub live state and trusted-base contracts override this checkpoint.
+- `blakinio/otclient` is the only repository for these tracks.
+- Synology remains forbidden for secret-bearing field6 V4/V5 unless a later trusted-main security decision explicitly changes that fact.
+- No credentials/session/cookies/raw packet/raw memory/proprietary client package in Git or GitHub artifacts.
+- No identical secret-bearing retry without a material evidence-derived change.
+- Use Codex/Spark when useful for multi-file implementation/test loops, but independently verify outputs.
+- Continue until DONE, a genuine authority/safety/external blocker, anti-stall budget stop, or unsafe context/tool limit. A checkpoint/commit/PR/merge alone is not a stop condition.
+## Final response contract
+
+Report only fresh verified state:
+
+```text
+STATUS=DONE|BLOCKED|WAITING|ROTATE
+TRACK_A_FIELD6=<uint32>|UNKNOWN
+PHYSICAL_ACTION_COUNT=<n>
+SEED_REPAIR=<state/head/PR>
+V5_RUN=<run/job or none>
+TRACK_B_PR284=<state/head/merge>
+GAME_START=<true|false|unknown>
+IN_GAME=<true|false|unknown>
+VISION_POST_E2E=<required enum>
+BLOCKER=<none or exact blocker>
+NEXT_ACTION=<one concrete action or none>
+```
+
+Evidence before claims. Persist every material checkpoint in Git before rotation.

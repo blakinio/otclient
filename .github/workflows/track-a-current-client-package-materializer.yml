@@ -6,6 +6,7 @@ on:
     types: [opened, synchronize, reopened]
     paths:
       - .github/scripts/test_track_a_current_client_package_parallel.py
+      - .github/scripts/test_track_a_current_client_package_seed.py
       - .github/scripts/track_a_current_client_package_materialize.py
       - .github/scripts/track_a_current_client_package_acquire.sh
       - .github/workflows/track-a-current-client-package-materializer.yml
@@ -33,6 +34,7 @@ jobs:
         run: |
           set -Eeuo pipefail
           python3 .github/scripts/test_track_a_current_client_package_parallel.py
+          python3 .github/scripts/test_track_a_current_client_package_seed.py
           python3 -m py_compile .github/scripts/track_a_current_client_package_materialize.py
           bash -n .github/scripts/track_a_current_client_package_acquire.sh
           python3 .github/scripts/test_track_a_agent_runtime_governance.py \

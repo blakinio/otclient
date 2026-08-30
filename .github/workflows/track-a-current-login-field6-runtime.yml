@@ -96,7 +96,7 @@ jobs:
       github.event.issue.pull_request &&
       github.event.issue.number == 758 &&
       github.event.comment.user.login == github.repository_owner &&
-      github.event.comment.body == 'AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V4 once=true'
+      github.event.comment.body == 'AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V5 once=true'
     name: One-shot isolated field6 observation
     runs-on: ${{ format('field6-v4-{0}', github.event.comment.id) }}
     timeout-minutes: 45
@@ -191,7 +191,7 @@ jobs:
           grep -Fqx "independent_runner_name: $EXPECTED_INDEPENDENT_RUNNER_NAME" "$task"
           grep -Fqx "independent_rootfs_url: $EXPECTED_INDEPENDENT_ROOTFS_URL" "$task"
           grep -Fqx "independent_rootfs_sha256: $EXPECTED_INDEPENDENT_ROOTFS_SHA" "$task"
-          grep -Fq 'AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V4 once=true' "$task"
+          grep -Fq 'AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V5 once=true' "$task"
           python3 .github/scripts/test_track_a_agent_runtime_governance.py
           python3 .github/scripts/test_track_a_current_login_field6_runtime.py
           python3 .github/scripts/test_track_a_current_login_field6_security_contract.py

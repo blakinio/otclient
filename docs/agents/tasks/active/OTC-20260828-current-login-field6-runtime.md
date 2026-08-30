@@ -1,29 +1,29 @@
 ---
 task_id: OTC-20260828-current-login-field6-runtime
-status: validating
+status: implementing
 agent: ChatGPT
-session_id: chatgpt-20260830-field6-v5-independent-runner
+session_id: chatgpt-20260830-field6-v6-generation
 session_role: implementer
 policy_version: 2
 project_lane: otclient
 lane: RUNTIME_RESEARCH
 track_id: official-client-re
 task_kind: reverse_engineering_runtime
-phase: live_admission
-branch: fix/OTC-20260830-field6-v5-independent-runner
+phase: validate
+branch: fix/OTC-20260830-field6-v6-generation
 base_branch: main
-base_main: 0b5e473aed4e61f05fc28005f1c0ec9cd99cbf61
+base_main: d1ce0ad811cf6a4a5a3466f7e5af045f39acab31
 created: 2026-08-28T19:00:00+02:00
-updated: 2026-08-30T15:31:47+02:00
+updated: 2026-08-30T16:03:48+02:00
 risk: high
-execution_class: independent_ephemeral_physical_runtime
-execution_mode: github_actions_independent_ephemeral_physical
-execution_reason: one fresh exact-current scalar-only V5 login observation on a brand-new one-job isolated WSL2 guest using a root-owned exact official-launcher package seed after terminal V4 pre-action acquisition failure
+execution_class: github_hosted
+execution_mode: github_actions_static
+execution_reason: repository-only V6 generation rotation after terminal pre-action V5 provenance-readability failure; no runner registration, credential access, client execution, login or physical mutation is authorized in this phase
 persistent_session_role: none
-physical_e2e_required: true
-runtime_access: ephemeral_isolated
-runtime_owner_task: OTC-20260828-current-login-field6-runtime
-runtime_namespace: field6-runtime-ephemeral-OTC-20260828-v5-display131-seed
+physical_e2e_required: false
+runtime_access: none
+runtime_owner_task: NOT_APPLICABLE
+runtime_namespace: NOT_APPLICABLE
 canonical_registration: NOT_APPLICABLE
 canonical_lease_generation: NOT_APPLICABLE
 registration_lease_generation: NOT_APPLICABLE
@@ -31,54 +31,52 @@ gate_a: NOT_APPLICABLE
 generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
-target_uniqueness: PROVEN
-mutation_authorized: true
-credentials_allowed: true
-login_allowed: true
+target_uniqueness: NOT_APPLICABLE
+mutation_authorized: false
+credentials_allowed: false
+login_allowed: false
 relogin_allowed: false
 restart_allowed: false
 character_selection_allowed: false
 gameplay_allowed: false
-gui_input_authorized: true
-process_control_authorized: true
+gui_input_authorized: false
+process_control_authorized: false
 network_payload_capture_allowed: false
-physical_action_budget: 1
+physical_action_budget: 0
 physical_action_count: 0
 implementation_authorized: true
-live_runtime_authorization_source: PR_758_COMMENT_5468621219
-related_pr: 813
-independent_guest_name: OTClientV5Clean
-independent_runner_name: molehill-otclient-v5-01
-independent_rootfs_url: https://cloud-images.ubuntu.com/releases/noble/release-20260801/ubuntu-24.04-server-cloudimg-amd64-root.tar.xz
-independent_rootfs_sha256: 915b4be62933475c3fb5f5031aa2e159294db95fb32aaa9e8b317aadcb6c065d
-independent_runner_provenance: /etc/otclient-field6-runner-provenance
-independent_runner_provenance_schema: otclient.track-a.independent-field6-runner.v2
-independent_seed_path: /opt/otclient-v5-seed/seed.tar.gz
-independent_seed_size: 412272538
-independent_seed_sha256: 64031ba091884c5b1be71416394b8ada6dac9529cfed60e7b4856c04b7e5b016
+live_runtime_authorization_source: NOT_APPLICABLE
+feature_scope:
+  type: infrastructure
+  user_facing: false
+  backend_required: false
+  frontend_required: false
+  integration_required: false
+  e2e_required: false
 context_pressure: medium
 context_growth: stable
-context_score: 9
+context_score: 8
 estimate_confidence: high
 decomposition_decision: phased
-decomposition_reason: V5 routing/admission and one-shot field6 proof are sequential; scalar promotion and Track B remain separate only after sanitized proof
-validation_level: exact_head
-last_completed_step: PR #813 candidate 908d5e2fd98dfc170c6ce803d516984aa01d589b passed exact-head field6 runtime/security/admission, package materializer, Track A governance, self-hosted boundary and CI Required; physical job 99264790747 was skipped
-session_rotation_count: 5
+decomposition_reason: revoke terminal V5 statically first; a fresh V6 guest and physical routing/admission require a separate trusted-main phase
+validation_level: focused
+last_completed_step: PR #815 RED run 33315765050 / job 99268806498 failed exactly on missing current V6 generation while physical job 99268807332 was skipped
+session_rotation_count: 6
 heavy_validation_runs: 1
 stale_takeover_count: 0
-human_interruptions: 0
+human_interruptions: 1
 invocation_started_at: 2026-08-30T11:05:00+02:00
-last_progress_at: 2026-08-30T15:31:47+02:00
-ci_checks_for_current_head: 5
-ci_check_generation: field6_v5_independent_seed_green
+last_progress_at: 2026-08-30T16:03:48+02:00
+ci_checks_for_current_head: 0
+ci_check_generation: field6_v6_static_green
 terminal_ci_wait_started_at: null
-terminal_ci_checks_for_current_generation: 5
+terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 2
+repair_cycles_for_current_gate: 1
 context_reconstruction_attempts: 1
 stall_warnings: 0
+related_pr: 815
 owned_paths:
   - .github/scripts/test_track_a_current_login_field6_runtime.py
   - .github/scripts/test_track_a_current_login_field6_security_contract.py
@@ -89,78 +87,86 @@ owned_paths:
   - .github/scripts/track_a_current_login_field6_runtime.sh
   - .github/scripts/track_a_current_login_field6_runtime_secret_wrapper.sh
   - .github/workflows/track-a-current-login-field6-runtime.yml
-  - docs/agents/contracts/TRACK_A_INDEPENDENT_EPHEMERAL_PHYSICAL_RUNTIME_V2.md
   - docs/agents/tasks/active/OTC-20260828-current-login-field6-runtime.md
   - docs/agents/evidence/OTC-20260828-current-login-field6-runtime/**
-  - docs/superpowers/plans/2026-08-30-field6-v5-independent-runner.md
+  - docs/superpowers/plans/2026-08-30-field6-v6-generation.md
 modules_touched:
   - track-a-ephemeral-runtime-research
 depends_on:
   - merged PR #752 exact-current field6 scalar-owner promotion
   - merged PR #754 exact-current client fence
   - merged PR #758 runtime observation implementation
-  - merged PR #804 independent ephemeral physical runtime contract/routing
   - merged PR #811 serialized acquisition repair
   - merged PR #812 static V5 generation
-  - merged PR #814 exact official-launcher seed importer at 0b5e473aed4e61f05fc28005f1c0ec9cd99cbf61
-  - PR #758 V5 owner admission comment 5468621219
-  - terminal V4 run 33300352335 / job 99227195253 with physical_action_count=0
+  - merged PR #814 exact official-launcher seed importer
+  - merged PR #813 V5 independent seed runner admission at d1ce0ad811cf6a4a5a3466f7e5af045f39acab31
+  - terminal V5 run 33314713078 / job 99265883209 with physical_action_count=0
 blocks:
   - OTCLIENT-TIBIA-GLOBAL-LOGIN-FINAL-CONTINUE
 ---
 
 # Objective
 
-Recover the exact current public scalar carried in `edx` when the exact official native Linux Tibia client enters the statically proven `GameclientMessageLogin` producer at `PIE + 0xe25620`, then promote only that scalar as the Track B field6 input.
+Recover the exact current public scalar carried in `edx` when official native Linux Tibia client `15.32.75d4a0` enters the proven `GameclientMessageLogin` producer at `PIE + 0xe25620`, then promote only that scalar as the admissible Track B field6 input.
 
-Exact client fence remains `15.32.75d4a0`, size `52105824`, SHA256 `d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a`. `FIELD6_VALUE=UNKNOWN` until the admitted physical observation proves a uint32 value.
+This phase is repository-only generation rotation. It revokes terminal V5 and creates no live V6 authority.
 
-# Prior-generation terminal fact
+# Exact client fence
 
-V4 run `33300352335`, attempt 1, job `99227195253` passed clean-runner/trusted-main/WARP gates and failed before owner authorization, secret exposure, client execution or login. Therefore `physical_action_count=0`, `login_submit_count=0`, and `FIELD6_VALUE=UNKNOWN`. Historical V3/V4 executable trigger literals must remain revoked.
+```yaml
+version: 15.32.75d4a0
+size: 52105824
+sha256: d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a
+packed_bin_client_sha256: 075810c54af2d6912000eab062763db29563f5a1f4bf1d984154b2d07fd5729f
+producer_entry: 0xe25620
+FIELD6_VALUE: UNKNOWN
+```
 
-# V5 owner admission
+# Terminal V5 fact
 
-PR #758 comment `5468621219` is the separate owner admission for this generation. It grants at most one login scalar observation, no relogin, no restart, no character selection, no world entry, no gameplay and no network payload capture.
+V5 trigger comment `5469017445` created run `33314713078`, attempt 1, job `99265883209`. Queue uniqueness and runner identity were proven. The first live step then failed before checkout because root-owned provenance mode `0600` was not readable by the unprivileged runner account.
 
-The exact V5 trigger remains unposted. The executable trigger is `AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V5 once=true`, but it becomes usable only after this routing/admission change is merged to trusted main.
+Trusted-main checkout, package preflight, owner-authorization consumption, secret-bearing capture, scalar validation and upload were all skipped. Authoritative terminal state remains `physical_action_count: 0`, `login_submit_count: 0`, `FIELD6_VALUE: UNKNOWN`, authorization unconsumed, credentials not exposed to capture, official client not started.
 
-The exact queued trigger comment ID becomes the one-time runner label. The scheduling form is the one-time label `field6-v5-<comment_id>`. That comment ID becomes the one-time runner label. Before registration, exactly one attempt-1 queued job must request it and no other job may request it.
+The ephemeral runner removed its runner credentials/config and deregistered. Exact WSL ownership readback then proved and destroyed only `OTClientV5Clean`. Durable sanitized evidence is `docs/agents/evidence/OTC-20260828-current-login-field6-runtime/20260830-v5-terminal-pre-action-provenance-readability.md`.
 
-If the one allowed login submit occurs without scalar proof, an identical V5 retry is forbidden.
+The exact consumed V5 trigger body is deliberately omitted from this active task so historical UI reruns cannot satisfy current trusted-main admission.
 
-# Fresh independent host proof
+# Static V6 generation
 
-The only admitted guest is `OTClientV5Clean` on owner-controlled Molehill-PC and runner `molehill-otclient-v5-01`. It was imported fresh from the pinned Canonical rootfs after the tainted V4 guest was removed by exact WSL ownership/BasePath proof.
+The current future generation identifier is exactly:
 
-Direct pre-registration readback proved automount and Windows interop disabled, no `/mnt/c`, no host drive mounts, no Docker or Podman sockets, no prior repository checkout, no runner credentials, no runner `_work`, required system toolroot installed, and GitHub Actions runner `2.337.0` archive SHA256 `70920811a4f8ad4328818682bca5c6469c1c942fab52448868071d0063816613`.
+```text
+AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V6 once=true
+```
 
-# Exact official-launcher seed
+This is only a repository generation identifier. It has not been posted as an owner trigger and this task grants it no live authority.
 
-Merged PR #814 provides the fail-closed official-launcher seed importer. Proprietary seed bytes remain local. The root-owned guest path is `/opt/otclient-v5-seed/seed.tar.gz`, size `412272538`, SHA256 `64031ba091884c5b1be71416394b8ada6dac9529cfed60e7b4856c04b7e5b016`.
+Current task must remain static-safe:
 
-A pre-registration production-importer probe on the real archive verified `8732/8732` regular files, exact package/assets manifests and the exact `bin/client` fence, then its extracted probe output was deleted. Only the immutable root-owned mode-0400 seed remains. V5 package acquisition must use this official-launcher seed and must not use the known-unreliable custom direct payload curl path.
+```yaml
+execution_class: github_hosted
+execution_mode: github_actions_static
+physical_e2e_required: false
+runtime_access: none
+target_uniqueness: NOT_APPLICABLE
+mutation_authorized: false
+credentials_allowed: false
+login_allowed: false
+physical_action_budget: 0
+physical_action_count: 0
+```
 
-# Live boundary after merge
+The workflow current-generation condition and trusted-main task check rotate to V6. Existing `field6-v5-*`, `molehill-otclient-v5-01`, `OTClientV5Clean` and seed/provenance executable boundaries remain unchanged but inert while this task is `runtime_access: none`; they are not reusable and will be rotated only in a separate V6 physical routing/admission PR after a brand-new guest is proven.
 
-The provenance record is `/etc/otclient-field6-runner-provenance` with schema `otclient.track-a.independent-field6-runner.v2`. It must bind the exact guest, rootfs, runner, trigger-derived label, generation nonce and exact seed path/size/SHA, plus all isolation booleans true. The workflow independently re-hashes the seed before checkout, authorization consumption or secret exposure.
+# TDD evidence
 
-Runner registration is allowed only after queue uniqueness proof and uses `--ephemeral --disableupdate --no-default-labels --labels field6-v5-<comment_id>`. The runner accepts at most one job. After every terminal outcome the entire V5 guest, runner state and local seed are destroyed.
+RED head `12ed31a58ddc9e33dc546f577aba41ef3117ba24` produced hosted run `33315765050`. Runtime contract job `99268806498` failed exactly because workflow lacked the current V6 generation literal. Physical job `99268807332` was SKIPPED. No runner, secret, client or physical action was used by the RED generation.
 
-# V5 routing exact-head GREEN checkpoint
+# Successor host rule
 
-Candidate head `908d5e2fd98dfc170c6ce803d516984aa01d589b` is based exactly on trusted `main@0b5e473aed4e61f05fc28005f1c0ec9cd99cbf61`. A separate clean native-Linux checkout proved the diff contains exactly the eight planned V5 routing/admission paths and passed runtime, security, seed, governance, materializer and independent-admission contracts.
-
-Hosted exact-head evidence:
-
-- field6 workflow run `33314310412`: runtime contract job `99264790357` SUCCESS; fresh V5 admission audit job `99264790250` SUCCESS; physical live job `99264790747` SKIPPED;
-- package materializer run `33314310405`, job `99264790288`: SUCCESS;
-- Track A governance run `33314310382`: deterministic audit job `99264790148` SUCCESS and fresh behavior audit `99264790252` SUCCESS;
-- self-hosted boundary run `33314310392`: fresh boundary audit `99264790221` SUCCESS and boundary job `99264790273` SUCCESS;
-- CI run `33314310524`: syntax/actionlint job `99264817054` SUCCESS and `CI / Required` job `99264877769` SUCCESS.
-
-No V5 trigger, runner registration, credential exposure, official-client execution, login or physical action occurred during these checks. `FIELD6_VALUE` remains `UNKNOWN`.
+After static V6 merge, create a brand-new `OTClientV6Clean` from the same pinned Canonical rootfs. The V6 provenance record must be root-owned, not writable by runner, **and readable by runner**: mode `0644`. The official-launcher seed is copied fresh and independently reverified. No V6 trigger may be posted until a separate V6 routing/admission change is merged to trusted main and exact queue uniqueness is proven.
 
 # Next action
 
-Commit this durable GREEN checkpoint, require the resulting documentation-only exact head to repeat the same hosted gates with the physical job SKIPPED, verify zero review debt and unchanged trusted main, then merge #813 with an expected-head guard. Only after trusted-main readback may the single V5 trigger be posted and queue uniqueness/provenance/ephemeral-runner execution begin.
+Require exact-head static runtime/security/audit/package/governance/self-hosted-boundary/CI GREEN with physical job SKIPPED, record evidence, merge with expected-head guard, then proceed to fresh V6 guest preparation and separate V6 routing/admission.

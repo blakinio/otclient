@@ -18,8 +18,8 @@
 ## TDD sequence
 
 - [x] RED contract requires current V6 trigger and rejects V5 as historical.
-- [ ] Verify causal RED while physical live job is SKIPPED.
-- [ ] Minimal GREEN: workflow current-generation condition V5 -> V6 and active task returns to static-safe `github_hosted` / `runtime_access:none` / budget 0.
+- [x] Verify causal RED while physical live job is SKIPPED: run `33315765050`, runtime job `99268806498` failed on missing V6, physical job `99268807332` SKIPPED.
+- [x] Minimal GREEN implemented: workflow current-generation condition V5 -> V6 and active task returned to static-safe `github_hosted` / `runtime_access:none` / budget 0.
 - [ ] Preserve V5 physical runner/guest/seed routing inert behind static task; rotate those only in a later fresh V6 routing/admission PR.
 - [ ] Exact-head runtime/static-audit/package/governance/self-hosted-boundary/CI GREEN.
 - [ ] Merge with expected-head guard and trusted-main readback.

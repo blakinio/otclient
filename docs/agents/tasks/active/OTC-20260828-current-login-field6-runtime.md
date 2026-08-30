@@ -14,7 +14,7 @@ branch: fix/OTC-20260830-field6-v6-independent-runner
 base_branch: main
 base_main: 8442ead31bd448becc01082d34cbe2212f36a58d
 created: 2026-08-28T19:00:00+02:00
-updated: 2026-08-30T16:08:11+02:00
+updated: 2026-08-30T16:31:07+02:00
 risk: high
 execution_class: independent_ephemeral_physical_runtime
 execution_mode: github_actions_independent_ephemeral_physical
@@ -72,7 +72,7 @@ estimate_confidence: high
 decomposition_decision: phased
 decomposition_reason: V6 physical routing/admission is now the single sequential evidence chain; scalar promotion remains separate after proof
 validation_level: focused
-last_completed_step: PR #816 RED run 33316729039 failed causally on missing V6 physical label while job 99271431442 was skipped; local V6 runtime/security/seed/admission candidate is GREEN
+last_completed_step: PR #816 candidate 32aafc5c2b084a2198c38db192d3eb8375270751 passed exact-head runtime/security/admission/package/governance/self-hosted-boundary/CI; physical job 99272181229 skipped
 session_rotation_count: 6
 heavy_validation_runs: 1
 stale_takeover_count: 0
@@ -205,3 +205,8 @@ PR #758 comment `5469210031` is the non-trigger V6 owner admission. The exact V6
 Fresh `OTClientV6Clean` on Molehill-PC is isolated from host drives/interop/Docker/Podman and has no prior repo or runner state. The exact official-launcher seed was copied by host control and re-hashed inside the guest. Runner-user readback proved the exact immutable-readable permission fence: provenance mode `0644`, seed directory mode `0555`, seed mode `0444`.
 
 If the one allowed V6 login submit occurs without scalar proof, an identical V6 retry is forbidden. No relogin, restart, character selection, world entry, gameplay or network payload capture is allowed.
+
+
+# V6 routing exact-head GREEN checkpoint
+
+Candidate 32aafc5c2b084a2198c38db192d3eb8375270751 on trusted base 8442ead31bd448becc01082d34cbe2212f36a58d passed hosted validation: field6 run 33317003099 (runtime 99272180811 SUCCESS, fresh V6 audit 99272180700 SUCCESS, physical 99272181229 SKIPPED); package run 33317003094 job 99272180653 SUCCESS; governance run 33317003128 jobs 99272180685/99272180822 SUCCESS; self-hosted boundary run 33317003079 jobs 99272180620/99272180753 SUCCESS; CI run 33317003291, CI / Required 99272262431 SUCCESS. No V6 trigger, runner registration, credentials, client execution or physical action occurred.

@@ -38,7 +38,7 @@ V6 must use:
 - [x] Rotate helper and package-acquisition runner/seed allowlists V5 -> V6.
 - [x] Update independent admission audit to V6 and contract v3.
 - [x] Change active task to `independent_ephemeral_physical_runtime`, one-login budget, admission source `PR_758_COMMENT_5469210031`, exact V6 guest/runner/seed/modes.
-- [ ] Exact-head hosted runtime/security/admission/package/governance/boundary/CI GREEN; physical job SKIPPED; merge with expected-head guard.
+- [x] Candidate `32aafc5c2b084a2198c38db192d3eb8375270751` exact-head hosted runtime/security/admission/package/governance/boundary/CI GREEN; physical job `99272181229` SKIPPED. Final docs-only exact-head repeat and merge remain.
 
 ### Task 3 ? one-shot V6
 

@@ -52,7 +52,7 @@ Clean baseline on the initial implementation head:
 - vision benchmark: 34 tests passed;
 - worktree clean after removal of generated Python caches.
 
-No architecture question is open. No authority expansion occurred.
+No architecture question was open at preflight. No authority expansion occurred.
 
 ## Wave 1 implementation checkpoint
 
@@ -77,9 +77,80 @@ Material protocol rulings are durable in the SDD ledger: raw PR #790 `IN_GAME_VI
 
 Fresh combined Wave 1 readback on `6dc038c0863db3265cc8354c4cb6167ce0bdda50` passed 7 reusable-vision tests, 17 protocol tests, 34 frozen benchmark tests, and the offline direct-script help smoke. Live `main` advanced to `0b5e473aed4e61f05fc28005f1c0ec9cd99cbf61` through PR #814; its three package-materializer files are disjoint from this implementation.
 
+## Wave 2 implementation and review checkpoint
+
+Local implementation head:
+
+`a65d0afefa787ee0469245a69079a2a595749655`
+
+The local branch is still based on the approved planning head `3edc3f2a73b9eb9a40a2b5936114e7d9ada62533`. Live `main` was refreshed to `9f79685f6d073c160397eeefdbc2beb27e8921ad`. PR #810 remains Draft and its last published head is `8a63adbfb0e130b845e12ab88deec8a984770f65`; no workflow runs or legacy commit statuses are attached to that published head.
+
+Task 3 — existing-store agent persistence:
+
+- implementation `06c249b08`;
+- reviewed fixes `c031a864c`, `fa2de84d0`, `c81b180b5`;
+- focused persistence suite: 18 tests PASS;
+- Package B regression: 24 tests PASS with the repository's two expected skips;
+- final independent re-review: all Important findings addressed, no new findings, clean;
+- reuses the existing SQLite/WAL store and shared event ledger; no second database/control plane was added.
+
+Task 5 — exact Qwen sensor and logical model slot:
+
+- implementation `e72c9e26e`;
+- reviewed fixes `06f1ca2f4`, `638983278`, `b7ad58477`, `81e5c1f0a`, `8887f7830`;
+- final focused/stable suite: 62 tests PASS with one expected real-Windows conditional skip;
+- frozen PR #790 benchmark: 34 tests PASS;
+- final independent review: both residual findings addressed, no new findings, spec compliant / quality approved / clean;
+- no live Ollama/model/runtime/network process was used.
+
+Task 4 — persistent coordinator:
+
+- implementation candidate `f6243238a`;
+- focused suite: 18 tests PASS; Package A: 76 PASS; Package B: 39 PASS;
+- independent adversarial review: Critical 3 / Important 6 / Minor 1, spec non-compliant, fix required;
+- reproduced load-bearing failures include effect execution after STOP admission, non-atomic PAUSE/event persistence, and duplicate executor invocation after post-effect persistence failure;
+- ordinary durable ledger fixes remain possible inside the existing store, but the frozen `execute(request) -> receipt` contract has no final-commit/cancellation handshake capable of proving STOP dominance and crash-safe exactly-once effect admission.
+
+Task 6 — deterministic visual/runtime reconciliation:
+
+- implementation `2b93f0559`;
+- scoped privacy/full-observation fix `a65d0afef`;
+- focused reconciler: 10 tests PASS;
+- full Control Center discovery: 371 tests PASS with 3 skips;
+- frozen benchmark: 34 tests PASS;
+- independent re-review closed secret-shaped reference retention and incomplete `VisionObservation` validation with no new scoped finding;
+- the core finite table is fail-closed for visual-only world state, `STRUCTURAL_ONLY`, conflicts and exit semantics;
+- one Important remains: the frozen three-field runtime observation and two-argument reconciler cannot authenticate producer identity, current run/runtime binding or freshness from opaque refs.
+
+## Architecture review packages
+
+`ARCHITECT_REVIEW_REQUIRED`
+
+Task 4 problem:
+
+- Binding public executor contract: `execute(request) -> receipt`.
+- Required property: SYSTEM/OWNER STOP must dominate and latch durably; no future physical effect may occur after STOP without explicit OWNER RESUME and fresh reconciliation; effect ambiguity and replay must be crash-safe.
+- Conflict: a final effect commit can race STOP after the coordinator's last boolean check, while holding the coordinator lock would starve STOP behind the external executor call. The public protocol exposes no cancellation/final-commit handshake.
+- Recommended ruling: retain the frozen base protocol for Null/read-only use, add a reviewed `GuardedBoundedActionExecutor` extension with a one-shot final-commit callback and cancellation handle, refuse effect-capable executors that lack it, and reuse `MutationCoordinator` plus the same SQLite action/budget ledger.
+- Alternatives: accept a weaker pre-mark-and-wait semantic that cannot prove STOP request dominance, or keep the phase strictly Null-only and defer effect-capable fake semantics.
+
+Task 6 problem:
+
+- Binding public observation: `RuntimeObservation(state, evidence_class, evidence_refs)` and `reconcile_state(visual, runtime)`.
+- Required property: `WORLD_CONFIRMED`/`WORLD_EXIT` require separately reviewed stronger **current** runtime evidence; stale/forged evidence must fail closed.
+- Conflict: opaque refs do not authenticate producer, run/runtime identity, observation time, deadline or causal review. Encoding freshness in the ref string would let callers self-assert authority.
+- Recommended ruling: preserve the frozen observation wire shape but add a narrow trusted immutable reconciliation context/resolver owned by Control Center; the existing two-argument path remains a safe default that cannot promote without verified context.
+- Alternatives: keep confirmed states unreachable in this repository-only phase, or amend the observation protocol with authenticated provenance fields.
+
+The full problem/options/consequence/file packages and every per-agent model/effort/reason entry are durable in:
+
+`.superpowers/sdd/2026-08-30-local-track-a-vision-agent-supervisor/progress.md`
+
+Tasks 7–10 are not dispatched because Task 7 depends on both blocked components. No Critical/Important finding was hidden or adjudicated away.
+
 ## Current continuation
 
-Task 3 is the first uncompleted task. Dispatch its fresh persistence implementer from the generated SDD brief with the reviewed Mapping traversal ruling, require RED-first TDD evidence plus commit/report, and run the separate spec/quality reviewer before advancing. Continue through Task 10 and the broad whole-branch review unless a named stop condition occurs.
+The next action is an independent supervising-architect ruling on the two packages above. After rulings, resume the Task 4 and Task 6 RED-to-GREEN fix/re-review loops. Task 7 may begin only after both dependency reviews are clean. PR #810 must remain Draft and unmerged.
 
 ## Safety boundary
 

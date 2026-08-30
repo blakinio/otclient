@@ -10,12 +10,12 @@ task_kind: implementation
 phase: implementation_execution
 branch: feat/OTC-20260830-local-vision-agent-supervisor-foundation
 base_branch: docs/OTC-20260830-local-vision-agent-supervisor-discovery
-trusted_main: 0b5e473aed4e61f05fc28005f1c0ec9cd99cbf61
+trusted_main: 9f79685f6d073c160397eeefdbc2beb27e8921ad
 parent_task: OTC-20260830-local-vision-agent-supervisor-discovery
 parent_pr: 808
 implementation_pr: 810
 created: 2026-08-30T11:51:56+02:00
-updated_at: 2026-08-30T13:24:38Z
+updated_at: 2026-08-30T15:48:40Z
 risk: high
 execution_class: repository_worktree
 execution_mode: subagent_driven_development
@@ -75,8 +75,8 @@ current_environment:
   remote_desktop_commander: offline
   codex_worktree: available
   codex_subagent_dispatch: available
-current_blocker: NONE
-next_action: dispatch Task 3 persistence implementer from the plan-scoped SDD brief, including the reviewed immutable Mapping payload traversal ruling, then require restart/idempotency/privacy/event-sequence TDD evidence and independent review before Task 4
+current_blocker: ARCHITECT_REVIEW_REQUIRED — Task 4 executor commit/STOP atomicity contract and Task 6 authenticated current-provenance contract
+next_action: supervising architect selects the reviewed Task 4 executor handshake/ledger contract and Task 6 trusted current-evidence context; then resume the two scoped fix/re-review loops before Task 7
 ---
 
 # Local vision-agent supervisor foundation implementation
@@ -101,17 +101,20 @@ This authorization permits repository implementation and tests only. It does **n
 
 Use `superpowers:using-git-worktrees`, `superpowers:subagent-driven-development`, and `superpowers:test-driven-development` exactly as applicable. Maintain the plan-scoped SDD ledger. Do not run multiple implementation subagents concurrently against shared files. Each implementation task requires its own independent spec/quality review before the next task.
 
-The Codex execution environment is available. Live Git/GitHub state was reconciled, an isolated worktree was verified, the clean baseline passed, and the plan-scoped SDD ledger contains the required dependency/interface scan and rulings. Tasks 1 and 2 are complete with independent review; Task 3 is the first uncompleted implementation task.
+The Codex execution environment is available. Live Git/GitHub state was reconciled, an isolated worktree was verified, the clean baseline passed, and the plan-scoped SDD ledger contains the required dependency/interface scan and rulings. Tasks 1, 2, 3, and 5 are complete with clean independent reviews. Task 4 and Task 6 each reached a binding architecture boundary after independent adversarial review; ordinary independent findings in Task 6 were fixed and re-reviewed clean. Tasks 7–10 remain dependency-blocked and were not dispatched.
 
 ## Context checkpoint
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-30T13:24:38Z
-head: 6dc038c0863db3265cc8354c4cb6167ce0bdda50
+updated_at: 2026-08-30T15:48:40Z
+head: a65d0afefa787ee0469245a69079a2a595749655
 branch: feat/OTC-20260830-local-vision-agent-supervisor-foundation
 pr: 810
-status: implementing
+remote_pr_head: 8a63adbfb0e130b845e12ab88deec8a984770f65
+merge_base: 3edc3f2a73b9eb9a40a2b5936114e7d9ada62533
+live_main: 9f79685f6d073c160397eeefdbc2beb27e8921ad
+status: blocked
 context_routes:
   - track-a-governance
   - local-agent-supervisor-design
@@ -124,19 +127,28 @@ owned_paths:
   - docs/agents/tasks/active/OTC-20260830-local-vision-agent-supervisor-foundation.md
   - docs/agents/reports/OTC-20260830-local-vision-agent-supervisor-foundation.md
 proven:
-  - Live Git and GitHub state was re-fetched before implementation; PR 810 remains a Draft stacked on Draft PR 808.
+  - Live Git and GitHub state was refreshed at this checkpoint; PR 810 remains Draft at remote head 8a63adbfb0e130b845e12ab88deec8a984770f65 and is stacked on Draft PR 808 at 3edc3f2a73b9eb9a40a2b5936114e7d9ada62533.
   - Isolated non-main worktree is available on the implementation branch.
   - Control Center baseline passed 253 tests with 2 skipped.
   - Vision benchmark baseline passed 34 tests.
   - Frozen authority remains runtime_access none with physical action budget and count zero.
   - Task 1 reusable vision core is independently approved with zero findings.
   - Task 2 strict protocol completed three reviewed fix rounds and the final re-review reports all findings addressed.
+  - Task 3 SQLite/WAL persistence completed three reviewed fix rounds; 18 focused tests and Package B regression evidence pass, with restart, idempotency, privacy, and cause-free corruption handling independently approved.
+  - Task 5 model-slot/Qwen sensor completed five fix rounds; final independent gate is clean with 62 focused/stable tests, one expected Windows-only skip, and 34 frozen benchmark tests.
+  - Task 6 core table and scoped privacy/full-observation fixes pass 371 Control Center tests with 3 skips and 34 frozen benchmark tests; its independent re-review closes the two ordinary findings.
+  - Task 4 implementation commit f6243238a was not accepted: independent adversarial probes reproduced three Critical and six Important durability/concurrency findings.
+  - No workflow run or legacy commit status is attached to the last published PR head 8a63adbfb0e130b845e12ab88deec8a984770f65.
 derived:
-  - Current main changes through 0b5e473aed4e61f05fc28005f1c0ec9cd99cbf61 are disjoint from the implementation surfaces, so the live stacked PR base remains safe for Task 3 execution.
+  - Task 7 cannot start because its Task 4 and Task 6 dependencies are both architect-blocked.
+  - The local branch intentionally contains reviewed but not-yet-accepted Task 4 and Task 6 implementations so exact evidence and fix bases remain durable.
 unknown:
-  - Task 3 RED and GREEN results until the fresh persistence implementer completes them.
-  - Exact-head CI outcome after the first pushed milestone.
-conflicts: []
+  - Architect-selected final commit/cancellation handshake for an effect-capable bounded executor.
+  - Architect-selected authenticated current-run/runtime/freshness binding for reviewed-causal runtime evidence.
+  - Exact-head hosted CI outcome after publishing the current local checkpoint.
+conflicts:
+  - TASK4_EXECUTOR_ATOMICITY_CONTRACT — the frozen execute(request)->receipt protocol has no final-commit/cancellation handshake capable of proving OWNER STOP dominance across an in-flight physical effect and crash-safe post-effect persistence.
+  - TASK6_CURRENT_PROVENANCE_CONTRACT — the frozen three-field RuntimeObservation and two-argument reconcile_state function have no trusted producer/run/runtime/time context capable of authenticating freshness; opaque refs cannot supply authority.
 first_failure:
   marker: TASK-CHECKPOINT-MISSING-001
   evidence: checkpoint validator reported that the pre-existing active task record lacked the required Context checkpoint section
@@ -156,6 +168,17 @@ validation:
   - command: Wave 1 combined focused readback on 6dc038c0863db3265cc8354c4cb6167ce0bdda50
     result: PASS
     evidence: reusable vision 7 tests, agent protocol 17 tests, frozen benchmark 34 tests, and direct-script offline help all passed
-blockers: []
-next_action: Dispatch the Task 3 persistence implementer from the generated plan-scoped brief with the reviewed Mapping traversal ruling, then require RED-first restart, idempotency, privacy, and durable-sequence evidence before independent review.
+  - command: python -m unittest tests.tools.tibia_re_control_center.test_agent_vision tests.tools.tibia_re_vision.test_evidence tests.tools.tibia_re_vision.test_ollama
+    result: PASS
+    evidence: 62 tests passed with one expected real-Windows conditional skip on Task 5 final head; frozen benchmark separately passed 34 tests
+  - command: python -m unittest discover -s tests/tools/tibia_re_control_center -p test_*.py -q
+    result: PASS
+    evidence: 371 tests passed with 3 skips after Task 6 scoped fixes
+  - command: python -m unittest discover -s tools/tibia-re-vision-benchmark/tests -p test_*.py -q
+    result: PASS
+    evidence: 34 frozen benchmark tests passed after Task 6 scoped fixes
+blockers:
+  - ARCHITECT_REVIEW_REQUIRED: Task 4 executor/STOP/effect-commit protocol
+  - ARCHITECT_REVIEW_REQUIRED: Task 6 current reviewed-causal provenance protocol
+next_action: Obtain supervising architect rulings for both formal packages in the SDD ledger/report, execute scoped RED-to-GREEN fixes and independent re-reviews, then dispatch Task 7 only when both dependency gates are clean.
 ```

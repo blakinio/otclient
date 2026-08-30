@@ -7,7 +7,6 @@ from tools.tibia_re_control_center.agent_protocol import (
     AgentVisualState,
     ClientIdentity,
     NamedAgentAction,
-    ResultEnvelope,
     TaskEnvelope,
 )
 from tools.tibia_re_control_center.canonical import jcs_dumps
@@ -16,7 +15,7 @@ from tools.tibia_re_control_center.model import MAX_SAFE_INTEGER, ValidationErro
 
 def envelope(**overrides):
     value = {
-        "schema": "TaskEnvelope.v1",
+        "schema": "otclient.local-agent.task.v1",
         "session_id": "session-1",
         "task_id": "task-1",
         "run_id": "run-1",
@@ -47,6 +46,10 @@ class AgentProtocolTests(unittest.TestCase):
         for field in ("username", "password", "credential", "raw_secret", "unexpected"):
             with self.subTest(field=field), self.assertRaises(ValidationError):
                 TaskEnvelope.from_mapping(envelope(**{field: "secret"}))
+
+    def test_rejects_short_task_schema_type_name(self):
+        with self.assertRaises(ValidationError):
+            TaskEnvelope.from_mapping(envelope(schema="TaskEnvelope.v1"))
 
     def test_rejects_bad_sha_and_ids(self):
         with self.assertRaises(ValidationError):
@@ -162,6 +165,28 @@ class AgentProtocolTests(unittest.TestCase):
         self.assertEqual(jcs_dumps(event.payload), expected)
         self.assertEqual(jcs_dumps(event.payload), expected)
 
+    def test_event_payload_rejects_unpaired_surrogates_in_keys_and_values(self):
+        cases = (
+            {"bad\ud800": "ok"},
+            {"ok": "bad\udfff"},
+            {"nested": {"bad\ud800": "ok"}},
+            {"nested": {"ok": "bad\udfff"}},
+        )
+        for payload in cases:
+            with self.subTest(payload=repr(payload)), self.assertRaises(ValidationError):
+                AgentEvent.new(
+                    session_id="session-1", run_id=None, provenance=AgentProvenance.SENSOR,
+                    kind="observation", state_before="IDLE", state_after="OBSERVING",
+                    payload=payload,
+                )
+
+        event = AgentEvent.new(
+            session_id="session-1", run_id=None, provenance=AgentProvenance.SENSOR,
+            kind="observation", state_before="IDLE", state_after="OBSERVING",
+            payload={"café": {"value": "世界"}},
+        )
+        self.assertEqual(jcs_dumps(event.payload), '{"café":{"value":"世界"}}')
+
     def test_protocol_schema_literals_match_bindings(self):
         self.assertEqual(TaskEnvelope.from_mapping(envelope(schema="otclient.local-agent.task.v1")).schema, "otclient.local-agent.task.v1")
         event = AgentEvent.new(
@@ -169,7 +194,6 @@ class AgentProtocolTests(unittest.TestCase):
             kind="observation", state_before="IDLE", state_after="OBSERVING",
         )
         self.assertEqual(event.schema, "otclient.local-agent.event.v1")
-        self.assertIn("otclient.local-agent.result.v1", ResultEnvelope.__doc__ or "")
 
 
 if __name__ == "__main__":

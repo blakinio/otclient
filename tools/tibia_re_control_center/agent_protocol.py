@@ -99,6 +99,16 @@ def _enum(value: Any, enum_type: type[Enum], field: str) -> Any:
         raise ValidationError("INVALID_ENUM", f"{field} is not an admitted value", field) from exc
 
 
+def _validate_payload_string(value: str, field: str) -> str:
+    try:
+        value.encode("utf-8", "strict")
+    except UnicodeEncodeError as exc:
+        raise ValidationError("INVALID_UTF8", "payload strings must be valid UTF-8", field) from exc
+    if any(0xD800 <= ord(char) <= 0xDFFF for char in value):
+        raise ValidationError("INVALID_UTF8", "payload strings cannot contain surrogates", field)
+    return value
+
+
 def _freeze_payload(value: Any, field: str = "payload") -> MappingProxyType:
     if not isinstance(value, dict):
         raise ValidationError("INVALID_FIELD", "payload must be a dictionary", field)
@@ -106,7 +116,7 @@ def _freeze_payload(value: Any, field: str = "payload") -> MappingProxyType:
     for key, item in value.items():
         if not isinstance(key, str):
             raise ValidationError("INVALID_FIELD", "payload keys must be strings", field)
-        frozen[key] = _freeze_value(item, field)
+        frozen[_validate_payload_string(key, field)] = _freeze_value(item, field)
     return MappingProxyType(frozen)
 
 
@@ -115,7 +125,9 @@ def _freeze_value(value: Any, field: str) -> object:
         return _freeze_payload(value, field)
     if isinstance(value, (list, tuple)):
         return tuple(_freeze_value(entry, field) for entry in value)
-    if value is None or isinstance(value, (str, bool)):
+    if isinstance(value, str):
+        return _validate_payload_string(value, field)
+    if value is None or isinstance(value, bool):
         return value
     if isinstance(value, int):
         if abs(value) > MAX_SAFE_INTEGER:
@@ -171,8 +183,8 @@ class TaskEnvelope:
             raise ValidationError("INVALID_FIELD", "task envelope must be a mapping")
         keys = ("schema", "session_id", "task_id", "run_id", "idempotency_key", "trusted_main_sha", "client_identity", "objective", "allowed_actions", "physical_action_budget", "max_attempts", "deadline_epoch_ms", "runtime_access", "required_evidence", "secret_capability_ref")
         require_exact_keys(value, keys)
-        if value["schema"] not in ("TaskEnvelope.v1", "otclient.local-agent.task.v1"):
-            raise ValidationError("INVALID_SCHEMA", "schema is not an admitted TaskEnvelope schema", "schema")
+        if value["schema"] != "otclient.local-agent.task.v1":
+            raise ValidationError("INVALID_SCHEMA", "schema must be otclient.local-agent.task.v1", "schema")
         ids = {field: validate_opaque_id(value[field], field_name=field) for field in ("session_id", "task_id", "run_id", "idempotency_key")}
         trusted = _sha(value["trusted_main_sha"], "trusted_main_sha", _SHA40, 40)
         actions = value["allowed_actions"]
@@ -220,8 +232,6 @@ class AgentEvent:
 
 @dataclass(frozen=True)
 class ResultEnvelope:
-    """Result envelope binding for ``otclient.local-agent.result.v1``."""
-
     schema: str
     session_id: str
     run_id: str

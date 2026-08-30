@@ -21,7 +21,7 @@
 - [x] Verify causal RED while physical live job is SKIPPED: run `33315765050`, runtime job `99268806498` failed on missing V6, physical job `99268807332` SKIPPED.
 - [x] Minimal GREEN implemented: workflow current-generation condition V5 -> V6 and active task returned to static-safe `github_hosted` / `runtime_access:none` / budget 0.
 - [ ] Preserve V5 physical runner/guest/seed routing inert behind static task; rotate those only in a later fresh V6 routing/admission PR.
-- [ ] Exact-head runtime/static-audit/package/governance/self-hosted-boundary/CI GREEN.
+- [x] Exact-head candidate `b28599af6f73d024d4d56fcb6486199ca1cb8a07` GREEN: field6 `33315959590`, package `33315959597`, governance `33315959585`, boundary `33315959570`, CI `33315959686`; physical job `99269338963` SKIPPED.
 - [ ] Merge with expected-head guard and trusted-main readback.
 
 ## Successor rule

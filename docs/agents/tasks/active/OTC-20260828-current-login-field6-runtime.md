@@ -14,7 +14,7 @@ branch: fix/OTC-20260830-field6-v6-generation
 base_branch: main
 base_main: d1ce0ad811cf6a4a5a3466f7e5af045f39acab31
 created: 2026-08-28T19:00:00+02:00
-updated: 2026-08-30T16:03:48+02:00
+updated: 2026-08-30T16:08:11+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: github_actions_static
@@ -60,17 +60,17 @@ estimate_confidence: high
 decomposition_decision: phased
 decomposition_reason: revoke terminal V5 statically first; a fresh V6 guest and physical routing/admission require a separate trusted-main phase
 validation_level: focused
-last_completed_step: PR #815 RED run 33315765050 / job 99268806498 failed exactly on missing current V6 generation while physical job 99268807332 was skipped
+last_completed_step: PR #815 candidate b28599af6f73d024d4d56fcb6486199ca1cb8a07 passed exact-head runtime/static audit/package/governance/self-hosted boundary/CI; physical job 99269338963 skipped
 session_rotation_count: 6
 heavy_validation_runs: 1
 stale_takeover_count: 0
 human_interruptions: 1
 invocation_started_at: 2026-08-30T11:05:00+02:00
-last_progress_at: 2026-08-30T16:03:48+02:00
-ci_checks_for_current_head: 0
+last_progress_at: 2026-08-30T16:08:11+02:00
+ci_checks_for_current_head: 5
 ci_check_generation: field6_v6_static_green
 terminal_ci_wait_started_at: null
-terminal_ci_checks_for_current_generation: 0
+terminal_ci_checks_for_current_generation: 5
 unchanged_state_checks: 0
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 1
@@ -162,6 +162,18 @@ The workflow current-generation condition and trusted-main task check rotate to 
 # TDD evidence
 
 RED head `12ed31a58ddc9e33dc546f577aba41ef3117ba24` produced hosted run `33315765050`. Runtime contract job `99268806498` failed exactly because workflow lacked the current V6 generation literal. Physical job `99268807332` was SKIPPED. No runner, secret, client or physical action was used by the RED generation.
+
+# V6 static exact-head GREEN checkpoint
+
+Candidate head `b28599af6f73d024d4d56fcb6486199ca1cb8a07` passed:
+
+- field6 run `33315959590`: runtime job `99269338212` SUCCESS, fresh static audit `99269338409` SUCCESS, physical job `99269338963` SKIPPED;
+- package run `33315959597`, job `99269338316` SUCCESS;
+- governance run `33315959585`: jobs `99269338228` and `99269338281` SUCCESS;
+- self-hosted boundary run `33315959570`: jobs `99269338200` and `99269338225` SUCCESS;
+- CI run `33315959686`: syntax/actionlint job `99269366267` SUCCESS and `CI / Required` job `99269435334` SUCCESS.
+
+No V6 trigger, runner registration, credential exposure, client execution, login or physical action occurred.
 
 # Successor host rule
 

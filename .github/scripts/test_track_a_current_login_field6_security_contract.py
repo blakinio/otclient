@@ -20,16 +20,52 @@ def read(path: Path) -> str:
 
 
 task = read(TASK)
-for required in (
+static_required = (
+    "execution_class: github_hosted",
+    "execution_mode: github_actions_static",
+    "persistent_session_role: none",
+    "physical_e2e_required: false",
+    "runtime_access: none",
+    "runtime_owner_task: NOT_APPLICABLE",
+    "runtime_namespace: NOT_APPLICABLE",
+    "target_uniqueness: NOT_APPLICABLE",
+    "mutation_authorized: false",
+    "credentials_allowed: false",
+    "login_allowed: false",
+    "gui_input_authorized: false",
+    "process_control_authorized: false",
+    "character_selection_allowed: false",
+    "gameplay_allowed: false",
+    "network_payload_capture_allowed: false",
+    "physical_action_count: 0",
+)
+live_required = (
     "execution_class: independent_ephemeral_physical_runtime",
     "persistent_session_role: none",
     "physical_e2e_required: true",
+    "runtime_access: ephemeral_isolated",
+    "target_uniqueness: PROVEN",
+    "mutation_authorized: true",
+    "credentials_allowed: true",
+    "login_allowed: true",
+    "character_selection_allowed: false",
+    "gameplay_allowed: false",
+    "network_payload_capture_allowed: false",
+    "physical_action_budget: 1",
+    "physical_action_count: 0",
     f"independent_guest_name: {EXPECTED_GUEST}",
     f"independent_runner_name: {EXPECTED_RUNNER}",
     f"independent_rootfs_sha256: {EXPECTED_ROOTFS_SHA}",
-):
-    if required not in task:
-        raise SystemExit(f"FIELD6_SECURITY_CONTRACT_RED: task missing {required!r}")
+)
+static = all(required in task for required in static_required)
+live = all(required in task for required in live_required)
+if not (static or live):
+    missing_static = [required for required in static_required if required not in task]
+    missing_live = [required for required in live_required if required not in task]
+    raise SystemExit(
+        "FIELD6_SECURITY_CONTRACT_RED: task is neither static-safe nor live-authorized; "
+        f"static_missing={missing_static}; live_missing={missing_live}"
+    )
 
 workflow = read(WORKFLOW)
 run_attempt_guard = 'test "${GITHUB_RUN_ATTEMPT:?}" = "1"'

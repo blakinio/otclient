@@ -6,6 +6,7 @@ from functools import partial
 from pathlib import Path
 import tempfile
 import threading
+import traceback
 import unittest
 
 from tools.tibia_re_control_center.agent_protocol import AgentVisualState
@@ -64,6 +65,39 @@ def _infer(scheduler, model=QWEN_VISION_MODEL):
         num_ctx=QWEN_NUM_CTX,
         num_predict=QWEN_NUM_PREDICT,
     )
+
+
+def _capture_exception(test_case, exception_type, call):
+    try:
+        call()
+    except exception_type as error:
+        return error
+    test_case.fail(f"{exception_type.__name__} not raised")
+
+
+def _assert_sanitized_exception(test_case, error, code, forbidden):
+    test_case.assertEqual(code, str(error))
+    test_case.assertIsNone(error.__cause__)
+    test_case.assertIsNone(error.__context__)
+    graph = []
+    pending = [error]
+    seen = set()
+    while pending:
+        current = pending.pop()
+        if id(current) in seen:
+            continue
+        seen.add(id(current))
+        graph.append(str(current))
+        if current.__cause__ is not None:
+            pending.append(current.__cause__)
+        if current.__context__ is not None:
+            pending.append(current.__context__)
+    rendered = "".join(
+        traceback.format_exception(type(error), error, error.__traceback__)
+    )
+    outward = "\n".join(graph + [rendered])
+    for sentinel in forbidden:
+        test_case.assertNotIn(sentinel, outward)
 
 
 class ModelSlotSchedulerTests(unittest.TestCase):
@@ -126,6 +160,20 @@ class ModelSlotSchedulerTests(unittest.TestCase):
         self.assertEqual({"ok": True}, _infer(scheduler))
         self.assertTrue(scheduler.owns(QWEN_VISION_MODEL))
 
+    def test_model_slot_error_codes_are_allowlisted_and_value_free(self):
+        code_secret = "SENTINEL_SECRET_UNAPPROVED_CODE"
+        failure = _capture_exception(
+            self,
+            ValueError,
+            lambda: ModelSlotUnavailable(code_secret),
+        )
+        _assert_sanitized_exception(
+            self,
+            failure,
+            "model slot error code invalid",
+            (code_secret,),
+        )
+
     def test_zero_keep_alive_success_reconciles_empty(self):
         resident = [[]]
         scheduler = self._scheduler(resident, provider=lambda call: {"ok": True})
@@ -186,7 +234,7 @@ class ModelSlotSchedulerTests(unittest.TestCase):
 
         scheduler = self._scheduler(resident, provider=provider)
         _infer(scheduler)
-        with self.assertRaisesRegex(RuntimeError, "failed before target load"):
+        with self.assertRaisesRegex(ModelSlotUnavailable, "MODEL_INFERENCE_FAILED"):
             _infer(scheduler, "other:exact")
         self.assertEqual([], resident[0])
         self.assertFalse(scheduler.owns(QWEN_VISION_MODEL))
@@ -220,7 +268,7 @@ class ModelSlotSchedulerTests(unittest.TestCase):
             provider=lambda call: (_ for _ in ()).throw(RuntimeError("before load")),
             unload=lambda model: unloads.append(model),
         )
-        with self.assertRaisesRegex(RuntimeError, "before load"):
+        with self.assertRaisesRegex(ModelSlotUnavailable, "MODEL_INFERENCE_FAILED"):
             _infer(scheduler)
         self.assertFalse(scheduler.owns(QWEN_VISION_MODEL))
         resident[0] = [QWEN_VISION_MODEL]
@@ -235,14 +283,14 @@ class ModelSlotSchedulerTests(unittest.TestCase):
             raise RuntimeError("after load")
 
         scheduler = self._scheduler(resident, provider=after_load)
-        with self.assertRaisesRegex(RuntimeError, "after load"):
+        with self.assertRaisesRegex(ModelSlotUnavailable, "MODEL_INFERENCE_FAILED"):
             _infer(scheduler)
         self.assertTrue(scheduler.owns(QWEN_VISION_MODEL))
         scheduler.release()
         self.assertFalse(scheduler.owns(QWEN_VISION_MODEL))
 
         scheduler = self._scheduler([[]], provider=lambda call: (_ for _ in ()).throw(RuntimeError("auto empty")))
-        with self.assertRaisesRegex(RuntimeError, "auto empty"):
+        with self.assertRaisesRegex(ModelSlotUnavailable, "MODEL_INFERENCE_FAILED"):
             _infer(scheduler)
         self.assertFalse(scheduler.owns(QWEN_VISION_MODEL))
 
@@ -436,6 +484,144 @@ class ModelSlotSchedulerTests(unittest.TestCase):
         self.assertEqual([QWEN_VISION_MODEL], resident[0])
         self.assertEqual([QWEN_VISION_MODEL], unloads)
 
+    def test_unload_return_and_raise_failures_expose_only_fixed_codes(self):
+        foreign_secret = "SENTINEL_SECRET_FOREIGN_MODEL"
+        unload_secret = "SENTINEL_SECRET_UNLOAD_PROVIDER"
+        ps_secret = "SENTINEL_SECRET_RESIDENCY_PROVIDER"
+
+        resident = [[]]
+
+        def unload_to_foreign(model):
+            resident[0] = [foreign_secret]
+
+        scheduler = self._scheduler(resident, unload=unload_to_foreign)
+        _infer(scheduler)
+        failure = _capture_exception(
+            self,
+            ModelSlotUnavailable,
+            scheduler.release,
+        )
+        _assert_sanitized_exception(
+            self,
+            failure,
+            "MODEL_UNLOAD_NOT_VERIFIED",
+            (foreign_secret,),
+        )
+        self.assertFalse(scheduler.owns(QWEN_VISION_MODEL))
+
+        resident = [[]]
+
+        def unload_then_fail_unknown(model):
+            resident[0] = RuntimeError(ps_secret)
+            raise RuntimeError(unload_secret)
+
+        scheduler = self._scheduler(resident, unload=unload_then_fail_unknown)
+        _infer(scheduler)
+        failure = _capture_exception(
+            self,
+            ModelSlotUnavailable,
+            scheduler.release,
+        )
+        _assert_sanitized_exception(
+            self,
+            failure,
+            "MODEL_UNLOAD_FAILED",
+            (unload_secret, ps_secret),
+        )
+        self.assertFalse(scheduler.owns(QWEN_VISION_MODEL))
+
+    def test_digest_provider_exception_is_sanitized_and_preserves_old_owner(self):
+        digest_secret = "SENTINEL_SECRET_DIGEST_PROVIDER"
+        resident = [[]]
+        scheduler = self._scheduler(resident)
+        _infer(scheduler)
+        scheduler._digest = lambda model: (_ for _ in ()).throw(RuntimeError(digest_secret))
+
+        failure = _capture_exception(
+            self,
+            ModelSlotUnavailable,
+            lambda: _infer(scheduler, "other:exact"),
+        )
+
+        _assert_sanitized_exception(
+            self,
+            failure,
+            "MODEL_DIGEST_UNAVAILABLE",
+            (digest_secret,),
+        )
+        self.assertTrue(scheduler.owns(QWEN_VISION_MODEL))
+
+    def test_inference_provider_exception_normal_post_states_are_sanitized(self):
+        provider_secret = "SENTINEL_SECRET_INFERENCE_PROVIDER"
+        for post_state, owned in (([], False), ([QWEN_VISION_MODEL], True)):
+            with self.subTest(post_state=post_state):
+                resident = [[]]
+
+                def provider(call, state=post_state):
+                    resident[0] = state
+                    raise RuntimeError(provider_secret)
+
+                scheduler = self._scheduler(resident, provider=provider)
+                failure = _capture_exception(
+                    self,
+                    ModelSlotUnavailable,
+                    lambda: _infer(scheduler),
+                )
+                _assert_sanitized_exception(
+                    self,
+                    failure,
+                    "MODEL_INFERENCE_FAILED",
+                    (provider_secret,),
+                )
+                self.assertEqual(owned, scheduler.owns(QWEN_VISION_MODEL))
+
+    def test_inference_exception_with_unsafe_post_state_keeps_safety_primary(self):
+        provider_secret = "SENTINEL_SECRET_INFERENCE_FAILURE"
+        foreign_secret = "SENTINEL_SECRET_POST_MODEL"
+        ps_secret = "SENTINEL_SECRET_POST_RESIDENCY"
+        cases = (
+            ([foreign_secret], "DIFFERENT_RESIDENT_MODEL", (provider_secret, foreign_secret)),
+            (RuntimeError(ps_secret), "RESIDENCY_UNKNOWN", (provider_secret, ps_secret)),
+        )
+        for post_state, expected_code, forbidden in cases:
+            with self.subTest(expected_code=expected_code):
+                resident = [[]]
+
+                def provider(call, state=post_state):
+                    resident[0] = state
+                    raise RuntimeError(provider_secret)
+
+                scheduler = self._scheduler(resident, provider=provider)
+                failure = _capture_exception(
+                    self,
+                    ModelSlotUnavailable,
+                    lambda: _infer(scheduler),
+                )
+                _assert_sanitized_exception(
+                    self,
+                    failure,
+                    expected_code,
+                    forbidden,
+                )
+                self.assertFalse(scheduler.owns(QWEN_VISION_MODEL))
+
+    def test_inference_does_not_catch_process_control_exceptions(self):
+        for control_error in (KeyboardInterrupt(), SystemExit()):
+            with self.subTest(error_type=type(control_error).__name__):
+                resident = [[]]
+
+                def provider(call, error=control_error):
+                    raise error
+
+                scheduler = self._scheduler(resident, provider=provider)
+                propagated = _capture_exception(
+                    self,
+                    type(control_error),
+                    lambda: _infer(scheduler),
+                )
+                self.assertIs(control_error, propagated)
+                self.assertFalse(scheduler.owns(QWEN_VISION_MODEL))
+
     def _assert_unload_loses_ownership(self, *, operation, unload_raises):
         post_states = (
             ("foreign", ["foreign:model"]),
@@ -622,6 +808,66 @@ class AgentVisionSensorTests(unittest.TestCase):
         self.assertEqual(capture.sha256, result.capture_sha256)
         self.assertEqual(2, len(calls))
 
+    def test_capture_and_snapshot_os_errors_do_not_leak_paths_or_causes(self):
+        capture_secret = "SENTINEL_SECRET_CAPTURE_PATH"
+        with tempfile.TemporaryDirectory() as raw:
+            capture = self._capture(
+                Path(raw),
+                filename=f"{capture_secret}.bin",
+            )
+            capture.path.unlink()
+            failure = _capture_exception(
+                self,
+                ValueError,
+                lambda: self._sensor(lambda call: None).observe(capture),
+            )
+            _assert_sanitized_exception(
+                self,
+                failure,
+                "capture bytes unavailable",
+                (capture_secret, str(capture.path)),
+            )
+
+            capture = self._capture(Path(raw), filename="snapshot-source.bin")
+            snapshot_parents = []
+
+            def unlink_snapshot(call):
+                snapshot = Path(call["image_path"])
+                snapshot_parents.append(snapshot.parent)
+                snapshot.unlink()
+                return _visual_evidence(capture)
+
+            failure = _capture_exception(
+                self,
+                ValueError,
+                lambda: self._sensor(unlink_snapshot).observe(capture),
+            )
+            _assert_sanitized_exception(
+                self,
+                failure,
+                "capture snapshot integrity invalid",
+                ("capture.snapshot", "tibia-re-vision-"),
+            )
+            self.assertFalse(snapshot_parents[0].exists())
+
+    def test_strict_output_diagnostics_never_include_untrusted_values(self):
+        output_secret = "SENTINEL_SECRET_MODEL_OUTPUT"
+        with tempfile.TemporaryDirectory() as raw:
+            capture = self._capture(Path(raw))
+            evidence = _visual_evidence(capture)
+            evidence[output_secret] = {"raw": output_secret}
+            failure = _capture_exception(
+                self,
+                ValueError,
+                lambda: self._sensor(lambda call: evidence).observe(capture),
+            )
+        _assert_sanitized_exception(
+            self,
+            failure,
+            "VisualEvidence invalid: payload keys invalid",
+            (output_secret,),
+        )
+
     def test_provider_digest_and_schema_failures_all_allow_exact_retry(self):
         with tempfile.TemporaryDirectory() as raw:
             directory = Path(raw)
@@ -636,7 +882,7 @@ class AgentVisionSensorTests(unittest.TestCase):
                 return _visual_evidence(capture)
 
             sensor = self._sensor(flaky_provider)
-            with self.assertRaisesRegex(RuntimeError, "transient provider"):
+            with self.assertRaisesRegex(ModelSlotUnavailable, "MODEL_INFERENCE_FAILED"):
                 sensor.observe(capture)
             sensor.observe(capture)
             self.assertEqual(2, len(provider_calls))

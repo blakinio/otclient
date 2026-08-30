@@ -29,12 +29,28 @@ QWEN_VISION_PROFILE_ID = f"ollama:{QWEN_VISION_MODEL}@sha256:{QWEN_VISION_DIGEST
 QWEN_NUM_CTX = 4096
 QWEN_NUM_PREDICT = 256
 QWEN_TEMPERATURE = 0
+_UNSET = object()
+_MODEL_SLOT_ERROR_CODES = frozenset({
+    "DIFFERENT_RESIDENT_MODEL",
+    "MODEL_DIGEST_MISMATCH",
+    "MODEL_DIGEST_UNAVAILABLE",
+    "MODEL_INFERENCE_FAILED",
+    "MODEL_SLOT_NOT_OWNED",
+    "MODEL_SLOT_REENTRANT",
+    "MODEL_UNLOAD_FAILED",
+    "MODEL_UNLOAD_NOT_VERIFIED",
+    "MULTIPLE_RESIDENT_MODELS",
+    "RESIDENCY_UNKNOWN",
+    "TARGET_NOT_OWNED",
+})
 
 
 class ModelSlotUnavailable(RuntimeError):
     """The sole local-model slot cannot safely be used by this scheduler."""
 
     def __init__(self, code: str) -> None:
+        if code not in _MODEL_SLOT_ERROR_CODES:
+            raise ValueError("model slot error code invalid")
         self.code = code
         super().__init__(code)
 
@@ -129,10 +145,13 @@ class ModelSlotScheduler:
         return resident
 
     def _verify_digest(self, model: str, expected_digest: str) -> None:
+        actual: object = _UNSET
         try:
             actual = self._digest(model)
-        except Exception as exc:
-            raise ModelSlotUnavailable("MODEL_DIGEST_UNAVAILABLE") from exc
+        except Exception:
+            pass
+        if actual is _UNSET:
+            raise ModelSlotUnavailable("MODEL_DIGEST_UNAVAILABLE")
         if not isinstance(actual, str) or actual.lower() != expected_digest.lower():
             raise ModelSlotUnavailable("MODEL_DIGEST_MISMATCH")
 
@@ -144,11 +163,11 @@ class ModelSlotScheduler:
         return ModelSlotUnavailable(code)
 
     def _unload_owned_and_verify_empty(self, model: str) -> None:
-        unload_error: Exception | None = None
+        unload_failed = False
         try:
             self._unload(model)
-        except Exception as exc:
-            unload_error = exc
+        except Exception:
+            unload_failed = True
 
         # Classify the one post-effect observation identically whether the
         # provider returned or raised.  Only exact continuity proves that the
@@ -157,8 +176,8 @@ class ModelSlotScheduler:
         resident = self._residency()
         if resident != [model]:
             self._owned_model = None
-        if unload_error is not None:
-            raise ModelSlotUnavailable("MODEL_UNLOAD_FAILED") from unload_error
+        if unload_failed:
+            raise ModelSlotUnavailable("MODEL_UNLOAD_FAILED")
         if resident != []:
             raise ModelSlotUnavailable("MODEL_UNLOAD_NOT_VERIFIED")
 
@@ -221,6 +240,8 @@ class ModelSlotScheduler:
             self._transition_thread = thread_id
             try:
                 self._admit(model, expected_digest)
+                response: object = _UNSET
+                provider_failed = False
                 try:
                     response = self._infer(
                         model,
@@ -234,13 +255,23 @@ class ModelSlotScheduler:
                         num_ctx=num_ctx,
                         num_predict=num_predict,
                     )
-                except BaseException as provider_error:
-                    try:
-                        self._reconcile_provider_residency(model)
-                    except ModelSlotUnavailable as residency_error:
-                        raise residency_error from provider_error
-                    raise
-                self._reconcile_provider_residency(model)
+                except Exception:
+                    provider_failed = True
+
+                # Reconcile outside the provider handler so untrusted provider
+                # exception objects cannot become an implicit context.  A
+                # residency safety failure remains primary over inference.
+                residency_failure: str | None = None
+                try:
+                    self._reconcile_provider_residency(model)
+                except ModelSlotUnavailable as error:
+                    residency_failure = error.code
+                if residency_failure is not None:
+                    raise ModelSlotUnavailable(residency_failure)
+                if provider_failed:
+                    raise ModelSlotUnavailable("MODEL_INFERENCE_FAILED")
+                if response is _UNSET:
+                    raise AssertionError("provider response state invalid")
                 return response
             finally:
                 self._transition_thread = None
@@ -298,19 +329,31 @@ class AgentVisionSensor:
             raise ValueError("capture.source_monotonic_ns invalid")
         if not isinstance(capture.sha256, str) or len(capture.sha256) != 64:
             raise ValueError("capture.sha256 invalid")
+        capture_bytes: object = _UNSET
         try:
-            bytes_ = capture.path.read_bytes()
-        except OSError as exc:
-            raise ValueError("capture bytes unavailable") from exc
+            capture_bytes = capture.path.read_bytes()
+        except OSError:
+            pass
+        if capture_bytes is _UNSET:
+            raise ValueError("capture bytes unavailable")
+        if not isinstance(capture_bytes, bytes):
+            raise AssertionError("capture reader returned non-bytes")
+        bytes_ = capture_bytes
         if not bytes_:
             raise ValueError("capture bytes empty")
         actual = hashlib.sha256(bytes_).hexdigest()
         if actual != capture.sha256.lower():
             raise ValueError("capture sha256 does not match bytes")
-        validate_input_manifest(
-            {"secret_safe": capture.secret_safe, "sha256": capture.sha256},
-            capture.path,
-        )
+        manifest_unavailable = False
+        try:
+            validate_input_manifest(
+                {"secret_safe": capture.secret_safe, "sha256": capture.sha256},
+                capture.path,
+            )
+        except OSError:
+            manifest_unavailable = True
+        if manifest_unavailable:
+            raise ValueError("capture bytes unavailable")
         return bytes_, actual
 
     @staticmethod
@@ -331,16 +374,30 @@ class AgentVisionSensor:
 
     @classmethod
     def _verify_snapshot(cls, path: Path, expected_sha256: str) -> None:
+        metadata: object = _UNSET
         try:
             metadata = path.lstat()
-            if not cls._snapshot_metadata_is_safe(
-                metadata.st_mode,
-                windows=os.name == "nt",
-            ):
-                raise ValueError("capture snapshot integrity invalid")
-            bytes_ = path.read_bytes()
-        except OSError as exc:
-            raise ValueError("capture snapshot integrity invalid") from exc
+        except OSError:
+            pass
+        if metadata is _UNSET:
+            raise ValueError("capture snapshot integrity invalid")
+        if not isinstance(metadata, os.stat_result):
+            raise AssertionError("snapshot metadata state invalid")
+        if not cls._snapshot_metadata_is_safe(
+            metadata.st_mode,
+            windows=os.name == "nt",
+        ):
+            raise ValueError("capture snapshot integrity invalid")
+        snapshot_bytes: object = _UNSET
+        try:
+            snapshot_bytes = path.read_bytes()
+        except OSError:
+            pass
+        if snapshot_bytes is _UNSET:
+            raise ValueError("capture snapshot integrity invalid")
+        if not isinstance(snapshot_bytes, bytes):
+            raise AssertionError("snapshot reader returned non-bytes")
+        bytes_ = snapshot_bytes
         if hashlib.sha256(bytes_).hexdigest() != expected_sha256:
             raise ValueError("capture snapshot integrity invalid")
 
@@ -462,6 +519,7 @@ class AgentVisionSensor:
     def observe(self, capture: SecretSafeCapture) -> VisionObservation:
         bytes_, actual_sha256 = self._capture_bytes(capture)
         self._reserve_identity(capture, actual_sha256)
+        observation_complete = False
         try:
             with self._snapshot(bytes_, actual_sha256) as snapshot_path:
                 response = self._scheduler.infer(
@@ -486,8 +544,9 @@ class AgentVisionSensor:
                     evidence_ref=capture.evidence_ref,
                     capture_sha256=actual_sha256,
                 )
-        except BaseException:
-            self._rollback_identity(capture, actual_sha256)
-            raise
+            observation_complete = True
+        finally:
+            if not observation_complete:
+                self._rollback_identity(capture, actual_sha256)
         self._commit_identity(capture, actual_sha256)
         return result

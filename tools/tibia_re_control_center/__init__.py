@@ -6,6 +6,19 @@ Official Tibia runtime/client access remains absent.
 """
 
 from .artifact import ArtifactStore
+from .agent_protocol import (
+    AgentEvent,
+    AgentOperationalState,
+    AgentProvenance,
+    AgentSessionRecord,
+    AgentVisualState,
+    ClientIdentity,
+    NamedAgentAction,
+    OwnerControlCommand,
+    ResultEnvelope,
+    ResultStatus,
+    TaskEnvelope,
+)
 from .comparison import ComparisonProfile, ComparisonResult, compare_runs
 from .engine import EngineRunResult, ScenarioEngine
 from .execution import CancellationToken, MutationCoordinator
@@ -24,18 +37,29 @@ from .store import DeterministicDurableStore
 __all__ = [
     "ActionRequest",
     "ActionResult",
+    "AgentEvent",
+    "AgentOperationalState",
+    "AgentProvenance",
+    "AgentSessionRecord",
+    "AgentVisualState",
     "ArtifactStore",
     "Authority",
     "CancellationToken",
+    "ClientIdentity",
     "ComparisonProfile",
     "ComparisonResult",
     "DeterministicDurableStore",
     "EffectBound",
     "EngineRunResult",
     "MutationCoordinator",
+    "NamedAgentAction",
+    "OwnerControlCommand",
     "Recorder",
+    "ResultEnvelope",
+    "ResultStatus",
     "ScenarioEngine",
     "SideEffectBudget",
+    "TaskEnvelope",
     "ValidationError",
     "compare_runs",
     "parse_and_validate",

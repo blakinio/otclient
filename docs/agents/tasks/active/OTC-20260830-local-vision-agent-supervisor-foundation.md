@@ -13,8 +13,9 @@ base_branch: docs/OTC-20260830-local-vision-agent-supervisor-discovery
 trusted_main: 18ff83053f5c5d85c9bce6debab0f7fef6b79ecd
 parent_task: OTC-20260830-local-vision-agent-supervisor-discovery
 parent_pr: 808
-created: 2026-08-30T12:05:00+02:00
-updated_at: 2026-08-30T12:05:00+02:00
+implementation_pr: 810
+created: 2026-08-30T11:51:56+02:00
+updated_at: 2026-08-30T11:53:25+02:00
 risk: high
 execution_class: repository_worktree
 execution_mode: subagent_driven_development
@@ -54,14 +55,19 @@ physical_action_count: 0
 approved_architecture: approach_c
 approved_spec: docs/superpowers/specs/2026-08-30-local-track-a-vision-agent-supervisor-design.md
 implementation_plan: docs/superpowers/plans/2026-08-30-local-track-a-vision-agent-supervisor.md
+canonical_prompt: docs/agents/prompts/OTC_20260830_LOCAL_VISION_AGENT_SUPERVISOR_FOUNDATION_SDD.md
+alias_prompt: docs/agents/prompts/OTC_20260830_LOCAL_VISION_AGENT_SUPERVISOR_FOUNDATION_SDD_ALIAS.md
 owned_paths:
   - docs/agents/tasks/active/OTC-20260830-local-vision-agent-supervisor-foundation.md
   - docs/agents/reports/OTC-20260830-local-vision-agent-supervisor-foundation.md
+  - docs/agents/prompts/OTC_20260830_LOCAL_VISION_AGENT_SUPERVISOR_FOUNDATION_SDD.md
+  - docs/agents/prompts/OTC_20260830_LOCAL_VISION_AGENT_SUPERVISOR_FOUNDATION_SDD_ALIAS.md
   - tools/tibia_re_vision/
   - tools/tibia_re_control_center/
   - tests/tools/tibia_re_vision/
   - tests/tools/tibia_re_control_center/
 related_prs:
+  - PR #810: stacked Draft implementation lane
   - PR #808: stacked documentation/design/planning parent; keep Draft until its own closeout gate
   - PR #790: merged vision benchmark evidence and reusable Qwen3-VL/Ollama safety behavior
   - PR #615: stale bounded Ollama PoC; reuse independently revalidated invariants only
@@ -69,7 +75,7 @@ current_environment:
   remote_desktop_commander: offline
   current_chat_subagent_dispatch: unavailable
 current_blocker: EXECUTION_ENVIRONMENT_SUBAGENT_WORKTREE_UNAVAILABLE
-next_action: start a Codex SDD coordinator on feat/OTC-20260830-local-vision-agent-supervisor-foundation, create or verify an isolated worktree, revalidate live main/open ownership/spec/plan, run a clean baseline, create the plan-scoped SDD ledger, then execute Task 1 with RED-first TDD and the mandated implementer-review loop
+next_action: start OTC-LOCAL-VISION-AGENT-SUPERVISOR-FOUNDATION-SDD in Codex/Spark on feat/OTC-20260830-local-vision-agent-supervisor-foundation, create or verify an isolated worktree, revalidate live main/open ownership/spec/plan, run a clean baseline, create the plan-scoped SDD ledger, then execute Task 1 with RED-first TDD and the mandated implementer-review loop
 ---
 
 # Local vision-agent supervisor foundation implementation
@@ -84,7 +90,10 @@ This authorization permits repository implementation and tests only. It does **n
 
 - Design: `docs/superpowers/specs/2026-08-30-local-track-a-vision-agent-supervisor-design.md`
 - Plan: `docs/superpowers/plans/2026-08-30-local-track-a-vision-agent-supervisor.md`
+- Canonical SDD prompt: `docs/agents/prompts/OTC_20260830_LOCAL_VISION_AGENT_SUPERVISOR_FOUNDATION_SDD.md`
+- Alias: `OTC-LOCAL-VISION-AGENT-SUPERVISOR-FOUNDATION-SDD`
 - Parent checkpoint: PR #808
+- Implementation Draft PR: #810
 - Live Git/GitHub state remains source of truth.
 
 ## Required execution workflow

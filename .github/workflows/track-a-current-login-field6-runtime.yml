@@ -26,14 +26,17 @@ env:
   EXPECTED_SIZE: '52105824'
   EXPECTED_SHA: d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a
   TASK_STATE: /home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260828-current-login-field6-runtime
-  EXPECTED_INDEPENDENT_RUNNER_NAME: molehill-otclient-v5-01
-  EXPECTED_INDEPENDENT_GUEST_NAME: OTClientV5Clean
+  EXPECTED_INDEPENDENT_RUNNER_NAME: molehill-otclient-v6-01
+  EXPECTED_INDEPENDENT_GUEST_NAME: OTClientV6Clean
   EXPECTED_INDEPENDENT_ROOTFS_URL: https://cloud-images.ubuntu.com/releases/noble/release-20260801/ubuntu-24.04-server-cloudimg-amd64-root.tar.xz
   EXPECTED_INDEPENDENT_ROOTFS_SHA: 915b4be62933475c3fb5f5031aa2e159294db95fb32aaa9e8b317aadcb6c065d
   PROVENANCE_FILE: /etc/otclient-field6-runner-provenance
-  EXPECTED_SEED_PATH: /opt/otclient-v5-seed/seed.tar.gz
+  EXPECTED_SEED_PATH: /opt/otclient-v6-seed/seed.tar.gz
   EXPECTED_SEED_SIZE: '412272538'
   EXPECTED_SEED_SHA: 64031ba091884c5b1be71416394b8ada6dac9529cfed60e7b4856c04b7e5b016
+  EXPECTED_PROVENANCE_MODE: '0644'
+  EXPECTED_SEED_DIR_MODE: '0555'
+  EXPECTED_SEED_MODE: '0444'
 
 jobs:
   contract:
@@ -67,7 +70,7 @@ jobs:
 
   fresh-audit:
     if: github.event_name == 'pull_request'
-    name: Fresh independent V5 admission audit
+    name: Fresh independent V6 admission audit
     runs-on: ubuntu-24.04
     timeout-minutes: 4
     env:
@@ -103,7 +106,7 @@ jobs:
       github.event.comment.user.login == github.repository_owner &&
       github.event.comment.body == 'AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V6 once=true'
     name: One-shot isolated field6 observation
-    runs-on: ${{ format('field6-v5-{0}', github.event.comment.id) }}
+    runs-on: ${{ format('field6-v6-{0}', github.event.comment.id) }}
     timeout-minutes: 45
     concurrency:
       group: official-client-re-current-login-field6-runtime
@@ -112,7 +115,7 @@ jobs:
       - name: Prove independent clean guest provenance
         shell: bash
         env:
-          EXPECTED_ONE_TIME_LABEL: ${{ format('field6-v5-{0}', github.event.comment.id) }}
+          EXPECTED_ONE_TIME_LABEL: ${{ format('field6-v6-{0}', github.event.comment.id) }}
         run: |
           set -Eeuo pipefail
           test "${GITHUB_RUN_ATTEMPT:?}" = "1"
@@ -124,14 +127,16 @@ jobs:
           python3 - "$PROVENANCE_FILE" "$EXPECTED_INDEPENDENT_GUEST_NAME" \
             "$EXPECTED_INDEPENDENT_ROOTFS_URL" "$EXPECTED_INDEPENDENT_ROOTFS_SHA" \
             "$EXPECTED_INDEPENDENT_RUNNER_NAME" "$EXPECTED_ONE_TIME_LABEL" \
-            "$EXPECTED_SEED_PATH" "$EXPECTED_SEED_SIZE" "$EXPECTED_SEED_SHA" <<'PY'
+            "$EXPECTED_SEED_PATH" "$EXPECTED_SEED_SIZE" "$EXPECTED_SEED_SHA" \
+            "$EXPECTED_PROVENANCE_MODE" "$EXPECTED_SEED_DIR_MODE" "$EXPECTED_SEED_MODE" <<'PY'
           import hashlib, json, pathlib, re, stat, sys
-          path,guest,url,rootfs_sha,runner,label,seed_path,seed_size,seed_sha=sys.argv[1:]
+          path,guest,url,rootfs_sha,runner,label,seed_path,seed_size,seed_sha,provenance_mode,seed_dir_mode,seed_mode=sys.argv[1:]
           p=pathlib.Path(path)
           st=p.lstat()
           if not stat.S_ISREG(st.st_mode) or p.is_symlink(): raise SystemExit('FIELD6_PROVENANCE_NOT_REGULAR')
           if st.st_uid != 0 or st.st_gid != 0: raise SystemExit('FIELD6_PROVENANCE_NOT_ROOT_OWNED')
           if st.st_mode & 0o022: raise SystemExit('FIELD6_PROVENANCE_WRITABLE_BY_NONROOT')
+          if format(stat.S_IMODE(st.st_mode),'04o') != provenance_mode: raise SystemExit('FIELD6_PROVENANCE_MODE_INVALID')
           data=json.loads(p.read_text(encoding='utf-8'))
           required={
             'schema','guest_name','rootfs_url','rootfs_sha256','runner_name','one_time_label',
@@ -140,7 +145,7 @@ jobs:
             'seed_path','seed_size','seed_sha256','seed_preflight_verified'
           }
           if set(data) != required: raise SystemExit('FIELD6_PROVENANCE_SCHEMA_KEYS_INVALID')
-          if data['schema'] != 'otclient.track-a.independent-field6-runner.v2': raise SystemExit('FIELD6_PROVENANCE_SCHEMA_INVALID')
+          if data['schema'] != 'otclient.track-a.independent-field6-runner.v3': raise SystemExit('FIELD6_PROVENANCE_SCHEMA_INVALID')
           expected={'guest_name':guest,'rootfs_url':url,'rootfs_sha256':rootfs_sha,'runner_name':runner,'one_time_label':label,'seed_path':seed_path,'seed_sha256':seed_sha}
           for key,value in expected.items():
             if data.get(key) != value: raise SystemExit('FIELD6_PROVENANCE_'+key.upper()+'_MISMATCH')
@@ -150,10 +155,16 @@ jobs:
           if not isinstance(data['generation_nonce'],str) or not re.fullmatch(r'[0-9a-f]{32,64}',data['generation_nonce']):
             raise SystemExit('FIELD6_PROVENANCE_GENERATION_NONCE_INVALID')
           seed=pathlib.Path(seed_path)
+          seed_dir=seed.parent
+          seed_dir_st=seed_dir.lstat()
+          if not stat.S_ISDIR(seed_dir_st.st_mode) or seed_dir.is_symlink(): raise SystemExit('FIELD6_SEED_DIR_INVALID')
+          if seed_dir_st.st_uid != 0 or seed_dir_st.st_gid != 0: raise SystemExit('FIELD6_SEED_DIR_NOT_ROOT_OWNED')
+          if format(stat.S_IMODE(seed_dir_st.st_mode),'04o') != seed_dir_mode: raise SystemExit('FIELD6_SEED_DIR_MODE_INVALID')
           seed_st=seed.lstat()
           if not stat.S_ISREG(seed_st.st_mode) or seed.is_symlink(): raise SystemExit('FIELD6_SEED_NOT_REGULAR')
           if seed_st.st_uid != 0 or seed_st.st_gid != 0: raise SystemExit('FIELD6_SEED_NOT_ROOT_OWNED')
           if seed_st.st_mode & 0o022: raise SystemExit('FIELD6_SEED_WRITABLE_BY_NONROOT')
+          if format(stat.S_IMODE(seed_st.st_mode),'04o') != seed_mode: raise SystemExit('FIELD6_SEED_MODE_INVALID')
           if seed_st.st_size != int(seed_size): raise SystemExit('FIELD6_SEED_SIZE_MISMATCH')
           h=hashlib.sha256()
           with seed.open('rb') as f:
@@ -214,7 +225,10 @@ jobs:
           grep -Fqx "independent_seed_path: $EXPECTED_SEED_PATH" "$task"
           grep -Fqx "independent_seed_size: $EXPECTED_SEED_SIZE" "$task"
           grep -Fqx "independent_seed_sha256: $EXPECTED_SEED_SHA" "$task"
-          grep -Fqx 'independent_runner_provenance_schema: otclient.track-a.independent-field6-runner.v2' "$task"
+          grep -Fqx 'independent_runner_provenance_schema: otclient.track-a.independent-field6-runner.v3' "$task"
+          grep -Fqx "independent_provenance_mode: $EXPECTED_PROVENANCE_MODE" "$task"
+          grep -Fqx "independent_seed_dir_mode: $EXPECTED_SEED_DIR_MODE" "$task"
+          grep -Fqx "independent_seed_mode: $EXPECTED_SEED_MODE" "$task"
           grep -Fq 'AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V6 once=true' "$task"
           python3 .github/scripts/test_track_a_agent_runtime_governance.py
           python3 .github/scripts/test_track_a_current_login_field6_runtime.py

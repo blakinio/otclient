@@ -29,15 +29,15 @@ V6 must use:
 
 - [x] Security contract expects V6 runner/guest/label/admission/seed path and new independent-runtime contract v3.
 - [x] Security contract rejects current V5 physical runner/guest/label and requires exact readability-mode markers.
-- [ ] Open Draft PR and verify hosted causal RED while physical job is SKIPPED.
+- [x] Draft PR #816 hosted RED head `fbfa35ce78b347f3a9a64e0857d59fd9d458961f`: run `33316729039`, runtime job `99271430782` FAILURE on missing `field6-v6-*`, fresh audit `99271430912` FAILURE, physical job `99271431442` SKIPPED.
 
 ### Task 2 ? GREEN routing/admission
 
-- [ ] Create `TRACK_A_INDEPENDENT_EPHEMERAL_PHYSICAL_RUNTIME_V3.md` with exact readability modes.
-- [ ] Rotate workflow env/label/schema/seed path and executable physical identity V5 -> V6 while keeping current generation V6 trigger unchanged.
-- [ ] Rotate helper and package-acquisition runner/seed allowlists V5 -> V6.
-- [ ] Update independent admission audit to V6 and contract v3.
-- [ ] Change active task to `independent_ephemeral_physical_runtime`, one-login budget, admission source `PR_758_COMMENT_5469210031`, exact V6 guest/runner/seed/modes.
+- [x] Create `TRACK_A_INDEPENDENT_EPHEMERAL_PHYSICAL_RUNTIME_V3.md` with exact readability modes.
+- [x] Rotate workflow env/label/schema/seed path and executable physical identity V5 -> V6 while keeping current generation V6 trigger unchanged.
+- [x] Rotate helper and package-acquisition runner/seed allowlists V5 -> V6.
+- [x] Update independent admission audit to V6 and contract v3.
+- [x] Change active task to `independent_ephemeral_physical_runtime`, one-login budget, admission source `PR_758_COMMENT_5469210031`, exact V6 guest/runner/seed/modes.
 - [ ] Exact-head hosted runtime/security/admission/package/governance/boundary/CI GREEN; physical job SKIPPED; merge with expected-head guard.
 
 ### Task 3 ? one-shot V6
@@ -48,3 +48,5 @@ V6 must use:
 - [ ] Register exact ephemeral/no-default-label runner via masked `ACTIONS_RUNNER_INPUT_TOKEN`; start one job.
 - [ ] Destroy V6 guest after terminal outcome regardless of result; never rerun V6.
 - [ ] If scalar proven, promote sanitized scalar to trusted main and continue Track B/global-login closeout.
+
+Local candidate falsification: runtime/security/seed contracts PASS; full independent admission audit PASS; Bash syntax PASS; git diff --check PASS. Hosted GREEN remains required before merge.

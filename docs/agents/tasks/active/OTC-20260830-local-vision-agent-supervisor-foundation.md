@@ -10,12 +10,12 @@ task_kind: implementation
 phase: implementation_execution
 branch: feat/OTC-20260830-local-vision-agent-supervisor-foundation
 base_branch: docs/OTC-20260830-local-vision-agent-supervisor-discovery
-trusted_main: 82bd4ef6d11431a40e47d8eea6fa15f372edcdc4
+trusted_main: 0b5e473aed4e61f05fc28005f1c0ec9cd99cbf61
 parent_task: OTC-20260830-local-vision-agent-supervisor-discovery
 parent_pr: 808
 implementation_pr: 810
 created: 2026-08-30T11:51:56+02:00
-updated_at: 2026-08-30T12:38:48Z
+updated_at: 2026-08-30T13:24:38Z
 risk: high
 execution_class: repository_worktree
 execution_mode: subagent_driven_development
@@ -76,7 +76,7 @@ current_environment:
   codex_worktree: available
   codex_subagent_dispatch: available
 current_blocker: NONE
-next_action: dispatch Task 1 implementer from the plan-scoped SDD brief, require RED-first evidence and a committed report, then run the independent spec/quality review and any required fix loop before Task 2
+next_action: dispatch Task 3 persistence implementer from the plan-scoped SDD brief, including the reviewed immutable Mapping payload traversal ruling, then require restart/idempotency/privacy/event-sequence TDD evidence and independent review before Task 4
 ---
 
 # Local vision-agent supervisor foundation implementation
@@ -101,14 +101,14 @@ This authorization permits repository implementation and tests only. It does **n
 
 Use `superpowers:using-git-worktrees`, `superpowers:subagent-driven-development`, and `superpowers:test-driven-development` exactly as applicable. Maintain the plan-scoped SDD ledger. Do not run multiple implementation subagents concurrently against shared files. Each implementation task requires its own independent spec/quality review before the next task.
 
-The Codex execution environment is now available. Live Git/GitHub state was reconciled, an isolated worktree was verified, the clean baseline passed, and the plan-scoped SDD ledger contains the required dependency/interface scan and rulings. Task 1 is the first uncompleted implementation task.
+The Codex execution environment is available. Live Git/GitHub state was reconciled, an isolated worktree was verified, the clean baseline passed, and the plan-scoped SDD ledger contains the required dependency/interface scan and rulings. Tasks 1 and 2 are complete with independent review; Task 3 is the first uncompleted implementation task.
 
 ## Context checkpoint
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-30T12:38:48Z
-head: 0cf3a1302579a5dad2a0de4f331d7f41451dd1d9
+updated_at: 2026-08-30T13:24:38Z
+head: 6dc038c0863db3265cc8354c4cb6167ce0bdda50
 branch: feat/OTC-20260830-local-vision-agent-supervisor-foundation
 pr: 810
 status: implementing
@@ -129,10 +129,12 @@ proven:
   - Control Center baseline passed 253 tests with 2 skipped.
   - Vision benchmark baseline passed 34 tests.
   - Frozen authority remains runtime_access none with physical action budget and count zero.
+  - Task 1 reusable vision core is independently approved with zero findings.
+  - Task 2 strict protocol completed three reviewed fix rounds and the final re-review reports all findings addressed.
 derived:
-  - Current main changes are disjoint from the planned implementation surfaces, so the live stacked PR base is safe for Task 1 execution.
+  - Current main changes through 0b5e473aed4e61f05fc28005f1c0ec9cd99cbf61 are disjoint from the implementation surfaces, so the live stacked PR base remains safe for Task 3 execution.
 unknown:
-  - Task 1 RED and GREEN results until the fresh implementer completes them.
+  - Task 3 RED and GREEN results until the fresh persistence implementer completes them.
   - Exact-head CI outcome after the first pushed milestone.
 conflicts: []
 first_failure:
@@ -151,6 +153,9 @@ validation:
   - command: python -m unittest discover -s tools/tibia-re-vision-benchmark/tests -p test_*.py -q
     result: PASS
     evidence: 34 tests passed in 6.069 seconds on initial implementation head
+  - command: Wave 1 combined focused readback on 6dc038c0863db3265cc8354c4cb6167ce0bdda50
+    result: PASS
+    evidence: reusable vision 7 tests, agent protocol 17 tests, frozen benchmark 34 tests, and direct-script offline help all passed
 blockers: []
-next_action: Dispatch the Task 1 implementer from the generated plan-scoped brief and require RED-first evidence, GREEN regressions, self-review, commit, and report before independent review.
+next_action: Dispatch the Task 3 persistence implementer from the generated plan-scoped brief with the reviewed Mapping traversal ruling, then require RED-first restart, idempotency, privacy, and durable-sequence evidence before independent review.
 ```

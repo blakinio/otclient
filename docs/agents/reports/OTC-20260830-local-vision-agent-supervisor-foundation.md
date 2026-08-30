@@ -54,9 +54,32 @@ Clean baseline on the initial implementation head:
 
 No architecture question is open. No authority expansion occurred.
 
+## Wave 1 implementation checkpoint
+
+Task 1 — reusable PR #790 vision/Ollama safety core:
+
+- implementation `0f2a0927c`;
+- required missing-module RED recorded;
+- reusable package: 7 tests PASS;
+- frozen vision benchmark: 34 tests PASS;
+- direct-script `--help`: PASS without provider access;
+- independent review: spec compliant / Approved, zero findings.
+
+Task 2 — strict agent protocol:
+
+- implementation `622b466bd`;
+- reviewed fixes `bb33609e4`, `b200e5fc1`, `6dc038c08`;
+- required missing-module RED plus focused fix-round RED evidence recorded;
+- final focused protocol suite: 17 tests PASS;
+- final scoped re-review: all findings addressed, no new breakage.
+
+Material protocol rulings are durable in the SDD ledger: raw PR #790 `IN_GAME_VISUAL` remains separate from normalized `WORLD_VISUAL`; the canonical task wire literal is `otclient.local-agent.task.v1`; event payloads preserve the exact declared field while using a recursively immutable, JCS-safe Mapping representation. Task 3 must extend existing persistence privacy and JSON traversal to `Mapping` before storing that representation.
+
+Fresh combined Wave 1 readback on `6dc038c0863db3265cc8354c4cb6167ce0bdda50` passed 7 reusable-vision tests, 17 protocol tests, 34 frozen benchmark tests, and the offline direct-script help smoke. Live `main` advanced to `0b5e473aed4e61f05fc28005f1c0ec9cd99cbf61` through PR #814; its three package-materializer files are disjoint from this implementation.
+
 ## Current continuation
 
-Task 1 is the first uncompleted task. Dispatch its fresh implementer from the generated SDD brief, require RED-first TDD evidence plus commit/report, and run the separate spec/quality reviewer before advancing. Continue through Task 10 and the broad whole-branch review unless a named stop condition occurs.
+Task 3 is the first uncompleted task. Dispatch its fresh persistence implementer from the generated SDD brief with the reviewed Mapping traversal ruling, require RED-first TDD evidence plus commit/report, and run the separate spec/quality reviewer before advancing. Continue through Task 10 and the broad whole-branch review unless a named stop condition occurs.
 
 ## Safety boundary
 

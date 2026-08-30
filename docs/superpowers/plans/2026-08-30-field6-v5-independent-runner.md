@@ -59,9 +59,9 @@
 
 ### Task 3: Exact-head static verification and merge
 
-- [ ] Field6 runtime/security/full independent audit GREEN; physical live job SKIPPED.
-- [ ] Package materializer, Track A governance, self-hosted PR boundary, yamllint/actionlint, and `CI / Required` GREEN.
-- [ ] Diff limited to planned paths; zero unresolved review threads/reviews; no material main drift.
+- [x] Field6 runtime/security/full independent audit GREEN; physical live job SKIPPED on candidate `908d5e2fd98dfc170c6ce803d516984aa01d589b`: run `33314310412`, contract `99264790357`, audit `99264790250`, physical `99264790747` SKIPPED.
+- [x] Package materializer, Track A governance, self-hosted PR boundary, yamllint/actionlint, and `CI / Required` GREEN: runs `33314310405`, `33314310382`, `33314310392`, `33314310524`; `CI / Required` job `99264877769`.
+- [x] Clean native-Linux verification proved exactly eight planned changed paths against `main@0b5e473aed4e61f05fc28005f1c0ec9cd99cbf61`; GitHub main remained unchanged through candidate validation. Final zero-review-debt readback is repeated after this checkpoint commit.
 - [ ] Mark ready and squash-merge with expected-head guard.
 - [ ] Trusted-main readback proves V5 runner/guest/label/admission and no current V4 physical acceptance.
 
@@ -69,7 +69,7 @@
 
 - [ ] While no V5 runner is registered/online, post exactly one trigger comment `AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V5 once=true` on PR #758.
 - [ ] Prove exactly one attempt-1 queued job exists and requires only `field6-v5-<comment_id>`; no other queued job requires that label.
-- [ ] Create root-owned `/etc/otclient-field6-runner-provenance` in `OTClientV5Clean`, exact schema v1, binding guest/rootfs SHA/runner/one-time label plus fresh generation nonce and all isolation booleans true; mode 0644 or stricter, root:root, not runner-writable.
+- [ ] Create root-owned `/etc/otclient-field6-runner-provenance` in `OTClientV5Clean`, exact schema v2, binding guest/rootfs SHA/runner/one-time label, exact seed path/size/SHA, fresh generation nonce and all isolation booleans true; mode 0644 or stricter, root:root, not runner-writable.
 - [ ] Obtain a short-lived GitHub runner registration token without logging it; configure runner as `--ephemeral --disableupdate --no-default-labels --labels field6-v5-<comment_id>` and exact name `molehill-otclient-v5-01`.
 - [ ] Start the one-job runner, observe terminal workflow result, then destroy/unregister `OTClientV5Clean` after evidence retrieval regardless of result.
 - [ ] If one login submit occurs without scalar proof, do not replay V5; persist terminal result and require a new justified generation.

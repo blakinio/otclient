@@ -14,7 +14,7 @@ branch: fix/OTC-20260830-field6-v5-independent-runner
 base_branch: main
 base_main: 0b5e473aed4e61f05fc28005f1c0ec9cd99cbf61
 created: 2026-08-28T19:00:00+02:00
-updated: 2026-08-30T15:05:00+02:00
+updated: 2026-08-30T15:31:47+02:00
 risk: high
 execution_class: independent_ephemeral_physical_runtime
 execution_mode: github_actions_independent_ephemeral_physical
@@ -63,17 +63,17 @@ estimate_confidence: high
 decomposition_decision: phased
 decomposition_reason: V5 routing/admission and one-shot field6 proof are sequential; scalar promotion and Track B remain separate only after sanitized proof
 validation_level: exact_head
-last_completed_step: Draft PR #813 RED run 33311073185 failed on missing V5 physical boundary while live job 99256101894 was skipped; seed importer PR #814 then merged to main as 0b5e473aed4e61f05fc28005f1c0ec9cd99cbf61 and real seed integration passed 8732/8732
+last_completed_step: PR #813 candidate 908d5e2fd98dfc170c6ce803d516984aa01d589b passed exact-head field6 runtime/security/admission, package materializer, Track A governance, self-hosted boundary and CI Required; physical job 99264790747 was skipped
 session_rotation_count: 5
 heavy_validation_runs: 1
 stale_takeover_count: 0
 human_interruptions: 0
 invocation_started_at: 2026-08-30T11:05:00+02:00
-last_progress_at: 2026-08-30T15:05:00+02:00
-ci_checks_for_current_head: 0
+last_progress_at: 2026-08-30T15:31:47+02:00
+ci_checks_for_current_head: 5
 ci_check_generation: field6_v5_independent_seed_green
 terminal_ci_wait_started_at: null
-terminal_ci_checks_for_current_generation: 0
+terminal_ci_checks_for_current_generation: 5
 unchanged_state_checks: 0
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 2
@@ -147,6 +147,20 @@ The provenance record is `/etc/otclient-field6-runner-provenance` with schema `o
 
 Runner registration is allowed only after queue uniqueness proof and uses `--ephemeral --disableupdate --no-default-labels --labels field6-v5-<comment_id>`. The runner accepts at most one job. After every terminal outcome the entire V5 guest, runner state and local seed are destroyed.
 
+# V5 routing exact-head GREEN checkpoint
+
+Candidate head `908d5e2fd98dfc170c6ce803d516984aa01d589b` is based exactly on trusted `main@0b5e473aed4e61f05fc28005f1c0ec9cd99cbf61`. A separate clean native-Linux checkout proved the diff contains exactly the eight planned V5 routing/admission paths and passed runtime, security, seed, governance, materializer and independent-admission contracts.
+
+Hosted exact-head evidence:
+
+- field6 workflow run `33314310412`: runtime contract job `99264790357` SUCCESS; fresh V5 admission audit job `99264790250` SUCCESS; physical live job `99264790747` SKIPPED;
+- package materializer run `33314310405`, job `99264790288`: SUCCESS;
+- Track A governance run `33314310382`: deterministic audit job `99264790148` SUCCESS and fresh behavior audit `99264790252` SUCCESS;
+- self-hosted boundary run `33314310392`: fresh boundary audit `99264790221` SUCCESS and boundary job `99264790273` SUCCESS;
+- CI run `33314310524`: syntax/actionlint job `99264817054` SUCCESS and `CI / Required` job `99264877769` SUCCESS.
+
+No V5 trigger, runner registration, credential exposure, official-client execution, login or physical action occurred during these checks. `FIELD6_VALUE` remains `UNKNOWN`.
+
 # Next action
 
-Make #813 exact-head hosted runtime/security/admission/materializer/governance/self-hosted-boundary/CI checks GREEN with the physical live job SKIPPED, merge with expected-head guard, then post exactly one V5 trigger, prove queue uniqueness, create root-owned schema-v2 provenance, register/start the one-job runner and evaluate the sanitized scalar-only result. Track B remains blocked until a proven scalar is separately promoted to trusted main.
+Commit this durable GREEN checkpoint, require the resulting documentation-only exact head to repeat the same hosted gates with the physical job SKIPPED, verify zero review debt and unchanged trusted main, then merge #813 with an expected-head guard. Only after trusted-main readback may the single V5 trigger be posted and queue uniqueness/provenance/ephemeral-runner execution begin.

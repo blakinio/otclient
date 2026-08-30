@@ -1,29 +1,34 @@
 ---
 task_id: OTC-20260830-local-vision-agent-supervisor-discovery
-status: investigating
+status: waiting
 agent: ChatGPT
 session_role: coordinator
 project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: discovery
-phase: investigate
+phase: architecture_design
 branch: docs/OTC-20260830-local-vision-agent-supervisor-discovery
 base_branch: main
 base_main: 18ff83053f5c5d85c9bce6debab0f7fef6b79ecd
 created: 2026-08-30T10:39:00+02:00
-updated_at: 2026-08-30T10:39:00+02:00
+updated_at: 2026-08-30T11:00:00+02:00
 risk: high
 execution_class: github_hosted
-execution_mode: chat_github
+execution_mode: work
 implementation_authorized: false
+prompting_standard_version: 2.1
 policy_version: 2
+run_scope: single_task
+continuation_policy: stop_at_task_boundary
+task_completion_policy: checkpoint_only
+user_communication: low_noise
 context_pressure: medium
 context_growth: stable
 context_score: 8
 estimate_confidence: high
-decomposition_decision: discovery_first
-decomposition_reason: owner requested an architecture that joins existing local supervisor, local vision/OCR, bounded GUI control, chat/dashboard and Track A runtime governance; implementation boundary must be approved before code
+decomposition_decision: phased
+decomposition_reason: architecture is now reconciled around one persistent Molehill control/session plane plus the existing canonical Track A runtime edge; implementation remains gated on explicit owner approval and a subsequent formal spec approval
 runtime_access: none
 runtime_owner_task: NOT_APPLICABLE
 runtime_namespace: NOT_APPLICABLE
@@ -61,15 +66,22 @@ reuses:
   - docs/agents/contracts/TRACK_A_KASMVNC_RUNTIME_ACCESS_V1.md
   - existing local supervisor under C:/Users/barte/Documents/ChatGPT/llm/supervisor
   - existing local_worker MCP server registered in the local Codex configuration
+  - .github/scripts/tibia-official-client-re-control-center-bridge-transport.py
+  - .github/scripts/tibia-official-client-re-input-lock.py
+  - .github/scripts/track_a_game_window_state_qualification.py
+  - .github/scripts/track_a_current_world_entered_anchor.py
+  - .github/scripts/track_a_current_login_field6_runtime_secret_wrapper.sh
 depends_on:
-  - owner approval of the future autonomous GUI/operator architecture
+  - explicit owner approval of the recommended future autonomous GUI/operator architecture direction
 blocks:
   - TRACK_A_AUTONOMOUS_VISION_GUI_RESEARCH
-last_completed_step: inspected current trusted-main Track A contracts, local Ollama supervisor, local models, benchmark evidence, Docker/Hermes state and disabled CUA registration
-current_blocker: ARCHITECTURE_NOT_YET_APPROVED
-next_action: present 2-3 architecture approaches and obtain explicit owner approval before writing the formal design spec or implementing any runtime/input change
+last_completed_step: completed and durably recorded architecture comparison and recommendation: persistent Molehill session/control service, Qwen3-VL visual sensor, deterministic policy/evidence, and a narrow canonical Track A runtime edge reusing guarded dispatch, runtime signals and input.lock; CUA and Hermes are not primary action runtimes
+current_blocker: OWNER_ARCHITECTURE_APPROVAL_REQUIRED
+next_action: owner explicitly approves or rejects the recommended architecture direction; only after approval write the formal design spec under docs/superpowers/specs/ and stop again for approval before implementation planning
 ---
 
 # Local vision-agent supervisor discovery
 
-Discovery-only checkpoint for reusing the owner's existing local Ollama/supervisor stack as the foundation for a future Track A autonomous vision/OCR operator. This task grants no live-client observation, login, input, credentials, process control or gameplay authority.
+Discovery/architecture checkpoint for reusing the owner's existing Ollama/supervisor stack as the foundation for a future Track A local vision/OCR research agent. The recommended architecture and delivery matrix are recorded in `docs/agents/reports/OTC-20260830-local-vision-agent-supervisor-discovery.md`.
+
+This task grants no live-client observation, credentials, login, character selection, GUI input, process control, process-memory access or gameplay authority. It is intentionally waiting at the owner architecture-approval hard gate.

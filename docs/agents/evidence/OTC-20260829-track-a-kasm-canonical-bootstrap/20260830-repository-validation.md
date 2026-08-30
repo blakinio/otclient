@@ -44,3 +44,7 @@ Before either lease is acquired, a fixed task-local `bootstrap-attempt-consumed.
 ## Next gate
 
 Restack PR #801 onto current trusted `main`, run exact-head hosted CI/security review, merge only after green gates, then create the two separate trusted-main live task admissions with the concrete current registration generation. Only after those records are merged may the owner-only workflow be dispatched once.
+
+## Post-restack verification
+
+The implementation branch was merged forward with protected main@23cee2cbc24467a8ad82e39e194992be0382e868 without conflicts. Post-restack local validation repeated 58 canonical-transition tests, 11 Kasm-worker tests, 10 existing-probe regressions and 6 workflow/security tests, all PASS. Track A governance, independent self-hosted PR-boundary audit, YAML parse and git diff --check also PASS. No live workflow was dispatched.

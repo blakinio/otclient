@@ -7,10 +7,10 @@ project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: infrastructure
-phase: implementation_complete_pending_exact_head_validation
+phase: exact_head_ci_review
 branch: feat/OTC-20260829-track-a-kasm-canonical-bootstrap-v2
 base_branch: main
-base_main: 08c31195fd2f44224badf1b6bdff85192495898b
+base_main: 23cee2cbc24467a8ad82e39e194992be0382e868
 created: 2026-08-29T17:34:00+02:00
 risk: high
 execution_class: github_hosted

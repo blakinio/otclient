@@ -4,8 +4,13 @@ import re
 
 ROOT = Path(__file__).resolve().parents[2]
 HELPER = ROOT / ".github/scripts/track_a_current_login_field6_runtime.sh"
+ACQUIRE = ROOT / ".github/scripts/track_a_current_client_package_acquire.sh"
 TASK = ROOT / "docs/agents/tasks/active/OTC-20260828-current-login-field6-runtime.md"
 WORKFLOW = ROOT / ".github/workflows/track-a-current-login-field6-runtime.yml"
+
+EXPECTED_RUNNER = "molehill-otclient-v4-01"
+EXPECTED_GUEST = "OTClientV4Clean"
+EXPECTED_ROOTFS_SHA = "915b4be62933475c3fb5f5031aa2e159294db95fb32aaa9e8b317aadcb6c065d"
 
 
 def read(path: Path) -> str:
@@ -16,24 +21,40 @@ def read(path: Path) -> str:
 
 task = read(TASK)
 for required in (
-    "execution_class: synology_physical_runtime",
-    "persistent_session_role: canonical_runtime_owner",
+    "execution_class: independent_ephemeral_physical_runtime",
+    "persistent_session_role: none",
     "physical_e2e_required: true",
+    f"independent_guest_name: {EXPECTED_GUEST}",
+    f"independent_runner_name: {EXPECTED_RUNNER}",
+    f"independent_rootfs_sha256: {EXPECTED_ROOTFS_SHA}",
 ):
     if required not in task:
         raise SystemExit(f"FIELD6_SECURITY_CONTRACT_RED: task missing {required!r}")
-
 
 workflow = read(WORKFLOW)
 run_attempt_guard = 'test "${GITHUB_RUN_ATTEMPT:?}" = "1"'
 auth_marker = '- name: Consume exact owner authorization once'
 secret_marker = 'TIBIA_TEST_EMAIL: ${{ secrets.TIBIA_TEST_EMAIL }}'
+provenance_marker = '- name: Prove independent clean guest provenance'
+expected_label = "runs-on: ${{ format('field6-v4-{0}', github.event.comment.id) }}"
+for required in (
+    expected_label,
+    f"EXPECTED_INDEPENDENT_RUNNER_NAME: {EXPECTED_RUNNER}",
+    f"EXPECTED_INDEPENDENT_GUEST_NAME: {EXPECTED_GUEST}",
+    f"EXPECTED_INDEPENDENT_ROOTFS_SHA: {EXPECTED_ROOTFS_SHA}",
+    "PROVENANCE_FILE: /etc/otclient-field6-runner-provenance",
+    'test "${RUNNER_NAME:?}" = "$EXPECTED_INDEPENDENT_RUNNER_NAME"',
+    "TRACK_A_FIELD6_INDEPENDENT_PROVENANCE_VERIFIED=1",
+    "TRACK_A_FIELD6_SYSTEM_TOOLROOT=1",
+):
+    if required not in workflow:
+        raise SystemExit(f"FIELD6_SECURITY_CONTRACT_RED: live workflow missing {required!r}")
+if "runs-on: [otclient, synology]" in workflow:
+    raise SystemExit("FIELD6_SECURITY_CONTRACT_RED: V4 live job still targets Synology")
 if run_attempt_guard not in workflow:
     raise SystemExit("FIELD6_SECURITY_CONTRACT_RED: live workflow missing GITHUB_RUN_ATTEMPT == 1 guard")
-if workflow.index(run_attempt_guard) > workflow.index(auth_marker):
-    raise SystemExit("FIELD6_SECURITY_CONTRACT_RED: rerun guard must precede authorization consumption")
-if workflow.index(run_attempt_guard) > workflow.index(secret_marker):
-    raise SystemExit("FIELD6_SECURITY_CONTRACT_RED: rerun guard must precede secret exposure")
+if not workflow.index(provenance_marker) < workflow.index(run_attempt_guard) < workflow.index(auth_marker) < workflow.index(secret_marker):
+    raise SystemExit("FIELD6_SECURITY_CONTRACT_RED: provenance step must begin with rerun guard before authorization and secret exposure")
 
 helper = read(HELPER)
 for secret_name in ("email", "password"):
@@ -41,14 +62,24 @@ for secret_name in ("email", "password"):
         raise SystemExit(
             f"FIELD6_SECURITY_CONTRACT_RED: {secret_name} must not be passed to xdotool argv"
         )
-
 for required in (
     "xd_type_stdin()",
     '"$XDO" type --window "$1" --delay 12 --file -',
     'printf \'%s\' "$email" | xd_type_stdin "$win"',
     'printf \'%s\' "$password" | xd_type_stdin "$win"',
+    "TRACK_A_FIELD6_SYSTEM_TOOLROOT",
+    "TRACK_A_FIELD6_INDEPENDENT_PROVENANCE_VERIFIED",
+    EXPECTED_RUNNER,
 ):
     if required not in helper:
         raise SystemExit(f"FIELD6_SECURITY_CONTRACT_RED: helper missing {required!r}")
+
+acquire = read(ACQUIRE)
+for required in (
+    "TRACK_A_FIELD6_INDEPENDENT_PROVENANCE_VERIFIED",
+    EXPECTED_RUNNER,
+):
+    if required not in acquire:
+        raise SystemExit(f"FIELD6_SECURITY_CONTRACT_RED: package acquisition missing {required!r}")
 
 print("TRACK_A_CURRENT_LOGIN_FIELD6_SECURITY_CONTRACT=PASS")

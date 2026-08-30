@@ -20,6 +20,9 @@ ROOT="$TASK_BASE/package-acquisition/$RUN_ID"
 WARP="$ROOT/warp"
 SOURCE="$ROOT/current-package"
 MATERIALIZER="${BASH_SOURCE[0]%/*}/track_a_current_client_package_materialize.py"
+SEED_IMPORTER="${BASH_SOURCE[0]%/*}/track_a_current_client_package_seed.py"
+SEED_ARCHIVE='/opt/otclient-v5-seed/seed.tar.gz'
+INDEPENDENT_RUNNER_NAME='molehill-otclient-v5-01'
 WIRE_PID_FILE="$ROOT/wireproxy.pid"
 WIRE_PID=''
 WIRE_BIN="$WARP/bin/wireproxy"
@@ -209,8 +212,9 @@ runner_allowed() {
     synology-otclient-01)
       return 0
       ;;
-    molehill-otclient-v4-01)
-      [[ "${TRACK_A_FIELD6_INDEPENDENT_PROVENANCE_VERIFIED:-}" == 1 ]]
+    "$INDEPENDENT_RUNNER_NAME")
+      [[ "${TRACK_A_FIELD6_INDEPENDENT_PROVENANCE_VERIFIED:-}" == 1 ]] || return 1
+      [[ "${TRACK_A_FIELD6_INDEPENDENT_SEED_VERIFIED:-}" == 1 ]]
       return
       ;;
     *)
@@ -224,6 +228,7 @@ prepare() {
   runner_allowed || fail wrong_runner
   [[ "$RUN_ID" =~ ^[1-9][0-9]*$ ]] || fail invalid_run_id
   [[ -f "$MATERIALIZER" && ! -L "$MATERIALIZER" ]] || fail materializer_missing_or_symlink
+  [[ -f "$SEED_IMPORTER" && ! -L "$SEED_IMPORTER" ]] || fail seed_importer_missing_or_symlink
   [[ ! -e "$ROOT" && ! -L "$ROOT" ]] || fail acquisition_root_collision
   if env | grep -Eq '^(TIBIA_TEST_EMAIL|TIBIA_TEST_PASSWORD)='; then
     fail secret_environment_present_during_package_preflight
@@ -232,6 +237,20 @@ prepare() {
   mkdir -p "$ROOT"
   chmod 700 "$TASK_BASE" "$TASK_BASE/package-acquisition" "$ROOT" 2>/dev/null || true
   trap rollback_prepare EXIT
+
+  if [[ "${RUNNER_NAME:-}" == "$INDEPENDENT_RUNNER_NAME" ]]; then
+    [[ "${TRACK_A_FIELD6_INDEPENDENT_PROVENANCE_VERIFIED:-}" == 1 ]] || fail provenance_not_verified
+    [[ "${TRACK_A_FIELD6_INDEPENDENT_SEED_VERIFIED:-}" == 1 ]] || fail seed_provenance_not_verified
+    python3 "$SEED_IMPORTER" "$SEED_ARCHIVE" "$SOURCE" --require-root-owner
+    [[ -x "$SOURCE/bin/client" && ! -L "$SOURCE/bin/client" ]] || fail seed_client_invalid
+    [[ "$(stat -Lc %s "$SOURCE/bin/client")" == "$EXPECTED_CLIENT_SIZE" ]] || fail seed_client_size_mismatch
+    [[ "$(sha256sum "$SOURCE/bin/client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]] || fail seed_client_hash_mismatch
+    trap - EXIT
+    printf 'TRACK_A_FIELD6_EXACT_PACKAGE_SOURCE=official_launcher_seed\n'
+    printf 'TRACK_A_FIELD6_PACKAGE_EXECUTED=false\n'
+    printf 'TRACK_A_FIELD6_PACKAGE_PREFLIGHT=PASS\n'
+    return
+  fi
 
   prepare_warp
   python3 "$MATERIALIZER" \

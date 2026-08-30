@@ -13,6 +13,7 @@ Current evidence at design time:
 - stale/deleted organization runner restart loops were stopped and disabled;
 - `oteryn-organization-recovery` was recovered from a proven stale empty `.backup.lock` and is stable;
 - fresh gameWindowState preflight `33258891050 / 99117302494` reaches exact-client inventory and fails memory-free with `OFFICIAL_CLIENT_CANDIDATE_COUNT=0`;
+- follow-up memory-free preflight `33261982889 / 99125374010` on `main@d05744b746b33c979b85ba25442ffab7298ba786` proves the authoritative registration is still PRESENT for `otclient-track-a-kasmvnc` while the all-running-container inventory is again `OFFICIAL_CLIENT_CANDIDATE_COUNT=0`; the persisted registered PID/start are stale (`13947 / 51652120`) and must not be silently ignored by create-new bootstrap;
 - `otclient-track-a-kasmvnc` is running, `DISPLAY=:1` is the owner-designated physical desktop, and no Tibia `client` process is running;
 - the exact executable remains at `/home/kasm-user/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client`, fenced to `15.32.75d4a0 / 52105824 / d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a`.
 
@@ -25,6 +26,27 @@ The promoted canonical transition has a reviewed initial-creation path, but its 
 The legacy bootstrap therefore cannot safely create the Docker/Kasm target expected by current registration, Kasm proof and gameWindowState read-only consumers.
 
 An ad-hoc manual start or raw `docker exec` before bootstrap is rejected. Client start is process control, and the accepted ADR requires creation inside one current lease + continuously held canonical flock + zero-client inventory + exact launch proof + registration commit + safe-detach transaction.
+
+## Approved addendum: prior-boot zero-client registration invalidation
+
+The live evidence discovered after the original design was approved is a distinct fail-closed state: the canonical registration still exists, but the official client no longer exists after the Synology boot epoch changed. `create_new` MUST NOT be relaxed to ignore that registration.
+
+Before any Kasm `create_new` launch, a separate metadata-only canonical transition named `boot-epoch-registration-invalidate` must run under a current `canonical_recovery` lease and the continuously held canonical flock. It may remove only the exact authoritative registration after proving all of the following:
+
+1. the registration is structurally valid, exact-current-fenced, `proof_kind: existing_runtime_adoption_v1`, and fail-closed (`state: UNKNOWN` plus approved fail-closed `state_evidence`);
+2. the current recovery lease generation is newer than the registration lease generation;
+3. the registration runtime locator names `otclient-track-a-kasmvnc` and its recorded container id is compatible with the current full container id;
+4. the worker preflight proves the exact package bytes remain present and executable on `DISPLAY=:1`;
+5. the worker preflight reports the current Kasm `boot_id_sha256`, and it differs from the registration boot id;
+6. complete inventory across all running Docker containers proves zero official-client candidates, with mismatched/unverifiable candidates failing closed;
+7. no Tibia main window exists on `DISPLAY=:1`;
+8. the zero-client/boot/container/package proof is repeated and stable immediately before registration deletion while the lease/flock remain current.
+
+The transition deletes only `runtime-registration.json` through the existing exact-record `_remove(old)` path. It does not start, stop, signal, attach to, inspect memory of, or otherwise mutate a client. After deletion it repeats the zero-client preflight. If a candidate appears after deletion, the transition fails closed with registration absent; it MUST NOT restore the stale prior-boot registration onto a different process.
+
+The live workflow then releases the recovery lease, proves registration absence, acquires a separate `canonical_bootstrap` lease for the bootstrap task, and runs `kasm-bootstrap`. Any race in the gap is harmless because `kasm-bootstrap` re-proves registration absence and zero-client state while holding its own canonical flock.
+
+The Kasm bootstrap worker preflight is extended additively with `boot_id_sha256`; that value is part of `preflight_fingerprint`.
 
 ## Goals
 
@@ -95,7 +117,7 @@ The post-launch Kasm probe continues to emit `proof_kind: existing_runtime_adopt
 
 The bootstrap registration uses that proven shape and adds one optional provenance field:
 
-`creation_kind: kasm_bootstrap_v1`
+`bootstrap_provenance: kasm_create_new_v1`
 
 Existing readers already permit additive registration fields. The canonical transition tests must prove that this field does not alter existing adoption/rebind/recovery/Gate-B behavior.
 
@@ -160,7 +182,7 @@ Success requires all of:
 
 Implementation remains `runtime_access: none` and does not execute the official client.
 
-After trusted-main merge, a dedicated owner-only `workflow_dispatch` physical workflow performs exactly one bootstrap attempt. It must:
+After trusted-main merge, a dedicated owner-only `workflow_dispatch` physical workflow performs one prior-boot invalidation phase followed by exactly one bootstrap attempt. It must:
 
 - require repository owner actor;
 - require `github.ref == 'refs/heads/main'`;
@@ -168,7 +190,7 @@ After trusted-main merge, a dedicated owner-only `workflow_dispatch` physical wo
 - run on `[otclient, synology]`;
 - have no `pull_request` path to the physical job;
 - expose no secrets/credentials;
-- require a durable task checkpoint with `runtime_access: canonical_bootstrap`, `bootstrap_mode: create_new`, `bootstrap: PASS`, `bootstrap_attempt_limit: 1`, `mutation_authorized: true`, `credentials_allowed: false`, `login_allowed: false`, `character_selection_allowed: false`, `gameplay_allowed: false`, plus explicit `live_runtime_authorization_source` bound to the owner's current approval;
+- require two durable task checkpoints: first a metadata-only `runtime_access: canonical_recovery` checkpoint with `recovery_mode: prior_boot_zero_client_invalidation_v1`, `canonical_registration: PRESENT`, `mutation_authorized: false`; then, only after invalidation succeeds and registration absence is re-proven, a `runtime_access: canonical_bootstrap` checkpoint with `bootstrap_mode: create_new`, `canonical_registration: ABSENT`, `bootstrap: PASS`, `bootstrap_attempt_limit: 1`, `mutation_authorized: true`; both forbid credentials/login/character/gameplay and bind `live_runtime_authorization_source` to the owner's current approval;
 - reject `GITHUB_RUN_ATTEMPT != 1` so UI rerun cannot become a second bootstrap attempt;
 - persist a consumed one-shot authorization record before launch;
 - record run/job, main SHA, lease/registration generations, container full ID, PID/start, exact fence and rollback/detach outcome without raw client data.
@@ -216,7 +238,7 @@ The historical all-`EMPTY` session cannot be spliced into the new run.
 - launch occurs only after zero-candidate proof;
 - Kasm proof runs before and after commit;
 - launch record and probe identity must match;
-- registration carries Docker locator/provenance, `creation_kind: kasm_bootstrap_v1` and `state: UNKNOWN`;
+- registration carries Docker locator/provenance, `bootstrap_provenance: kasm_create_new_v1` and `state: UNKNOWN`;
 - lease/registration drift aborts before commit;
 - post-commit proof failure removes only own registration and performs exact rollback;
 - success leaves client alive only after safe-detach proof;

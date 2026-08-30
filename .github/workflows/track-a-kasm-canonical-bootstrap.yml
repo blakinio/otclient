@@ -1,0 +1,377 @@
+name: Track A Kasm canonical bootstrap
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/scripts/tibia-official-client-re-kasm-bootstrap-worker.py
+      - .github/scripts/test_tibia_official_client_re_kasm_bootstrap_worker.py
+      - .github/scripts/tibia-official-client-re-canonical-live-transition.py
+      - .github/scripts/test_tibia_official_client_re_canonical_live_transition.py
+      - .github/scripts/test_tibia_official_client_re-kasm-existing-runtime-probe.py
+      - .github/scripts/test_tibia_official_client_re_kasm_existing_runtime_probe.py
+      - .github/scripts/test_track_a_kasm_canonical_bootstrap_workflow.py
+      - .github/scripts/test_track_a_agent_runtime_governance.py
+      - .github/workflows/track-a-kasm-canonical-bootstrap.yml
+      - docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
+      - docs/agents/tasks/active/OTC-20260829-track-a-kasm-canonical-bootstrap.md
+      - docs/superpowers/specs/2026-08-29-track-a-kasm-canonical-bootstrap-design.md
+      - docs/superpowers/plans/2026-08-29-track-a-kasm-canonical-bootstrap.md
+  workflow_dispatch:
+    inputs:
+      authorization:
+        description: Exact one-shot owner authorization
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: track-a-kasm-canonical-bootstrap-${{ github.event_name }}
+  cancel-in-progress: false
+
+jobs:
+  contract:
+    name: Hosted Kasm canonical bootstrap contract
+    if: ${{ github.event_name == 'pull_request' }}
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Run deterministic hosted contract
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -Eeuo pipefail
+          [[ "$(git rev-parse HEAD)" == "$HEAD_SHA" ]]
+          python3 .github/scripts/test_tibia_official_client_re_kasm_bootstrap_worker.py -v
+          python3 .github/scripts/test_tibia_official_client_re_canonical_live_transition.py -v
+          python3 .github/scripts/test_tibia_official_client_re_kasm_existing_runtime_probe.py
+          python3 .github/scripts/test_track_a_kasm_canonical_bootstrap_workflow.py -v
+          python3 .github/scripts/test_track_a_agent_runtime_governance.py \
+            --changed-from "$BASE_SHA" --expected-branch "$HEAD_BRANCH"
+          python3 .github/scripts/audit_track_a_selfhosted_pr_boundary.py --base "$BASE_SHA"
+          python3 -m py_compile \
+            .github/scripts/tibia-official-client-re-kasm-bootstrap-worker.py \
+            .github/scripts/test_tibia_official_client_re_kasm_bootstrap_worker.py \
+            .github/scripts/tibia-official-client-re-canonical-live-transition.py \
+            .github/scripts/test_tibia_official_client_re_canonical_live_transition.py \
+            .github/scripts/test_track_a_kasm_canonical_bootstrap_workflow.py \
+            .github/scripts/test_track_a_agent_runtime_governance.py
+          ruby -e "require 'yaml'; YAML.load_file('.github/workflows/track-a-kasm-canonical-bootstrap.yml'); puts 'YAML_PARSE=PASS'"
+          git diff --check "$BASE_SHA"...HEAD
+          echo TRACK_A_KASM_CANONICAL_BOOTSTRAP_HOSTED_CONTRACT=PASS
+
+  live-bootstrap:
+    name: Owner-only prior-boot invalidation and Kasm create-new
+    permissions: {}
+    if: >-
+      ${{ github.event_name == 'workflow_dispatch' &&
+          github.actor == github.repository_owner &&
+          github.ref == 'refs/heads/main' &&
+          inputs.authorization == 'INVALIDATE_PRIOR_BOOT_THEN_CREATE_NEW_KASM_CANONICAL_BOOTSTRAP' }}
+    runs-on: [otclient, synology]
+    timeout-minutes: 15
+    env:
+      EXPECTED_VERSION: 15.32.75d4a0
+      EXPECTED_SIZE: '52105824'
+      EXPECTED_SHA: d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime
+      RECOVERY_TASK: OTC-20260829-track-a-kasm-canonical-bootstrap-invalidation-live
+      BOOTSTRAP_TASK: OTC-20260829-track-a-kasm-canonical-bootstrap-live
+    steps:
+      - name: Materialize exact public main without GitHub credentials
+        id: trust
+        shell: bash
+        run: |
+          set +x
+          set -Eeuo pipefail
+          [[ "$RUNNER_NAME" == 'synology-otclient-01' ]]
+          work="$RUNNER_TEMP/track-a-kasm-canonical-bootstrap-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          rm -rf "$work"
+          git clone --quiet --depth 1 --single-branch --branch main https://github.com/blakinio/otclient.git "$work"
+          cd "$work"
+          [[ "$GITHUB_REPOSITORY" == 'blakinio/otclient' ]]
+          [[ "$GITHUB_RUN_ATTEMPT" == '1' ]] || {
+            echo TRACK_A_KASM_CANONICAL_BOOTSTRAP_REFUSED=RERUN_ATTEMPT >&2
+            exit 60
+          }
+          trusted_main="$(git rev-parse HEAD)"
+          live_main="$(git ls-remote origin refs/heads/main | awk 'NR==1 {print $1}')"
+          [[ "$trusted_main" == "$live_main" ]] || {
+            echo TRACK_A_KASM_CANONICAL_BOOTSTRAP_REFUSED=LIVE_MAIN_MOVED >&2
+            exit 61
+          }
+          python3 .github/scripts/test_tibia_official_client_re_kasm_bootstrap_worker.py -q
+          python3 .github/scripts/test_tibia_official_client_re_canonical_live_transition.py -q
+          python3 .github/scripts/test_tibia_official_client_re_kasm_existing_runtime_probe.py >/dev/null
+          python3 .github/scripts/test_track_a_agent_runtime_governance.py >/dev/null
+          echo "trusted_main=$trusted_main" >> "$GITHUB_OUTPUT"
+          echo TRACK_A_KASM_CANONICAL_BOOTSTRAP_TRUSTED_MAIN=PASS
+
+      - name: Validate separate durable recovery and bootstrap admissions
+        shell: bash
+        run: |
+          set +x
+          set -Eeuo pipefail
+          work="$RUNNER_TEMP/track-a-kasm-canonical-bootstrap-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          cd "$work"
+          python3 - <<'PY'
+          import importlib.util
+          import pathlib
+          import re
+          import sys
+
+          root = pathlib.Path('.')
+          path = root / '.github/scripts/test_track_a_agent_runtime_governance.py'
+          spec = importlib.util.spec_from_file_location('kasm_live_governance', path)
+          assert spec and spec.loader
+          governance = importlib.util.module_from_spec(spec)
+          sys.modules[spec.name] = governance
+          spec.loader.exec_module(governance)
+
+          def check_task(relative, expected, positive=()):
+              task = root / relative
+              if not task.is_file():
+                  raise SystemExit('LIVE_TASK_ABSENT:' + relative)
+              if not governance.validate_track_a_task(task):
+                  raise SystemExit('LIVE_TASK_NOT_TRACK_A:' + relative)
+              values = governance.parse_frontmatter(task)
+              for key, value in expected.items():
+                  if values.get(key) != value:
+                      raise SystemExit(f'LIVE_TASK_ADMISSION_REFUSED:{relative}:{key}={values.get(key)!r}')
+              for key in positive:
+                  if not re.fullmatch(r'[1-9][0-9]*', values.get(key, '')):
+                      raise SystemExit(f'LIVE_TASK_ADMISSION_REFUSED:{relative}:{key}=NON_POSITIVE')
+              return values
+
+          recovery = check_task(
+              'docs/agents/tasks/active/OTC-20260829-track-a-kasm-canonical-bootstrap-invalidation-live.md',
+              {
+                  'runtime_access': 'canonical_recovery',
+                  'runtime_owner_task': 'OTC-20260829-track-a-kasm-canonical-bootstrap-invalidation-live',
+                  'runtime_namespace': 'canonical-live-runtime',
+                  'canonical_registration': 'PRESENT',
+                  'canonical_lease_generation': 'UNKNOWN',
+                  'gate_a': 'REQUIRED_NOT_PROVEN',
+                  'generation_rebind': 'NOT_APPLICABLE',
+                  'gate_b': 'NOT_APPLICABLE',
+                  'bootstrap': 'NOT_APPLICABLE',
+                  'target_uniqueness': 'UNKNOWN',
+                  'mutation_authorized': 'false',
+                  'recovery_mode': 'prior_boot_zero_client_invalidation_v1',
+                  'credentials_allowed': 'false',
+                  'login_allowed': 'false',
+                  'process_control_authorized': 'false',
+                  'physical_action_budget': '0',
+              },
+              positive=('registration_lease_generation',),
+          )
+          bootstrap = check_task(
+              'docs/agents/tasks/active/OTC-20260829-track-a-kasm-canonical-bootstrap-live.md',
+              {
+                  'runtime_access': 'canonical_bootstrap',
+                  'runtime_owner_task': 'OTC-20260829-track-a-kasm-canonical-bootstrap-live',
+                  'runtime_namespace': 'canonical-live-runtime',
+                  'canonical_registration': 'ABSENT',
+                  'canonical_lease_generation': 'UNKNOWN',
+                  'registration_lease_generation': 'NOT_APPLICABLE',
+                  'gate_a': 'REQUIRED_NOT_PROVEN',
+                  'generation_rebind': 'NOT_APPLICABLE',
+                  'gate_b': 'NOT_APPLICABLE',
+                  'bootstrap': 'PASS',
+                  'target_uniqueness': 'UNKNOWN',
+                  'mutation_authorized': 'true',
+                  'bootstrap_mode': 'create_new',
+                  'bootstrap_attempt_limit': '1',
+                  'credentials_allowed': 'false',
+                  'login_allowed': 'false',
+                  'relogin_allowed': 'false',
+                  'character_selection_allowed': 'false',
+                  'gameplay_allowed': 'false',
+                  'gui_input_authorized': 'false',
+                  'process_control_authorized': 'true',
+                  'physical_action_budget': '1',
+                  'physical_action_count': '0',
+              },
+          )
+          source = bootstrap.get('live_runtime_authorization_source', '').strip()
+          if not source or source.upper() in {'NONE', 'UNKNOWN', 'NOT_APPLICABLE'}:
+              raise SystemExit('LIVE_TASK_ADMISSION_REFUSED:live_runtime_authorization_source')
+          print('TRACK_A_KASM_CANONICAL_RECOVERY_ADMISSION=PASS')
+          print('TRACK_A_KASM_CANONICAL_BOOTSTRAP_ADMISSION=PASS')
+          PY
+
+      - name: Consume one-shot physical authorization before authority acquisition
+        shell: bash
+        env:
+          TRUSTED_MAIN: ${{ steps.trust.outputs.trusted_main }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          work="$RUNNER_TEMP/track-a-kasm-canonical-bootstrap-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          cd "$work"
+          root="/home/runner/_work/_otclient_tibia_re_state/tasks/$BOOTSTRAP_TASK/runtime"
+          mkdir -p "$root"
+          chmod 700 "/home/runner/_work/_otclient_tibia_re_state/tasks/$BOOTSTRAP_TASK" "$root" 2>/dev/null || true
+          marker="$root/bootstrap-attempt-consumed.json"
+          python3 - "$marker" "$TRUSTED_MAIN" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" <<'PY'
+          import json, os, pathlib, sys
+          path=pathlib.Path(sys.argv[1])
+          payload={'schema_version':1,'trusted_main':sys.argv[2],'run_id':sys.argv[3],'run_attempt':int(sys.argv[4])}
+          try:
+              fd=os.open(path, os.O_WRONLY|os.O_CREAT|os.O_EXCL, 0o600)
+          except FileExistsError as exc:
+              raise SystemExit('BOOTSTRAP_ATTEMPT_ALREADY_CONSUMED') from exc
+          with os.fdopen(fd,'w',encoding='utf-8') as f:
+              json.dump(payload,f,sort_keys=True,separators=(',',':')); f.write('\n'); f.flush(); os.fsync(f.fileno())
+          PY
+          echo BOOTSTRAP_ONE_SHOT_AUTHORIZATION_CONSUMED=PASS
+
+      - name: Invalidate only the proven prior-boot zero-client registration
+        shell: bash
+        env:
+          TRUSTED_MAIN: ${{ steps.trust.outputs.trusted_main }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          work="$RUNNER_TEMP/track-a-kasm-canonical-bootstrap-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          cd "$work"
+          task="$RECOVERY_TASK"
+          session="github-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-invalidation"
+          token_root="/home/runner/_work/_otclient_tibia_re_state/tasks/$task/runtime"
+          token="$token_root/canonical-lease-token"
+          lease='.github/scripts/tibia-official-client-re-canonical-live-lease'
+          transition='.github/scripts/tibia-official-client-re-canonical-live-transition.py'
+          worker='.github/scripts/tibia-official-client-re-kasm-bootstrap-worker.py'
+          acquired=0
+          released=0
+          mkdir -p "$token_root"
+          chmod 700 "/home/runner/_work/_otclient_tibia_re_state/tasks/$task" "$token_root" 2>/dev/null || true
+          rm -f "$token"
+          cleanup() {
+            rc=$?
+            if [[ "$acquired" == 1 && "$released" != 1 ]]; then
+              bash "$lease" release --task-id "$task" --session-id "$session" --token-file "$token" >/dev/null 2>&1 || true
+            fi
+            rm -f "$token"
+            exit "$rc"
+          }
+          trap cleanup EXIT
+          [[ "$(git ls-remote origin refs/heads/main | awk 'NR==1 {print $1}')" == "$TRUSTED_MAIN" ]]
+          echo RECOVERY_LEASE_ACQUIRE=BEGIN
+          bash "$lease" acquire --task-id "$task" --session-id "$session" --token-file "$token" --ttl-seconds 600 \
+            --stale-takeover-reason 'owner-approved prior-boot zero-client invalidation before Kasm create-new'
+          acquired=1
+          bash "$lease" validate --task-id "$task" --session-id "$session" --token-file "$token"
+          python3 "$transition" boot-epoch-registration-invalidate \
+            --task-id "$task" --session-id "$session" --token-file "$token" --worker "$worker"
+          bash "$lease" release --task-id "$task" --session-id "$session" --token-file "$token"
+          released=1
+          rm -f "$token"
+          echo TRACK_A_KASM_CANONICAL_INVALIDATION_RELEASE=PASS
+
+      - name: Prove authoritative registration absent after invalidation
+        shell: bash
+        env:
+          TRUSTED_MAIN: ${{ steps.trust.outputs.trusted_main }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          work="$RUNNER_TEMP/track-a-kasm-canonical-bootstrap-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          cd "$work"
+          [[ "$(git ls-remote origin refs/heads/main | awk 'NR==1 {print $1}')" == "$TRUSTED_MAIN" ]]
+          test ! -e "$CANONICAL_STATE/runtime-registration.json"
+          echo TRACK_A_KASM_CANONICAL_INVALIDATION_REGISTRATION_ABSENT=PASS
+
+      - name: Create exactly one current Kasm client under a new canonical bootstrap lease
+        shell: bash
+        env:
+          TRUSTED_MAIN: ${{ steps.trust.outputs.trusted_main }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          work="$RUNNER_TEMP/track-a-kasm-canonical-bootstrap-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          cd "$work"
+          task="$BOOTSTRAP_TASK"
+          session="github-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-bootstrap"
+          token_root="/home/runner/_work/_otclient_tibia_re_state/tasks/$task/runtime"
+          token="$token_root/canonical-lease-token"
+          lease='.github/scripts/tibia-official-client-re-canonical-live-lease'
+          transition='.github/scripts/tibia-official-client-re-canonical-live-transition.py'
+          worker='.github/scripts/tibia-official-client-re-kasm-bootstrap-worker.py'
+          probe='.github/scripts/tibia-official-client-re-kasm-existing-runtime-probe.py'
+          acquired=0
+          released=0
+          mkdir -p "$token_root"
+          chmod 700 "/home/runner/_work/_otclient_tibia_re_state/tasks/$task" "$token_root" 2>/dev/null || true
+          rm -f "$token"
+          cleanup() {
+            rc=$?
+            if [[ "$acquired" == 1 && "$released" != 1 ]]; then
+              bash "$lease" release --task-id "$task" --session-id "$session" --token-file "$token" >/dev/null 2>&1 || true
+            fi
+            rm -f "$token"
+            exit "$rc"
+          }
+          trap cleanup EXIT
+          [[ "$(git ls-remote origin refs/heads/main | awk 'NR==1 {print $1}')" == "$TRUSTED_MAIN" ]]
+          test ! -e "$CANONICAL_STATE/runtime-registration.json"
+          echo BOOTSTRAP_LEASE_ACQUIRE=BEGIN
+          bash "$lease" acquire --task-id "$task" --session-id "$session" --token-file "$token" --ttl-seconds 600 \
+            --stale-takeover-reason 'owner-approved one-shot Kasm canonical create-new'
+          acquired=1
+          bash "$lease" validate --task-id "$task" --session-id "$session" --token-file "$token"
+          python3 "$transition" kasm-bootstrap \
+            --task-id "$task" --session-id "$session" --token-file "$token" \
+            --worker "$worker" --probe "$probe" --worker-timeout 120
+          bash "$lease" release --task-id "$task" --session-id "$session" --token-file "$token"
+          released=1
+          rm -f "$token"
+          echo TRACK_A_KASM_CANONICAL_BOOTSTRAP_RELEASE=PASS
+
+      - name: Verify secret-free current registration metadata
+        shell: bash
+        env:
+          TRUSTED_MAIN: ${{ steps.trust.outputs.trusted_main }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          work="$RUNNER_TEMP/track-a-kasm-canonical-bootstrap-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          cd "$work"
+          [[ "$(git ls-remote origin refs/heads/main | awk 'NR==1 {print $1}')" == "$TRUSTED_MAIN" ]]
+          python3 - "$CANONICAL_STATE/runtime-registration.json" "$BOOTSTRAP_TASK" "$EXPECTED_VERSION" "$EXPECTED_SIZE" "$EXPECTED_SHA" <<'PY'
+          import json, os, pathlib, re, stat, sys
+          path=pathlib.Path(sys.argv[1]); task=sys.argv[2]; version=sys.argv[3]; size=int(sys.argv[4]); sha=sys.argv[5]
+          st=path.lstat(); owner=(not hasattr(os,'getuid')) or st.st_uid==os.getuid()
+          assert stat.S_ISREG(st.st_mode) and not path.is_symlink() and stat.S_IMODE(st.st_mode)==0o600 and owner
+          data=json.loads(path.read_text())
+          assert data.get('schema_version') == 1 and data.get('runtime_id') == 'track-a-canonical-live'
+          assert (data.get('client_version'),data.get('client_size'),data.get('client_sha256')) == (version,size,sha)
+          assert data.get('proof_kind') == 'existing_runtime_adoption_v1'
+          locator=data.get('runtime_locator',''); parts=locator.split(':',2)
+          assert len(parts)==3 and parts[0]=='docker' and parts[1]=='otclient-track-a-kasmvnc' and re.fullmatch(r'[0-9a-f]{64}',parts[2])
+          assert data.get('inventory_scope') == 'all_running_docker_containers' and data.get('inventory_complete') is True
+          assert data.get('candidate_count') == 1 and re.fullmatch(r'[0-9a-f]{64}',data.get('candidate_fingerprint',''))
+          assert data.get('state') == 'UNKNOWN'
+          assert data.get('bootstrap_provenance') == 'kasm_create_new_v1'
+          assert data.get('source_task') == task
+          for key in ('registration_generation','lease_generation','pid','process_start_ticks'):
+              assert isinstance(data.get(key),int) and data[key] > 0
+          print('TRACK_A_KASM_CANONICAL_BOOTSTRAP_REGISTRATION=PASS')
+          print('PROCESS_MEMORY_OBSERVATION=false')
+          print('CREDENTIAL_ACCESS=false')
+          print('LOGIN_PERFORMED=false')
+          print('SEMANTIC_PROMOTION=false')
+          PY

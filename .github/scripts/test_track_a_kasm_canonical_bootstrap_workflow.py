@@ -47,6 +47,10 @@ class Tests(unittest.TestCase):
         live = job_block(self.text, 'live-bootstrap')
         for forbidden in ('${{ secrets.', 'TIBIA_TEST_EMAIL', 'TIBIA_TEST_PASSWORD'):
             self.assertNotIn(forbidden, self.text)
+        self.assertNotIn('uses: actions/checkout', live)
+        self.assertNotIn('github.token', live)
+        self.assertIn('permissions: {}', live)
+        self.assertIn('git clone', live)
         attempt = live.index('GITHUB_RUN_ATTEMPT')
         consumed = live.index('bootstrap-attempt-consumed.json')
         recovery_lease = live.index('RECOVERY_LEASE_ACQUIRE')
@@ -87,7 +91,8 @@ class Tests(unittest.TestCase):
             'physical_action_budget: 0',
         )
         for exact in recovery_required:
-            self.assertIn(exact, live)
+            key, value = exact.split(': ', 1)
+            self.assertIn(f"'{key}': '{value}'", live)
 
         self.assertIn('OTC-20260829-track-a-kasm-canonical-bootstrap-live.md', live)
         bootstrap_required = (
@@ -116,9 +121,11 @@ class Tests(unittest.TestCase):
             'physical_action_count: 0',
         )
         for exact in bootstrap_required:
-            self.assertIn(exact, live)
+            key, value = exact.split(': ', 1)
+            self.assertIn(f"'{key}': '{value}'", live)
         self.assertIn('live_runtime_authorization_source', live)
-        self.assertGreaterEqual(live.count('validate_track_a_task'), 2)
+        self.assertGreaterEqual(live.count('check_task('), 3)
+        self.assertIn('validate_track_a_task', live)
 
     def test_implementation_task_remains_repository_only(self):
         frontmatter = self.task.split('---', 2)[1]

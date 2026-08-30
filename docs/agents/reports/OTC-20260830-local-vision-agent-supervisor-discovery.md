@@ -1,146 +1,264 @@
 # OTC-20260830 local vision-agent supervisor discovery
 
-## Purpose
+## Purpose and authority
 
-Preserve the current discovery state before any architectural or runtime change. The owner wants to reuse local vision/OCR to accelerate official-client research and ultimately allow a bounded local agent to navigate login/character-select/world transitions, verify outcomes and collect research samples while remaining observable and chat-controllable.
+This checkpoint records the architecture design for reusing the owner's existing local Ollama/supervisor stack as the foundation for a future observable Track A vision/OCR research agent.
 
-This report is discovery evidence only. It does not authorize implementation, official-client observation, credentials, login, GUI input, process control, gameplay or semantic promotion.
+This report is discovery/design evidence only. It does **not** authorize implementation, official-client observation, credentials, login, character selection, GUI input, process control, process-memory access, gameplay or semantic promotion. The current task remains `runtime_access: none`, `implementation_authorized: false`, `physical_action_budget: 0`.
 
-## Trusted repository state
+## Verified current state
 
-Discovery was reconciled against `main` at `18ff83053f5c5d85c9bce6debab0f7fef6b79ecd`, the squash merge of PR #801 (`feat(track-a): add Kasm canonical bootstrap`). Current Track A admission and KasmVNC contracts still require explicit task authority and the applicable Gate A/Gate B/bootstrap/recovery boundaries before any live input/login action.
+Live GitHub state was revalidated before design. `main` remains `18ff83053f5c5d85c9bce6debab0f7fef6b79ecd`, the merge of PR #801 (`feat(track-a): add Kasm canonical bootstrap`). PR #808 remains an open Draft on `docs/OTC-20260830-local-vision-agent-supervisor-discovery`; no overlapping open local-vision/CUA agent PR was found.
+
+Trusted-main Track A contracts still require explicit task authority and the applicable exact-client fence, canonical admission/lease/rebind/recovery, Gate A/Gate B, whole-lifetime supervisor and `input.lock` boundaries before a future physical effect. `runtime_access: none` cannot be silently expanded into observation or mutation authority.
+
+Additional trusted-main components discovered during architecture reconciliation materially reduce the amount of new code required:
+
+- `.github/scripts/tibia-official-client-re-control-center-bridge-transport.py` already constrains Control Center dispatch to the canonical `guarded-dispatch` transition process, exact repo-owned probe/worker paths, no shell and private stdin/stdout pipes; its test also verifies that the transport never reads token-file contents;
+- `.github/scripts/tibia-official-client-re-input-lock.py` already provides fail-closed cross-process GUI/input serialization with cancellation and bounded acquisition;
+- `.github/scripts/track_a_game_window_state_qualification.py` already provides exact-client, read-only `gameWindowState` qualification with change events, heartbeat, identity revalidation and fail-closed behavior while explicitly refusing semantic promotion;
+- `.github/scripts/track_a_current_world_entered_anchor.py` and related durable-state logic already provide exact-current stronger causal anchors for world entry;
+- `.github/scripts/track_a_current_login_field6_runtime_secret_wrapper.sh` and its helper already demonstrate a secret-handling pattern where credential variables are scrubbed from external child environments and the client/observer processes are checked for leakage.
+
+These mechanisms remain governed by their own runtime authority. Their existence is reuse evidence, not permission to invoke them from this task.
+
+## Existing local supervisor state
+
+A fresh read-only inspection of `C:/Users/barte/Documents/ChatGPT/llm/supervisor` on Molehill-PC confirmed:
+
+- `supervisor.ps1`, `mcp/local_worker_server.py`, `mcp/README.md`, `policies/LOCAL_MODEL_ROUTING.yaml`, `policies/SECURITY_POLICY.md`, benchmark/evidence directories and the pinned Hermes integration are present;
+- `local_worker_server.py --self-test` still returns `local_worker_server self-test passed`;
+- `mcp_servers.local_workers` remains registered in the local Codex configuration;
+- `mcp_servers.cua_repl` remains present but `enabled = false`;
+- Ollama API is ready on `0.32.14`; Docker is ready; `muse-ollama-proxy` remains `Exited (255)` and was not started or modified;
+- `ollama ps` was empty, so no local model was resident at readback;
+- `qwen3-vl:4b-instruct-q4_K_M`, `gemma4:12b`, `qwen3.5:9b`, `qwen2.5-coder:14b`, `gpt-oss:20b` and `muse-glimmer:latest` remain installed.
+
+The local worker is intentionally a bounded, mostly stateless low-risk text/file delegation surface. Its policy explicitly reserves architecture, security and authentication/credential decisions for the stronger coordinator and treats every local-model output as untrusted. It is therefore a reusable subworker, not the correct place to embed persistent agent session state or Track A authority.
+
+Hermes is currently integrated as a pinned, isolated batch audit/tool-loop container behind a fixed Ollama proxy. It is useful isolation plumbing but is not currently a persistent session/control/dashboard service. Making it the primary Track A agent runtime would add a second planning/authority layer without solving the required owner-control and evidence semantics.
 
 ## Existing Tibia vision evidence
 
-Merged PR #790 executed `TIBIA-RE-VISION-BENCHMARK` on Molehill-PC. Terminal benchmark result remained `PARTIAL`, with no formally promoted `PRIMARY_MODEL`, because representative Track B screenshots were unavailable and synthetic smoke could not be extrapolated into project-specific production authority.
-
-The leading tested local profile was:
+Merged PR #790 remains the vision benchmark authority. Its terminal result is `PARTIAL`, not a formal `PRIMARY_MODEL`, because representative selection-quality Tibia/Track B screenshots were unavailable. The leading tested profile remains:
 
 ```text
 qwen3-vl:4b-instruct-q4_K_M
 sha256: ee4b975b58c17ce268cd19d40db35d5edc64603035d2ffc1fee1968eb0947f7b
+num_ctx: 4096
+num_predict: 256
+temperature: 0
 ```
 
-Verified bounded smoke evidence from PR #790:
+Verified bounded smoke evidence remains login classification `3/3`, expected-text recall `1.0`, black no-text false-text `0/3`, false `IN_GAME_VISUAL` `0/3`, all hard gates PASS and final model residency empty. OvisOCR2 matched positive text recall but fabricated non-empty text on black controls `3/3` under both tested prompt profiles and remains unpromoted.
 
-- login classification: `3/3`;
-- expected-text recall: `1.0`;
-- solid-black no-text false text: `0/3`;
-- false `IN_GAME_VISUAL`: `0/3`;
-- all benchmark hard gates: PASS;
-- final local-model residency: empty.
+Architecture consequence: Qwen3-VL is the first local visual sensor to use for representative evidence, but its output remains `visual_only` and `structural_authority: false`. The full benchmark should not be re-run merely to design this system.
 
-OvisOCR2 exact revision `1fc9221...` achieved text recall `1.0` but fabricated non-empty text on the solid-black negative control `3/3` in both tested prompt profiles. It was correctly not promoted as an OCR fallback. Ovis2.5-2B remained unsupported on the tested Windows/AMD backend profile.
+## Architectural approaches compared
 
-Conclusion: Qwen3-VL is already the best evidenced local vision/OCR sensor candidate for the next representative Tibia dataset. OCR/vision must remain `visual_only` evidence and must not independently create `IN_GAME` or other structural authority.
+### Approach A - CUA-centric local operator
 
-## Existing local supervisor stack
+Use the disabled `cua_repl` as the primary capture/action surface and let the local agent drive desktop interaction through broad computer-use primitives.
 
-The owner already has a local stack under:
+Advantages: fastest route to a generic GUI operator and least bespoke executor code.
+
+Costs: authority is much broader than the required Track A action vocabulary; binding every click/keypress to canonical lease/Gate A/Gate B/`input.lock`/exact-client state is harder; evidence and action budgets become indirect; the currently disabled CUA surface is not a tested Track A primitive. This is rejected as the primary physical-effect path.
+
+### Approach B - Hermes-centric persistent tool-loop
+
+Turn the existing pinned Hermes container into the persistent local planner and expose capture, vision, runtime and action tools to it.
+
+Advantages: existing container isolation, safe-mode conventions and fixed Ollama proxy can be reused.
+
+Costs: the current Hermes integration is batch/audit oriented; it introduces an extra autonomous planning layer between the owner/supervisor and Track A authority; persistent state/dashboard/control provenance still has to be built; model-residency and authority boundaries become more complex. This is rejected as the primary runtime. Hermes may remain a deferred bounded subworker if a future concrete use case justifies it.
+
+### Approach C - thin persistent session service + narrow Track A runtime edge
+
+Keep ChatGPT/Codex as the architectural/supervising coordinator. Add one small persistent local agent-session service on Molehill that owns session state, dashboard/chat, event/evidence recording, model scheduling and the supervisor protocol. It consumes sensors and proposes only named high-level actions. Physical Track A capture/signals/effects stay behind a narrow runtime-edge adapter that reuses canonical trusted-main guard/transition/lock mechanisms.
+
+Advantages: smallest coherent extension of what already exists; explicit owner control; no second agent platform; deterministic authority remains outside the model; clean separation of visual evidence from semantic promotion; direct reuse of existing Track A infrastructure.
+
+Cost: one new persistent service and a small set of adapters/schemas must be built and tested.
+
+**Recommendation: Approach C.**
+
+## Recommended component boundaries
+
+The future system should have two trust/placement zones.
+
+### Molehill local control plane
+
+1. **Existing supervisor lifecycle / Ollama** - reuse and minimally extend for one-model-at-a-time admission and health reporting. A model-residency conflict must fail closed; the agent must not evict an unexpected foreign resident model merely to continue.
+2. **New agent session service** - persistent session ID, task/run state machine, heartbeat, owner/supervisor/model/system provenance, control precedence, bounded orchestration and restart recovery.
+3. **Vision sensor adapter** - reuse PR #790 `VisualEvidence` semantics and exact Qwen3-VL profile. Deterministic crop/hash/change/template checks run before model inference where cheaper. Qwen produces observations only.
+4. **Existing local worker MCP** - reuse only for low-risk bounded text/extraction tasks. It is not the session runtime and never gains architecture/security/credential authority.
+5. **New evidence recorder** - append-only event ledger plus content-addressed artifact manifest; terminal export is a portable evidence bundle.
+6. **New dashboard/chat surface** - served by the same session service to avoid a second backend. Loopback is the default exposure; LAN exposure is opt-in and must have explicit authentication/session protection.
+7. **New thin supervisor bridge** - versioned task/result/event protocol exposed to ChatGPT/Codex, preferably by a separate narrow MCP adapter rather than adding high-risk capabilities to `local_worker_server.py`.
+
+### Track A physical runtime edge
+
+1. **Capture adapter** - extend/reuse the existing Kasm X11/`ffmpeg x11grab` observation path. Capture is read-only and separately admitted when a later task allows it.
+2. **Runtime signal adapters** - reuse exact-client and `gameWindowState`/world-entered/current-runtime evidence producers. They remain stronger corroboration than OCR and keep their existing fail-closed semantics.
+3. **Track A authority adapter** - a thin adapter over the canonical registration/lease/rebind/recovery/Gate A/Gate B/live-guard/whole-lifetime supervisor/`input.lock` mechanisms. It must not reimplement or fork those contracts.
+4. **Bounded action executor** - new narrow executor behind the authority adapter. Its model-facing vocabulary is named semantic actions, never arbitrary shell, unrestricted coordinate clicking or arbitrary typed text.
+5. **Credential broker boundary** - future separately-authorized secret injection at the effect edge. The model, dashboard chat, task envelopes and evidence must never contain raw credential values.
+
+The runtime-edge transport should extend the existing Control Center guarded-dispatch path rather than inventing a parallel bypass. The persistent Molehill service sends capability-bounded requests; the edge independently revalidates current authority before every physical-effect transaction.
+
+## End-to-end data and control flow
 
 ```text
-C:/Users/barte/Documents/ChatGPT/llm/supervisor
+OWNER dashboard/chat                     SUPERVISING ChatGPT/Codex
+        |                                           |
+        +-------------- control/task ---------------+
+                            |
+                  agent session service
+                   /       |        \
+          event/evidence  model      supervisor bridge
+              ledger      scheduler
+                           |
+                  deterministic vision prefilter
+                           |
+                     Qwen3-VL sensor
+                           |
+                     VisualEvidence
+                           |
+                    state reconciler
+                     /           \
+             visual state      runtime signals
+                                   |
+                           Track A runtime edge
+                                   |
+                    authority adapter / input.lock
+                                   |
+                       bounded named executor
+                                   |
+                      before/after observation
+                                   |
+                  terminal evidence/result bundle
 ```
 
-Observed reusable components:
+A state such as `WORLD`/`IN_GAME` may be visually suggested, but semantic promotion requires the applicable reviewed stronger runtime evidence. Visual/runtime disagreement produces `CONFLICT`/`INCONCLUSIVE`, never an optimistic promotion.
 
-- `supervisor.ps1` lifecycle wrapper;
-- local Ollama runtime under `runtime/Ollama`;
-- `mcp/local_worker_server.py` plus tests and README;
-- `policies/LOCAL_MODEL_ROUTING.yaml`;
-- `policies/SECURITY_POLICY.md`;
-- benchmark/evidence directories, model state and isolated worktrees;
-- pinned Hermes Agent image integration and fixed Ollama proxy design.
+## Supervisor handoff protocol
 
-`local_worker_server.py --self-test` returned `local_worker_server self-test passed`. The MCP server is already registered in the local Codex configuration as `mcp_servers.local_workers` and currently exposes bounded low-risk delegation/file/capability tools.
+Use stable versioned envelopes independent of transport.
 
-Current local-worker routing makes `gemma4:12b` the default bounded code/text worker. The separate `qwen3.5:9b` text/review fallback remains disabled after its prior benchmark produced false-positive review findings. That policy finding does not invalidate the separately benchmarked `qwen3-vl:4b-instruct-q4_K_M` Tibia vision profile.
+`TaskEnvelope.v1` should carry: `session_id`, `task_id`, `run_id`, `trusted_main_sha`, exact-client identity/fence, bounded objective, allowed named actions, physical action budget, retry/time limits, required evidence, runtime-authority class, idempotency key and optional opaque secret capability reference. It must contain no raw credentials.
 
-## Local models observed
+`AgentEvent.v1` should carry: monotonically increasing sequence, timestamp, provenance (`OWNER`, `SUPERVISOR`, `SYSTEM`, `MODEL`), state transition, sensor/runtime observation references, action proposal/approval/performance state and artifact hashes.
 
-Ollama client/runtime version observed: `0.32.14`.
+`ResultEnvelope.v1` should carry: `run_id`, terminal `PASS | FAIL | INCONCLUSIVE`, final reconciled state, evidence-manifest hash/reference, action counts/budget consumption and unresolved conflicts.
 
-Installed models included:
+The transport can be a narrow local MCP/HTTP bridge, but the envelope is the contract. Duplicate `TaskEnvelope` idempotency keys must not repeat physical effects.
 
-```text
-qwen3-vl:4b-instruct-q4_K_M  4.4B Q4_K_M  completion,vision,tools
-qwen3.5:9b                   9.7B Q4_K_M  completion,vision,tools,thinking
-gemma4:12b                   11.9B Q4_K_M completion,vision,audio,tools,thinking
-qwen2.5-coder:14b            14.8B Q4_K_M completion,tools,insert
-gpt-oss:20b                  20.9B MXFP4  completion,tools,thinking
-muse-glimmer:latest          27.9B Q4_K_M completion,vision,tools,thinking
-```
+## Dashboard and owner chat behavior
 
-No model was resident at the final check. The repository's mandatory single-local-model residency policy remains applicable: actual model inference must be serialized and a model switch requires unload plus residency revalidation.
+The dashboard should show one live session with:
 
-## Docker / Hermes state after Docker Desktop start
+- session/heartbeat and current deterministic state;
+- latest secret-safe screenshot/crop and its SHA;
+- latest visual classification/confidence and OCR text marked untrusted/visual-only;
+- stronger runtime signals and whether they agree with visual evidence;
+- requested, approved and performed named action with before/after states;
+- current physical action budget/count;
+- event timeline with explicit provenance;
+- terminal result/evidence bundle link.
 
-Fresh local readback after the owner started Docker Desktop:
+Owner chat and supervisor messages share the session timeline but never collapse provenance. `OWNER` control commands are parsed as control-plane commands, not prompts for the model.
 
-```text
-Docker Server=29.6.1 Client=29.6.1
-Ollama API ready=true
-OllamaVersion=0.32.14
-DockerReady=true
-FixedProxyReady=false
-```
+Control precedence is fail-closed:
 
-The pinned Hermes image is already local:
+1. SYSTEM safety/authority fault blocks physical effects;
+2. OWNER `STOP`/`PAUSE` dominates supervisor/model activity;
+3. SUPERVISOR task/capability instructions apply only inside owner/system constraints;
+4. MODEL output is a proposal/observation only.
 
-```text
-nousresearch/hermes-agent@sha256:abd7ccd3ef5eeadc4d56c6fac054cd0b2e1dc5ec7e69fe0d1938dda5c180d456
-```
+`STOP` latches immediately and forbids new effects. `PAUSE` preserves state/evidence but forbids effects. A restart never auto-resumes a previously paused/stopped physical session. `SCREENSHOT` is an explicit read-only request and never carries effect authority. An owner-originated pause cannot be overridden by the model or supervisor.
 
-The internal network `muse-supervisor-internal` already exists. The `muse-ollama-proxy` container also exists but was `Exited (255)` at discovery time. Therefore `supervisor doctor` currently fails only because the fixed Ollama proxy is not running. No `supervisor start` or proxy restart was performed in this discovery task.
+## Credential boundary
 
-## Computer-use state
+Raw secrets must never be model inputs, chat payloads, dashboard events, OCR targets, task/result envelopes or logs.
 
-The local Codex configuration contains `mcp_servers.cua_repl`, pointing at the installed OpenAI desktop/Codex application, but it is explicitly:
+The future model requests only an abstract named action such as `SUBMIT_AUTHORIZED_LOGIN`. The runtime edge resolves an opaque, separately-authorized credential capability locally and performs the secret-bearing keystrokes inside the smallest possible effect boundary. The existing Track A secret-wrapper pattern is reusable evidence for environment scrubbing, but the exact future credential store/provider remains **deferred and separately authorized**.
 
-```text
-enabled = false
-```
+During secret entry, raw frames containing populated secret fields must not be sent to Qwen or persisted. The preferred design is to suppress capture during the injection interval and/or deterministically mask configured secret-field regions before any image leaves the runtime edge. Evidence records only the abstract action and its before/after state, not the secret values.
 
-This is a candidate computer-use layer only. It was not enabled or tested. Future design must decide whether to reuse CUA or implement a narrower X11/Kasm-specific executor.
+## Action authority and budgets
 
-## Reuse recommendation for the future design
+The model must never receive raw `click(x,y)`, arbitrary `type(text)`, shell or process-control tools. It may propose only a versioned allowlist such as future `SUBMIT_AUTHORIZED_LOGIN`, `SELECT_CHARACTER`, `ENTER_WORLD`, `EXIT_WORLD`, plus read-only `SCREENSHOT`.
 
-Do not build a second local-agent platform from scratch. The architecture should preferentially reuse:
+Each mutating named action has an explicit expected source state, expected terminal state, maximum low-level input count, maximum attempts and deadline. The executor reserves/charges the physical budget before effect. Every actual low-level input event counts. Retries are bounded and consume budget.
 
-1. existing supervisor lifecycle and single-model residency controls;
-2. existing MCP local-worker channel for bounded supervisor-to-local-model delegation;
-3. PR #790 vision harness semantics and Qwen3-VL profile for image/OCR classification;
-4. PR #801 canonical Kasm/bootstrap infrastructure for the physical runtime;
-5. existing Kasm read-only `ffmpeg x11grab` capture path;
-6. either the disabled CUA layer or a narrower exact-action X11 executor after security comparison;
-7. a new thin session/dashboard/chat layer for owner visibility and two-way communication.
+Before each mutating transaction, the Track A authority adapter independently proves the applicable current exact-client fence, canonical target/lease/gates/rebind state, whole-lifetime supervisor and `input.lock`. Missing, stale or ambiguous authority returns a blocked state; it does not silently bootstrap, rebind or widen authority unless the later task explicitly authorizes that transition.
 
-The local agent should not be allowed to infer authority from model output. Proposed future control flow is `capture -> local vision classification -> deterministic policy/state machine -> narrowly authorized action -> independent runtime confirmation -> evidence bundle`. Runtime signals remain stronger than OCR for semantic state claims.
+No unrestricted gameplay action family is part of this architecture.
 
-## Architecture decisions still open
+## Failure and recovery behavior
 
-The following are intentionally not decided by this report:
+- heartbeat loss, runtime-edge loss or stale session -> `PAUSED`/`DEGRADED`, no physical effect and no automatic resume;
+- capture or Qwen failure -> bounded sensor-only retry; then `INCONCLUSIVE`, without compensating GUI input;
+- visual/runtime disagreement or ambiguous screen -> `CONFLICT`/`UNKNOWN`, no action;
+- exact-client/lease/Gate/input-lock/whole-lifetime-supervisor failure -> `PAUSED_AUTHORITY`, no action;
+- unexpected local model residency -> `WAITING_MODEL_SLOT`, no parallel inference and no forced eviction of an unowned model;
+- executor outcome unknown after an effect -> `PERFORMED_UNKNOWN` and reconciliation only; do not automatically replay a possibly already-delivered physical action;
+- service restart -> restore event ledger, preserve owner STOP/PAUSE latch, require fresh runtime/authority reconciliation before any later effect;
+- evidence hash mismatch -> invalidate the affected run/evidence instead of repairing provenance.
 
-- CUA versus narrow X11 action executor;
-- credential handoff mechanism for autonomous login;
-- exact allowed action vocabulary and budgets;
-- dashboard transport/authentication;
-- owner/supervisor message precedence and pause/stop semantics;
-- evidence retention and screenshot redaction policy;
-- whether the local agent may autonomously repeat login/world-entry cycles and how many;
-- which runtime signals must confirm each OCR-derived screen classification.
+## Testing strategy for a later implementation
 
-These questions require an explicit architectural design and owner approval before implementation.
+1. Schema/state-machine unit tests: versioned envelopes, provenance, precedence, idempotency, action budgets, STOP/PAUSE latching and restart recovery.
+2. Offline replay tests: PR #790 frozen images plus synthetic runtime events; zero physical input.
+3. Vision integration tests: exact Qwen3-VL profile against existing fixtures first, then separately admitted representative secret-safe captures; preserve PR #790 hard gates instead of re-running an unrelated model bake-off.
+4. Security tests: prove raw credentials cannot enter prompts/events/logs/evidence; reject raw model click/type/shell requests; verify masking/suppression around credential injection.
+5. Single-model residency tests: only one local model resident/inferencing at a time; foreign/unexpected residency fails closed.
+6. Track A adapter contract tests: mock canonical lease/gates/exact-client/live-guard/`input.lock`; prove the new service cannot bypass existing authority.
+7. Dashboard/reconnect tests: provenance, event replay, owner control precedence and heartbeat behavior.
+8. Crash/ambiguity tests around request -> approval -> effect -> result; idempotency must prevent duplicate physical effects.
+9. Only after separate owner/spec/runtime authorization: staged physical tests progressing from read-only capture to dummy X11 actions, then narrowly authorized official-client transition tests. No gameplay expansion.
 
-## Current boundary
+## Phased implementation sequence after owner approval
 
-```text
-runtime_access=none
-implementation_authorized=false
-login_allowed=false
-gui_input_authorized=false
-process_control_authorized=false
-physical_action_count=0
-```
+The current task stops before implementation. If the owner approves this direction, the next repository step is the required formal design spec under `docs/superpowers/specs/`, followed by self-review and a second owner approval of the written spec.
 
-No official Tibia client runtime was touched by this discovery. No OCR inference was newly run against the official client, no GUI input was sent, no credentials were accessed and no supervisor/Hermes proxy state was changed.
+Only after that gate should planning/implementation be considered in this order:
+
+1. control-plane schemas, persistent session state, evidence ledger and dashboard/chat using fake adapters; physical budget stays zero;
+2. offline vision adapter and deterministic preprocessing using PR #790 fixtures under the single-model scheduler;
+3. separately-authorized read-only Track A capture/runtime-signal integration through the canonical runtime edge; still no input;
+4. narrow named-action executor and authority adapter tested against a dummy/emulated X11 target;
+5. separately designed/approved credential broker tested only against a dummy login surface;
+6. separately-authorized Track A login/character/world transition E2E with exact client/gates/locks/evidence and bounded action budget.
+
+## Delivery matrix
+
+| Layer | Decision | Reuse / build boundary |
+|---|---|---|
+| supervisor lifecycle | EXTEND EXISTING | reuse `supervisor.ps1`; add health/model-slot integration only |
+| capture producer | EXTEND EXISTING | Kasm `ffmpeg x11grab`/runtime-edge adapter; no new desktop platform |
+| vision/OCR sensor | EXTEND EXISTING | PR #790 `VisualEvidence` semantics + exact Qwen3-VL profile |
+| deterministic classifiers | NEW | crop/hash/change/template/redaction/prefilter layer |
+| runtime signal adapters | EXTEND EXISTING | `gameWindowState`, world-entered and exact-current runtime evidence |
+| agent state machine | NEW | persistent deterministic session/recovery/control state |
+| decision/orchestration | NEW | thin session service; model suggestions remain untrusted |
+| bounded action executor | EXTEND + NEW NARROW ADAPTER | canonical Control Center guarded dispatch + named action implementation |
+| credential abstraction | NEW, IMPLEMENTATION DEFERRED | opaque capability + edge broker; raw secrets never exposed |
+| Track A authority adapter | REUSE + THIN ADAPTER | canonical lease/gates/rebind/live-guard/`input.lock`; do not duplicate logic |
+| evidence recorder | NEW + EXTEND | append-only event ledger + PR #790 visual evidence/artifact hashes |
+| supervisor handoff | NEW THIN BRIDGE | `TaskEnvelope` / `AgentEvent` / `ResultEnvelope`, transport-neutral |
+| dashboard | NEW | same session-service backend; loopback default |
+| owner chat/control | NEW | provenance-preserving OWNER/SUPERVISOR/SYSTEM/MODEL timeline |
+| pause/stop/recovery lifecycle | NEW | deterministic control plane; no auto-resume |
+| existing local worker MCP | REUSE | bounded low-risk text subworker only |
+| CUA REPL | DEFERRED / NOT PRIMARY | remain disabled; optional future diagnostic adapter only if justified |
+| Hermes tool-loop | DEFERRED / NOT NEEDED | retain existing isolation/audit use; not primary session runtime |
+| unrestricted gameplay | NOT NEEDED / FORBIDDEN | outside this architecture |
+
+## Owner approval hard gate
+
+Recommended direction: **Approach C - persistent Molehill session/control service plus a narrow canonical Track A runtime edge, Qwen3-VL as visual sensor, deterministic policy/authority outside the model, CUA and Hermes excluded from the primary action path.**
+
+No implementation code, formal design spec, CUA enablement, official-client runtime observation/input, login, credential access or PR merge is authorized by this report.
+
+The single next repository action is owner approval or rejection of this architectural direction. If approved, the following task must write the formal design spec and stop again for owner approval of that written spec before implementation planning.

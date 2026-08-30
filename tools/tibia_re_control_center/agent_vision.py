@@ -30,11 +30,6 @@ QWEN_NUM_CTX = 4096
 QWEN_NUM_PREDICT = 256
 QWEN_TEMPERATURE = 0
 _UNSET = object()
-# Stable endpoint adapters report bounded transport, timeout, provider-runtime,
-# and protocol-value failures through these built-in families.  Contract and
-# programming defects such as AssertionError, TypeError, and AttributeError are
-# intentionally outside this taxonomy and must remain visible.
-_OPERATIONAL_ENDPOINT_ERRORS = (OSError, RuntimeError, ValueError)
 _SNAPSHOT_FILESYSTEM_FAILURE = "capture snapshot filesystem failure"
 _MODEL_SLOT_ERROR_CODES = frozenset({
     "DIFFERENT_RESIDENT_MODEL",
@@ -49,6 +44,19 @@ _MODEL_SLOT_ERROR_CODES = frozenset({
     "RESIDENCY_UNKNOWN",
     "TARGET_NOT_OWNED",
 })
+
+
+def _is_operational_endpoint_error(error: BaseException) -> bool:
+    """Classify only failures emitted operationally by the stable adapters."""
+    # Transport/timeouts are OSError subclasses and protocol decoding/value
+    # failures are ValueError subclasses.  The stable adapter also uses the
+    # exact built-in RuntimeError for bounded provider state failures; its
+    # programming subclasses (for example NotImplementedError and
+    # RecursionError) must remain visible.
+    return (
+        isinstance(error, (OSError, ValueError))
+        or type(error) is RuntimeError
+    )
 
 
 class ModelSlotUnavailable(RuntimeError):
@@ -140,26 +148,29 @@ class ModelSlotScheduler:
     def _residency(self, *, suppress_unexpected_errors: bool = False) -> list[str] | None:
         try:
             resident = self._ps()
-        except _OPERATIONAL_ENDPOINT_ERRORS:
-            return None
-        except BaseException:
-            if suppress_unexpected_errors:
+            if resident is None or type(resident) is not list:
+                return None
+            canonical: list[str] = []
+            for item in resident:
+                if type(item) is not str or not item:
+                    return None
+                canonical.append(item)
+            return canonical
+        except BaseException as error:
+            if (
+                suppress_unexpected_errors
+                or _is_operational_endpoint_error(error)
+            ):
                 return None
             raise
-        if (
-            resident is None
-            or not isinstance(resident, list)
-            or not all(isinstance(item, str) and item for item in resident)
-        ):
-            return None
-        return resident
 
     def _verify_digest(self, model: str, expected_digest: str) -> None:
         actual: object = _UNSET
         try:
             actual = self._digest(model)
-        except _OPERATIONAL_ENDPOINT_ERRORS:
-            pass
+        except BaseException as error:
+            if not _is_operational_endpoint_error(error):
+                raise
         if actual is _UNSET:
             raise ModelSlotUnavailable("MODEL_DIGEST_UNAVAILABLE")
         if not isinstance(actual, str) or actual.lower() != expected_digest.lower():
@@ -173,37 +184,51 @@ class ModelSlotScheduler:
         return ModelSlotUnavailable(code)
 
     def _unload_owned_and_verify_empty(self, model: str) -> None:
-        unload_error: BaseException | None = None
-        unload_traceback = None
+        unload_failed = False
         try:
             self._unload(model)
         except BaseException as error:
-            unload_error = error
-            unload_traceback = error.__traceback__
+            if not _is_operational_endpoint_error(error):
+                self._post_unload_is_empty(
+                    model,
+                    suppress_unexpected_errors=True,
+                )
+                raise
+            unload_failed = True
 
         # Classify the one post-effect observation identically whether the
         # provider returned or raised.  Only exact continuity proves that the
         # old ownership claim remains valid; every other state loses the claim
         # so a later same-name foreign resident can never be unloaded.
-        preserve_active_error = (
-            unload_error is not None
-            and not isinstance(unload_error, _OPERATIONAL_ENDPOINT_ERRORS)
+        empty = self._post_unload_is_empty(
+            model,
+            suppress_unexpected_errors=False,
         )
+        if unload_failed:
+            raise ModelSlotUnavailable("MODEL_UNLOAD_FAILED")
+        if not empty:
+            raise ModelSlotUnavailable("MODEL_UNLOAD_NOT_VERIFIED")
+
+    def _post_unload_is_empty(
+        self,
+        model: str,
+        *,
+        suppress_unexpected_errors: bool,
+    ) -> bool:
         try:
             resident = self._residency(
-                suppress_unexpected_errors=preserve_active_error,
+                suppress_unexpected_errors=suppress_unexpected_errors,
             )
+            continuous = resident == [model]
+            empty = resident == []
         except BaseException:
             self._owned_model = None
+            if suppress_unexpected_errors:
+                return False
             raise
-        if resident != [model]:
+        if not continuous:
             self._owned_model = None
-        if preserve_active_error and unload_error is not None:
-            raise unload_error.with_traceback(unload_traceback)
-        if unload_error is not None:
-            raise ModelSlotUnavailable("MODEL_UNLOAD_FAILED")
-        if resident != []:
-            raise ModelSlotUnavailable("MODEL_UNLOAD_NOT_VERIFIED")
+        return empty
 
     def _admit(self, model: str, expected_digest: str) -> None:
         resident = self._residency()
@@ -240,18 +265,20 @@ class ModelSlotScheduler:
             resident = self._residency(
                 suppress_unexpected_errors=suppress_unexpected_errors,
             )
+            if resident == []:
+                self._owned_model = None
+                return None
+            if resident == [model]:
+                # This exact target appeared during the serialized acquisition.
+                self._owned_model = model
+                return None
+            self._owned_model = None
+            return self._residency_failure(resident, model).code
         except BaseException:
             self._owned_model = None
+            if suppress_unexpected_errors:
+                return "RESIDENCY_UNKNOWN"
             raise
-        if resident == []:
-            self._owned_model = None
-            return None
-        if resident == [model]:
-            # This exact target appeared during the serialized acquisition.
-            self._owned_model = model
-            return None
-        self._owned_model = None
-        return self._residency_failure(resident, model).code
 
     def infer(
         self,
@@ -276,8 +303,7 @@ class ModelSlotScheduler:
             try:
                 self._admit(model, expected_digest)
                 response: object = _UNSET
-                provider_error: BaseException | None = None
-                provider_traceback = None
+                provider_failed = False
                 try:
                     response = self._infer(
                         model,
@@ -292,26 +318,23 @@ class ModelSlotScheduler:
                         num_predict=num_predict,
                     )
                 except BaseException as error:
-                    provider_error = error
-                    provider_traceback = error.__traceback__
+                    if not _is_operational_endpoint_error(error):
+                        self._reconcile_provider_residency(
+                            model,
+                            suppress_unexpected_errors=True,
+                        )
+                        raise
+                    provider_failed = True
 
                 # Reconcile outside the provider handler so untrusted provider
-                # exception objects cannot become an implicit context. Control
-                # and programming exceptions stay primary, while their
-                # secondary classification is deliberately non-throwing.
-                preserve_active_error = (
-                    provider_error is not None
-                    and not isinstance(provider_error, _OPERATIONAL_ENDPOINT_ERRORS)
-                )
+                # operational exception objects cannot become implicit context.
                 residency_failure = self._reconcile_provider_residency(
                     model,
-                    suppress_unexpected_errors=preserve_active_error,
+                    suppress_unexpected_errors=False,
                 )
-                if preserve_active_error and provider_error is not None:
-                    raise provider_error.with_traceback(provider_traceback)
                 if residency_failure is not None:
                     raise ModelSlotUnavailable(residency_failure)
-                if provider_error is not None:
+                if provider_failed:
                     raise ModelSlotUnavailable("MODEL_INFERENCE_FAILED")
                 if response is _UNSET:
                     raise AssertionError("provider response state invalid")

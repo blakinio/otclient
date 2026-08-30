@@ -158,6 +158,31 @@ class _FailingTemporaryDirectory:
         raise OSError(f"{self._sentinel}:{self.name}")
 
 
+class _ExplodingEqualityList(list):
+    def __eq__(self, other):
+        raise TypeError("SECONDARY_EQUALITY_SENTINEL")
+
+    def __ne__(self, other):
+        raise TypeError("SECONDARY_EQUALITY_SENTINEL")
+
+
+class _ExplodingIterationList(list):
+    def __iter__(self):
+        raise AttributeError("SECONDARY_ITERATION_SENTINEL")
+
+
+class _ExplodingString(str):
+    def __bool__(self):
+        raise TypeError("SECONDARY_STRING_SENTINEL")
+
+    def __eq__(self, other):
+        raise TypeError("SECONDARY_STRING_SENTINEL")
+
+
+class _ProgrammingRuntimeError(RuntimeError):
+    pass
+
+
 class ModelSlotSchedulerTests(unittest.TestCase):
     def _scheduler(self, resident, *, digest=QWEN_VISION_DIGEST, provider=None, unload=None):
         self.unloads = []
@@ -944,6 +969,206 @@ class ModelSlotSchedulerTests(unittest.TestCase):
                     )
                     self.assertFalse(scheduler.owns(QWEN_VISION_MODEL))
                     self.assertIsNone(scheduler._transition_thread)
+
+    def test_adversarial_residency_cannot_mask_an_active_transition_error(self):
+        shape_factories = (
+            ("equality", lambda: _ExplodingEqualityList([QWEN_VISION_MODEL])),
+            ("iteration", lambda: _ExplodingIterationList([QWEN_VISION_MODEL])),
+            ("string_subclass", lambda: [_ExplodingString(QWEN_VISION_MODEL)]),
+        )
+        primary_types = (KeyboardInterrupt, SystemExit, TypeError)
+        secondary_sentinels = (
+            "SECONDARY_EQUALITY_SENTINEL",
+            "SECONDARY_ITERATION_SENTINEL",
+            "SECONDARY_STRING_SENTINEL",
+        )
+        for transition in ("infer", "unload"):
+            for shape_name, shape_factory in shape_factories:
+                for primary_type in primary_types:
+                    with self.subTest(
+                        transition=transition,
+                        shape=shape_name,
+                        primary=primary_type.__name__,
+                    ):
+                        resident = [[]]
+                        calls = []
+                        unloads = []
+                        primary_error = primary_type("PRIMARY_TRANSITION_SENTINEL")
+
+                        def provider(call, error=primary_error):
+                            calls.append(call)
+                            if len(calls) == 1:
+                                resident[0] = [call["model"]]
+                                return {"ok": True}
+                            resident[0] = shape_factory()
+                            raise error
+
+                        def unload(model, error=primary_error):
+                            unloads.append(model)
+                            resident[0] = shape_factory()
+                            raise error
+
+                        scheduler = self._scheduler(
+                            resident,
+                            provider=provider if transition == "infer" else None,
+                            unload=(
+                                unload
+                                if transition == "unload"
+                                else lambda model: unloads.append(model)
+                            ),
+                        )
+                        _infer(scheduler)
+                        propagated = _capture_exception(
+                            self,
+                            primary_type,
+                            (lambda: _infer(scheduler))
+                            if transition == "infer"
+                            else scheduler.release,
+                        )
+                        self.assertIs(primary_error, propagated)
+                        _assert_sanitized_exception(
+                            self,
+                            propagated,
+                            "PRIMARY_TRANSITION_SENTINEL",
+                            secondary_sentinels,
+                        )
+                        transition_code = (
+                            ModelSlotScheduler.infer.__code__
+                            if transition == "infer"
+                            else ModelSlotScheduler._unload_owned_and_verify_empty.__code__
+                        )
+                        callback_code = (
+                            provider.__code__
+                            if transition == "infer"
+                            else unload.__code__
+                        )
+                        traceback_codes = []
+                        current_traceback = propagated.__traceback__
+                        while current_traceback is not None:
+                            traceback_codes.append(current_traceback.tb_frame.f_code)
+                            current_traceback = current_traceback.tb_next
+                        self.assertEqual(1, traceback_codes.count(transition_code))
+                        self.assertIs(callback_code, traceback_codes[-1])
+                        self.assertFalse(scheduler.owns(QWEN_VISION_MODEL))
+                        self.assertIsNone(scheduler._transition_thread)
+
+                        resident[0] = [QWEN_VISION_MODEL]
+                        with self.assertRaisesRegex(ModelSlotUnavailable, "TARGET_NOT_OWNED"):
+                            _infer(scheduler)
+                        scheduler.release()
+                        self.assertEqual(
+                            1 if transition == "unload" else 0,
+                            len(unloads),
+                        )
+
+    def test_adversarial_residency_shapes_fail_closed_without_a_primary(self):
+        shape_factories = (
+            lambda: _ExplodingEqualityList([QWEN_VISION_MODEL]),
+            lambda: _ExplodingIterationList([QWEN_VISION_MODEL]),
+            lambda: [_ExplodingString(QWEN_VISION_MODEL)],
+        )
+        forbidden = (
+            "SECONDARY_EQUALITY_SENTINEL",
+            "SECONDARY_ITERATION_SENTINEL",
+            "SECONDARY_STRING_SENTINEL",
+        )
+        for shape_factory in shape_factories:
+            for transition in ("preflight", "infer", "unload"):
+                with self.subTest(shape=shape_factory, transition=transition):
+                    resident = [shape_factory() if transition == "preflight" else []]
+
+                    def provider(call):
+                        resident[0] = shape_factory()
+                        return {"ok": True}
+
+                    def unload(model):
+                        resident[0] = shape_factory()
+
+                    scheduler = self._scheduler(
+                        resident,
+                        provider=provider if transition == "infer" else None,
+                        unload=unload if transition == "unload" else None,
+                    )
+                    if transition == "unload":
+                        _infer(scheduler)
+                        call = scheduler.release
+                        expected_code = "MODEL_UNLOAD_NOT_VERIFIED"
+                    else:
+                        call = lambda: _infer(scheduler)
+                        expected_code = "RESIDENCY_UNKNOWN"
+
+                    failure = _capture_exception(self, ModelSlotUnavailable, call)
+                    _assert_sanitized_exception(
+                        self,
+                        failure,
+                        expected_code,
+                        forbidden,
+                    )
+                    self.assertFalse(scheduler.owns(QWEN_VISION_MODEL))
+                    self.assertIsNone(scheduler._transition_thread)
+
+    def test_runtime_programming_subclasses_propagate_at_all_endpoint_seams(self):
+        error_types = (
+            NotImplementedError,
+            RecursionError,
+            _ProgrammingRuntimeError,
+        )
+        for error_type in error_types:
+            for seam in ("ps", "digest", "infer", "unload"):
+                with self.subTest(error=error_type.__name__, seam=seam):
+                    resident = [[]]
+                    unloads = []
+                    programmer_error = error_type("RUNTIME_PROGRAMMING_SENTINEL")
+                    scheduler = self._scheduler(
+                        resident,
+                        unload=lambda model: unloads.append(model),
+                    )
+
+                    if seam == "ps":
+                        scheduler._ps = lambda error=programmer_error: (
+                            (_ for _ in ()).throw(error)
+                        )
+                        call = lambda: _infer(scheduler)
+                    elif seam == "digest":
+                        scheduler._digest = lambda model, error=programmer_error: (
+                            (_ for _ in ()).throw(error)
+                        )
+                        call = lambda: _infer(scheduler)
+                    elif seam == "infer":
+                        def fail_infer(*args, error=programmer_error, **kwargs):
+                            resident[0] = []
+                            raise error
+
+                        scheduler._infer = fail_infer
+                        call = lambda: _infer(scheduler)
+                    else:
+                        _infer(scheduler)
+
+                        def fail_unload(model, error=programmer_error):
+                            unloads.append(model)
+                            resident[0] = []
+                            raise error
+
+                        scheduler._unload = fail_unload
+                        call = scheduler.release
+
+                    propagated = _capture_exception(self, error_type, call)
+                    self.assertIs(programmer_error, propagated)
+                    _assert_sanitized_exception(
+                        self,
+                        propagated,
+                        "RUNTIME_PROGRAMMING_SENTINEL",
+                        (),
+                    )
+                    self.assertIsNone(scheduler._transition_thread)
+
+                    if seam in {"infer", "unload"}:
+                        self.assertFalse(scheduler.owns(QWEN_VISION_MODEL))
+                        resident[0] = [QWEN_VISION_MODEL]
+                        with self.assertRaisesRegex(ModelSlotUnavailable, "TARGET_NOT_OWNED"):
+                            _infer(scheduler)
+                        scheduler.release()
+                        self.assertEqual(1 if seam == "unload" else 0, len(unloads))
 
     def _assert_unload_loses_ownership(self, *, operation, unload_raises):
         post_states = (

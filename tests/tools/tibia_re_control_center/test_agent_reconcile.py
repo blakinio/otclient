@@ -12,21 +12,32 @@ from tools.tibia_re_control_center.agent_reconcile import (
     reconcile_state,
 )
 from tools.tibia_re_control_center.agent_vision import VisionObservation
+from tools.tibia_re_control_center.agent_vision import QWEN_VISION_PROFILE_ID
+
+
+class _StringSubclass(str):
+    pass
+
+
+class _TupleSubclass(tuple):
+    pass
 
 
 def _visual(
     screen_class: object = "WORLD_VISUAL",
     *,
+    visible_text: object = (),
+    confidence: object = None,
     evidence_ref: object = "capture:fixture",
     capture_sha256: object = "a" * 64,
-    model_profile_id: object = "test-profile",
+    model_profile_id: object = QWEN_VISION_PROFILE_ID,
     visual_only: object = True,
     structural_authority: object = False,
 ) -> VisionObservation:
     return VisionObservation(
         screen_class=screen_class,  # type: ignore[arg-type]
-        visible_text=(),
-        confidence=None,
+        visible_text=visible_text,  # type: ignore[arg-type]
+        confidence=confidence,  # type: ignore[arg-type]
         model_profile_id=model_profile_id,  # type: ignore[arg-type]
         evidence_ref=evidence_ref,  # type: ignore[arg-type]
         capture_sha256=capture_sha256,  # type: ignore[arg-type]
@@ -149,6 +160,72 @@ class ReconciliationTests(unittest.TestCase):
                 result = reconcile_state(visual, runtime)
                 self.assertIs(result.state, ReconciledState.UNKNOWN)
                 self.assertNotIn(secret, repr(result))
+
+    def test_secret_shaped_provenance_is_dropped_without_an_outward_leak(self):
+        sentinel = "OPENAI_API_KEY=sentinel_reconciliation_secret"
+        cases = (
+            ("visual ref", _visual(evidence_ref=sentinel), _runtime("IN_GAME", RuntimeEvidenceClass.REVIEWED_CAUSAL, ("runtime:world",))),
+            ("runtime ref", _visual(), _runtime("IN_GAME", RuntimeEvidenceClass.REVIEWED_CAUSAL, (sentinel,))),
+        )
+
+        for name, visual, runtime in cases:
+            with self.subTest(name=name):
+                result = reconcile_state(visual, runtime)
+                self.assertIs(result.state, ReconciledState.UNKNOWN)
+                self.assertEqual(result.visual_evidence_refs, ())
+                self.assertEqual(result.runtime_evidence_refs, ())
+                self.assertNotIn(sentinel, repr(result))
+                self.assertNotIn(sentinel, str(result))
+
+    def test_complete_task5_visual_contract_is_required_before_all_table_rules(self):
+        oversized_text = "x" * 4097
+        cases = (
+            ("mutable visible text", {"visible_text": ["safe"]}),
+            ("tuple subclass visible text", {"visible_text": _TupleSubclass(("safe",))}),
+            ("string subclass visible text", {"visible_text": (_StringSubclass("safe"),)}),
+            ("surrogate visible text", {"visible_text": ("bad\ud800",)}),
+            ("too many visible strings", {"visible_text": tuple("safe" for _ in range(257))}),
+            ("oversized visible string", {"visible_text": (oversized_text,)}),
+            ("nan confidence", {"confidence": float("nan")}),
+            ("infinite confidence", {"confidence": float("inf")}),
+            ("confidence below range", {"confidence": -0.01}),
+            ("confidence above range", {"confidence": 1.01}),
+            ("integer confidence", {"confidence": 1}),
+            ("unreviewed profile", {"model_profile_id": "ollama:unreviewed@sha256:" + "b" * 64}),
+            ("profile string subclass", {"model_profile_id": _StringSubclass(QWEN_VISION_PROFILE_ID)}),
+            ("capture string subclass", {"capture_sha256": _StringSubclass("a" * 64)}),
+            ("evidence ref string subclass", {"evidence_ref": _StringSubclass("capture:fixture")}),
+        )
+
+        for name, kwargs in cases:
+            with self.subTest(name=name):
+                result = reconcile_state(
+                    _visual("WORLD_VISUAL", **kwargs),
+                    _runtime("IN_GAME", RuntimeEvidenceClass.REVIEWED_CAUSAL, ("runtime:world",)),
+                )
+                self.assertIs(result.state, ReconciledState.UNKNOWN)
+                self.assertEqual(result.visual_evidence_refs, ())
+                self.assertEqual(result.runtime_evidence_refs, ())
+
+    def test_admitted_task5_confidence_forms_remain_reconcilable(self):
+        for confidence in (None, 0.0, 0.5, 1.0):
+            with self.subTest(confidence=confidence):
+                result = reconcile_state(
+                    _visual("WORLD_VISUAL", confidence=confidence),
+                    _runtime("IN_GAME", RuntimeEvidenceClass.REVIEWED_CAUSAL, ("runtime:world",)),
+                )
+                self.assertIs(result.state, ReconciledState.WORLD_CONFIRMED)
+
+    def test_malformed_visual_never_emits_visual_state_without_runtime_evidence(self):
+        for screen_class in ("LOGIN_SCREEN", "CHARACTER_SELECT", "WORLD_VISUAL"):
+            with self.subTest(screen_class=screen_class):
+                result = reconcile_state(
+                    _visual(screen_class, visible_text=["mutable"]),
+                    _runtime("UNKNOWN", RuntimeEvidenceClass.UNKNOWN, ()),
+                )
+                self.assertIs(result.state, ReconciledState.UNKNOWN)
+                self.assertEqual(result.visual_evidence_refs, ())
+                self.assertEqual(result.runtime_evidence_refs, ())
 
     def test_result_retains_immutable_visual_and_runtime_provenance(self):
         result = reconcile_state(

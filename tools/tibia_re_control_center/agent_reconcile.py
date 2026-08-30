@@ -9,9 +9,12 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from enum import Enum
+from math import isfinite
 from typing import Any
 
-from .agent_vision import VisionObservation
+from .agent_vision import QWEN_VISION_PROFILE_ID, VisionObservation
+from .model import PrivacyError, ValidationError
+from .recorder import ensure_no_secret_material
 
 
 class RuntimeEvidenceClass(str, Enum):
@@ -47,6 +50,8 @@ class ReconciliationResult:
 
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _MAX_REF_BYTES = 128
+_MAX_VISIBLE_TEXT_ENTRIES = 256
+_MAX_VISIBLE_TEXT_BYTES = 4096
 
 # ``IN_GAME_VISUAL`` and ``WORLD_EXIT`` are the Task 5 model vocabulary;
 # Task 5's sensor normally emits their normalized forms.  No trimming or case
@@ -95,7 +100,34 @@ def _safe_ref(value: Any) -> str | None:
         or "\\" in value
     ):
         return None
+    try:
+        ensure_no_secret_material(value, key_path="reconciliation.evidence_ref")
+    except (PrivacyError, ValidationError):
+        return None
     return value
+
+
+def _safe_visible_text(value: Any) -> bool:
+    if type(value) is not tuple or len(value) > _MAX_VISIBLE_TEXT_ENTRIES:
+        return False
+    for item in value:
+        if type(item) is not str:
+            return False
+        try:
+            encoded = item.encode("utf-8", "strict")
+        except UnicodeEncodeError:
+            return False
+        if (
+            len(encoded) > _MAX_VISIBLE_TEXT_BYTES
+            or any(0xD800 <= ord(char) <= 0xDFFF for char in item)
+            or any(ord(char) < 0x20 or ord(char) == 0x7F for char in item)
+        ):
+            return False
+        try:
+            ensure_no_secret_material(item, key_path="reconciliation.visible_text")
+        except (PrivacyError, ValidationError):
+            return False
+    return True
 
 
 def _visual_parts(visual: Any) -> tuple[str | None, tuple[str, ...]]:
@@ -104,9 +136,18 @@ def _visual_parts(visual: Any) -> tuple[str | None, tuple[str, ...]]:
     if (
         type(visual.screen_class) is not str
         or type(visual.capture_sha256) is not str
+        or type(visual.model_profile_id) is not str
         or not _SHA256.fullmatch(visual.capture_sha256)
+        or not _safe_visible_text(visual.visible_text)
+        or visual.model_profile_id != QWEN_VISION_PROFILE_ID
         or visual.visual_only is not True
         or visual.structural_authority is not False
+    ):
+        return None, ()
+    if visual.confidence is not None and (
+        type(visual.confidence) is not float
+        or not isfinite(visual.confidence)
+        or not 0.0 <= visual.confidence <= 1.0
     ):
         return None, ()
     screen = _VISUAL_NORMALIZATION.get(visual.screen_class)
@@ -156,7 +197,7 @@ def reconcile_state(visual: VisionObservation, runtime: RuntimeObservation) -> R
     visual_state, visual_refs = _visual_parts(visual)
     runtime_state, evidence_class, runtime_refs = _runtime_parts(runtime)
     if visual_state is None or runtime_state is None or evidence_class is None:
-        return _result(ReconciledState.UNKNOWN, visual_refs, runtime_refs)
+        return _result(ReconciledState.UNKNOWN, (), ())
 
     if evidence_class is RuntimeEvidenceClass.REVIEWED_CAUSAL and not runtime_refs:
         return _result(ReconciledState.UNKNOWN, visual_refs, runtime_refs)

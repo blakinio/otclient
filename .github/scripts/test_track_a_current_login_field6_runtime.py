@@ -144,7 +144,7 @@ workflow = need(
         ".github/scripts/track_a_current_client_package_materialize.py",
         ".github/scripts/track_a_current_client_package_acquire.sh",
         "github.event.comment.user.login == github.repository_owner",
-        "AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V4 once=true",
+        "AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V5 once=true",
         "ref: main",
         "secrets.TIBIA_TEST_EMAIL",
         "secrets.TIBIA_TEST_PASSWORD",
@@ -162,8 +162,12 @@ workflow = need(
         "FIELD6_VALUE_PROVEN=true",
     ),
 )
-if "AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V3 once=true" in workflow:
-    raise SystemExit("FIELD6_RUNTIME_CONTRACT_RED: consumed V3 trigger must not remain executable")
+for consumed_generation in ("V3", "V4"):
+    consumed = f"AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_{consumed_generation} once=true"
+    if consumed in workflow:
+        raise SystemExit(
+            f"FIELD6_RUNTIME_CONTRACT_RED: consumed {consumed_generation} trigger must not remain executable"
+        )
 if "secrets.TIBIA_TEST_EMAIL" in workflow.split("jobs:\n", 1)[1].split("live-observation:", 1)[0]:
     raise SystemExit("FIELD6_RUNTIME_CONTRACT_RED: contract job must not receive login secrets")
 preflight = workflow.index("bash .github/scripts/track_a_current_client_package_acquire.sh prepare")
@@ -185,16 +189,18 @@ task = need(
         ".github/scripts/track_a_current_client_package_materialize.py",
         ".github/scripts/track_a_current_client_package_acquire.sh",
         ".github/scripts/track_a_current_login_field6_runtime_secret_wrapper.sh",
-        "AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V4 once=true",
+        "AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V5 once=true",
         "character_selection_allowed: false",
         "gameplay_allowed: false",
         "network_payload_capture_allowed: false",
     ),
 )
-if "AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V3 once=true" in task:
-    raise SystemExit(
-        "FIELD6_RUNTIME_CONTRACT_RED: current task must omit consumed V3 trigger literal to block historical reruns"
-    )
+for consumed_generation in ("V3", "V4"):
+    consumed = f"AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_{consumed_generation} once=true"
+    if consumed in task:
+        raise SystemExit(
+            f"FIELD6_RUNTIME_CONTRACT_RED: current task must omit consumed {consumed_generation} trigger literal to block historical reruns"
+        )
 static = (
     "runtime_access: none" in task
     and "mutation_authorized: false" in task

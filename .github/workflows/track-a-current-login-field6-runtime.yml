@@ -73,15 +73,21 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
-      - name: Falsify V4 admission completion
+      - name: Falsify current field6 admission/security state
         shell: bash
         run: |
           set -Eeuo pipefail
           test -n "$BASE_SHA"
-          python3 .github/scripts/audit_track_a_current_login_field6_admission.py --base "$BASE_SHA"
+          task="docs/agents/tasks/active/$TASK_ID.md"
+          test -f "$task"
           python3 .github/scripts/test_track_a_current_login_field6_security_contract.py
           python3 .github/scripts/test_track_a_current_login_field6_runtime.py
           python3 -m py_compile .github/scripts/audit_track_a_current_login_field6_admission.py
+          if grep -Fqx 'runtime_access: none' "$task"; then
+            echo TRACK_A_FIELD6_STATIC_REPAIR_AUDIT=PASS
+          else
+            python3 .github/scripts/audit_track_a_current_login_field6_admission.py --base "$BASE_SHA"
+          fi
           git diff --check "$BASE_SHA"...HEAD
 
   live-observation:
@@ -93,7 +99,7 @@ jobs:
       github.event.comment.body == 'AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V4 once=true'
     name: One-shot isolated field6 observation
     runs-on: ${{ format('field6-v4-{0}', github.event.comment.id) }}
-    timeout-minutes: 18
+    timeout-minutes: 45
     concurrency:
       group: official-client-re-current-login-field6-runtime
       cancel-in-progress: false

@@ -8,6 +8,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW = ROOT / '.github/workflows/track-a-kasm-canonical-bootstrap.yml'
 TASK = ROOT / 'docs/agents/tasks/active/OTC-20260829-track-a-kasm-canonical-bootstrap.md'
+RECOVERY_LIVE_TASK = ROOT / 'docs/agents/tasks/active/OTC-20260829-track-a-kasm-canonical-bootstrap-invalidation-live.md'
+BOOTSTRAP_LIVE_TASK = ROOT / 'docs/agents/tasks/active/OTC-20260829-track-a-kasm-canonical-bootstrap-live.md'
 
 
 def job_block(text: str, name: str) -> str:
@@ -126,6 +128,40 @@ class Tests(unittest.TestCase):
         self.assertIn('live_runtime_authorization_source', live)
         self.assertGreaterEqual(live.count('check_task('), 3)
         self.assertIn('validate_track_a_task', live)
+
+    def test_referenced_live_task_cards_exist_with_pending_admissions(self):
+        self.assertTrue(RECOVERY_LIVE_TASK.is_file(), 'recovery live task card missing')
+        self.assertTrue(BOOTSTRAP_LIVE_TASK.is_file(), 'bootstrap live task card missing')
+        recovery = RECOVERY_LIVE_TASK.read_text(encoding='utf-8')
+        bootstrap = BOOTSTRAP_LIVE_TASK.read_text(encoding='utf-8')
+        for exact in (
+            'runtime_access: canonical_recovery',
+            'runtime_owner_task: OTC-20260829-track-a-kasm-canonical-bootstrap-invalidation-live',
+            'canonical_registration: PRESENT',
+            'canonical_lease_generation: UNKNOWN',
+            'registration_lease_generation: 43',
+            'gate_a: REQUIRED_NOT_PROVEN',
+            'recovery_mode: prior_boot_zero_client_invalidation_v1',
+            'physical_action_budget: 0',
+            'live_runtime_authorization_source: PR_758_COMMENT_5470597018',
+        ):
+            self.assertIn(exact, recovery)
+        for exact in (
+            'runtime_access: canonical_bootstrap',
+            'runtime_owner_task: OTC-20260829-track-a-kasm-canonical-bootstrap-live',
+            'canonical_registration: ABSENT',
+            'canonical_lease_generation: UNKNOWN',
+            'registration_lease_generation: NOT_APPLICABLE',
+            'bootstrap: PASS',
+            'bootstrap_mode: create_new',
+            'bootstrap_attempt_limit: 1',
+            'physical_action_budget: 1',
+            'physical_action_count: 0',
+            'credentials_allowed: false',
+            'login_allowed: false',
+            'live_runtime_authorization_source: PR_758_COMMENT_5470597018',
+        ):
+            self.assertIn(exact, bootstrap)
 
     def test_implementation_task_remains_repository_only(self):
         frontmatter = self.task.split('---', 2)[1]

@@ -223,9 +223,11 @@ class AgentPersistenceTests(unittest.TestCase):
         error = context.exception
         self.assertEqual("PERSISTENT_STATE_CORRUPT", error.code)
         self.assertIsNone(error.__cause__)
+        self.assertIsNone(error.__context__)
         self.assertNotIn(secret_text, str(error))
         self.assertNotIn(secret_text, error.safe_message)
         self.assertNotIn(secret_text, "".join(traceback.format_exception(error)))
+        self.assertTrue(all(secret_text not in str(linked) for linked in self._exception_links(error)))
 
     def test_unexpected_decode_failures_propagate_unchanged(self):
         self.store.write_agent_session(AgentSessionRecord(
@@ -347,6 +349,17 @@ class AgentPersistenceTests(unittest.TestCase):
         with self.assertRaises(ValidationError) as context:
             callback()
         self.assertEqual("PERSISTENT_STATE_CORRUPT", context.exception.code)
+
+    def _exception_links(self, error):
+        pending = [error]
+        visited = set()
+        while pending:
+            current = pending.pop()
+            if id(current) in visited:
+                continue
+            visited.add(id(current))
+            yield current
+            pending.extend(linked for linked in (current.__cause__, current.__context__) if linked is not None)
 
 
 if __name__ == "__main__":

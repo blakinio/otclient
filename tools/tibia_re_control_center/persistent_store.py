@@ -357,7 +357,8 @@ def _checked_agent_session(row: Any, requested_session_id: str) -> AgentSessionR
             raise ValueError("session body is not canonical")
         return record
     except _DURABLE_AGENT_DATA_ERRORS:
-        raise _persistent_agent_corruption() from None
+        pass
+    raise _persistent_agent_corruption()
 
 
 def _checked_agent_task_row(
@@ -390,7 +391,8 @@ def _checked_agent_task_row(
                 raise ValueError("result identity or canonical form mismatch")
         return envelope, canonical_envelope, parsed_result, canonical_result
     except _DURABLE_AGENT_DATA_ERRORS:
-        raise _persistent_agent_corruption() from None
+        pass
+    raise _persistent_agent_corruption()
 
 
 class SQLitePersistentStore:

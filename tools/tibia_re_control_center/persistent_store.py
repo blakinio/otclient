@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import os
 import sqlite3
 import threading
+from collections.abc import Mapping
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from enum import Enum
@@ -12,6 +14,15 @@ from pathlib import Path
 from typing import Any
 
 from .canonical import jcs_dumps
+from .agent_protocol import (
+    AgentEvent,
+    AgentOperationalState,
+    AgentProvenance,
+    AgentSessionRecord,
+    ResultEnvelope,
+    ResultStatus,
+    TaskEnvelope,
+)
 from .model import (
     ActionLedgerRecord,
     BudgetDimension,
@@ -29,7 +40,7 @@ from .recorder import ensure_no_secret_material
 
 
 def _ensure_persistable(value: Any, *, key_path: str = "payload") -> None:
-    if isinstance(value, dict):
+    if isinstance(value, Mapping):
         for key, child in value.items():
             normalized = str(key).lower()
             if normalized == "private_chat" and child in {"OMIT", "REDACT"}:
@@ -82,7 +93,7 @@ class RequestLedgerRecord:
 def _jsonable(value: Any) -> Any:
     if isinstance(value, Enum):
         return value.value
-    if isinstance(value, dict):
+    if isinstance(value, Mapping):
         return {str(key): _jsonable(child) for key, child in value.items()}
     if isinstance(value, (list, tuple)):
         return [_jsonable(child) for child in value]
@@ -143,6 +154,72 @@ def _budget_obj(ledger: BudgetLedger) -> dict[str, Any]:
     }
 
 
+_TASK_SCHEMA = "otclient.local-agent.task.v1"
+_EVENT_SCHEMA = "otclient.local-agent.event.v1"
+_RESULT_SCHEMA = "otclient.local-agent.result.v1"
+
+
+def _agent_session_obj(record: AgentSessionRecord) -> dict[str, Any]:
+    return asdict(record)
+
+
+def _agent_session_from(value: Mapping[str, Any]) -> AgentSessionRecord:
+    data = dict(value)
+    data["operational_state"] = AgentOperationalState(data["operational_state"])
+    return AgentSessionRecord(**data)
+
+
+def _task_obj(envelope: TaskEnvelope) -> dict[str, Any]:
+    return asdict(envelope)
+
+
+def _canonical_task(envelope: TaskEnvelope) -> tuple[TaskEnvelope, dict[str, Any]]:
+    parsed = TaskEnvelope.from_mapping(_task_obj(envelope))
+    return parsed, _task_obj(parsed)
+
+
+def _canonical_result(result: ResultEnvelope) -> dict[str, Any]:
+    if result.schema != _RESULT_SCHEMA:
+        raise ValidationError("INVALID_SCHEMA", "result schema is invalid")
+    return asdict(result)
+
+
+def _result_from(value: Mapping[str, Any]) -> ResultEnvelope:
+    data = dict(value)
+    if data.get("schema") != _RESULT_SCHEMA:
+        raise ValidationError("PERSISTENT_STATE_CORRUPT", "persistent agent result schema is invalid")
+    data["status"] = ResultStatus(data["status"])
+    data["unresolved_conflicts"] = tuple(data["unresolved_conflicts"])
+    return ResultEnvelope(**data)
+
+
+def _agent_event_obj(event: AgentEvent, *, seq: int) -> dict[str, Any]:
+    return {
+        "schema": event.schema,
+        "session_id": event.session_id,
+        "run_id": event.run_id,
+        "seq": seq,
+        "observed_epoch_ms": event.observed_epoch_ms,
+        "provenance": event.provenance,
+        "kind": event.kind,
+        "state_before": event.state_before,
+        "state_after": event.state_after,
+        "artifact_refs": event.artifact_refs,
+        "action_id": event.action_id,
+        "payload": event.payload,
+    }
+
+
+def _agent_event_from(value: Mapping[str, Any]) -> AgentEvent:
+    data = dict(value)
+    if data.get("schema") != _EVENT_SCHEMA:
+        raise ValidationError("PERSISTENT_STATE_CORRUPT", "persistent agent event schema is invalid")
+    data["provenance"] = AgentProvenance(data["provenance"])
+    data["artifact_refs"] = tuple(data["artifact_refs"])
+    data["payload"] = dict(data["payload"])
+    return AgentEvent(**data)
+
+
 class SQLitePersistentStore:
     """Artifact-v1 safety/request store backed by one local SQLite transaction domain."""
 
@@ -186,6 +263,8 @@ class SQLitePersistentStore:
                 CREATE TABLE IF NOT EXISTS resources (resource_id TEXT PRIMARY KEY, request_id TEXT NOT NULL UNIQUE, operation TEXT NOT NULL, state TEXT NOT NULL, body TEXT NOT NULL, result TEXT);
                 CREATE TABLE IF NOT EXISTS events (seq INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT, body TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS artifacts (run_id TEXT NOT NULL, path TEXT NOT NULL, sha256 TEXT NOT NULL, body BLOB NOT NULL, PRIMARY KEY(run_id,path));
+                CREATE TABLE IF NOT EXISTS agent_sessions (session_id TEXT PRIMARY KEY, body TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS agent_tasks (idempotency_key TEXT PRIMARY KEY, session_id TEXT NOT NULL, run_id TEXT NOT NULL UNIQUE, envelope_hash TEXT NOT NULL, body TEXT NOT NULL, result TEXT);
             """)
 
     @contextmanager
@@ -401,6 +480,105 @@ class SQLitePersistentStore:
     def list_run_resources(self, *, offset: int = 0, limit: int = 100) -> list[dict[str, Any]]:
         rows = self._fetchall("SELECT resource_id FROM resources WHERE operation IN ('CREATE_RUN','ONE_STEP_EXPERIMENT') ORDER BY rowid DESC LIMIT ? OFFSET ?", (limit, offset))
         return [self.get_resource(row[0]) or {} for row in rows]
+
+    def write_agent_session(self, record: AgentSessionRecord) -> None:
+        body_obj = _agent_session_obj(record)
+        _ensure_persistable(body_obj, key_path="agent_session")
+        with self._transaction("agent_session"):
+            self._db.execute(
+                "INSERT INTO agent_sessions(session_id,body) VALUES(?,?) "
+                "ON CONFLICT(session_id) DO UPDATE SET body=excluded.body",
+                (record.session_id, _dump(body_obj)),
+            )
+
+    def load_agent_session(self, session_id: str) -> AgentSessionRecord | None:
+        row = self._fetchone("SELECT body FROM agent_sessions WHERE session_id=?", (session_id,))
+        return None if row is None else _agent_session_from(_load(row[0]))
+
+    def _agent_task_values(self, body: str, result: str | None) -> dict[str, object]:
+        _, canonical_envelope = _canonical_task(TaskEnvelope.from_mapping(_load(body)))
+        canonical_result = None
+        if result is not None:
+            parsed_result = _result_from(_load(result))
+            canonical_result = _canonical_result(parsed_result)
+        return {
+            "envelope": _jsonable(canonical_envelope),
+            "result": None if canonical_result is None else _jsonable(canonical_result),
+        }
+
+    def accept_agent_task(self, envelope: TaskEnvelope) -> dict[str, object]:
+        parsed, canonical_envelope = _canonical_task(envelope)
+        _ensure_persistable(canonical_envelope, key_path="agent_task")
+        body = _dump(canonical_envelope)
+        envelope_hash = hashlib.sha256(body.encode("utf-8")).hexdigest()
+        with self._transaction("agent_task_accept"):
+            row = self._db.execute(
+                "SELECT envelope_hash,body,result FROM agent_tasks WHERE idempotency_key=?",
+                (parsed.idempotency_key,),
+            ).fetchone()
+            if row is not None:
+                if row[0] != envelope_hash or row[1] != body:
+                    raise ValidationError("IDEMPOTENCY_CONFLICT", "agent task idempotency key is already bound")
+                return {"accepted_new": False, **self._agent_task_values(row[1], row[2])}
+            run_row = self._db.execute(
+                "SELECT idempotency_key FROM agent_tasks WHERE run_id=?", (parsed.run_id,)
+            ).fetchone()
+            if run_row is not None:
+                raise ValidationError("IDEMPOTENCY_CONFLICT", "agent task run is already bound")
+            self._db.execute(
+                "INSERT INTO agent_tasks(idempotency_key,session_id,run_id,envelope_hash,body,result) "
+                "VALUES(?,?,?,?,?,NULL)",
+                (parsed.idempotency_key, parsed.session_id, parsed.run_id, envelope_hash, body),
+            )
+        return {"accepted_new": True, **self._agent_task_values(body, None)}
+
+    def load_agent_task(self, idempotency_key: str) -> dict[str, object] | None:
+        row = self._fetchone(
+            "SELECT body,result FROM agent_tasks WHERE idempotency_key=?", (idempotency_key,)
+        )
+        return None if row is None else self._agent_task_values(row[0], row[1])
+
+    def finish_agent_task(self, idempotency_key: str, result: ResultEnvelope) -> None:
+        canonical_result = _canonical_result(result)
+        _ensure_persistable(canonical_result, key_path="agent_result")
+        result_body = _dump(canonical_result)
+        with self._transaction("agent_task_finish"):
+            row = self._db.execute(
+                "SELECT body,result FROM agent_tasks WHERE idempotency_key=?", (idempotency_key,)
+            ).fetchone()
+            if row is None:
+                raise ValidationError("AGENT_TASK_MISSING", "cannot finish an unknown agent task")
+            task = TaskEnvelope.from_mapping(_load(row[0]))
+            if (result.session_id != task.session_id or result.run_id != task.run_id
+                    or result.trusted_main_sha != task.trusted_main_sha):
+                raise ValidationError("TASK_RESULT_MISMATCH", "agent result does not match accepted task")
+            if row[1] is None:
+                self._db.execute(
+                    "UPDATE agent_tasks SET result=? WHERE idempotency_key=?",
+                    (result_body, idempotency_key),
+                )
+            elif row[1] != result_body:
+                raise ValidationError("IDEMPOTENCY_CONFLICT", "agent task result is already bound")
+
+    def append_agent_event(self, event: AgentEvent) -> AgentEvent:
+        if event.schema != _EVENT_SCHEMA:
+            raise ValidationError("INVALID_SCHEMA", "agent event schema is invalid")
+        prospective = _agent_event_obj(event, seq=0)
+        _ensure_persistable(prospective, key_path="agent_event")
+        with self._transaction("agent_event"):
+            cursor = self._db.execute("INSERT INTO events(run_id,body) VALUES(?,?)", (event.run_id, "{}"))
+            seq = int(cursor.lastrowid)
+            if seq <= 0:
+                raise DurabilityError("agent event sequence was not committed")
+            body_obj = _agent_event_obj(event, seq=seq)
+            body = _dump(body_obj)
+            self._db.execute("UPDATE events SET body=? WHERE seq=?", (body, seq))
+            row = self._db.execute("SELECT MAX(seq) FROM events").fetchone()
+            maximum = 0 if row is None or row[0] is None else int(row[0])
+            cutoff = maximum - self.event_retention
+            if cutoff > 0:
+                self._db.execute("DELETE FROM events WHERE seq<=?", (cutoff,))
+        return _agent_event_from(_load(body))
 
     def append_events(self, run_id: str, events: list[dict[str, Any]]) -> None:
         for event in events:

@@ -738,8 +738,8 @@ def _read_kasm_bootstrap_record(path: Path, expected_schema: str) -> dict[str, A
     if expected_schema == KASM_PREFLIGHT_SCHEMA:
         required = {
             'schema', 'container_name', 'container_id', 'display', 'package_dir',
-            'client_path', 'client_size', 'client_sha256', 'candidate_count',
-            'main_window_count', 'preflight_fingerprint',
+            'client_path', 'client_size', 'client_sha256', 'boot_id_sha256',
+            'candidate_count', 'main_window_count', 'preflight_fingerprint',
         }
         if set(data) != required:
             raise E('kasm_bootstrap_record_invalid')
@@ -755,7 +755,11 @@ def _read_kasm_bootstrap_record(path: Path, expected_schema: str) -> dict[str, A
         }
         if any(data.get(key) != value for key, value in expected.items()):
             raise E('kasm_bootstrap_record_invalid')
-        if not _is_hex64(data.get('container_id')) or not _is_hex64(data.get('preflight_fingerprint')):
+        if (
+            not _is_hex64(data.get('container_id'))
+            or not _is_hex64(data.get('boot_id_sha256'))
+            or not _is_hex64(data.get('preflight_fingerprint'))
+        ):
             raise E('kasm_bootstrap_record_invalid')
         unsigned = dict(data)
         fingerprint = unsigned.pop('preflight_fingerprint')
@@ -841,6 +845,114 @@ def _require_kasm_launch_bound_to_preflight(
     ):
         if launch.get(key) != preflight.get(key):
             raise E('kasm_bootstrap_launch_preflight_mismatch')
+
+
+def _registered_kasm_container_id_for_invalidation(
+    registration: dict[str, Any], generation: int
+) -> str:
+    if registration.get('proof_kind') != ADOPTION_PROOF_KIND:
+        raise E('invalidation_adoption_registration_required')
+    if (
+        registration.get('state') != 'UNKNOWN'
+        or registration.get('state_evidence') not in {
+            'BRIDGE_3_OF_3_SEMANTICS_UNPROVEN', 'NO_STRUCTURAL_BRIDGE'
+        }
+    ):
+        raise E('invalidation_registration_not_fail_closed')
+    lease_generation = registration.get('lease_generation')
+    if not isinstance(lease_generation, int) or lease_generation >= generation:
+        raise E('invalidation_generation_not_newer')
+    if registration.get('display') != KASM_TARGET_DISPLAY:
+        raise E('invalidation_display_mismatch')
+    locator = registration.get('runtime_locator')
+    if not isinstance(locator, str):
+        raise E('invalidation_runtime_namespace_mismatch')
+    parts = locator.split(':', 2)
+    if len(parts) != 3 or parts[0] != 'docker' or parts[1] != KASM_TARGET_CONTAINER:
+        raise E('invalidation_runtime_namespace_mismatch')
+    recorded_id = parts[2].lower()
+    if not (12 <= len(recorded_id) <= 64) or any(c not in '0123456789abcdef' for c in recorded_id):
+        raise E('invalidation_container_identity_invalid')
+    return recorded_id
+
+
+def _require_prior_boot_zero_client_preflight(
+    registration: dict[str, Any], recorded_container_id: str, preflight: dict[str, Any]
+) -> None:
+    current_id = str(preflight.get('container_id', '')).lower()
+    if len(recorded_container_id) == 64:
+        container_matches = current_id == recorded_container_id
+    else:
+        container_matches = current_id.startswith(recorded_container_id)
+    if not container_matches:
+        raise E('invalidation_container_identity_mismatch')
+    if preflight.get('boot_id_sha256') == registration.get('boot_id_sha256'):
+        raise E('invalidation_boot_epoch_not_changed')
+
+
+def _boot_epoch_registration_invalidate(
+    args: argparse.Namespace,
+    guard: Any,
+    lease: Any,
+    manager: Any,
+    identity: Any,
+    generation: int,
+) -> None:
+    old = _read()
+    if old is None:
+        raise E('registration_absent')
+    recorded_container_id = _registered_kasm_container_id_for_invalidation(old, generation)
+    record_path = STATE / '.kasm-prior-boot-invalidation.json'
+    removed = False
+    try:
+        STATE.mkdir(parents=True, exist_ok=True, mode=0o700)
+        record_path.unlink(missing_ok=True)
+
+        _worker(args.worker, 'preflight', str(record_path))
+        first = _read_kasm_bootstrap_record(record_path, KASM_PREFLIGHT_SCHEMA)
+        _require_prior_boot_zero_client_preflight(old, recorded_container_id, first)
+        _lease(manager, lease, identity, args.token_file, generation)
+        _cancel(guard)
+        if _read() != old:
+            raise E('invalidation_registration_changed')
+
+        _worker(args.worker, 'preflight', str(record_path))
+        second = _read_kasm_bootstrap_record(record_path, KASM_PREFLIGHT_SCHEMA)
+        _require_prior_boot_zero_client_preflight(old, recorded_container_id, second)
+        if second != first:
+            raise E('invalidation_preflight_changed')
+        if _read() != old:
+            raise E('invalidation_registration_changed')
+        _lease(manager, lease, identity, args.token_file, generation)
+        _cancel(guard)
+
+        try:
+            _remove(old)
+        except E as exc:
+            if exc.code == 'registration_cleanup_mismatch':
+                raise E('invalidation_registration_changed') from exc
+            raise
+        removed = True
+        _lease(manager, lease, identity, args.token_file, generation)
+        _cancel(guard)
+
+        _worker(args.worker, 'preflight', str(record_path))
+        third = _read_kasm_bootstrap_record(record_path, KASM_PREFLIGHT_SCHEMA)
+        _require_prior_boot_zero_client_preflight(old, recorded_container_id, third)
+        if third != first:
+            raise E('invalidation_postdelete_preflight_changed')
+        if _read() is not None:
+            raise E('invalidation_registration_reappeared')
+        _lease(manager, lease, identity, args.token_file, generation)
+        _cancel(guard)
+    finally:
+        record_path.unlink(missing_ok=True)
+        # Once the stale prior-boot registration is safely removed, never restore it
+        # onto a process that may appear later. A post-delete failure stays ABSENT.
+        if removed and REG.exists():
+            current = _read()
+            if current == old:
+                raise E('invalidation_stale_registration_restored')
 
 
 def _kasm_bootstrap(
@@ -1637,7 +1749,7 @@ def _child(args: argparse.Namespace, guard: Any, lock_fd: int, previous_mask: se
         identity = lease.LeaseIdentity(args.task_id, args.session_id)
         generation = _lease(manager, lease, identity, args.token_file)
         _cancel(guard)
-        {'bootstrap': _bootstrap, 'kasm-bootstrap': _kasm_bootstrap, 'adopt-existing': _adopt_existing, 'semantic-downgrade': _semantic_downgrade, 'stale-registration-recovery': _stale_registration_recovery, 'boot-epoch-registration-recovery': _boot_epoch_registration_recovery, 'rebind': _rebind, 'gate-b': _gateb, 'guarded-dispatch': _guarded_dispatch}[args.operation](
+        {'bootstrap': _bootstrap, 'kasm-bootstrap': _kasm_bootstrap, 'boot-epoch-registration-invalidate': _boot_epoch_registration_invalidate, 'adopt-existing': _adopt_existing, 'semantic-downgrade': _semantic_downgrade, 'stale-registration-recovery': _stale_registration_recovery, 'boot-epoch-registration-recovery': _boot_epoch_registration_recovery, 'rebind': _rebind, 'gate-b': _gateb, 'guarded-dispatch': _guarded_dispatch}[args.operation](
             args, guard, lease, manager, identity, generation
         )
         label = args.operation.upper().replace('-', '_')
@@ -1713,7 +1825,7 @@ def _supervise(args: argparse.Namespace) -> int:
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(description=__doc__)
     sub = result.add_subparsers(dest='operation', required=True)
-    for name in ('bootstrap', 'kasm-bootstrap', 'adopt-existing', 'semantic-downgrade', 'stale-registration-recovery', 'boot-epoch-registration-recovery', 'rebind', 'gate-b', 'guarded-dispatch'):
+    for name in ('bootstrap', 'kasm-bootstrap', 'boot-epoch-registration-invalidate', 'adopt-existing', 'semantic-downgrade', 'stale-registration-recovery', 'boot-epoch-registration-recovery', 'rebind', 'gate-b', 'guarded-dispatch'):
         command = sub.add_parser(name)
         command.add_argument('--task-id', required=True)
         command.add_argument('--session-id', required=True)
@@ -1725,6 +1837,9 @@ def parser() -> argparse.ArgumentParser:
             command.add_argument('--worker', required=True, type=Path)
             command.add_argument('--probe', required=True, type=Path)
             command.add_argument('--worker-timeout', type=int, default=120)
+        elif name == 'boot-epoch-registration-invalidate':
+            command.add_argument('--worker', required=True, type=Path)
+            command.add_argument('--worker-timeout', type=int, default=90)
         elif name == 'guarded-dispatch':
             command.add_argument('--probe', required=True, type=Path)
             command.add_argument('--worker', required=True, type=Path)

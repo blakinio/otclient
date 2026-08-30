@@ -745,7 +745,7 @@ class Tests(unittest.TestCase):
         args = self.kasm_args()
         old = self.prior_boot_registration(); self.write(old)
         first = self.kasm_preflight()
-        changed = dict(first, container_id='e' * 64); unsigned = dict(changed); unsigned.pop('preflight_fingerprint')
+        changed = dict(first, boot_id_sha256='e' * 64); unsigned = dict(changed); unsigned.pop('preflight_fingerprint')
         changed['preflight_fingerprint'] = hashlib.sha256(json.dumps(unsigned, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
         calls = []
         with mock.patch.object(self.m, '_worker', side_effect=self._preflight_worker_writer(calls, [first, changed])), \

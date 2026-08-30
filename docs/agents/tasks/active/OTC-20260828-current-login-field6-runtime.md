@@ -14,7 +14,7 @@ branch: fix/OTC-20260830-field6-v7-generation
 base_branch: main
 base_main: 5def12f5fbb5f3554b60b894df7257f00dcd39f3
 created: 2026-08-28T19:00:00+02:00
-updated: 2026-08-30T16:31:07+02:00
+updated: 2026-08-30T16:48:00+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: github_actions_static
@@ -60,7 +60,7 @@ estimate_confidence: high
 decomposition_decision: phased
 decomposition_reason: revoke terminal V6 statically first; fresh V7 X11 namespace repair and live admission require a separate trusted-main phase
 validation_level: focused
-last_completed_step: V7 RED run 33317634698 runtime job 99273879730 failed exactly on missing V7 generation; physical job 99273880151 skipped
+last_completed_step: V7 GREEN head c2fec0fcc0b376695ee2d11de79ee81174ee47ca passed exact-head field6 run 33317762701 (runtime 99274221549 SUCCESS, static audit 99274221406 SUCCESS, physical 99274221980 SKIPPED), package 33317762678/99274221335 SUCCESS, governance 33317762681/99274221424+99274221612 SUCCESS, boundary 33317762711/99274221481+99274221547 SUCCESS, CI 33317762813/99274297146 SUCCESS
 session_rotation_count: 6
 heavy_validation_runs: 1
 stale_takeover_count: 0

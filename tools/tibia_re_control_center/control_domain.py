@@ -11,6 +11,7 @@ from enum import Enum
 from typing import Any
 
 from .artifact import ArtifactStore
+from .agent_session import AgentSessionCoordinator
 from .canonical import sha256_jcs
 from .engine import ScenarioEngine
 from .execution import MutationCoordinator
@@ -118,6 +119,7 @@ class ControlDomainService:
             raise RuntimeError("Package B admits only the explicit FAKE_TEST adapter")
         self.store = SQLitePersistentStore(data_root, event_retention=event_retention)
         self.coordinator = MutationCoordinator(self.adapter, self.store, self.clock, backend_epoch=backend_epoch)
+        self.agent = AgentSessionCoordinator(self.store, self.coordinator)
         self._request_stripes = tuple(threading.RLock() for _ in range(64))
         self._test_faults: dict[str, int] = {}
 
@@ -347,6 +349,7 @@ class ControlDomainService:
                 "official_session": "UNKNOWN",
             },
             "official_client_access": "NONE",
+            "agent": self.agent.foundation_status(),
         }
 
     def capabilities(self) -> dict[str, Any]:

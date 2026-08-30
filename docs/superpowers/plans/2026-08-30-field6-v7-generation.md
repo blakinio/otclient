@@ -11,8 +11,8 @@ V6 run `33317265138` / job `99272880272` failed at `xvfb_socket_missing` after p
 ## Task 1 ? static V7 generation
 
 - [x] TDD RED requires `AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V7 once=true` and revokes V6 as historical.
-- [ ] Hosted RED causal; physical job SKIPPED.
-- [ ] Minimal GREEN rotates workflow/task current generation V6 -> V7 and returns task to static-safe `runtime_access:none`, budget 0.
+- [x] Hosted RED causal: run `33317634698`, runtime `99273879730` FAILURE exactly on missing V7; fresh audit `99273879638` FAILURE; physical `99273880151` SKIPPED.
+- [x] Minimal GREEN rotates workflow/task current generation V6 -> V7 and returns task to static-safe `runtime_access:none`, budget 0.
 - [ ] Exact-head CI/review/main readback and expected-head merge.
 
 ## Task 2 ? fresh V7 X11 host prerequisite

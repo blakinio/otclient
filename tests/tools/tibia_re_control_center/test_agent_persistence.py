@@ -4,6 +4,7 @@ import json
 import sqlite3
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
 from types import MappingProxyType
 
@@ -161,6 +162,72 @@ class AgentPersistenceTests(unittest.TestCase):
             self.store.finish_agent_task("missing", result())
         self.assertEqual("AGENT_TASK_MISSING", context.exception.code)
 
+    def test_task_and_result_reconstruct_after_restart_and_replay_canonical_input(self):
+        accepted = self.store.accept_agent_task(task())
+        self.store.finish_agent_task("idem-1", result())
+        self.store.close()
+        self.store = SQLitePersistentStore(self.root)
+        loaded = self.store.load_agent_task("idem-1")
+        self.assertEqual(accepted["envelope"], loaded["envelope"])
+        self.assertEqual("PASS", loaded["result"]["status"])
+        equivalent = replace(
+            task(),
+            allowed_actions=["SCREENSHOT"],
+            required_evidence=["screenshot"],
+        )
+        replay = self.store.accept_agent_task(equivalent)
+        self.assertFalse(replay["accepted_new"])
+        self.store.finish_agent_task("idem-1", replace(result(), unresolved_conflicts=["none"]))
+
+    def test_corrupt_session_body_identity_fails_closed(self):
+        self.store.write_agent_session(AgentSessionRecord(
+            "session-1", AgentOperationalState.IDLE, None, 0, False, False, None,
+        ))
+        body = json.loads(self.store._fetchone("SELECT body FROM agent_sessions WHERE session_id='session-1'")[0])
+        body["session_id"] = "session-other"
+        self.store._db.execute("UPDATE agent_sessions SET body=? WHERE session_id='session-1'", (json.dumps(body),))
+        self._assert_corrupt(lambda: self.store.load_agent_session("session-1"))
+
+    def test_corrupt_task_canonical_body_hash_and_identities_fail_closed(self):
+        self.store.accept_agent_task(task())
+        original_body = self.store._fetchone("SELECT body FROM agent_tasks WHERE idempotency_key='idem-1'")[0]
+        body = json.loads(original_body)
+        body["objective"] = "corrupt but valid JSON"
+        self.store._db.execute("UPDATE agent_tasks SET body=? WHERE idempotency_key='idem-1'", (json.dumps(body),))
+        self._assert_corrupt(lambda: self.store.load_agent_task("idem-1"))
+
+        self.store._db.execute("UPDATE agent_tasks SET body=? WHERE idempotency_key='idem-1'", (original_body,))
+        self.store._db.execute("UPDATE agent_tasks SET session_id='session-other' WHERE idempotency_key='idem-1'")
+        self._assert_corrupt(lambda: self.store.accept_agent_task(task()))
+
+    def test_corrupt_task_hash_result_identity_and_shape_fail_closed(self):
+        self.store.accept_agent_task(task())
+        self.store.finish_agent_task("idem-1", result())
+        original_hash = self.store._fetchone("SELECT envelope_hash FROM agent_tasks WHERE idempotency_key='idem-1'")[0]
+        self.store._db.execute("UPDATE agent_tasks SET envelope_hash=? WHERE idempotency_key='idem-1'", ("0" * 64,))
+        self._assert_corrupt(lambda: self.store.load_agent_task("idem-1"))
+
+        self.store._db.execute("UPDATE agent_tasks SET envelope_hash=? WHERE idempotency_key='idem-1'", (original_hash,))
+        corrupt_result = json.loads(self.store._fetchone("SELECT result FROM agent_tasks WHERE idempotency_key='idem-1'")[0])
+        corrupt_result["run_id"] = "run-other"
+        self.store._db.execute("UPDATE agent_tasks SET result=? WHERE idempotency_key='idem-1'", (json.dumps(corrupt_result),))
+        self._assert_corrupt(lambda: self.store.load_agent_task("idem-1"))
+
+        self.store._db.execute("UPDATE agent_tasks SET result=? WHERE idempotency_key='idem-1'", (json.dumps({"schema": "otclient.local-agent.result.v1"}),))
+        self._assert_corrupt(lambda: self.store.load_agent_task("idem-1"))
+
+    def test_same_run_under_different_idempotency_key_conflicts(self):
+        self.store.accept_agent_task(task())
+        with self.assertRaises(ValidationError) as context:
+            self.store.accept_agent_task(task(idempotency_key="idem-2"))
+        self.assertEqual("IDEMPOTENCY_CONFLICT", context.exception.code)
+
+    def test_result_identity_mismatch_is_rejected_as_caller_input(self):
+        self.store.accept_agent_task(task())
+        with self.assertRaises(ValidationError) as context:
+            self.store.finish_agent_task("idem-1", replace(result(), run_id="run-other"))
+        self.assertEqual("TASK_RESULT_MISMATCH", context.exception.code)
+
     def test_mappingproxy_payload_secret_is_rejected_before_event_write(self):
         sensitive = event(payload={"nested": {"password": "do-not-persist"}})
         with self.assertRaises(ValidationError) as context:
@@ -173,6 +240,30 @@ class AgentPersistenceTests(unittest.TestCase):
         with self.assertRaises(DurabilityError):
             self.store.accept_agent_task(task())
         self.assertIsNone(self.store.load_agent_task("idem-1"))
+
+    def test_event_body_failure_rolls_back_placeholder_and_mixed_retention_backpressure(self):
+        self.store.inject_fault("agent_event_body")
+        with self.assertRaises(DurabilityError):
+            self.store.append_agent_event(event())
+        self.assertEqual(0, self.store._fetchone("SELECT COUNT(*) FROM events")[0])
+        appended = self.store.append_agent_event(event())
+        body = json.loads(self.store._fetchone("SELECT body FROM events WHERE seq=?", (appended.seq,))[0])
+        self.assertEqual(appended.seq, body["seq"])
+        self.assertIsInstance(appended.payload, MappingProxyType)
+
+        self.store.close()
+        self.store = SQLitePersistentStore(self.root, event_retention=32)
+        self.store.append_events("legacy", [{"kind": "legacy", "payload": {"index": index}} for index in range(32)])
+        self.store.append_agent_event(event())
+        self.store.append_agent_event(event(payload={"index": 33}))
+        with self.assertRaises(ValidationError) as context:
+            self.store.list_events(cursor=1, limit=10)
+        self.assertEqual("CONTROL_EVENT_BACKPRESSURE", context.exception.code)
+
+    def _assert_corrupt(self, callback):
+        with self.assertRaises(ValidationError) as context:
+            callback()
+        self.assertEqual("PERSISTENT_STATE_CORRUPT", context.exception.code)
 
 
 if __name__ == "__main__":

@@ -34,7 +34,11 @@ from .model import (
     DurabilityTimeout,
     EffectBound,
     LifecycleState,
+    MAX_SAFE_INTEGER,
     ValidationError,
+    checked_non_negative,
+    require_exact_keys,
+    validate_opaque_id,
 )
 from .recorder import ensure_no_secret_material
 
@@ -164,9 +168,36 @@ def _agent_session_obj(record: AgentSessionRecord) -> dict[str, Any]:
 
 
 def _agent_session_from(value: Mapping[str, Any]) -> AgentSessionRecord:
-    data = dict(value)
-    data["operational_state"] = AgentOperationalState(data["operational_state"])
-    return AgentSessionRecord(**data)
+    if type(value) is not dict:
+        raise TypeError("session body must be an object")
+    require_exact_keys(value, (
+        "session_id", "operational_state", "current_run_id", "last_event_seq",
+        "pause_latched", "stop_latched", "heartbeat_epoch_ms",
+    ))
+    current_run_id = value["current_run_id"]
+    if current_run_id is not None:
+        current_run_id = validate_opaque_id(current_run_id, field_name="current_run_id")
+    heartbeat_epoch_ms = value["heartbeat_epoch_ms"]
+    if heartbeat_epoch_ms is not None:
+        if isinstance(heartbeat_epoch_ms, bool):
+            raise TypeError("heartbeat must be an integer")
+        heartbeat_epoch_ms = checked_non_negative(
+            heartbeat_epoch_ms, maximum=MAX_SAFE_INTEGER, field_name="heartbeat_epoch_ms"
+        )
+    last_event_seq = value["last_event_seq"]
+    if isinstance(last_event_seq, bool):
+        raise TypeError("last event sequence must be an integer")
+    if type(value["pause_latched"]) is not bool or type(value["stop_latched"]) is not bool:
+        raise TypeError("latches must be booleans")
+    return AgentSessionRecord(
+        session_id=validate_opaque_id(value["session_id"], field_name="session_id"),
+        operational_state=AgentOperationalState(value["operational_state"]),
+        current_run_id=current_run_id,
+        last_event_seq=checked_non_negative(last_event_seq, maximum=MAX_SAFE_INTEGER, field_name="last_event_seq"),
+        pause_latched=value["pause_latched"],
+        stop_latched=value["stop_latched"],
+        heartbeat_epoch_ms=heartbeat_epoch_ms,
+    )
 
 
 def _task_obj(envelope: TaskEnvelope) -> dict[str, Any]:
@@ -181,16 +212,53 @@ def _canonical_task(envelope: TaskEnvelope) -> tuple[TaskEnvelope, dict[str, Any
 def _canonical_result(result: ResultEnvelope) -> dict[str, Any]:
     if result.schema != _RESULT_SCHEMA:
         raise ValidationError("INVALID_SCHEMA", "result schema is invalid")
+    if isinstance(result.action_count, bool) or isinstance(result.physical_action_budget, bool):
+        raise ValidationError("INVALID_FIELD", "result counters must be integers")
+    validate_opaque_id(result.session_id, field_name="session_id")
+    validate_opaque_id(result.run_id, field_name="run_id")
+    checked_non_negative(result.action_count, maximum=MAX_SAFE_INTEGER, field_name="action_count")
+    checked_non_negative(result.physical_action_budget, maximum=MAX_SAFE_INTEGER, field_name="physical_action_budget")
+    if not isinstance(result.status, ResultStatus):
+        raise ValidationError("INVALID_ENUM", "result status is invalid")
+    if (not isinstance(result.trusted_main_sha, str) or len(result.trusted_main_sha) != 40
+            or any(char not in "0123456789abcdef" for char in result.trusted_main_sha)):
+        raise ValidationError("INVALID_SHA1", "result trusted main SHA is invalid")
+    if (not isinstance(result.evidence_manifest_sha256, str) or len(result.evidence_manifest_sha256) != 64
+            or any(char not in "0123456789abcdef" for char in result.evidence_manifest_sha256)):
+        raise ValidationError("INVALID_SHA256", "result evidence manifest SHA is invalid")
+    if not isinstance(result.final_state, str) or not result.final_state:
+        raise ValidationError("INVALID_FIELD", "result final state is invalid")
+    if not isinstance(result.unresolved_conflicts, (list, tuple)) or any(
+            not isinstance(item, str) or not item for item in result.unresolved_conflicts):
+        raise ValidationError("INVALID_FIELD", "result conflicts are invalid")
     return asdict(result)
 
 
 def _result_from(value: Mapping[str, Any]) -> ResultEnvelope:
-    data = dict(value)
-    if data.get("schema") != _RESULT_SCHEMA:
-        raise ValidationError("PERSISTENT_STATE_CORRUPT", "persistent agent result schema is invalid")
-    data["status"] = ResultStatus(data["status"])
-    data["unresolved_conflicts"] = tuple(data["unresolved_conflicts"])
-    return ResultEnvelope(**data)
+    if type(value) is not dict:
+        raise TypeError("result body must be an object")
+    require_exact_keys(value, (
+        "schema", "session_id", "run_id", "status", "trusted_main_sha", "final_state",
+        "action_count", "physical_action_budget", "evidence_manifest_sha256", "unresolved_conflicts",
+    ))
+    if value["schema"] != _RESULT_SCHEMA:
+        raise ValueError("result schema is invalid")
+    if not isinstance(value["unresolved_conflicts"], list):
+        raise TypeError("result conflicts must be a list")
+    result = ResultEnvelope(
+        schema=value["schema"],
+        session_id=value["session_id"],
+        run_id=value["run_id"],
+        status=ResultStatus(value["status"]),
+        trusted_main_sha=value["trusted_main_sha"],
+        final_state=value["final_state"],
+        action_count=value["action_count"],
+        physical_action_budget=value["physical_action_budget"],
+        evidence_manifest_sha256=value["evidence_manifest_sha256"],
+        unresolved_conflicts=tuple(value["unresolved_conflicts"]),
+    )
+    _canonical_result(result)
+    return result
 
 
 def _agent_event_obj(event: AgentEvent, *, seq: int) -> dict[str, Any]:
@@ -218,6 +286,60 @@ def _agent_event_from(value: Mapping[str, Any]) -> AgentEvent:
     data["artifact_refs"] = tuple(data["artifact_refs"])
     data["payload"] = dict(data["payload"])
     return AgentEvent(**data)
+
+
+def _persistent_agent_corruption(exc: Exception) -> ValidationError:
+    return ValidationError("PERSISTENT_STATE_CORRUPT", "persistent agent row is corrupt")
+
+
+def _checked_agent_session(row: Any, requested_session_id: str) -> AgentSessionRecord:
+    try:
+        if not isinstance(row, tuple) or len(row) != 2:
+            raise TypeError("invalid session row")
+        row_session_id, body = row
+        if not isinstance(row_session_id, str) or not isinstance(body, str):
+            raise TypeError("invalid session row values")
+        record = _agent_session_from(_load(body))
+        if requested_session_id != row_session_id or record.session_id != row_session_id:
+            raise ValueError("session identity mismatch")
+        if body != _dump(_agent_session_obj(record)):
+            raise ValueError("session body is not canonical")
+        return record
+    except Exception as exc:
+        raise _persistent_agent_corruption(exc) from exc
+
+
+def _checked_agent_task_row(
+    row: Any, requested_idempotency_key: str,
+) -> tuple[TaskEnvelope, dict[str, Any], ResultEnvelope | None, dict[str, Any] | None]:
+    try:
+        if not isinstance(row, tuple) or len(row) != 6:
+            raise TypeError("invalid task row")
+        idempotency_key, session_id, run_id, envelope_hash, body, result_body = row
+        if (not all(isinstance(item, str) for item in (idempotency_key, session_id, run_id, envelope_hash, body))
+                or result_body is not None and not isinstance(result_body, str)):
+            raise TypeError("invalid task row values")
+        envelope = TaskEnvelope.from_mapping(_load(body))
+        _, canonical_envelope = _canonical_task(envelope)
+        canonical_body = _dump(canonical_envelope)
+        canonical_hash = hashlib.sha256(canonical_body.encode("utf-8")).hexdigest()
+        if (requested_idempotency_key != idempotency_key or envelope.idempotency_key != idempotency_key
+                or envelope.session_id != session_id or envelope.run_id != run_id
+                or body != canonical_body or envelope_hash != canonical_hash):
+            raise ValueError("task identity or canonical form mismatch")
+        parsed_result = None
+        canonical_result = None
+        if result_body is not None:
+            parsed_result = _result_from(_load(result_body))
+            canonical_result = _canonical_result(parsed_result)
+            if (result_body != _dump(canonical_result)
+                    or parsed_result.session_id != envelope.session_id
+                    or parsed_result.run_id != envelope.run_id
+                    or parsed_result.trusted_main_sha != envelope.trusted_main_sha):
+                raise ValueError("result identity or canonical form mismatch")
+        return envelope, canonical_envelope, parsed_result, canonical_result
+    except Exception as exc:
+        raise _persistent_agent_corruption(exc) from exc
 
 
 class SQLitePersistentStore:
@@ -492,15 +614,13 @@ class SQLitePersistentStore:
             )
 
     def load_agent_session(self, session_id: str) -> AgentSessionRecord | None:
-        row = self._fetchone("SELECT body FROM agent_sessions WHERE session_id=?", (session_id,))
-        return None if row is None else _agent_session_from(_load(row[0]))
+        row = self._fetchone(
+            "SELECT session_id,body FROM agent_sessions WHERE session_id=?", (session_id,)
+        )
+        return None if row is None else _checked_agent_session(row, session_id)
 
-    def _agent_task_values(self, body: str, result: str | None) -> dict[str, object]:
-        _, canonical_envelope = _canonical_task(TaskEnvelope.from_mapping(_load(body)))
-        canonical_result = None
-        if result is not None:
-            parsed_result = _result_from(_load(result))
-            canonical_result = _canonical_result(parsed_result)
+    def _agent_task_values(self, row: Any, idempotency_key: str) -> dict[str, object]:
+        _, canonical_envelope, _, canonical_result = _checked_agent_task_row(row, idempotency_key)
         return {
             "envelope": _jsonable(canonical_envelope),
             "result": None if canonical_result is None else _jsonable(canonical_result),
@@ -513,13 +633,15 @@ class SQLitePersistentStore:
         envelope_hash = hashlib.sha256(body.encode("utf-8")).hexdigest()
         with self._transaction("agent_task_accept"):
             row = self._db.execute(
-                "SELECT envelope_hash,body,result FROM agent_tasks WHERE idempotency_key=?",
+                "SELECT idempotency_key,session_id,run_id,envelope_hash,body,result "
+                "FROM agent_tasks WHERE idempotency_key=?",
                 (parsed.idempotency_key,),
             ).fetchone()
             if row is not None:
-                if row[0] != envelope_hash or row[1] != body:
+                self._agent_task_values(row, parsed.idempotency_key)
+                if row[3] != envelope_hash or row[4] != body:
                     raise ValidationError("IDEMPOTENCY_CONFLICT", "agent task idempotency key is already bound")
-                return {"accepted_new": False, **self._agent_task_values(row[1], row[2])}
+                return {"accepted_new": False, **self._agent_task_values(row, parsed.idempotency_key)}
             run_row = self._db.execute(
                 "SELECT idempotency_key FROM agent_tasks WHERE run_id=?", (parsed.run_id,)
             ).fetchone()
@@ -530,13 +652,15 @@ class SQLitePersistentStore:
                 "VALUES(?,?,?,?,?,NULL)",
                 (parsed.idempotency_key, parsed.session_id, parsed.run_id, envelope_hash, body),
             )
-        return {"accepted_new": True, **self._agent_task_values(body, None)}
+        row = (parsed.idempotency_key, parsed.session_id, parsed.run_id, envelope_hash, body, None)
+        return {"accepted_new": True, **self._agent_task_values(row, parsed.idempotency_key)}
 
     def load_agent_task(self, idempotency_key: str) -> dict[str, object] | None:
         row = self._fetchone(
-            "SELECT body,result FROM agent_tasks WHERE idempotency_key=?", (idempotency_key,)
+            "SELECT idempotency_key,session_id,run_id,envelope_hash,body,result "
+            "FROM agent_tasks WHERE idempotency_key=?", (idempotency_key,)
         )
-        return None if row is None else self._agent_task_values(row[0], row[1])
+        return None if row is None else self._agent_task_values(row, idempotency_key)
 
     def finish_agent_task(self, idempotency_key: str, result: ResultEnvelope) -> None:
         canonical_result = _canonical_result(result)
@@ -544,20 +668,21 @@ class SQLitePersistentStore:
         result_body = _dump(canonical_result)
         with self._transaction("agent_task_finish"):
             row = self._db.execute(
-                "SELECT body,result FROM agent_tasks WHERE idempotency_key=?", (idempotency_key,)
+                "SELECT idempotency_key,session_id,run_id,envelope_hash,body,result "
+                "FROM agent_tasks WHERE idempotency_key=?", (idempotency_key,)
             ).fetchone()
             if row is None:
                 raise ValidationError("AGENT_TASK_MISSING", "cannot finish an unknown agent task")
-            task = TaskEnvelope.from_mapping(_load(row[0]))
+            task, _, _, _ = _checked_agent_task_row(row, idempotency_key)
             if (result.session_id != task.session_id or result.run_id != task.run_id
                     or result.trusted_main_sha != task.trusted_main_sha):
                 raise ValidationError("TASK_RESULT_MISMATCH", "agent result does not match accepted task")
-            if row[1] is None:
+            if row[5] is None:
                 self._db.execute(
                     "UPDATE agent_tasks SET result=? WHERE idempotency_key=?",
                     (result_body, idempotency_key),
                 )
-            elif row[1] != result_body:
+            elif row[5] != result_body:
                 raise ValidationError("IDEMPOTENCY_CONFLICT", "agent task result is already bound")
 
     def append_agent_event(self, event: AgentEvent) -> AgentEvent:
@@ -570,6 +695,7 @@ class SQLitePersistentStore:
             seq = int(cursor.lastrowid)
             if seq <= 0:
                 raise DurabilityError("agent event sequence was not committed")
+            self._before_write("agent_event_body")
             body_obj = _agent_event_obj(event, seq=seq)
             body = _dump(body_obj)
             self._db.execute("UPDATE events SET body=? WHERE seq=?", (body, seq))

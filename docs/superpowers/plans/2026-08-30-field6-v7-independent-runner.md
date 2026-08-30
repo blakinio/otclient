@@ -18,21 +18,21 @@
 
 PR #758 comment `5469433732` is V7 admission only. Executable `AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V7 once=true` remains unposted.
 
-## Task 1 — TDD RED
+## Task 1 â€” TDD RED
 
 - [x] Security contract expects V7 runner/guest/label/admission/seed and new independent-runtime contract v4.
 - [x] Contract requires same-boot local X11 directory mode `1777`, `mountpoint=false`, secret-free Xvfb proof, and X11 verification before authorization/secrets.
 - [x] Draft PR #818 RED head `7a8d17fc331aa5d5d2411ff8294336c44014a966`: run `33318537209`, runtime `99276293558` FAILURE exactly on missing V7 scheduling boundary, fresh audit `99276293429` FAILURE, physical `99276294001` SKIPPED.
 
-## Task 2 — GREEN routing/admission
+## Task 2 â€” GREEN routing/admission
 
 - [ ] Create contract v4 with same-boot local X11 boundary.
 - [ ] Rotate workflow/helper/acquisition/audit physical identity V6 -> V7 and bind X11 proof into provenance schema v4.
 - [ ] Workflow independently re-proves local X11 namespace and performs secret-free Xvfb probe before authorization/secrets.
 - [ ] Live task uses one-login budget, V7 admission comment, exact guest/runner/seed/X11 fields.
-- [ ] Exact-head runtime/security/audit/package/governance/boundary/CI GREEN; physical job SKIPPED; merge expected-head.
+- [x] Candidate `e8b766f28a420958bc86e8c67b5e7861e87360ea`: field6 `33318877020` (runtime `99277192114` SUCCESS, V7 audit `99277191949` SUCCESS, physical `99277192508` SKIPPED); package `33318876984/99277191545` SUCCESS; governance `33318876978/99277191506+99277191586` SUCCESS; boundary `33318877017/99277191878+99277192016` SUCCESS; CI `33318877319/99277287592` SUCCESS.\r\n- [ ] Final docs-only exact-head validation, Ready and expected-head merge.
 
-## Task 3 — one-shot V7
+## Task 3 â€” one-shot V7
 
 - [ ] Post exactly one V7 trigger after trusted-main readback.
 - [ ] Queue uniqueness -> schema-v4 provenance -> ephemeral runner -> final queue gate.

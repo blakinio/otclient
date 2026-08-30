@@ -14,7 +14,7 @@ branch: fix/OTC-20260830-field6-v7-independent-runner
 base_branch: main
 base_main: 0c7abfdbeace981e50375d7a322c414936718945
 created: 2026-08-28T19:00:00+02:00
-updated: 2026-08-30T17:03:00+02:00
+updated: 2026-08-30T17:08:00+02:00
 risk: high
 execution_class: independent_ephemeral_physical_runtime
 execution_mode: github_actions_independent_ephemeral_physical
@@ -77,7 +77,7 @@ estimate_confidence: high
 decomposition_decision: phased
 decomposition_reason: V7 physical routing/admission is the single sequential evidence chain; scalar promotion remains separate after proof
 validation_level: focused
-last_completed_step: PR #818 RED run 33318537209: runtime 99276293558 failed exactly on missing field6-v7 scheduling boundary; fresh audit 99276293429 failed; physical 99276294001 skipped
+last_completed_step: V7 routing GREEN e8b766f28a420958bc86e8c67b5e7861e87360ea passed field6 run 33318877020 (runtime 99277192114 SUCCESS, V7 audit 99277191949 SUCCESS, physical 99277192508 SKIPPED), package 33318876984/99277191545 SUCCESS, governance 33318876978/99277191506+99277191586 SUCCESS, boundary 33318877017/99277191878+99277192016 SUCCESS, CI 33318877319/99277287592 SUCCESS
 session_rotation_count: 6
 heavy_validation_runs: 1
 stale_takeover_count: 0

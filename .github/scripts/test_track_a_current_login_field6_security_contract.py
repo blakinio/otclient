@@ -7,15 +7,18 @@ HELPER = ROOT / ".github/scripts/track_a_current_login_field6_runtime.sh"
 ACQUIRE = ROOT / ".github/scripts/track_a_current_client_package_acquire.sh"
 TASK = ROOT / "docs/agents/tasks/active/OTC-20260828-current-login-field6-runtime.md"
 WORKFLOW = ROOT / ".github/workflows/track-a-current-login-field6-runtime.yml"
-V2_CONTRACT = ROOT / "docs/agents/contracts/TRACK_A_INDEPENDENT_EPHEMERAL_PHYSICAL_RUNTIME_V2.md"
+V3_CONTRACT = ROOT / "docs/agents/contracts/TRACK_A_INDEPENDENT_EPHEMERAL_PHYSICAL_RUNTIME_V3.md"
 
-EXPECTED_RUNNER = "molehill-otclient-v5-01"
-EXPECTED_GUEST = "OTClientV5Clean"
+EXPECTED_RUNNER = "molehill-otclient-v6-01"
+EXPECTED_GUEST = "OTClientV6Clean"
 EXPECTED_ROOTFS_SHA = "915b4be62933475c3fb5f5031aa2e159294db95fb32aaa9e8b317aadcb6c065d"
-EXPECTED_ADMISSION = "PR_758_COMMENT_5468621219"
-EXPECTED_SEED_PATH = "/opt/otclient-v5-seed/seed.tar.gz"
+EXPECTED_ADMISSION = "PR_758_COMMENT_5469210031"
+EXPECTED_SEED_PATH = "/opt/otclient-v6-seed/seed.tar.gz"
 EXPECTED_SEED_SIZE = "412272538"
 EXPECTED_SEED_SHA = "64031ba091884c5b1be71416394b8ada6dac9529cfed60e7b4856c04b7e5b016"
+EXPECTED_PROVENANCE_MODE = "0644"
+EXPECTED_SEED_DIR_MODE = "0555"
+EXPECTED_SEED_MODE = "0444"
 
 
 def read(path: Path) -> str:
@@ -67,7 +70,10 @@ live_required = (
     f"independent_seed_path: {EXPECTED_SEED_PATH}",
     f"independent_seed_size: {EXPECTED_SEED_SIZE}",
     f"independent_seed_sha256: {EXPECTED_SEED_SHA}",
-    "independent_runner_provenance_schema: otclient.track-a.independent-field6-runner.v2",
+    "independent_runner_provenance_schema: otclient.track-a.independent-field6-runner.v3",
+    f"independent_provenance_mode: {EXPECTED_PROVENANCE_MODE}",
+    f"independent_seed_dir_mode: {EXPECTED_SEED_DIR_MODE}",
+    f"independent_seed_mode: {EXPECTED_SEED_MODE}",
 )
 static = all(required in task for required in static_required)
 live = all(required in task for required in live_required)
@@ -84,7 +90,7 @@ run_attempt_guard = 'test "${GITHUB_RUN_ATTEMPT:?}" = "1"'
 auth_marker = '- name: Consume exact owner authorization once'
 secret_marker = 'TIBIA_TEST_EMAIL: ${{ secrets.TIBIA_TEST_EMAIL }}'
 provenance_marker = '- name: Prove independent clean guest provenance'
-expected_label = "runs-on: ${{ format('field6-v5-{0}', github.event.comment.id) }}"
+expected_label = "runs-on: ${{ format('field6-v6-{0}', github.event.comment.id) }}"
 for required in (
     expected_label,
     f"EXPECTED_INDEPENDENT_RUNNER_NAME: {EXPECTED_RUNNER}",
@@ -95,14 +101,20 @@ for required in (
     "TRACK_A_FIELD6_INDEPENDENT_PROVENANCE_VERIFIED=1",
     "TRACK_A_FIELD6_INDEPENDENT_SEED_VERIFIED=1",
     "TRACK_A_FIELD6_SYSTEM_TOOLROOT=1",
-    "otclient.track-a.independent-field6-runner.v2",
+    "otclient.track-a.independent-field6-runner.v3",
+    f"EXPECTED_PROVENANCE_MODE: '{EXPECTED_PROVENANCE_MODE}'",
+    f"EXPECTED_SEED_DIR_MODE: '{EXPECTED_SEED_DIR_MODE}'",
+    f"EXPECTED_SEED_MODE: '{EXPECTED_SEED_MODE}'",
+    "FIELD6_PROVENANCE_MODE_INVALID",
+    "FIELD6_SEED_DIR_MODE_INVALID",
+    "FIELD6_SEED_MODE_INVALID",
     f"EXPECTED_SEED_PATH: {EXPECTED_SEED_PATH}",
     f"EXPECTED_SEED_SIZE: '{EXPECTED_SEED_SIZE}'",
     f"EXPECTED_SEED_SHA: {EXPECTED_SEED_SHA}",
 ):
     if required not in workflow:
         raise SystemExit(f"FIELD6_SECURITY_CONTRACT_RED: live workflow missing {required!r}")
-for forbidden in ("field6-v4-{0}", "molehill-otclient-v4-01", "OTClientV4Clean", "runs-on: [otclient, synology]"):
+for forbidden in ("field6-v5-{0}", "molehill-otclient-v5-01", "OTClientV5Clean", "runs-on: [otclient, synology]"):
     if forbidden in workflow:
         raise SystemExit(f"FIELD6_SECURITY_CONTRACT_RED: stale physical boundary remains in workflow: {forbidden}")
 if run_attempt_guard not in workflow:
@@ -125,8 +137,8 @@ for required in (
 ):
     if required not in helper:
         raise SystemExit(f"FIELD6_SECURITY_CONTRACT_RED: helper missing {required!r}")
-if "molehill-otclient-v4-01" in helper:
-    raise SystemExit("FIELD6_SECURITY_CONTRACT_RED: V4 runner remains accepted by helper")
+if "molehill-otclient-v5-01" in helper:
+    raise SystemExit("FIELD6_SECURITY_CONTRACT_RED: V5 runner remains accepted by helper")
 
 acquire = read(ACQUIRE)
 for required in (
@@ -139,15 +151,16 @@ for required in (
 ):
     if required not in acquire:
         raise SystemExit(f"FIELD6_SECURITY_CONTRACT_RED: package acquisition missing {required!r}")
-if "molehill-otclient-v4-01" in acquire:
-    raise SystemExit("FIELD6_SECURITY_CONTRACT_RED: V4 runner remains accepted by package acquisition")
+if "molehill-otclient-v5-01" in acquire:
+    raise SystemExit("FIELD6_SECURITY_CONTRACT_RED: V5 runner remains accepted by package acquisition")
 
-v2 = read(V2_CONTRACT)
+v3 = read(V3_CONTRACT)
 for required in (
-    "field6-v5-<comment_id>", EXPECTED_RUNNER, EXPECTED_GUEST, "--no-default-labels",
+    "field6-v6-<comment_id>", EXPECTED_RUNNER, EXPECTED_GUEST, "--no-default-labels",
     "no host Docker socket", EXPECTED_SEED_PATH, EXPECTED_SEED_SHA,
+    "provenance mode 0644", "seed directory mode 0555", "seed mode 0444",
 ):
-    if required not in v2:
-        raise SystemExit(f"FIELD6_SECURITY_CONTRACT_RED: V2 independent contract missing {required!r}")
+    if required not in v3:
+        raise SystemExit(f"FIELD6_SECURITY_CONTRACT_RED: V3 independent contract missing {required!r}")
 
 print("TRACK_A_CURRENT_LOGIN_FIELD6_SECURITY_CONTRACT=PASS")

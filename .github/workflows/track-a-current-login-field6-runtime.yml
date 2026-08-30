@@ -26,11 +26,14 @@ env:
   EXPECTED_SIZE: '52105824'
   EXPECTED_SHA: d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a
   TASK_STATE: /home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260828-current-login-field6-runtime
-  EXPECTED_INDEPENDENT_RUNNER_NAME: molehill-otclient-v4-01
-  EXPECTED_INDEPENDENT_GUEST_NAME: OTClientV4Clean
+  EXPECTED_INDEPENDENT_RUNNER_NAME: molehill-otclient-v5-01
+  EXPECTED_INDEPENDENT_GUEST_NAME: OTClientV5Clean
   EXPECTED_INDEPENDENT_ROOTFS_URL: https://cloud-images.ubuntu.com/releases/noble/release-20260801/ubuntu-24.04-server-cloudimg-amd64-root.tar.xz
   EXPECTED_INDEPENDENT_ROOTFS_SHA: 915b4be62933475c3fb5f5031aa2e159294db95fb32aaa9e8b317aadcb6c065d
   PROVENANCE_FILE: /etc/otclient-field6-runner-provenance
+  EXPECTED_SEED_PATH: /opt/otclient-v5-seed/seed.tar.gz
+  EXPECTED_SEED_SIZE: '412272538'
+  EXPECTED_SEED_SHA: 64031ba091884c5b1be71416394b8ada6dac9529cfed60e7b4856c04b7e5b016
 
 jobs:
   contract:
@@ -51,6 +54,8 @@ jobs:
           python3 .github/scripts/test_track_a_current_login_field6_runtime.py
           python3 .github/scripts/test_track_a_current_login_field6_security_contract.py
           python3 -m py_compile .github/scripts/track_a_current_client_package_materialize.py
+          python3 -m py_compile .github/scripts/track_a_current_client_package_seed.py
+          python3 .github/scripts/test_track_a_current_client_package_seed.py
           bash -n .github/scripts/track_a_current_client_package_acquire.sh
           bash -n .github/scripts/track_a_current_login_field6_runtime.sh
           bash -n .github/scripts/track_a_current_login_field6_runtime_secret_wrapper.sh
@@ -62,7 +67,7 @@ jobs:
 
   fresh-audit:
     if: github.event_name == 'pull_request'
-    name: Fresh independent V4 admission audit
+    name: Fresh independent V5 admission audit
     runs-on: ubuntu-24.04
     timeout-minutes: 4
     env:
@@ -98,7 +103,7 @@ jobs:
       github.event.comment.user.login == github.repository_owner &&
       github.event.comment.body == 'AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V5 once=true'
     name: One-shot isolated field6 observation
-    runs-on: ${{ format('field6-v4-{0}', github.event.comment.id) }}
+    runs-on: ${{ format('field6-v5-{0}', github.event.comment.id) }}
     timeout-minutes: 45
     concurrency:
       group: official-client-re-current-login-field6-runtime
@@ -107,7 +112,7 @@ jobs:
       - name: Prove independent clean guest provenance
         shell: bash
         env:
-          EXPECTED_ONE_TIME_LABEL: ${{ format('field6-v4-{0}', github.event.comment.id) }}
+          EXPECTED_ONE_TIME_LABEL: ${{ format('field6-v5-{0}', github.event.comment.id) }}
         run: |
           set -Eeuo pipefail
           test "${GITHUB_RUN_ATTEMPT:?}" = "1"
@@ -118,9 +123,10 @@ jobs:
           test ! -S /run/podman/podman.sock
           python3 - "$PROVENANCE_FILE" "$EXPECTED_INDEPENDENT_GUEST_NAME" \
             "$EXPECTED_INDEPENDENT_ROOTFS_URL" "$EXPECTED_INDEPENDENT_ROOTFS_SHA" \
-            "$EXPECTED_INDEPENDENT_RUNNER_NAME" "$EXPECTED_ONE_TIME_LABEL" <<'PY'
-          import json, os, pathlib, re, stat, sys
-          path,guest,url,rootfs_sha,runner,label=sys.argv[1:]
+            "$EXPECTED_INDEPENDENT_RUNNER_NAME" "$EXPECTED_ONE_TIME_LABEL" \
+            "$EXPECTED_SEED_PATH" "$EXPECTED_SEED_SIZE" "$EXPECTED_SEED_SHA" <<'PY'
+          import hashlib, json, pathlib, re, stat, sys
+          path,guest,url,rootfs_sha,runner,label,seed_path,seed_size,seed_sha=sys.argv[1:]
           p=pathlib.Path(path)
           st=p.lstat()
           if not stat.S_ISREG(st.st_mode) or p.is_symlink(): raise SystemExit('FIELD6_PROVENANCE_NOT_REGULAR')
@@ -130,21 +136,35 @@ jobs:
           required={
             'schema','guest_name','rootfs_url','rootfs_sha256','runner_name','one_time_label',
             'generation_nonce','automount_disabled','interop_disabled','docker_socket_absent',
-            'podman_socket_absent','prior_repo_state_absent','prior_runner_state_absent'
+            'podman_socket_absent','prior_repo_state_absent','prior_runner_state_absent',
+            'seed_path','seed_size','seed_sha256','seed_preflight_verified'
           }
           if set(data) != required: raise SystemExit('FIELD6_PROVENANCE_SCHEMA_KEYS_INVALID')
-          if data['schema'] != 'otclient.track-a.independent-field6-runner.v1': raise SystemExit('FIELD6_PROVENANCE_SCHEMA_INVALID')
-          expected={'guest_name':guest,'rootfs_url':url,'rootfs_sha256':rootfs_sha,'runner_name':runner,'one_time_label':label}
+          if data['schema'] != 'otclient.track-a.independent-field6-runner.v2': raise SystemExit('FIELD6_PROVENANCE_SCHEMA_INVALID')
+          expected={'guest_name':guest,'rootfs_url':url,'rootfs_sha256':rootfs_sha,'runner_name':runner,'one_time_label':label,'seed_path':seed_path,'seed_sha256':seed_sha}
           for key,value in expected.items():
             if data.get(key) != value: raise SystemExit('FIELD6_PROVENANCE_'+key.upper()+'_MISMATCH')
-          for key in ('automount_disabled','interop_disabled','docker_socket_absent','podman_socket_absent','prior_repo_state_absent','prior_runner_state_absent'):
+          if data.get('seed_size') != int(seed_size): raise SystemExit('FIELD6_PROVENANCE_SEED_SIZE_MISMATCH')
+          for key in ('automount_disabled','interop_disabled','docker_socket_absent','podman_socket_absent','prior_repo_state_absent','prior_runner_state_absent','seed_preflight_verified'):
             if data.get(key) is not True: raise SystemExit('FIELD6_PROVENANCE_'+key.upper()+'_NOT_TRUE')
           if not isinstance(data['generation_nonce'],str) or not re.fullmatch(r'[0-9a-f]{32,64}',data['generation_nonce']):
             raise SystemExit('FIELD6_PROVENANCE_GENERATION_NONCE_INVALID')
+          seed=pathlib.Path(seed_path)
+          seed_st=seed.lstat()
+          if not stat.S_ISREG(seed_st.st_mode) or seed.is_symlink(): raise SystemExit('FIELD6_SEED_NOT_REGULAR')
+          if seed_st.st_uid != 0 or seed_st.st_gid != 0: raise SystemExit('FIELD6_SEED_NOT_ROOT_OWNED')
+          if seed_st.st_mode & 0o022: raise SystemExit('FIELD6_SEED_WRITABLE_BY_NONROOT')
+          if seed_st.st_size != int(seed_size): raise SystemExit('FIELD6_SEED_SIZE_MISMATCH')
+          h=hashlib.sha256()
+          with seed.open('rb') as f:
+            for chunk in iter(lambda:f.read(1024*1024),b''): h.update(chunk)
+          if h.hexdigest() != seed_sha: raise SystemExit('FIELD6_SEED_SHA256_MISMATCH')
           print('TRACK_A_FIELD6_INDEPENDENT_PROVENANCE=PASS')
+          print('TRACK_A_FIELD6_INDEPENDENT_SEED=PASS')
           PY
           {
             echo TRACK_A_FIELD6_INDEPENDENT_PROVENANCE_VERIFIED=1
+            echo TRACK_A_FIELD6_INDEPENDENT_SEED_VERIFIED=1
             echo TRACK_A_FIELD6_SYSTEM_TOOLROOT=1
           } >> "$GITHUB_ENV"
           echo TRACK_A_FIELD6_RUN_ATTEMPT=1
@@ -191,6 +211,10 @@ jobs:
           grep -Fqx "independent_runner_name: $EXPECTED_INDEPENDENT_RUNNER_NAME" "$task"
           grep -Fqx "independent_rootfs_url: $EXPECTED_INDEPENDENT_ROOTFS_URL" "$task"
           grep -Fqx "independent_rootfs_sha256: $EXPECTED_INDEPENDENT_ROOTFS_SHA" "$task"
+          grep -Fqx "independent_seed_path: $EXPECTED_SEED_PATH" "$task"
+          grep -Fqx "independent_seed_size: $EXPECTED_SEED_SIZE" "$task"
+          grep -Fqx "independent_seed_sha256: $EXPECTED_SEED_SHA" "$task"
+          grep -Fqx 'independent_runner_provenance_schema: otclient.track-a.independent-field6-runner.v2' "$task"
           grep -Fq 'AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V5 once=true' "$task"
           python3 .github/scripts/test_track_a_agent_runtime_governance.py
           python3 .github/scripts/test_track_a_current_login_field6_runtime.py
@@ -201,15 +225,17 @@ jobs:
           bash -n .github/scripts/track_a_current_login_field6_runtime_secret_wrapper.sh
           echo TRACK_A_FIELD6_LIVE_ADMISSION=PASS
 
-      - name: Materialize exact current package through task-owned WARP
+      - name: Materialize exact current package from verified official-launcher seed
         shell: bash
         run: |
           set -Eeuo pipefail
+          test "${TRACK_A_FIELD6_INDEPENDENT_SEED_VERIFIED:?}" = "1"
           log="$RUNNER_TEMP/field6-package-preflight.log"
           bash .github/scripts/track_a_current_client_package_acquire.sh prepare | tee "$log"
-          grep -Fqx 'TRACK_A_EXACT_CURRENT_PACKAGE_ALL_FILES_VERIFIED=true' "$log"
-          grep -Fqx 'TRACK_A_EXACT_CURRENT_PACKAGE_EXECUTED_DOWNLOADED_CONTENT=false' "$log"
-          grep -Fqx 'TRACK_A_FIELD6_EXACT_PACKAGE_SOURCE=materialized' "$log"
+          grep -Fqx 'TRACK_A_FIELD6_SEED_REGULAR_FILES=8732' "$log"
+          grep -Fqx 'TRACK_A_FIELD6_SEED_ALL_FILES_VERIFIED=true' "$log"
+          grep -Fqx 'TRACK_A_FIELD6_SEED_MATERIALIZED=true' "$log"
+          grep -Fqx 'TRACK_A_FIELD6_EXACT_PACKAGE_SOURCE=official_launcher_seed' "$log"
           grep -Fqx 'TRACK_A_FIELD6_PACKAGE_EXECUTED=false' "$log"
           grep -Fqx 'TRACK_A_FIELD6_PACKAGE_PREFLIGHT=PASS' "$log"
 

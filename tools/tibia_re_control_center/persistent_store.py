@@ -11,6 +11,7 @@ from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from enum import Enum
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any
 
 from .canonical import jcs_dumps
@@ -288,8 +289,58 @@ def _agent_event_from(value: Mapping[str, Any]) -> AgentEvent:
     return AgentEvent(**data)
 
 
-def _persistent_agent_corruption(exc: Exception) -> ValidationError:
+_DURABLE_AGENT_DATA_ERRORS = (ValidationError, ValueError, TypeError, KeyError, UnicodeError, OverflowError)
+
+
+def _persistent_agent_corruption() -> ValidationError:
     return ValidationError("PERSISTENT_STATE_CORRUPT", "persistent agent row is corrupt")
+
+
+def _validated_agent_session_record(record: AgentSessionRecord) -> AgentSessionRecord:
+    if type(record) is not AgentSessionRecord:
+        raise ValidationError("INVALID_FIELD", "agent session record is invalid")
+    try:
+        return _agent_session_from(_agent_session_obj(record))
+    except ValidationError:
+        raise
+    except ValueError:
+        raise ValidationError("INVALID_ENUM", "agent session state is invalid") from None
+    except (TypeError, KeyError, UnicodeError, OverflowError):
+        raise ValidationError("INVALID_FIELD", "agent session record is invalid") from None
+
+
+def _validated_agent_event(event: AgentEvent) -> AgentEvent:
+    if type(event) is not AgentEvent:
+        raise ValidationError("INVALID_FIELD", "agent event is invalid")
+    if event.schema != _EVENT_SCHEMA:
+        raise ValidationError("INVALID_SCHEMA", "agent event schema is invalid")
+    if type(event.seq) is not int or event.seq != 0:
+        raise ValidationError("INVALID_INTEGER", "agent event sequence must be unallocated")
+    validate_opaque_id(event.session_id, field_name="session_id")
+    if event.run_id is not None:
+        validate_opaque_id(event.run_id, field_name="run_id")
+    if type(event.provenance) is not AgentProvenance:
+        raise ValidationError("INVALID_ENUM", "agent event provenance is invalid")
+    checked_non_negative(event.observed_epoch_ms, maximum=MAX_SAFE_INTEGER, field_name="observed_epoch_ms")
+    for value, field in ((event.kind, "kind"), (event.state_before, "state_before"), (event.state_after, "state_after")):
+        if not isinstance(value, str) or not value:
+            raise ValidationError("INVALID_FIELD", f"agent event {field} is invalid")
+    if type(event.artifact_refs) is not tuple:
+        raise ValidationError("INVALID_FIELD", "agent event artifact references must be a tuple")
+    for artifact_ref in event.artifact_refs:
+        validate_opaque_id(artifact_ref, field_name="artifact_ref")
+    if event.action_id is not None:
+        validate_opaque_id(event.action_id, field_name="action_id")
+    if type(event.payload) is not MappingProxyType:
+        raise ValidationError("INVALID_FIELD", "agent event payload must be immutable")
+    prospective = _agent_event_obj(event, seq=0)
+    _ensure_persistable(prospective, key_path="agent_event")
+    try:
+        return _agent_event_from(_load(_dump(prospective)))
+    except ValidationError:
+        raise
+    except (ValueError, TypeError, KeyError, UnicodeError, OverflowError):
+        raise ValidationError("INVALID_FIELD", "agent event is invalid") from None
 
 
 def _checked_agent_session(row: Any, requested_session_id: str) -> AgentSessionRecord:
@@ -305,8 +356,8 @@ def _checked_agent_session(row: Any, requested_session_id: str) -> AgentSessionR
         if body != _dump(_agent_session_obj(record)):
             raise ValueError("session body is not canonical")
         return record
-    except Exception as exc:
-        raise _persistent_agent_corruption(exc) from exc
+    except _DURABLE_AGENT_DATA_ERRORS:
+        raise _persistent_agent_corruption() from None
 
 
 def _checked_agent_task_row(
@@ -338,8 +389,8 @@ def _checked_agent_task_row(
                     or parsed_result.trusted_main_sha != envelope.trusted_main_sha):
                 raise ValueError("result identity or canonical form mismatch")
         return envelope, canonical_envelope, parsed_result, canonical_result
-    except Exception as exc:
-        raise _persistent_agent_corruption(exc) from exc
+    except _DURABLE_AGENT_DATA_ERRORS:
+        raise _persistent_agent_corruption() from None
 
 
 class SQLitePersistentStore:
@@ -604,13 +655,15 @@ class SQLitePersistentStore:
         return [self.get_resource(row[0]) or {} for row in rows]
 
     def write_agent_session(self, record: AgentSessionRecord) -> None:
-        body_obj = _agent_session_obj(record)
+        validated = _validated_agent_session_record(record)
+        body_obj = _agent_session_obj(validated)
         _ensure_persistable(body_obj, key_path="agent_session")
+        body = _dump(body_obj)
         with self._transaction("agent_session"):
             self._db.execute(
                 "INSERT INTO agent_sessions(session_id,body) VALUES(?,?) "
                 "ON CONFLICT(session_id) DO UPDATE SET body=excluded.body",
-                (record.session_id, _dump(body_obj)),
+                (validated.session_id, body),
             )
 
     def load_agent_session(self, session_id: str) -> AgentSessionRecord | None:
@@ -686,25 +739,25 @@ class SQLitePersistentStore:
                 raise ValidationError("IDEMPOTENCY_CONFLICT", "agent task result is already bound")
 
     def append_agent_event(self, event: AgentEvent) -> AgentEvent:
-        if event.schema != _EVENT_SCHEMA:
-            raise ValidationError("INVALID_SCHEMA", "agent event schema is invalid")
-        prospective = _agent_event_obj(event, seq=0)
-        _ensure_persistable(prospective, key_path="agent_event")
+        validated = _validated_agent_event(event)
         with self._transaction("agent_event"):
-            cursor = self._db.execute("INSERT INTO events(run_id,body) VALUES(?,?)", (event.run_id, "{}"))
+            cursor = self._db.execute("INSERT INTO events(run_id,body) VALUES(?,?)", (validated.run_id, "{}"))
             seq = int(cursor.lastrowid)
             if seq <= 0:
                 raise DurabilityError("agent event sequence was not committed")
             self._before_write("agent_event_body")
-            body_obj = _agent_event_obj(event, seq=seq)
+            body_obj = _agent_event_obj(validated, seq=seq)
             body = _dump(body_obj)
-            self._db.execute("UPDATE events SET body=? WHERE seq=?", (body, seq))
+            cursor = self._db.execute("UPDATE events SET body=? WHERE seq=?", (body, seq))
+            if cursor.rowcount != 1:
+                raise DurabilityError("agent event body update did not persist")
+            persisted = _agent_event_from(_load(body))
             row = self._db.execute("SELECT MAX(seq) FROM events").fetchone()
             maximum = 0 if row is None or row[0] is None else int(row[0])
             cutoff = maximum - self.event_retention
             if cutoff > 0:
                 self._db.execute("DELETE FROM events WHERE seq<=?", (cutoff,))
-        return _agent_event_from(_load(body))
+        return persisted
 
     def append_events(self, run_id: str, events: list[dict[str, Any]]) -> None:
         for event in events:

@@ -3,10 +3,12 @@ from __future__ import annotations
 import json
 import sqlite3
 import tempfile
+import traceback
 import unittest
 from dataclasses import replace
 from pathlib import Path
 from types import MappingProxyType
+from unittest.mock import patch
 
 from tools.tibia_re_control_center.agent_protocol import (
     AgentEvent,
@@ -20,6 +22,7 @@ from tools.tibia_re_control_center.agent_protocol import (
     TaskEnvelope,
 )
 from tools.tibia_re_control_center.model import DurabilityError, ValidationError
+from tools.tibia_re_control_center import persistent_store
 from tools.tibia_re_control_center.persistent_store import SQLitePersistentStore
 
 
@@ -64,6 +67,25 @@ def event(*, payload: dict[str, object] | None = None) -> AgentEvent:
         kind="observation", state_before="IDLE", state_after="OBSERVING",
         observed_epoch_ms=1, artifact_refs=("artifact-1",), payload=payload,
     )
+
+
+def raw_event(**overrides) -> AgentEvent:
+    value = {
+        "schema": "otclient.local-agent.event.v1",
+        "session_id": "session-1",
+        "run_id": "run-1",
+        "seq": 0,
+        "observed_epoch_ms": 1,
+        "provenance": AgentProvenance.SENSOR,
+        "kind": "observation",
+        "state_before": "IDLE",
+        "state_after": "OBSERVING",
+        "artifact_refs": ("artifact-1",),
+        "action_id": None,
+        "payload": {},
+    }
+    value.update(overrides)
+    return AgentEvent(**value)
 
 
 class AgentPersistenceTests(unittest.TestCase):
@@ -187,6 +209,67 @@ class AgentPersistenceTests(unittest.TestCase):
         body["session_id"] = "session-other"
         self.store._db.execute("UPDATE agent_sessions SET body=? WHERE session_id='session-1'", (json.dumps(body),))
         self._assert_corrupt(lambda: self.store.load_agent_session("session-1"))
+
+    def test_corruption_error_is_cause_free_and_does_not_echo_durable_text(self):
+        secret_text = "PASSWORD=hunter2"
+        self.store.write_agent_session(AgentSessionRecord(
+            "session-1", AgentOperationalState.IDLE, None, 0, False, False, None,
+        ))
+        body = json.loads(self.store._fetchone("SELECT body FROM agent_sessions WHERE session_id='session-1'")[0])
+        body["operational_state"] = secret_text
+        self.store._db.execute("UPDATE agent_sessions SET body=? WHERE session_id='session-1'", (json.dumps(body),))
+        with self.assertRaises(ValidationError) as context:
+            self.store.load_agent_session("session-1")
+        error = context.exception
+        self.assertEqual("PERSISTENT_STATE_CORRUPT", error.code)
+        self.assertIsNone(error.__cause__)
+        self.assertNotIn(secret_text, str(error))
+        self.assertNotIn(secret_text, error.safe_message)
+        self.assertNotIn(secret_text, "".join(traceback.format_exception(error)))
+
+    def test_unexpected_decode_failures_propagate_unchanged(self):
+        self.store.write_agent_session(AgentSessionRecord(
+            "session-1", AgentOperationalState.IDLE, None, 0, False, False, None,
+        ))
+        for failure in (RuntimeError("internal decoder failure"), MemoryError(), KeyboardInterrupt(), SystemExit()):
+            with self.subTest(failure=type(failure).__name__), patch.object(persistent_store, "_load", side_effect=failure):
+                with self.assertRaises(type(failure)):
+                    self.store.load_agent_session("session-1")
+
+    def test_invalid_session_inputs_fail_before_transaction(self):
+        cases = (
+            replace(AgentSessionRecord("session-1", AgentOperationalState.IDLE, None, 0, False, False, None), session_id="bad/id"),
+            replace(AgentSessionRecord("session-1", AgentOperationalState.IDLE, None, 0, False, False, None), operational_state="PASSWORD=hunter2"),
+            replace(AgentSessionRecord("session-1", AgentOperationalState.IDLE, None, 0, False, False, None), last_event_seq=-1),
+            replace(AgentSessionRecord("session-1", AgentOperationalState.IDLE, None, 0, False, False, None), heartbeat_epoch_ms=True),
+            replace(AgentSessionRecord("session-1", AgentOperationalState.IDLE, None, 0, False, False, None), pause_latched=1),
+        )
+        for record in cases:
+            with self.subTest(record=record):
+                with self.assertRaises(ValidationError) as raised:
+                    self.store.write_agent_session(record)
+                self.assertTrue(raised.exception.code.startswith(("INVALID", "INTEGER")))
+                self.assertEqual(0, self.store._fetchone("SELECT COUNT(*) FROM agent_sessions")[0])
+
+    def test_invalid_event_inputs_fail_before_event_insert(self):
+        cases = (
+            raw_event(schema="wrong"),
+            raw_event(seq=1),
+            raw_event(session_id="bad/id"),
+            raw_event(run_id="bad/id"),
+            raw_event(provenance="PASSWORD=hunter2"),
+            raw_event(observed_epoch_ms=True),
+            raw_event(kind=""),
+            raw_event(state_before=""),
+            raw_event(artifact_refs=["artifact-1"]),
+            raw_event(artifact_refs=("bad/id",)),
+            raw_event(action_id="bad/id"),
+        )
+        for invalid in cases:
+            with self.subTest(invalid=repr(invalid)):
+                with self.assertRaises(ValidationError):
+                    self.store.append_agent_event(invalid)
+                self.assertEqual(0, self.store._fetchone("SELECT COUNT(*) FROM events")[0])
 
     def test_corrupt_task_canonical_body_hash_and_identities_fail_closed(self):
         self.store.accept_agent_task(task())

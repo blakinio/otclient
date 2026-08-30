@@ -12,7 +12,7 @@ branch: docs/OTC-20260830-local-vision-agent-supervisor-discovery
 base_branch: main
 base_main: 18ff83053f5c5d85c9bce6debab0f7fef6b79ecd
 created: 2026-08-30T10:39:00+02:00
-updated_at: 2026-08-30T11:00:00+02:00
+updated_at: 2026-08-30T11:21:00+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: work
@@ -28,7 +28,7 @@ context_growth: stable
 context_score: 8
 estimate_confidence: high
 decomposition_decision: phased
-decomposition_reason: architecture is now reconciled around one persistent Molehill control/session plane plus the existing canonical Track A runtime edge; implementation remains gated on explicit owner approval and a subsequent formal spec approval
+decomposition_reason: owner approved the architecture direction; the formal written spec is now committed and self-reviewed, but implementation planning remains blocked until the owner separately approves the written spec
 runtime_access: none
 runtime_owner_task: NOT_APPLICABLE
 runtime_namespace: NOT_APPLICABLE
@@ -55,6 +55,7 @@ physical_action_count: 0
 owned_paths:
   - docs/agents/tasks/active/OTC-20260830-local-vision-agent-supervisor-discovery.md
   - docs/agents/reports/OTC-20260830-local-vision-agent-supervisor-discovery.md
+  - docs/superpowers/specs/2026-08-30-local-track-a-vision-agent-supervisor-design.md
 modules_touched:
   - track-a-runtime-governance
   - local-model-supervisor
@@ -72,16 +73,18 @@ reuses:
   - .github/scripts/track_a_current_world_entered_anchor.py
   - .github/scripts/track_a_current_login_field6_runtime_secret_wrapper.sh
 depends_on:
-  - explicit owner approval of the recommended future autonomous GUI/operator architecture direction
+  - explicit owner approval of docs/superpowers/specs/2026-08-30-local-track-a-vision-agent-supervisor-design.md
 blocks:
   - TRACK_A_AUTONOMOUS_VISION_GUI_RESEARCH
-last_completed_step: completed and durably recorded architecture comparison and recommendation: persistent Molehill session/control service, Qwen3-VL visual sensor, deterministic policy/evidence, and a narrow canonical Track A runtime edge reusing guarded dispatch, runtime signals and input.lock; CUA and Hermes are not primary action runtimes
-current_blocker: OWNER_ARCHITECTURE_APPROVAL_REQUIRED
-next_action: owner explicitly approves or rejects the recommended architecture direction; only after approval write the formal design spec under docs/superpowers/specs/ and stop again for approval before implementation planning
+last_completed_step: owner approved Approach C; formal design spec docs/superpowers/specs/2026-08-30-local-track-a-vision-agent-supervisor-design.md was committed and self-reviewed for placeholders, consistency, scope and authority boundaries with no material defect found
+current_blocker: OWNER_WRITTEN_SPEC_APPROVAL_REQUIRED
+next_action: owner reviews and explicitly approves or requests changes to docs/superpowers/specs/2026-08-30-local-track-a-vision-agent-supervisor-design.md; only after written-spec approval invoke the repository planning workflow
 ---
 
 # Local vision-agent supervisor discovery
 
-Discovery/architecture checkpoint for reusing the owner's existing Ollama/supervisor stack as the foundation for a future Track A local vision/OCR research agent. The recommended architecture and delivery matrix are recorded in `docs/agents/reports/OTC-20260830-local-vision-agent-supervisor-discovery.md`.
+Architecture direction `Approach C` is owner-approved. The formal written design is now:
 
-This task grants no live-client observation, credentials, login, character selection, GUI input, process control, process-memory access or gameplay authority. It is intentionally waiting at the owner architecture-approval hard gate.
+`docs/superpowers/specs/2026-08-30-local-track-a-vision-agent-supervisor-design.md`
+
+The task is intentionally waiting at the second architectural gate: written-spec owner approval. This task still grants no live-client observation, credentials, login, character selection, GUI input, process control, process-memory access or gameplay authority, and it does not authorize implementation planning yet.

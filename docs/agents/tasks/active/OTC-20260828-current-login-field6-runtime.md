@@ -1,29 +1,29 @@
 ---
 task_id: OTC-20260828-current-login-field6-runtime
-status: validating
+status: implementing
 agent: ChatGPT
-session_id: chatgpt-20260830-field6-v6-independent-runner
+session_id: chatgpt-20260830-field6-v7-generation
 session_role: implementer
 policy_version: 2
 project_lane: otclient
 lane: RUNTIME_RESEARCH
 track_id: official-client-re
 task_kind: reverse_engineering_runtime
-phase: live_admission
-branch: fix/OTC-20260830-field6-v6-independent-runner
+phase: validate
+branch: fix/OTC-20260830-field6-v7-generation
 base_branch: main
-base_main: 8442ead31bd448becc01082d34cbe2212f36a58d
+base_main: 5def12f5fbb5f3554b60b894df7257f00dcd39f3
 created: 2026-08-28T19:00:00+02:00
-updated: 2026-08-30T16:31:07+02:00
+updated: 2026-08-30T16:48:00+02:00
 risk: high
-execution_class: independent_ephemeral_physical_runtime
-execution_mode: github_actions_independent_ephemeral_physical
-execution_reason: one fresh exact-current scalar-only V6 login observation on brand-new OTClientV6Clean using exact official-launcher seed with runner-readable immutable permissions
+execution_class: github_hosted
+execution_mode: github_actions_static
+execution_reason: repository-only V7 generation rotation after terminal pre-login V6 Xvfb/WSLg socket failure; no V7 runtime, credential, client, login or physical mutation is authorized in this phase
 persistent_session_role: none
-physical_e2e_required: true
-runtime_access: ephemeral_isolated
-runtime_owner_task: OTC-20260828-current-login-field6-runtime
-runtime_namespace: field6-runtime-ephemeral-OTC-20260828-v6-seed
+physical_e2e_required: false
+runtime_access: none
+runtime_owner_task: NOT_APPLICABLE
+runtime_namespace: NOT_APPLICABLE
 canonical_registration: NOT_APPLICABLE
 canonical_lease_generation: NOT_APPLICABLE
 registration_lease_generation: NOT_APPLICABLE
@@ -31,33 +31,21 @@ gate_a: NOT_APPLICABLE
 generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
-target_uniqueness: PROVEN
-mutation_authorized: true
-credentials_allowed: true
-login_allowed: true
+target_uniqueness: NOT_APPLICABLE
+mutation_authorized: false
+credentials_allowed: false
+login_allowed: false
 relogin_allowed: false
 restart_allowed: false
 character_selection_allowed: false
 gameplay_allowed: false
-gui_input_authorized: true
-process_control_authorized: true
+gui_input_authorized: false
+process_control_authorized: false
 network_payload_capture_allowed: false
-physical_action_budget: 1
+physical_action_budget: 0
 physical_action_count: 0
 implementation_authorized: true
-live_runtime_authorization_source: PR_758_COMMENT_5469210031
-independent_guest_name: OTClientV6Clean
-independent_runner_name: molehill-otclient-v6-01
-independent_rootfs_url: https://cloud-images.ubuntu.com/releases/noble/release-20260801/ubuntu-24.04-server-cloudimg-amd64-root.tar.xz
-independent_rootfs_sha256: 915b4be62933475c3fb5f5031aa2e159294db95fb32aaa9e8b317aadcb6c065d
-independent_runner_provenance: /etc/otclient-field6-runner-provenance
-independent_runner_provenance_schema: otclient.track-a.independent-field6-runner.v3
-independent_provenance_mode: 0644
-independent_seed_path: /opt/otclient-v6-seed/seed.tar.gz
-independent_seed_size: 412272538
-independent_seed_sha256: 64031ba091884c5b1be71416394b8ada6dac9529cfed60e7b4856c04b7e5b016
-independent_seed_dir_mode: 0555
-independent_seed_mode: 0444
+live_runtime_authorization_source: NOT_APPLICABLE
 feature_scope:
   type: infrastructure
   user_facing: false
@@ -70,9 +58,9 @@ context_growth: stable
 context_score: 8
 estimate_confidence: high
 decomposition_decision: phased
-decomposition_reason: V6 physical routing/admission is now the single sequential evidence chain; scalar promotion remains separate after proof
+decomposition_reason: revoke terminal V6 statically first; fresh V7 X11 namespace repair and live admission require a separate trusted-main phase
 validation_level: focused
-last_completed_step: PR #816 candidate 32aafc5c2b084a2198c38db192d3eb8375270751 passed exact-head runtime/security/admission/package/governance/self-hosted-boundary/CI; physical job 99272181229 skipped
+last_completed_step: V7 GREEN head c2fec0fcc0b376695ee2d11de79ee81174ee47ca passed exact-head field6 run 33317762701 (runtime 99274221549 SUCCESS, static audit 99274221406 SUCCESS, physical 99274221980 SKIPPED), package 33317762678/99274221335 SUCCESS, governance 33317762681/99274221424+99274221612 SUCCESS, boundary 33317762711/99274221481+99274221547 SUCCESS, CI 33317762813/99274297146 SUCCESS
 session_rotation_count: 6
 heavy_validation_runs: 1
 stale_takeover_count: 0
@@ -80,7 +68,7 @@ human_interruptions: 1
 invocation_started_at: 2026-08-30T11:05:00+02:00
 last_progress_at: 2026-08-30T16:08:11+02:00
 ci_checks_for_current_head: 5
-ci_check_generation: field6_v6_static_green
+ci_check_generation: field6_v7_static_green
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 5
 unchanged_state_checks: 0
@@ -88,7 +76,7 @@ identical_failure_retries: 0
 repair_cycles_for_current_gate: 1
 context_reconstruction_attempts: 1
 stall_warnings: 0
-related_pr: 816
+related_pr: 817
 owned_paths:
   - .github/scripts/test_track_a_current_login_field6_runtime.py
   - .github/scripts/test_track_a_current_login_field6_security_contract.py
@@ -151,7 +139,7 @@ The exact consumed V5 trigger body is deliberately omitted from this active task
 The current future generation identifier is exactly:
 
 ```text
-AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V6 once=true
+AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V7 once=true
 ```
 
 This is only a repository generation identifier. It has not been posted as an owner trigger and this task grants it no live authority.
@@ -210,3 +198,15 @@ If the one allowed V6 login submit occurs without scalar proof, an identical V6 
 # V6 routing exact-head GREEN checkpoint
 
 Candidate 32aafc5c2b084a2198c38db192d3eb8375270751 on trusted base 8442ead31bd448becc01082d34cbe2212f36a58d passed hosted validation: field6 run 33317003099 (runtime 99272180811 SUCCESS, fresh V6 audit 99272180700 SUCCESS, physical 99272181229 SKIPPED); package run 33317003094 job 99272180653 SUCCESS; governance run 33317003128 jobs 99272180685/99272180822 SUCCESS; self-hosted boundary run 33317003079 jobs 99272180620/99272180753 SUCCESS; CI run 33317003291, CI / Required 99272262431 SUCCESS. No V6 trigger, runner registration, credentials, client execution or physical action occurred.
+
+# Terminal V6 and static V7 generation
+
+V6 run `33317265138`, attempt 1, job `99272880272` is terminal and must never be rerun. Provenance/admission/seed/authorization/WARP passed, then `start_xvfb` failed with `xvfb_socket_missing`. Trusted helper order proves `start_client` and `submit_login_once` were never reached. Physical action count and login submit count remain 0; field6 remains UNKNOWN. Exact V6 trigger text is deliberately omitted from this active task; durable V6 evidence is stored under the task evidence directory.
+
+The current future repository generation identifier is:
+
+```text
+AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V7 once=true
+```
+
+It is static only and has not been posted. Current phase must remain `runtime_access: none`, `mutation_authorized: false`, `credentials_allowed: false`, `login_allowed: false`, `physical_action_budget: 0`. A later separate V7 routing/admission phase requires a brand-new guest and proof that `/tmp/.X11-unix` is a local writable X11 socket namespace rather than the WSLg read-only mount.

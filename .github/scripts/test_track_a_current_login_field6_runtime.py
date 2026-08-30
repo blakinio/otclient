@@ -144,7 +144,7 @@ workflow = need(
         ".github/scripts/track_a_current_client_package_materialize.py",
         ".github/scripts/track_a_current_client_package_acquire.sh",
         "github.event.comment.user.login == github.repository_owner",
-        "AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V6 once=true",
+        "AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V7 once=true",
         "ref: main",
         "secrets.TIBIA_TEST_EMAIL",
         "secrets.TIBIA_TEST_PASSWORD",
@@ -162,7 +162,7 @@ workflow = need(
         "FIELD6_VALUE_PROVEN=true",
     ),
 )
-for consumed_generation in ("V3", "V4", "V5"):
+for consumed_generation in ("V3", "V4", "V5", "V6"):
     consumed = f"AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_{consumed_generation} once=true"
     if consumed in workflow:
         raise SystemExit(
@@ -189,13 +189,13 @@ task = need(
         ".github/scripts/track_a_current_client_package_materialize.py",
         ".github/scripts/track_a_current_client_package_acquire.sh",
         ".github/scripts/track_a_current_login_field6_runtime_secret_wrapper.sh",
-        "AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V6 once=true",
+        "AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V7 once=true",
         "character_selection_allowed: false",
         "gameplay_allowed: false",
         "network_payload_capture_allowed: false",
     ),
 )
-for consumed_generation in ("V3", "V4", "V5"):
+for consumed_generation in ("V3", "V4", "V5", "V6"):
     consumed = f"AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_{consumed_generation} once=true"
     if consumed in task:
         raise SystemExit(

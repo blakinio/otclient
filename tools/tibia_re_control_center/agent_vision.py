@@ -144,21 +144,23 @@ class ModelSlotScheduler:
         return ModelSlotUnavailable(code)
 
     def _unload_owned_and_verify_empty(self, model: str) -> None:
+        unload_error: Exception | None = None
         try:
             self._unload(model)
         except Exception as exc:
-            # An unloading provider can fail after having performed its effect.
-            # Reconcile that case so a later foreign same-name model is not
-            # accidentally treated as scheduler-owned.
-            resident = self._residency()
-            if resident == [] or (resident is not None and resident != [model]):
-                self._owned_model = None
-            raise ModelSlotUnavailable("MODEL_UNLOAD_FAILED") from exc
-        if self._residency() != []:
-            # Preserve the prior ownership proof so cleanup can be retried; no
-            # other model is unloaded in this failed-verification path.
+            unload_error = exc
+
+        # Classify the one post-effect observation identically whether the
+        # provider returned or raised.  Only exact continuity proves that the
+        # old ownership claim remains valid; every other state loses the claim
+        # so a later same-name foreign resident can never be unloaded.
+        resident = self._residency()
+        if resident != [model]:
+            self._owned_model = None
+        if unload_error is not None:
+            raise ModelSlotUnavailable("MODEL_UNLOAD_FAILED") from unload_error
+        if resident != []:
             raise ModelSlotUnavailable("MODEL_UNLOAD_NOT_VERIFIED")
-        self._owned_model = None
 
     def _admit(self, model: str, expected_digest: str) -> None:
         resident = self._residency()
@@ -312,13 +314,34 @@ class AgentVisionSensor:
         return bytes_, actual
 
     @staticmethod
-    def _verify_snapshot(path: Path, expected_sha256: str) -> None:
+    def _snapshot_metadata_is_safe(mode: int, *, windows: bool) -> bool:
+        if not stat.S_ISREG(mode):
+            return False
+        permissions = stat.S_IMODE(mode)
+        write_bits = stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH
+        if permissions & write_bits:
+            return False
+        if windows:
+            # CPython exposes the Windows read-only attribute through the
+            # owner-read/write mode aliases and commonly reports 0444.  This
+            # bounded phase relies additionally on the unshared temporary
+            # parent; POSIX-looking bits are not treated as a Windows ACL proof.
+            return bool(permissions & stat.S_IREAD)
+        return bool(permissions & stat.S_IRUSR)
+
+    @classmethod
+    def _verify_snapshot(cls, path: Path, expected_sha256: str) -> None:
         try:
-            mode = stat.S_IMODE(path.stat().st_mode)
+            metadata = path.lstat()
+            if not cls._snapshot_metadata_is_safe(
+                metadata.st_mode,
+                windows=os.name == "nt",
+            ):
+                raise ValueError("capture snapshot integrity invalid")
             bytes_ = path.read_bytes()
         except OSError as exc:
             raise ValueError("capture snapshot integrity invalid") from exc
-        if mode != stat.S_IRUSR or hashlib.sha256(bytes_).hexdigest() != expected_sha256:
+        if hashlib.sha256(bytes_).hexdigest() != expected_sha256:
             raise ValueError("capture snapshot integrity invalid")
 
     @classmethod

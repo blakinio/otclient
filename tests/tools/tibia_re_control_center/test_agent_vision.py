@@ -1,5 +1,7 @@
 import hashlib
 import inspect
+import os
+import stat
 from functools import partial
 from pathlib import Path
 import tempfile
@@ -410,6 +412,64 @@ class ModelSlotSchedulerTests(unittest.TestCase):
         scheduler.release()
         self.assertEqual([QWEN_VISION_MODEL], unloads)
 
+    def test_switch_loses_ownership_for_every_unverified_post_unload_state(self):
+        self._assert_unload_loses_ownership(operation="switch", unload_raises=False)
+        self._assert_unload_loses_ownership(operation="switch", unload_raises=True)
+
+    def test_release_loses_ownership_for_every_unverified_post_unload_state(self):
+        self._assert_unload_loses_ownership(operation="release", unload_raises=False)
+        self._assert_unload_loses_ownership(operation="release", unload_raises=True)
+
+    def test_release_unload_exception_with_exact_old_model_preserves_ownership(self):
+        resident = [[]]
+        unloads = []
+
+        def unload_without_effect(model):
+            unloads.append(model)
+            raise RuntimeError("unload failed before effect")
+
+        scheduler = self._scheduler(resident, unload=unload_without_effect)
+        _infer(scheduler)
+        with self.assertRaisesRegex(ModelSlotUnavailable, "MODEL_UNLOAD_FAILED"):
+            scheduler.release()
+        self.assertTrue(scheduler.owns(QWEN_VISION_MODEL))
+        self.assertEqual([QWEN_VISION_MODEL], resident[0])
+        self.assertEqual([QWEN_VISION_MODEL], unloads)
+
+    def _assert_unload_loses_ownership(self, *, operation, unload_raises):
+        post_states = (
+            ("foreign", ["foreign:model"]),
+            ("multiple", [QWEN_VISION_MODEL, "foreign:model"]),
+            ("unknown", None),
+            ("malformed", [""]),
+        )
+        expected_code = "MODEL_UNLOAD_FAILED" if unload_raises else "MODEL_UNLOAD_NOT_VERIFIED"
+        for label, post_state in post_states:
+            with self.subTest(operation=operation, unload_raises=unload_raises, post_state=label):
+                resident = [[]]
+                unloads = []
+
+                def unload(model, state=post_state):
+                    unloads.append(model)
+                    resident[0] = state
+                    if unload_raises:
+                        raise RuntimeError("unload provider failed")
+
+                scheduler = self._scheduler(resident, unload=unload)
+                _infer(scheduler)
+                with self.assertRaisesRegex(ModelSlotUnavailable, expected_code):
+                    if operation == "switch":
+                        _infer(scheduler, "other:exact")
+                    else:
+                        scheduler.release()
+
+                self.assertFalse(scheduler.owns(QWEN_VISION_MODEL))
+                resident[0] = [QWEN_VISION_MODEL]
+                with self.assertRaisesRegex(ModelSlotUnavailable, "TARGET_NOT_OWNED"):
+                    _infer(scheduler)
+                scheduler.release()
+                self.assertEqual([QWEN_VISION_MODEL], unloads)
+
     @staticmethod
     def _thread_call(failures, call):
         try:
@@ -700,6 +760,61 @@ class AgentVisionSensorTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "DUPLICATE_CAPTURE_SHA256"):
                 sensor.observe(capture)
         self.assertEqual(1, len(calls))
+
+    def test_snapshot_metadata_policy_is_factored_for_posix_and_windows(self):
+        regular = stat.S_IFREG
+        cases = (
+            (False, regular | 0o400, True),
+            (False, regular | 0o444, True),
+            (False, regular | 0o600, False),
+            (False, regular | 0o200, False),
+            (True, regular | 0o444, True),
+            (True, regular | 0o400, True),
+            (True, regular | 0o666, False),
+            (True, regular | 0o644, False),
+            (False, stat.S_IFLNK | 0o400, False),
+            (True, stat.S_IFDIR | 0o444, False),
+        )
+        for windows, mode, expected in cases:
+            with self.subTest(windows=windows, mode=oct(mode)):
+                self.assertEqual(
+                    expected,
+                    AgentVisionSensor._snapshot_metadata_is_safe(
+                        mode,
+                        windows=windows,
+                    ),
+                )
+
+    @unittest.skipUnless(os.name == "nt", "requires real Windows chmod semantics")
+    def test_windows_snapshot_exact_path_read_tamper_and_cleanup(self):
+        with tempfile.TemporaryDirectory() as raw:
+            capture = self._capture(Path(raw))
+            snapshot_parents = []
+            consumed = []
+
+            def provider(call):
+                snapshot = Path(call["image_path"])
+                snapshot_parents.append(snapshot.parent)
+                consumed.append(snapshot.read_bytes())
+                return _visual_evidence(capture)
+
+            result = self._sensor(provider).observe(capture)
+            self.assertEqual(capture.sha256, result.capture_sha256)
+            self.assertEqual([b"safe frame"], consumed)
+            self.assertFalse(snapshot_parents[0].exists())
+
+            capture = self._capture(Path(raw), filename="tamper.bin")
+
+            def tampering_provider(call):
+                snapshot = Path(call["image_path"])
+                snapshot_parents.append(snapshot.parent)
+                snapshot.chmod(stat.S_IREAD | stat.S_IWRITE)
+                snapshot.write_bytes(b"tampered")
+                return _visual_evidence(capture)
+
+            with self.assertRaisesRegex(ValueError, "snapshot integrity"):
+                self._sensor(tampering_provider).observe(capture)
+            self.assertFalse(snapshot_parents[1].exists())
 
 
 if __name__ == "__main__":

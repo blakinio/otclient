@@ -108,10 +108,10 @@ The Codex execution environment is available. Live Git/GitHub state was reconcil
 ```yaml
 checkpoint_version: 1
 updated_at: 2026-08-30T15:48:40Z
-head: a65d0afefa787ee0469245a69079a2a595749655
+head: 28c613e3ae5894dae42e1f9309bf8f9f6398e9c9
 branch: feat/OTC-20260830-local-vision-agent-supervisor-foundation
 pr: 810
-remote_pr_head: 8a63adbfb0e130b845e12ab88deec8a984770f65
+published_checkpoint_parent: 29cc136f0f15ff8073eaf24f01c0c9db0b11b1e6
 merge_base: 3edc3f2a73b9eb9a40a2b5936114e7d9ada62533
 live_main: 9f79685f6d073c160397eeefdbc2beb27e8921ad
 status: blocked
@@ -127,7 +127,7 @@ owned_paths:
   - docs/agents/tasks/active/OTC-20260830-local-vision-agent-supervisor-foundation.md
   - docs/agents/reports/OTC-20260830-local-vision-agent-supervisor-foundation.md
 proven:
-  - Live Git and GitHub state was refreshed at this checkpoint; PR 810 remains Draft at remote head 8a63adbfb0e130b845e12ab88deec8a984770f65 and is stacked on Draft PR 808 at 3edc3f2a73b9eb9a40a2b5936114e7d9ada62533.
+  - Live Git and GitHub state was refreshed and PR 810 was fast-forward published through checkpoint parent 29cc136f0f15ff8073eaf24f01c0c9db0b11b1e6; it remains Draft and stacked on Draft PR 808 at 3edc3f2a73b9eb9a40a2b5936114e7d9ada62533.
   - Isolated non-main worktree is available on the implementation branch.
   - Control Center baseline passed 253 tests with 2 skipped.
   - Vision benchmark baseline passed 34 tests.
@@ -137,15 +137,15 @@ proven:
   - Task 3 SQLite/WAL persistence completed three reviewed fix rounds; 18 focused tests and Package B regression evidence pass, with restart, idempotency, privacy, and cause-free corruption handling independently approved.
   - Task 5 model-slot/Qwen sensor completed five fix rounds; final independent gate is clean with 62 focused/stable tests, one expected Windows-only skip, and 34 frozen benchmark tests.
   - Task 6 core table and scoped privacy/full-observation fixes pass 371 Control Center tests with 3 skips and 34 frozen benchmark tests; its independent re-review closes the two ordinary findings.
-  - Task 4 implementation commit f6243238a was not accepted: independent adversarial probes reproduced three Critical and six Important durability/concurrency findings.
-  - No workflow run or legacy commit status is attached to the last published PR head 8a63adbfb0e130b845e12ab88deec8a984770f65.
+  - Task 4 implementation commit d822a1ade was not accepted: independent adversarial probes reproduced three Critical and six Important durability/concurrency findings.
+  - No workflow run or legacy commit status was attached to the previous Wave 1 head; exact-head checks require readback after this record commit publishes.
 derived:
   - Task 7 cannot start because its Task 4 and Task 6 dependencies are both architect-blocked.
   - The local branch intentionally contains reviewed but not-yet-accepted Task 4 and Task 6 implementations so exact evidence and fix bases remain durable.
 unknown:
   - Architect-selected final commit/cancellation handshake for an effect-capable bounded executor.
   - Architect-selected authenticated current-run/runtime/freshness binding for reviewed-causal runtime evidence.
-  - Exact-head hosted CI outcome after publishing the current local checkpoint.
+  - Exact-head hosted CI outcome after publishing this checkpoint record.
 conflicts:
   - TASK4_EXECUTOR_ATOMICITY_CONTRACT — the frozen execute(request)->receipt protocol has no final-commit/cancellation handshake capable of proving OWNER STOP dominance across an in-flight physical effect and crash-safe post-effect persistence.
   - TASK6_CURRENT_PROVENANCE_CONTRACT — the frozen three-field RuntimeObservation and two-argument reconcile_state function have no trusted producer/run/runtime/time context capable of authenticating freshness; opaque refs cannot supply authority.

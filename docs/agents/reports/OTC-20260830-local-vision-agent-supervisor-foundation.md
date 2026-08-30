@@ -79,11 +79,18 @@ Fresh combined Wave 1 readback on `6dc038c0863db3265cc8354c4cb6167ce0bdda50` pas
 
 ## Wave 2 implementation and review checkpoint
 
-Local implementation head:
+Published implementation code head:
 
-`a65d0afefa787ee0469245a69079a2a595749655`
+`28c613e3ae5894dae42e1f9309bf8f9f6398e9c9`
 
-The local branch is still based on the approved planning head `3edc3f2a73b9eb9a40a2b5936114e7d9ada62533`. Live `main` was refreshed to `9f79685f6d073c160397eeefdbc2beb27e8921ad`. PR #810 remains Draft and its last published head is `8a63adbfb0e130b845e12ab88deec8a984770f65`; no workflow runs or legacy commit statuses are attached to that published head.
+The branch is still based on the approved planning head `3edc3f2a73b9eb9a40a2b5936114e7d9ada62533`. Live `main` was refreshed to `9f79685f6d073c160397eeefdbc2beb27e8921ad`. PR #810 remains Draft. All local Task 3–6 commits were recreated as tree-identical GitHub commits and fast-forwarded through checkpoint parent `29cc136f0f15ff8073eaf24f01c0c9db0b11b1e6`; this record commit follows that parent.
+
+Key published commit mapping:
+
+- Task 3: `56cb9a593`, `e36042193`, `56ff36778`, `812cba560`;
+- Task 4 candidate: `d822a1ade`;
+- Task 5: `858bb4fba`, `12ce9c5ed`, `7112fa569`, `be2649658`, `4ba8ee61c`, `9c73fce24`;
+- Task 6: `cc37f47cd`, `28c613e3a`.
 
 Task 3 — existing-store agent persistence:
 
@@ -105,7 +112,7 @@ Task 5 — exact Qwen sensor and logical model slot:
 
 Task 4 — persistent coordinator:
 
-- implementation candidate `f6243238a`;
+- implementation candidate `d822a1ade` (local SDD equivalent `f6243238a`);
 - focused suite: 18 tests PASS; Package A: 76 PASS; Package B: 39 PASS;
 - independent adversarial review: Critical 3 / Important 6 / Minor 1, spec non-compliant, fix required;
 - reproduced load-bearing failures include effect execution after STOP admission, non-atomic PAUSE/event persistence, and duplicate executor invocation after post-effect persistence failure;
@@ -113,8 +120,8 @@ Task 4 — persistent coordinator:
 
 Task 6 — deterministic visual/runtime reconciliation:
 
-- implementation `2b93f0559`;
-- scoped privacy/full-observation fix `a65d0afef`;
+- implementation `cc37f47cd` (local SDD equivalent `2b93f0559`);
+- scoped privacy/full-observation fix `28c613e3a` (local SDD equivalent `a65d0afef`);
 - focused reconciler: 10 tests PASS;
 - full Control Center discovery: 371 tests PASS with 3 skips;
 - frozen benchmark: 34 tests PASS;

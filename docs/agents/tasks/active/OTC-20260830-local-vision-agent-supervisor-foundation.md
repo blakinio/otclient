@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260830-local-vision-agent-supervisor-foundation
-status: blocked
+status: implementing
 agent: Codex SDD coordinator
 session_role: implementation_coordinator
 project_lane: otclient
@@ -10,12 +10,12 @@ task_kind: implementation
 phase: implementation_execution
 branch: feat/OTC-20260830-local-vision-agent-supervisor-foundation
 base_branch: docs/OTC-20260830-local-vision-agent-supervisor-discovery
-trusted_main: 18ff83053f5c5d85c9bce6debab0f7fef6b79ecd
+trusted_main: 82bd4ef6d11431a40e47d8eea6fa15f372edcdc4
 parent_task: OTC-20260830-local-vision-agent-supervisor-discovery
 parent_pr: 808
 implementation_pr: 810
 created: 2026-08-30T11:51:56+02:00
-updated_at: 2026-08-30T11:53:25+02:00
+updated_at: 2026-08-30T12:38:48Z
 risk: high
 execution_class: repository_worktree
 execution_mode: subagent_driven_development
@@ -73,9 +73,10 @@ related_prs:
   - PR #615: stale bounded Ollama PoC; reuse independently revalidated invariants only
 current_environment:
   remote_desktop_commander: offline
-  current_chat_subagent_dispatch: unavailable
-current_blocker: EXECUTION_ENVIRONMENT_SUBAGENT_WORKTREE_UNAVAILABLE
-next_action: start OTC-LOCAL-VISION-AGENT-SUPERVISOR-FOUNDATION-SDD in Codex/Spark on feat/OTC-20260830-local-vision-agent-supervisor-foundation, create or verify an isolated worktree, revalidate live main/open ownership/spec/plan, run a clean baseline, create the plan-scoped SDD ledger, then execute Task 1 with RED-first TDD and the mandated implementer-review loop
+  codex_worktree: available
+  codex_subagent_dispatch: available
+current_blocker: NONE
+next_action: dispatch Task 1 implementer from the plan-scoped SDD brief, require RED-first evidence and a committed report, then run the independent spec/quality review and any required fix loop before Task 2
 ---
 
 # Local vision-agent supervisor foundation implementation
@@ -100,4 +101,56 @@ This authorization permits repository implementation and tests only. It does **n
 
 Use `superpowers:using-git-worktrees`, `superpowers:subagent-driven-development`, and `superpowers:test-driven-development` exactly as applicable. Maintain the plan-scoped SDD ledger. Do not run multiple implementation subagents concurrently against shared files. Each implementation task requires its own independent spec/quality review before the next task.
 
-The current chat could not begin that loop because Remote Desktop Commander had no connected device and this ChatGPT tool surface has no implementation-subagent dispatcher. No tests or implementation are claimed as run.
+The Codex execution environment is now available. Live Git/GitHub state was reconciled, an isolated worktree was verified, the clean baseline passed, and the plan-scoped SDD ledger contains the required dependency/interface scan and rulings. Task 1 is the first uncompleted implementation task.
+
+## Context checkpoint
+
+```yaml
+checkpoint_version: 1
+updated_at: 2026-08-30T12:38:48Z
+head: 0cf3a1302579a5dad2a0de4f331d7f41451dd1d9
+branch: feat/OTC-20260830-local-vision-agent-supervisor-foundation
+pr: 810
+status: implementing
+context_routes:
+  - track-a-governance
+  - local-agent-supervisor-design
+  - subagent-driven-development
+owned_paths:
+  - tools/tibia_re_vision/
+  - tools/tibia_re_control_center/
+  - tests/tools/tibia_re_vision/
+  - tests/tools/tibia_re_control_center/
+  - docs/agents/tasks/active/OTC-20260830-local-vision-agent-supervisor-foundation.md
+  - docs/agents/reports/OTC-20260830-local-vision-agent-supervisor-foundation.md
+proven:
+  - Live Git and GitHub state was re-fetched before implementation; PR 810 remains a Draft stacked on Draft PR 808.
+  - Isolated non-main worktree is available on the implementation branch.
+  - Control Center baseline passed 253 tests with 2 skipped.
+  - Vision benchmark baseline passed 34 tests.
+  - Frozen authority remains runtime_access none with physical action budget and count zero.
+derived:
+  - Current main changes are disjoint from the planned implementation surfaces, so the live stacked PR base is safe for Task 1 execution.
+unknown:
+  - Task 1 RED and GREEN results until the fresh implementer completes them.
+  - Exact-head CI outcome after the first pushed milestone.
+conflicts: []
+first_failure:
+  marker: TASK-CHECKPOINT-MISSING-001
+  evidence: checkpoint validator reported that the pre-existing active task record lacked the required Context checkpoint section
+rejected_hypotheses:
+  - The old execution-environment blocker is still active.
+  - PR 615 is a trusted implementation source suitable for wholesale cherry-pick.
+changed_paths:
+  - docs/agents/tasks/active/OTC-20260830-local-vision-agent-supervisor-foundation.md
+  - docs/agents/reports/OTC-20260830-local-vision-agent-supervisor-foundation.md
+validation:
+  - command: python -m unittest discover -s tests/tools/tibia_re_control_center -p test_*.py -q
+    result: PASS
+    evidence: 253 tests passed with 2 skipped in 36.107 seconds on initial implementation head
+  - command: python -m unittest discover -s tools/tibia-re-vision-benchmark/tests -p test_*.py -q
+    result: PASS
+    evidence: 34 tests passed in 6.069 seconds on initial implementation head
+blockers: []
+next_action: Dispatch the Task 1 implementer from the generated plan-scoped brief and require RED-first evidence, GREEN regressions, self-review, commit, and report before independent review.
+```

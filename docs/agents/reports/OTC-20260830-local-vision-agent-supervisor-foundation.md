@@ -27,32 +27,36 @@ Invocation alias:
 
 `OTC-LOCAL-VISION-AGENT-SUPERVISOR-FOUNDATION-SDD`
 
-## Fresh verification at handoff
+## Fresh verification at execution start
 
-- trusted live `main`: `18ff83053f5c5d85c9bce6debab0f7fef6b79ecd`;
-- repository is writable by the owner connection;
-- implementation branch did not previously exist and was created from the current PR #808 head `3edc3f2a73b9eb9a40a2b5936114e7d9ada62533`;
+- trusted live `main`: `82bd4ef6d11431a40e47d8eea6fa15f372edcdc4`;
+- implementation head at execution start: `0cf3a1302579a5dad2a0de4f331d7f41451dd1d9`;
+- parent PR #808 branch head: `3edc3f2a73b9eb9a40a2b5936114e7d9ada62533`;
+- isolated worktree: `/workspace/scratch/d0853bfcfb8f/otclient-foundation` on the implementation branch, not `main`;
 - PR #810 was created Draft and targets the parent planning branch, not `main`;
+- the open PR/branch changed-file inventory showed no competing owner of the planned Control Center, extracted vision, vision benchmark, or foundation-test surfaces;
+- current `main` changes since the planning snapshot are disjoint from the planned implementation surfaces;
 - no Official Tibia runtime, CUA, credential, login, model, proxy, Docker or service state was modified while opening the implementation lane.
 
-## Execution environment limitation
+## SDD preflight
 
-A direct Remote Desktop Commander probe returned `No devices available`, so Molehill-PC cannot currently host the required isolated worktree/tests from this chat. The current ChatGPT tool surface also exposes no Codex implementation-subagent dispatcher. Therefore no implementer or reviewer subagent, baseline test, RED test, GREEN test, or implementation commit is claimed.
+The previous execution-environment blocker is resolved by the current Codex worktree and subagent dispatcher. The plan-scoped ledger is:
 
-This is an execution-environment blocker, not a design or repository blocker.
+`.superpowers/sdd/2026-08-30-local-track-a-vision-agent-supervisor/progress.md`
 
-## Required continuation
+It records the live-state reconciliation, one self-consistency row per Task 1–10, all shared file/interface dependencies, and preflight rulings. The material naming ruling is that PR #790 raw evidence retains `IN_GAME_VISUAL`, while the normalized protocol state remains the spec-defined `WORLD_VISUAL`; both remain visual-only and neither can establish `WORLD_CONFIRMED`.
 
-Start `OTC-LOCAL-VISION-AGENT-SUPERVISOR-FOUNDATION-SDD` in Codex/Spark. The coordinator must:
+Clean baseline on the initial implementation head:
 
-1. revalidate live `main`, PR #808, PR #810 and open path ownership;
-2. create/verify an isolated worktree on the implementation branch;
-3. read the approved spec and implementation plan;
-4. initialize the plan-scoped `.superpowers/sdd/.../progress.md` ledger;
-5. perform the SDD preflight dependency/interface scan;
-6. execute Task 1 using RED-first TDD;
-7. dispatch the independent task reviewer and complete its review/fix loop before Task 2;
-8. continue autonomously task-by-task until a real stop condition or terminal repository-only completion.
+- Control Center: 253 tests passed, 2 skipped;
+- vision benchmark: 34 tests passed;
+- worktree clean after removal of generated Python caches.
+
+No architecture question is open. No authority expansion occurred.
+
+## Current continuation
+
+Task 1 is the first uncompleted task. Dispatch its fresh implementer from the generated SDD brief, require RED-first TDD evidence plus commit/report, and run the separate spec/quality reviewer before advancing. Continue through Task 10 and the broad whole-branch review unless a named stop condition occurs.
 
 ## Safety boundary
 

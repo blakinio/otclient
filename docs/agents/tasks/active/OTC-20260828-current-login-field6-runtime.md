@@ -9,12 +9,12 @@ project_lane: otclient
 lane: RUNTIME_RESEARCH
 track_id: official-client-re
 task_kind: reverse_engineering_runtime
-phase: implement
+phase: validate
 branch: fix/OTC-20260830-field6-package-cdn-throttle
 base_branch: main
 base_main: 18ff83053f5c5d85c9bce6debab0f7fef6b79ecd
 created: 2026-08-28T19:00:00+02:00
-updated: 2026-08-30T11:38:00+02:00
+updated: 2026-08-30T11:50:00+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: github_actions_static
@@ -60,20 +60,20 @@ estimate_confidence: medium
 decomposition_decision: phased
 decomposition_reason: keep one field6 task; repair current-package preflight repository-only, then rotate to a separately admitted successor physical generation after trusted-main merge
 validation_level: focused
-last_completed_step: terminal V4 run 33300352335/job 99227195253 was reconciled as pre-action package-acquisition failure; authorization/credentials/login steps were skipped and physical_action_count remains 0
+last_completed_step: TDD GREEN implementation head 3f3b42b3a3a66f322d8610d68a10ebaf8f25291d passed package/runtime/governance/self-hosted-boundary checks with the physical live job skipped; final checkpoint-head CI remains required before merge
 session_rotation_count: 3
-heavy_validation_runs: 0
+heavy_validation_runs: 1
 stale_takeover_count: 0
 human_interruptions: 0
 invocation_started_at: 2026-08-30T11:05:00+02:00
-last_progress_at: 2026-08-30T11:38:00+02:00
-ci_checks_for_current_head: 0
-ci_check_generation: package_cdn_throttle_red
+last_progress_at: 2026-08-30T11:50:00+02:00
+ci_checks_for_current_head: 4
+ci_check_generation: package_cdn_throttle_green_checkpoint
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 0
+repair_cycles_for_current_gate: 1
 context_reconstruction_attempts: 1
 stall_warnings: 0
 owned_paths:
@@ -225,6 +225,45 @@ TDD sequence:
 
 Repository repair E2E is `NOT_APPLICABLE`: this phase is intentionally static/hosted and must not execute the official client or consume live login authority. A later successor physical generation is a separate E2E/admission phase and remains required before field6 can be promoted.
 
+# Repair implementation and validation
+
+## FACT — TDD RED
+
+Draft PR #809 was opened from `fix/OTC-20260830-field6-package-cdn-throttle`. RED head `584ed49386354579b0e63d54f03a0e19d5f3fd88` produced materializer contract run `33304674507`, job `99238982400`, which failed exactly with:
+
+```text
+FIELD6_MATERIALIZER_CDN_THROTTLE_RED: DEFAULT_FILE_WORKERS must be 1
+```
+
+The same RED generation also exposed a distinct transition defect: the security contract accepted only the historical live V4 task shape, and the V4-specific admission audit rejected package-repair paths even when the task was explicitly `runtime_access: none`.
+
+## FACT — minimal GREEN
+
+GREEN implementation head `3f3b42b3a3a66f322d8610d68a10ebaf8f25291d` changes only the intended behavior:
+
+- `.github/scripts/track_a_current_client_package_materialize.py`: `DEFAULT_FILE_WORKERS` is `1` while `MAX_FILE_WORKERS` remains `16`;
+- `.github/scripts/track_a_current_client_package_acquire.sh`: production `FILE_WORKERS='1'`;
+- `.github/workflows/track-a-current-login-field6-runtime.yml`: bounded live timeout `45`; static-safe repair state runs security/runtime validation but skips only the historical V4-diff admission audit, while any non-static state still invokes that full audit;
+- `.github/workflows/track-a-current-client-package-materializer.yml`: live field6 workflow is included in contract path coverage;
+- `.github/scripts/test_track_a_current_login_field6_security_contract.py`: accepts exactly either static-safe or live-authorized task state while continuing to validate the executable live workflow's independent-runner, rerun, secret-ordering, stdin-secret and provenance controls;
+- `.github/scripts/test_track_a_current_client_package_parallel.py`: preserves explicit bounded-concurrency fixture coverage while requiring serial production/default behavior and the 45-minute live ceiling.
+
+All exact client packed/unpacked size and SHA fences, deterministic materialization ordering, WARP/SOCKS ownership, downloaded-content non-execution and cleanup behavior remain covered by the hosted contract.
+
+## FACT — GREEN verification before checkpoint
+
+On exact implementation head `3f3b42b3a3a66f322d8610d68a10ebaf8f25291d`:
+
+- package materializer contract run `33304932887`, job `99239670263`: SUCCESS;
+- field6 runtime run `33304932884`, contract job `99239670379`: SUCCESS;
+- same run, fresh static audit job `99239670289`: SUCCESS;
+- same run, physical `One-shot isolated field6 observation` job `99239670787`: SKIPPED;
+- Track A agent runtime governance run `33304932913`: SUCCESS;
+- Track A self-hosted PR boundary run `33304932888`: SUCCESS;
+- CI fast syntax/workflow validation, including yamllint and actionlint in run `33304933033`: SUCCESS before this checkpoint commit.
+
+The checkpoint commit itself must receive its own exact-head CI before PR #809 may leave Draft/merge.
+
 # Independent host state
 
 `Molehill-PC` went offline from Remote Desktop during public HTTP diagnostics. No live action is legal while the host is unavailable.
@@ -239,4 +278,4 @@ Track B remains blocked until a later sanitized evidence-promotion PR proves and
 
 # Next action
 
-Commit the hosted TDD RED contract on `fix/OTC-20260830-field6-package-cdn-throttle`, open an early draft PR, and require the materializer contract to fail specifically because production still pins eight workers/default 8 and the live job still has an 18-minute timeout before making any production repair.
+If PR #809 is not yet merged, require all exact checkpoint-head workflows to finish GREEN, confirm no unresolved review threads and no material `main` drift, then mark it ready and squash-merge with an expected-head guard. Once #809 is on trusted `main`, rotate this same task through a separate successor-generation admission update; do not reuse V4 and do not restore live credential/login authority until a brand-new independent guest is available and re-proves all isolation/provenance gates.

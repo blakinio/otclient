@@ -14,7 +14,7 @@ branch: fix/OTC-20260830-field6-package-cdn-throttle
 base_branch: main
 base_main: 18ff83053f5c5d85c9bce6debab0f7fef6b79ecd
 created: 2026-08-28T19:00:00+02:00
-updated: 2026-08-30T11:50:00+02:00
+updated: 2026-08-30T11:55:00+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: github_actions_static
@@ -60,15 +60,15 @@ estimate_confidence: medium
 decomposition_decision: phased
 decomposition_reason: keep one field6 task; repair current-package preflight repository-only, then rotate to a separately admitted successor physical generation after trusted-main merge
 validation_level: focused
-last_completed_step: TDD GREEN implementation head 3f3b42b3a3a66f322d8610d68a10ebaf8f25291d passed package/runtime/governance/self-hosted-boundary checks with the physical live job skipped; final checkpoint-head CI remains required before merge
+last_completed_step: closed unmerged Draft PR #809 as superseded after a connector-side mark-ready GraphQL failure and opened non-draft replacement PR #811 from the same repair branch/head; this pointer update creates the final exact-head CI generation required before merge
 session_rotation_count: 3
 heavy_validation_runs: 1
 stale_takeover_count: 0
 human_interruptions: 0
 invocation_started_at: 2026-08-30T11:05:00+02:00
-last_progress_at: 2026-08-30T11:50:00+02:00
-ci_checks_for_current_head: 4
-ci_check_generation: package_cdn_throttle_green_checkpoint
+last_progress_at: 2026-08-30T11:55:00+02:00
+ci_checks_for_current_head: 0
+ci_check_generation: package_cdn_throttle_pr811_final
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -109,6 +109,8 @@ depends_on:
   - PR #758 owner V4 admission comment 5457904227
   - PR #758 consumed V4 trigger comment 5467500633
   - V4 run 33300352335 / job 99227195253
+  - closed superseded Draft PR #809
+  - replacement PR #811
 blocks:
   - OTCLIENT-TIBIA-GLOBAL-LOGIN-FINAL-CONTINUE
 ---
@@ -136,7 +138,7 @@ No scalar may be guessed or promoted without a later separately admitted physica
 
 # Terminal V4 reconciliation
 
-The V4 owner admission on PR #758 is comment `5457904227`. The distinct live trigger was in fact posted as PR #758 comment `5467500633` with the exact body:
+The V4 owner admission on PR #758 is comment `5457904227`. The distinct live trigger was PR #758 comment `5467500633` with the exact body:
 
 ```text
 AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V4 once=true
@@ -216,20 +218,13 @@ Required invariants:
 - live observation job timeout is exactly 45 minutes, a bounded heavy-operation ceiling justified by V3 already exceeding the old 18-minute package deadline;
 - the materializer contract workflow must cover the live workflow path so a future timeout/pinning regression emits the contract check.
 
-TDD sequence:
-
-1. RED: change the hosted package contract first so current `FILE_WORKERS='8'`, default 8, and live timeout 18 fail for the expected reason.
-2. GREEN: make only the production pin/default/timeout/path-filter changes required by that contract.
-3. Run focused contract, runtime/security/admission/governance checks and exact-head required CI.
-4. Perform a fresh independent diff/evidence audit before merge.
-
 Repository repair E2E is `NOT_APPLICABLE`: this phase is intentionally static/hosted and must not execute the official client or consume live login authority. A later successor physical generation is a separate E2E/admission phase and remains required before field6 can be promoted.
 
 # Repair implementation and validation
 
 ## FACT — TDD RED
 
-Draft PR #809 was opened from `fix/OTC-20260830-field6-package-cdn-throttle`. RED head `584ed49386354579b0e63d54f03a0e19d5f3fd88` produced materializer contract run `33304674507`, job `99238982400`, which failed exactly with:
+Closed Draft PR #809 was initially opened from `fix/OTC-20260830-field6-package-cdn-throttle`. RED head `584ed49386354579b0e63d54f03a0e19d5f3fd88` produced materializer contract run `33304674507`, job `99238982400`, which failed exactly with:
 
 ```text
 FIELD6_MATERIALIZER_CDN_THROTTLE_RED: DEFAULT_FILE_WORKERS must be 1
@@ -250,19 +245,17 @@ GREEN implementation head `3f3b42b3a3a66f322d8610d68a10ebaf8f25291d` changes onl
 
 All exact client packed/unpacked size and SHA fences, deterministic materialization ordering, WARP/SOCKS ownership, downloaded-content non-execution and cleanup behavior remain covered by the hosted contract.
 
-## FACT — GREEN verification before checkpoint
+## FACT — checkpoint verification
 
-On exact implementation head `3f3b42b3a3a66f322d8610d68a10ebaf8f25291d`:
+Implementation head `3f3b42b3a3a66f322d8610d68a10ebaf8f25291d` passed package materializer, field6 runtime/static audit, Track A governance, self-hosted boundary and CI syntax/workflow validation; the physical observation job was SKIPPED.
 
-- package materializer contract run `33304932887`, job `99239670263`: SUCCESS;
-- field6 runtime run `33304932884`, contract job `99239670379`: SUCCESS;
-- same run, fresh static audit job `99239670289`: SUCCESS;
-- same run, physical `One-shot isolated field6 observation` job `99239670787`: SKIPPED;
-- Track A agent runtime governance run `33304932913`: SUCCESS;
-- Track A self-hosted PR boundary run `33304932888`: SUCCESS;
-- CI fast syntax/workflow validation, including yamllint and actionlint in run `33304933033`: SUCCESS before this checkpoint commit.
+The durable checkpoint head `cc4f021a7113e5988986af4cd4d4d4b90417d8a5` then received its own exact-head verification. In run `33305040161`, `CI / Required` job `99240025660` completed SUCCESS; package/runtime/admission/governance/self-hosted-boundary checks also completed SUCCESS, and the physical `One-shot isolated field6 observation` check `99239959490` was SKIPPED. Review threads and reviews on #809 were empty and `main` remained `18ff83053f5c5d85c9bce6debab0f7fef6b79ecd`.
 
-The checkpoint commit itself must receive its own exact-head CI before PR #809 may leave Draft/merge.
+## FACT — PR replacement without code change
+
+The connected GitHub `mark ready for review` mutation for #809 failed on a connector-side GraphQL schema error (`Repository.fullDatabaseId`). Readback proved #809 remained `draft=true`. To avoid bypassing the ready gate, #809 was closed unmerged as superseded. Non-draft replacement PR #811 was opened from the same repair branch at the same verified `cc4f021a7113e5988986af4cd4d4d4b90417d8a5` head. No code changed as part of that replacement.
+
+This task-pointer commit is the only change after replacement and therefore must receive its own exact-head CI/readback on PR #811 before merge.
 
 # Independent host state
 
@@ -272,10 +265,10 @@ The existing `OTClientV4Clean` instance has been used for public diagnostics aft
 
 # Successor-generation boundary
 
-This repair does not create or authorize V5 (or any other successor label). After the repair is reviewed, exact-head GREEN, and merged, a separate trusted-main admission update must record the terminal V4 pre-action result, preserve `physical_action_count: 0`, rotate to one distinct successor generation/trigger, and restore `ephemeral_isolated` credential/login authority only after all independent-runtime prerequisites are re-proven. The old V4 trigger/comment must never be reused.
+This repair does not create or authorize V5 (or any other successor label). After repair PR #811 is reviewed, exact-head GREEN, and merged, a separate trusted-main admission update must record the terminal V4 pre-action result, preserve `physical_action_count: 0`, rotate to one distinct successor generation/trigger, and restore `ephemeral_isolated` credential/login authority only after all independent-runtime prerequisites are re-proven. The old V4 trigger/comment must never be reused.
 
 Track B remains blocked until a later sanitized evidence-promotion PR proves and merges one exact `FIELD6_VALUE=<uint32>` from the official current client.
 
 # Next action
 
-If PR #809 is not yet merged, require all exact checkpoint-head workflows to finish GREEN, confirm no unresolved review threads and no material `main` drift, then mark it ready and squash-merge with an expected-head guard. Once #809 is on trusted `main`, rotate this same task through a separate successor-generation admission update; do not reuse V4 and do not restore live credential/login authority until a brand-new independent guest is available and re-proves all isolation/provenance gates.
+Require all exact-head workflows for this PR #811 pointer commit to finish GREEN, confirm no unresolved review threads/reviews and no material `main` drift, then squash-merge PR #811 with an expected-head guard. Once #811 is on trusted `main`, rotate this same task through a separate successor-generation admission update; do not reuse V4 and do not restore live credential/login authority until a brand-new independent guest is available and re-proves all isolation/provenance gates.

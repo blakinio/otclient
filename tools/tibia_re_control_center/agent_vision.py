@@ -30,6 +30,12 @@ QWEN_NUM_CTX = 4096
 QWEN_NUM_PREDICT = 256
 QWEN_TEMPERATURE = 0
 _UNSET = object()
+# Stable endpoint adapters report bounded transport, timeout, provider-runtime,
+# and protocol-value failures through these built-in families.  Contract and
+# programming defects such as AssertionError, TypeError, and AttributeError are
+# intentionally outside this taxonomy and must remain visible.
+_OPERATIONAL_ENDPOINT_ERRORS = (OSError, RuntimeError, ValueError)
+_SNAPSHOT_FILESYSTEM_FAILURE = "capture snapshot filesystem failure"
 _MODEL_SLOT_ERROR_CODES = frozenset({
     "DIFFERENT_RESIDENT_MODEL",
     "MODEL_DIGEST_MISMATCH",
@@ -131,11 +137,15 @@ class ModelSlotScheduler:
         with self._lock:
             return self._owned_model == model
 
-    def _residency(self) -> list[str] | None:
+    def _residency(self, *, suppress_unexpected_errors: bool = False) -> list[str] | None:
         try:
             resident = self._ps()
-        except Exception:
+        except _OPERATIONAL_ENDPOINT_ERRORS:
             return None
+        except BaseException:
+            if suppress_unexpected_errors:
+                return None
+            raise
         if (
             resident is None
             or not isinstance(resident, list)
@@ -148,7 +158,7 @@ class ModelSlotScheduler:
         actual: object = _UNSET
         try:
             actual = self._digest(model)
-        except Exception:
+        except _OPERATIONAL_ENDPOINT_ERRORS:
             pass
         if actual is _UNSET:
             raise ModelSlotUnavailable("MODEL_DIGEST_UNAVAILABLE")
@@ -163,20 +173,34 @@ class ModelSlotScheduler:
         return ModelSlotUnavailable(code)
 
     def _unload_owned_and_verify_empty(self, model: str) -> None:
-        unload_failed = False
+        unload_error: BaseException | None = None
+        unload_traceback = None
         try:
             self._unload(model)
-        except Exception:
-            unload_failed = True
+        except BaseException as error:
+            unload_error = error
+            unload_traceback = error.__traceback__
 
         # Classify the one post-effect observation identically whether the
         # provider returned or raised.  Only exact continuity proves that the
         # old ownership claim remains valid; every other state loses the claim
         # so a later same-name foreign resident can never be unloaded.
-        resident = self._residency()
+        preserve_active_error = (
+            unload_error is not None
+            and not isinstance(unload_error, _OPERATIONAL_ENDPOINT_ERRORS)
+        )
+        try:
+            resident = self._residency(
+                suppress_unexpected_errors=preserve_active_error,
+            )
+        except BaseException:
+            self._owned_model = None
+            raise
         if resident != [model]:
             self._owned_model = None
-        if unload_failed:
+        if preserve_active_error and unload_error is not None:
+            raise unload_error.with_traceback(unload_traceback)
+        if unload_error is not None:
             raise ModelSlotUnavailable("MODEL_UNLOAD_FAILED")
         if resident != []:
             raise ModelSlotUnavailable("MODEL_UNLOAD_NOT_VERIFIED")
@@ -206,17 +230,28 @@ class ModelSlotScheduler:
         self._verify_digest(model, expected_digest)
         self._unload_owned_and_verify_empty(active)
 
-    def _reconcile_provider_residency(self, model: str) -> None:
-        resident = self._residency()
+    def _reconcile_provider_residency(
+        self,
+        model: str,
+        *,
+        suppress_unexpected_errors: bool,
+    ) -> str | None:
+        try:
+            resident = self._residency(
+                suppress_unexpected_errors=suppress_unexpected_errors,
+            )
+        except BaseException:
+            self._owned_model = None
+            raise
         if resident == []:
             self._owned_model = None
-            return
+            return None
         if resident == [model]:
             # This exact target appeared during the serialized acquisition.
             self._owned_model = model
-            return
+            return None
         self._owned_model = None
-        raise self._residency_failure(resident, model)
+        return self._residency_failure(resident, model).code
 
     def infer(
         self,
@@ -241,7 +276,8 @@ class ModelSlotScheduler:
             try:
                 self._admit(model, expected_digest)
                 response: object = _UNSET
-                provider_failed = False
+                provider_error: BaseException | None = None
+                provider_traceback = None
                 try:
                     response = self._infer(
                         model,
@@ -255,20 +291,27 @@ class ModelSlotScheduler:
                         num_ctx=num_ctx,
                         num_predict=num_predict,
                     )
-                except Exception:
-                    provider_failed = True
+                except BaseException as error:
+                    provider_error = error
+                    provider_traceback = error.__traceback__
 
                 # Reconcile outside the provider handler so untrusted provider
-                # exception objects cannot become an implicit context.  A
-                # residency safety failure remains primary over inference.
-                residency_failure: str | None = None
-                try:
-                    self._reconcile_provider_residency(model)
-                except ModelSlotUnavailable as error:
-                    residency_failure = error.code
+                # exception objects cannot become an implicit context. Control
+                # and programming exceptions stay primary, while their
+                # secondary classification is deliberately non-throwing.
+                preserve_active_error = (
+                    provider_error is not None
+                    and not isinstance(provider_error, _OPERATIONAL_ENDPOINT_ERRORS)
+                )
+                residency_failure = self._reconcile_provider_residency(
+                    model,
+                    suppress_unexpected_errors=preserve_active_error,
+                )
+                if preserve_active_error and provider_error is not None:
+                    raise provider_error.with_traceback(provider_traceback)
                 if residency_failure is not None:
                     raise ModelSlotUnavailable(residency_failure)
-                if provider_failed:
+                if provider_error is not None:
                     raise ModelSlotUnavailable("MODEL_INFERENCE_FAILED")
                 if response is _UNSET:
                     raise AssertionError("provider response state invalid")
@@ -406,27 +449,103 @@ class AgentVisionSensor:
     def _snapshot(
         cls, bytes_: bytes, expected_sha256: str
     ) -> Iterator[Path]:
-        with tempfile.TemporaryDirectory(prefix="tibia-re-vision-") as raw:
-            path = Path(raw) / "capture.snapshot"
+        temporary: tempfile.TemporaryDirectory[str] | None = None
+        filesystem_failed = False
+        active_error: BaseException | None = None
+        active_traceback = None
+
+        def remember(error: BaseException) -> None:
+            nonlocal active_error, active_traceback
+            if active_error is None:
+                active_error = error
+                active_traceback = error.__traceback__
+
+        try:
+            temporary = tempfile.TemporaryDirectory(prefix="tibia-re-vision-")
+        except OSError:
+            filesystem_failed = True
+
+        path: Path | None = None
+        if temporary is not None:
+            try:
+                path = Path(temporary.name) / "capture.snapshot"
+            except OSError:
+                filesystem_failed = True
+            except BaseException as error:
+                remember(error)
+
+        if path is not None and active_error is None and not filesystem_failed:
             flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
             if hasattr(os, "O_NOFOLLOW"):
                 flags |= os.O_NOFOLLOW
-            descriptor = os.open(path, flags, 0o600)
+            descriptor = -1
+            handle = None
             try:
-                with os.fdopen(descriptor, "wb") as handle:
-                    descriptor = -1
-                    handle.write(bytes_)
-                    handle.flush()
-                    os.fsync(handle.fileno())
-            finally:
-                if descriptor >= 0:
+                descriptor = os.open(path, flags, 0o600)
+                handle = os.fdopen(descriptor, "wb")
+                descriptor = -1
+                handle.write(bytes_)
+                handle.flush()
+                os.fsync(handle.fileno())
+            except OSError:
+                filesystem_failed = True
+            except BaseException as error:
+                remember(error)
+
+            if handle is not None:
+                try:
+                    handle.close()
+                except OSError:
+                    filesystem_failed = True
+                except BaseException as error:
+                    remember(error)
+            elif descriptor >= 0:
+                try:
                     os.close(descriptor)
-            path.chmod(stat.S_IRUSR)
-            cls._verify_snapshot(path, expected_sha256)
+                except OSError:
+                    filesystem_failed = True
+                except BaseException as error:
+                    remember(error)
+
+        if path is not None and active_error is None and not filesystem_failed:
+            try:
+                path.chmod(stat.S_IRUSR)
+                cls._verify_snapshot(path, expected_sha256)
+            except OSError:
+                filesystem_failed = True
+            except BaseException as error:
+                remember(error)
+
+        if path is not None and active_error is None and not filesystem_failed:
             try:
                 yield path
-            finally:
+            except BaseException as error:
+                remember(error)
+
+            # Final verification always runs, but it cannot replace an active
+            # provider, control, or programming exception.
+            try:
                 cls._verify_snapshot(path, expected_sha256)
+            except OSError:
+                if active_error is None:
+                    filesystem_failed = True
+            except BaseException as error:
+                remember(error)
+
+        if temporary is not None:
+            try:
+                temporary.cleanup()
+            except OSError:
+                filesystem_failed = True
+            except BaseException as error:
+                remember(error)
+
+        if active_error is not None:
+            raise active_error.with_traceback(active_traceback)
+        if filesystem_failed:
+            raise ValueError(_SNAPSHOT_FILESYSTEM_FAILURE)
+        if path is None:
+            raise AssertionError("snapshot path state invalid")
 
     def _reserve_identity(self, capture: SecretSafeCapture, sha256: str) -> None:
         capture_key = (capture.run_id, sha256)

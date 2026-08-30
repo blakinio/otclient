@@ -1,3 +1,4 @@
+from contextlib import ExitStack
 import hashlib
 import inspect
 import os
@@ -8,6 +9,7 @@ import tempfile
 import threading
 import traceback
 import unittest
+from unittest.mock import patch
 
 from tools.tibia_re_control_center.agent_protocol import AgentVisualState
 from tools.tibia_re_control_center.agent_vision import (
@@ -24,6 +26,11 @@ from tools.tibia_re_control_center.agent_vision import (
 )
 from tools.tibia_re_vision.evidence import UnsafeInputError
 from tools.tibia_re_vision.ollama import run_ollama_trial
+
+
+_REAL_FDOPEN = os.fdopen
+_REAL_OS_CLOSE = os.close
+_REAL_PATH_READ_BYTES = Path.read_bytes
 
 
 def _visual_evidence(capture, *, screen_class="LOGIN_SCREEN"):
@@ -98,6 +105,57 @@ def _assert_sanitized_exception(test_case, error, code, forbidden):
     outward = "\n".join(graph + [rendered])
     for sentinel in forbidden:
         test_case.assertNotIn(sentinel, outward)
+
+
+class _FailingBinaryHandle:
+    def __init__(self, descriptor, operation, sentinel):
+        self._handle = _REAL_FDOPEN(descriptor, "wb")
+        self._operation = operation
+        self._sentinel = sentinel
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        self.close()
+        return False
+
+    def close(self):
+        self._handle.close()
+        if self._operation == "close":
+            raise OSError(self._sentinel)
+
+    def write(self, bytes_):
+        if self._operation == "write":
+            raise OSError(self._sentinel)
+        return self._handle.write(bytes_)
+
+    def flush(self):
+        if self._operation == "flush":
+            raise OSError(self._sentinel)
+        return self._handle.flush()
+
+    def fileno(self):
+        return self._handle.fileno()
+
+
+class _FailingTemporaryDirectory:
+    def __init__(self, path, sentinel, calls=None):
+        self.name = str(path)
+        self._sentinel = sentinel
+        self._calls = calls
+
+    def __enter__(self):
+        return self.name
+
+    def __exit__(self, exc_type, exc, tb):
+        self.cleanup()
+        return False
+
+    def cleanup(self):
+        if self._calls is not None:
+            self._calls.append(self.name)
+        raise OSError(f"{self._sentinel}:{self.name}")
 
 
 class ModelSlotSchedulerTests(unittest.TestCase):
@@ -622,6 +680,271 @@ class ModelSlotSchedulerTests(unittest.TestCase):
                 self.assertIs(control_error, propagated)
                 self.assertFalse(scheduler.owns(QWEN_VISION_MODEL))
 
+    def test_started_provider_control_exceptions_reconcile_every_post_state(self):
+        controls = (KeyboardInterrupt("interrupt"), SystemExit("exit"))
+        post_states = (
+            ("empty", [], False),
+            ("exact", [QWEN_VISION_MODEL], True),
+            ("foreign", ["foreign:model"], False),
+        )
+        for control_error in controls:
+            for label, post_state, expected_owned in post_states:
+                with self.subTest(error=type(control_error).__name__, post_state=label):
+                    resident = [[]]
+                    unloads = []
+                    calls = []
+
+                    def provider(call, state=post_state, error=control_error):
+                        calls.append(call)
+                        if len(calls) == 1:
+                            resident[0] = [call["model"]]
+                            return {"ok": True}
+                        resident[0] = state
+                        raise error
+
+                    scheduler = self._scheduler(
+                        resident,
+                        provider=provider,
+                        unload=lambda model: unloads.append(model),
+                    )
+                    _infer(scheduler)
+                    propagated = _capture_exception(
+                        self,
+                        type(control_error),
+                        lambda: _infer(scheduler),
+                    )
+                    self.assertIs(control_error, propagated)
+                    self.assertEqual(expected_owned, scheduler.owns(QWEN_VISION_MODEL))
+                    self.assertIsNone(scheduler._transition_thread)
+
+                    if not expected_owned:
+                        resident[0] = [QWEN_VISION_MODEL]
+                        with self.assertRaisesRegex(ModelSlotUnavailable, "TARGET_NOT_OWNED"):
+                            _infer(scheduler)
+                        scheduler.release()
+                        self.assertEqual([], unloads)
+
+    def test_started_unload_control_exceptions_reconcile_every_post_state(self):
+        controls = (KeyboardInterrupt("interrupt"), SystemExit("exit"))
+        post_states = (
+            ("empty", [], False),
+            ("exact", [QWEN_VISION_MODEL], True),
+            ("foreign", ["foreign:model"], False),
+        )
+        for control_error in controls:
+            for label, post_state, expected_owned in post_states:
+                with self.subTest(error=type(control_error).__name__, post_state=label):
+                    resident = [[]]
+                    unloads = []
+
+                    def unload(model, state=post_state, error=control_error):
+                        unloads.append(model)
+                        resident[0] = state
+                        raise error
+
+                    scheduler = self._scheduler(resident, unload=unload)
+                    _infer(scheduler)
+                    propagated = _capture_exception(
+                        self,
+                        type(control_error),
+                        scheduler.release,
+                    )
+                    self.assertIs(control_error, propagated)
+                    self.assertEqual(expected_owned, scheduler.owns(QWEN_VISION_MODEL))
+                    self.assertIsNone(scheduler._transition_thread)
+
+                    if not expected_owned:
+                        resident[0] = [QWEN_VISION_MODEL]
+                        with self.assertRaisesRegex(ModelSlotUnavailable, "TARGET_NOT_OWNED"):
+                            _infer(scheduler)
+                        scheduler.release()
+                        self.assertEqual([QWEN_VISION_MODEL], unloads)
+
+    def test_programming_exceptions_at_ps_and_digest_propagate_unchanged(self):
+        for error_type in (AssertionError, TypeError, AttributeError):
+            for seam in ("ps", "digest"):
+                with self.subTest(error=error_type.__name__, seam=seam):
+                    resident = [[]]
+                    scheduler = self._scheduler(resident)
+                    programmer_error = error_type(f"{seam} programmer defect")
+                    if seam == "ps":
+                        scheduler._ps = lambda error=programmer_error: (_ for _ in ()).throw(error)
+                    else:
+                        scheduler._digest = lambda model, error=programmer_error: (_ for _ in ()).throw(error)
+
+                    propagated = _capture_exception(
+                        self,
+                        error_type,
+                        lambda: _infer(scheduler),
+                    )
+                    self.assertIs(programmer_error, propagated)
+                    self.assertFalse(scheduler.owns(QWEN_VISION_MODEL))
+                    self.assertIsNone(scheduler._transition_thread)
+
+    def test_post_transition_ps_programming_errors_are_visible_and_clear_owner(self):
+        for error_type in (AssertionError, TypeError, AttributeError):
+            for transition in ("infer", "unload"):
+                with self.subTest(error=error_type.__name__, transition=transition):
+                    resident = [[]]
+                    ps_error = error_type("post-transition ps programmer defect")
+
+                    def provider(call, error=ps_error):
+                        resident[0] = error
+                        return {"ok": True}
+
+                    def unload(model, error=ps_error):
+                        resident[0] = error
+
+                    scheduler = self._scheduler(
+                        resident,
+                        provider=provider if transition == "infer" else None,
+                        unload=unload if transition == "unload" else None,
+                    )
+                    if transition == "unload":
+                        _infer(scheduler)
+                        call = scheduler.release
+                    else:
+                        call = lambda: _infer(scheduler)
+
+                    propagated = _capture_exception(self, error_type, call)
+                    self.assertIs(ps_error, propagated)
+                    self.assertFalse(scheduler.owns(QWEN_VISION_MODEL))
+                    self.assertIsNone(scheduler._transition_thread)
+
+    def test_started_provider_programming_exceptions_reconcile_and_propagate(self):
+        for error_type in (AssertionError, TypeError, AttributeError):
+            for label, post_state, expected_owned in (
+                ("empty", [], False),
+                ("exact", [QWEN_VISION_MODEL], True),
+                ("foreign", ["foreign:model"], False),
+            ):
+                with self.subTest(error=error_type.__name__, post_state=label):
+                    resident = [[]]
+                    calls = []
+                    programmer_error = error_type("provider programmer defect")
+
+                    def provider(call, state=post_state, error=programmer_error):
+                        calls.append(call)
+                        if len(calls) == 1:
+                            resident[0] = [call["model"]]
+                            return {"ok": True}
+                        resident[0] = state
+                        raise error
+
+                    scheduler = self._scheduler(resident, provider=provider)
+                    _infer(scheduler)
+                    propagated = _capture_exception(
+                        self,
+                        error_type,
+                        lambda: _infer(scheduler),
+                    )
+                    self.assertIs(programmer_error, propagated)
+                    self.assertEqual(expected_owned, scheduler.owns(QWEN_VISION_MODEL))
+                    self.assertIsNone(scheduler._transition_thread)
+
+    def test_started_unload_programming_exceptions_reconcile_and_propagate(self):
+        for error_type in (AssertionError, TypeError, AttributeError):
+            for label, post_state, expected_owned in (
+                ("empty", [], False),
+                ("exact", [QWEN_VISION_MODEL], True),
+                ("foreign", ["foreign:model"], False),
+            ):
+                with self.subTest(error=error_type.__name__, post_state=label):
+                    resident = [[]]
+                    programmer_error = error_type("unload programmer defect")
+
+                    def unload(model, state=post_state, error=programmer_error):
+                        resident[0] = state
+                        raise error
+
+                    scheduler = self._scheduler(resident, unload=unload)
+                    _infer(scheduler)
+                    propagated = _capture_exception(
+                        self,
+                        error_type,
+                        scheduler.release,
+                    )
+                    self.assertIs(programmer_error, propagated)
+                    self.assertEqual(expected_owned, scheduler.owns(QWEN_VISION_MODEL))
+                    self.assertIsNone(scheduler._transition_thread)
+
+    def test_explicit_operational_endpoint_errors_use_fixed_slot_codes(self):
+        cases = (
+            ("ps", "RESIDENCY_UNKNOWN"),
+            ("digest", "MODEL_DIGEST_UNAVAILABLE"),
+            ("infer", "MODEL_INFERENCE_FAILED"),
+            ("unload", "MODEL_UNLOAD_FAILED"),
+        )
+        for error_type in (OSError, TimeoutError, RuntimeError, ValueError):
+            for seam, expected_code in cases:
+                with self.subTest(error=error_type.__name__, seam=seam):
+                    resident = [[]]
+                    sentinel = f"OPERATIONAL_SECRET_{error_type.__name__}_{seam}"
+                    operational_error = error_type(sentinel)
+                    scheduler = self._scheduler(resident)
+
+                    if seam == "ps":
+                        scheduler._ps = lambda error=operational_error: (_ for _ in ()).throw(error)
+                        call = lambda: _infer(scheduler)
+                    elif seam == "digest":
+                        scheduler._digest = lambda model, error=operational_error: (_ for _ in ()).throw(error)
+                        call = lambda: _infer(scheduler)
+                    elif seam == "infer":
+                        scheduler._infer = lambda *args, error=operational_error, **kwargs: (
+                            (_ for _ in ()).throw(error)
+                        )
+                        call = lambda: _infer(scheduler)
+                    else:
+                        _infer(scheduler)
+                        scheduler._unload = lambda model, error=operational_error: (
+                            (_ for _ in ()).throw(error)
+                        )
+                        call = scheduler.release
+
+                    failure = _capture_exception(self, ModelSlotUnavailable, call)
+                    _assert_sanitized_exception(
+                        self,
+                        failure,
+                        expected_code,
+                        (sentinel,),
+                    )
+
+    def test_active_control_or_programming_error_survives_broken_reconciliation(self):
+        for primary_error in (KeyboardInterrupt("primary"), SystemExit("primary"), TypeError("primary")):
+            for seam in ("infer", "unload"):
+                with self.subTest(primary=type(primary_error).__name__, seam=seam):
+                    resident = [[]]
+                    calls = []
+
+                    def provider(call, error=primary_error):
+                        calls.append(call)
+                        if len(calls) == 1:
+                            resident[0] = [call["model"]]
+                            return {"ok": True}
+                        resident[0] = AssertionError("secondary residency defect")
+                        raise error
+
+                    def unload(model, error=primary_error):
+                        resident[0] = AssertionError("secondary residency defect")
+                        raise error
+
+                    scheduler = self._scheduler(resident, provider=provider, unload=unload)
+                    _infer(scheduler)
+                    propagated = _capture_exception(
+                        self,
+                        type(primary_error),
+                        (lambda: _infer(scheduler)) if seam == "infer" else scheduler.release,
+                    )
+                    self.assertIs(primary_error, propagated)
+                    _assert_sanitized_exception(
+                        self,
+                        propagated,
+                        str(primary_error),
+                        ("secondary residency defect",),
+                    )
+                    self.assertFalse(scheduler.owns(QWEN_VISION_MODEL))
+                    self.assertIsNone(scheduler._transition_thread)
+
     def _assert_unload_loses_ownership(self, *, operation, unload_raises):
         post_states = (
             ("foreign", ["foreign:model"]),
@@ -849,6 +1172,223 @@ class AgentVisionSensorTests(unittest.TestCase):
                 ("capture.snapshot", "tibia-re-vision-"),
             )
             self.assertFalse(snapshot_parents[0].exists())
+
+    def test_every_snapshot_filesystem_operation_is_fixed_sanitized_and_retryable(self):
+        operations = (
+            "temporary_parent",
+            "exclusive_open",
+            "fdopen",
+            "descriptor_close",
+            "write",
+            "flush",
+            "fsync",
+            "close",
+            "chmod",
+            "lstat",
+            "read_verify",
+            "cleanup",
+        )
+        for operation in operations:
+            with self.subTest(operation=operation), tempfile.TemporaryDirectory() as raw:
+                directory = Path(raw)
+                capture = self._capture(directory, filename=f"{operation}.bin")
+                calls = []
+                sensor = self._sensor(
+                    lambda call: calls.append(call) or _visual_evidence(capture)
+                )
+                sentinel = f"SENTINEL_SECRET_SNAPSHOT_{operation.upper()}"
+                generated_paths = []
+
+                if operation == "temporary_parent":
+                    failure_patch = patch(
+                        "tools.tibia_re_control_center.agent_vision.tempfile.TemporaryDirectory",
+                        side_effect=OSError(sentinel),
+                    )
+                elif operation == "exclusive_open":
+                    def fail_open(path, *args, **kwargs):
+                        generated_paths.append(str(path))
+                        raise OSError(f"{sentinel}:{path}")
+
+                    failure_patch = patch(
+                        "tools.tibia_re_control_center.agent_vision.os.open",
+                        side_effect=fail_open,
+                    )
+                elif operation == "fdopen":
+                    failure_patch = patch(
+                        "tools.tibia_re_control_center.agent_vision.os.fdopen",
+                        side_effect=OSError(sentinel),
+                    )
+                elif operation == "descriptor_close":
+                    def fail_descriptor_close(descriptor):
+                        _REAL_OS_CLOSE(descriptor)
+                        raise OSError(sentinel)
+
+                    failure_patch = ExitStack()
+                    failure_patch.enter_context(patch(
+                        "tools.tibia_re_control_center.agent_vision.os.fdopen",
+                        side_effect=OSError("FDOPEN_OPERATIONAL_SENTINEL"),
+                    ))
+                    failure_patch.enter_context(patch(
+                        "tools.tibia_re_control_center.agent_vision.os.close",
+                        side_effect=fail_descriptor_close,
+                    ))
+                elif operation in {"write", "flush", "close"}:
+                    failure_patch = patch(
+                        "tools.tibia_re_control_center.agent_vision.os.fdopen",
+                        side_effect=lambda descriptor, mode, op=operation, value=sentinel: (
+                            _FailingBinaryHandle(descriptor, op, value)
+                        ),
+                    )
+                elif operation == "fsync":
+                    failure_patch = patch(
+                        "tools.tibia_re_control_center.agent_vision.os.fsync",
+                        side_effect=OSError(sentinel),
+                    )
+                elif operation == "chmod":
+                    failure_patch = patch.object(
+                        Path,
+                        "chmod",
+                        side_effect=OSError(sentinel),
+                    )
+                elif operation == "lstat":
+                    failure_patch = patch.object(
+                        Path,
+                        "lstat",
+                        side_effect=OSError(sentinel),
+                    )
+                elif operation == "read_verify":
+                    def fail_snapshot_read(path):
+                        if path.name == "capture.snapshot":
+                            raise OSError(f"{sentinel}:{path}")
+                        return _REAL_PATH_READ_BYTES(path)
+
+                    failure_patch = patch.object(Path, "read_bytes", new=fail_snapshot_read)
+                else:
+                    cleanup_parent = directory / "cleanup-parent"
+                    cleanup_parent.mkdir()
+                    failure_patch = patch(
+                        "tools.tibia_re_control_center.agent_vision.tempfile.TemporaryDirectory",
+                        return_value=_FailingTemporaryDirectory(cleanup_parent, sentinel),
+                    )
+
+                with failure_patch:
+                    failure = _capture_exception(
+                        self,
+                        ValueError,
+                        lambda: sensor.observe(capture),
+                    )
+                _assert_sanitized_exception(
+                    self,
+                    failure,
+                    (
+                        "capture snapshot integrity invalid"
+                        if operation in {"lstat", "read_verify"}
+                        else "capture snapshot filesystem failure"
+                    ),
+                    (
+                        sentinel,
+                        "FDOPEN_OPERATIONAL_SENTINEL",
+                        "tibia-re-vision-",
+                        *generated_paths,
+                    ),
+                )
+
+                result = sensor.observe(capture)
+                self.assertEqual(capture.sha256, result.capture_sha256)
+                self.assertGreaterEqual(len(calls), 1)
+
+    def test_snapshot_tamper_and_control_exception_preserves_control_and_retry(self):
+        for control_error in (
+            KeyboardInterrupt("INTERRUPT_SECRET_SENTINEL"),
+            SystemExit("SYSTEM_EXIT_SECRET_SENTINEL"),
+        ):
+            with self.subTest(error=type(control_error).__name__), tempfile.TemporaryDirectory() as raw:
+                capture = self._capture(Path(raw))
+                calls = []
+
+                def provider(call, error=control_error):
+                    calls.append(call)
+                    if len(calls) == 1:
+                        snapshot = Path(call["image_path"])
+                        snapshot.chmod(0o600)
+                        snapshot.write_bytes(b"tampered")
+                        raise error
+                    return _visual_evidence(capture)
+
+                sensor = self._sensor(provider)
+                propagated = _capture_exception(
+                    self,
+                    type(control_error),
+                    lambda: sensor.observe(capture),
+                )
+                self.assertIs(control_error, propagated)
+                self.assertIsNone(propagated.__cause__)
+                self.assertIsNone(propagated.__context__)
+                result = sensor.observe(capture)
+                self.assertEqual(capture.sha256, result.capture_sha256)
+                self.assertEqual(2, len(calls))
+
+    def test_tamper_and_cleanup_failure_never_replace_an_active_provider_error(self):
+        active_errors = (
+            KeyboardInterrupt("PRIMARY_INTERRUPT"),
+            SystemExit("PRIMARY_EXIT"),
+            TypeError("PRIMARY_PROGRAMMING"),
+            RuntimeError("PRIMARY_OPERATIONAL"),
+        )
+        for active_error in active_errors:
+            with self.subTest(error=type(active_error).__name__), tempfile.TemporaryDirectory() as raw:
+                directory = Path(raw)
+                capture = self._capture(directory)
+                calls = []
+                cleanup_calls = []
+                cleanup_sentinel = "SENTINEL_SECRET_CLEANUP_DURING_PRIMARY"
+                cleanup_parent = directory / "cleanup-primary"
+                cleanup_parent.mkdir()
+
+                def provider(call, error=active_error):
+                    calls.append(call)
+                    if len(calls) == 1:
+                        snapshot = Path(call["image_path"])
+                        snapshot.chmod(0o600)
+                        snapshot.write_bytes(b"tampered")
+                        raise error
+                    return _visual_evidence(capture)
+
+                sensor = self._sensor(provider)
+                with patch(
+                    "tools.tibia_re_control_center.agent_vision.tempfile.TemporaryDirectory",
+                    return_value=_FailingTemporaryDirectory(
+                        cleanup_parent,
+                        cleanup_sentinel,
+                        cleanup_calls,
+                    ),
+                ):
+                    if isinstance(active_error, RuntimeError):
+                        propagated = _capture_exception(
+                            self,
+                            ModelSlotUnavailable,
+                            lambda: sensor.observe(capture),
+                        )
+                        expected_text = "MODEL_INFERENCE_FAILED"
+                    else:
+                        propagated = _capture_exception(
+                            self,
+                            type(active_error),
+                            lambda: sensor.observe(capture),
+                        )
+                        self.assertIs(active_error, propagated)
+                        expected_text = str(active_error)
+
+                _assert_sanitized_exception(
+                    self,
+                    propagated,
+                    expected_text,
+                    (cleanup_sentinel, str(cleanup_parent)),
+                )
+                self.assertEqual([str(cleanup_parent)], cleanup_calls)
+                result = sensor.observe(capture)
+                self.assertEqual(capture.sha256, result.capture_sha256)
+                self.assertEqual(2, len(calls))
 
     def test_strict_output_diagnostics_never_include_untrusted_values(self):
         output_secret = "SENTINEL_SECRET_MODEL_OUTPUT"

@@ -37,7 +37,7 @@ class Tests(unittest.TestCase):
             "github.event_name == 'workflow_dispatch'",
             'github.actor == github.repository_owner',
             "github.ref == 'refs/heads/main'",
-            "inputs.authorization == 'CREATE_NEW_KASM_CANONICAL_BOOTSTRAP'",
+            "inputs.authorization == 'INVALIDATE_PRIOR_BOOT_THEN_CREATE_NEW_KASM_CANONICAL_BOOTSTRAP'",
         ):
             self.assertIn(required, prefix)
         self.assertNotIn('pull_request', prefix)
@@ -48,10 +48,17 @@ class Tests(unittest.TestCase):
         for forbidden in ('${{ secrets.', 'TIBIA_TEST_EMAIL', 'TIBIA_TEST_PASSWORD'):
             self.assertNotIn(forbidden, self.text)
         attempt = live.index('GITHUB_RUN_ATTEMPT')
-        lease = live.index(' acquire ')
-        launch = live.index('kasm-bootstrap')
-        self.assertLess(attempt, lease)
-        self.assertLess(attempt, launch)
+        consumed = live.index('bootstrap-attempt-consumed.json')
+        recovery_lease = live.index('RECOVERY_LEASE_ACQUIRE')
+        invalidation = live.index('boot-epoch-registration-invalidate')
+        bootstrap_lease = live.index('BOOTSTRAP_LEASE_ACQUIRE')
+        launch = live.index('python3 "$transition" kasm-bootstrap')
+        self.assertLess(attempt, consumed)
+        self.assertLess(consumed, recovery_lease)
+        self.assertLess(recovery_lease, invalidation)
+        self.assertLess(invalidation, bootstrap_lease)
+        self.assertLess(bootstrap_lease, launch)
+        self.assertEqual(live.count('python3 "$transition" boot-epoch-registration-invalidate'), 1)
         self.assertEqual(live.count('python3 "$transition" kasm-bootstrap'), 1)
         self.assertNotIn('docker exec -d', live)
         self.assertNotIn('docker stop', live)
@@ -60,8 +67,30 @@ class Tests(unittest.TestCase):
 
     def test_live_task_admission_is_exact_and_separate(self):
         live = job_block(self.text, 'live-bootstrap')
+        self.assertIn('OTC-20260829-track-a-kasm-canonical-bootstrap-invalidation-live.md', live)
+        recovery_required = (
+            'runtime_access: canonical_recovery',
+            'runtime_owner_task: OTC-20260829-track-a-kasm-canonical-bootstrap-invalidation-live',
+            'runtime_namespace: canonical-live-runtime',
+            'canonical_registration: PRESENT',
+            'canonical_lease_generation: UNKNOWN',
+            'gate_a: REQUIRED_NOT_PROVEN',
+            'generation_rebind: NOT_APPLICABLE',
+            'gate_b: NOT_APPLICABLE',
+            'bootstrap: NOT_APPLICABLE',
+            'target_uniqueness: UNKNOWN',
+            'mutation_authorized: false',
+            'recovery_mode: prior_boot_zero_client_invalidation_v1',
+            'credentials_allowed: false',
+            'login_allowed: false',
+            'process_control_authorized: false',
+            'physical_action_budget: 0',
+        )
+        for exact in recovery_required:
+            self.assertIn(exact, live)
+
         self.assertIn('OTC-20260829-track-a-kasm-canonical-bootstrap-live.md', live)
-        required = (
+        bootstrap_required = (
             'runtime_access: canonical_bootstrap',
             'runtime_owner_task: OTC-20260829-track-a-kasm-canonical-bootstrap-live',
             'runtime_namespace: canonical-live-runtime',
@@ -86,10 +115,10 @@ class Tests(unittest.TestCase):
             'physical_action_budget: 1',
             'physical_action_count: 0',
         )
-        for exact in required:
+        for exact in bootstrap_required:
             self.assertIn(exact, live)
         self.assertIn('live_runtime_authorization_source', live)
-        self.assertIn('validate_track_a_task', live)
+        self.assertGreaterEqual(live.count('validate_track_a_task'), 2)
 
     def test_implementation_task_remains_repository_only(self):
         frontmatter = self.task.split('---', 2)[1]
@@ -125,8 +154,11 @@ class Tests(unittest.TestCase):
         self.assertIn('tibia-official-client-re-canonical-live-transition.py', live)
         self.assertIn('tibia-official-client-re-kasm-bootstrap-worker.py', live)
         self.assertIn('tibia-official-client-re-kasm-existing-runtime-probe.py', live)
+        self.assertIn('python3 "$transition" boot-epoch-registration-invalidate', live)
+        self.assertIn('TRACK_A_KASM_CANONICAL_INVALIDATION_RELEASE=PASS', live)
         self.assertIn('python3 "$transition" kasm-bootstrap', live)
         self.assertIn('TRACK_A_KASM_CANONICAL_BOOTSTRAP_RELEASE=PASS', live)
+        self.assertIn('TRACK_A_KASM_CANONICAL_INVALIDATION_REGISTRATION_ABSENT=PASS', live)
         self.assertIn('bootstrap_provenance', live)
         self.assertIn("'kasm_create_new_v1'", live)
         self.assertIn("'state') == 'UNKNOWN'", live)

@@ -8,19 +8,31 @@ Implementation branch:
 
 `feat/OTC-20260830-local-vision-agent-supervisor-foundation`
 
-The branch is intentionally stacked on the owner-approved discovery/design/planning branch so the approved spec and plan are present without merging PR #808 first.
+Stacked Draft implementation PR:
+
+`#810 feat(track-a): local vision agent supervisor foundation`
+
+The implementation branch/PR is intentionally stacked on the owner-approved discovery/design/planning branch / Draft PR #808 so the approved spec and plan are present without prematurely merging #808.
 
 Binding artifacts:
 
 - `docs/superpowers/specs/2026-08-30-local-track-a-vision-agent-supervisor-design.md`
 - `docs/superpowers/plans/2026-08-30-local-track-a-vision-agent-supervisor.md`
+- `docs/agents/prompts/OTC_20260830_LOCAL_VISION_AGENT_SUPERVISOR_FOUNDATION_SDD.md`
+- `docs/agents/prompts/OTC_20260830_LOCAL_VISION_AGENT_SUPERVISOR_FOUNDATION_SDD_ALIAS.md`
 - parent Draft PR #808
+- implementation Draft PR #810
+
+Invocation alias:
+
+`OTC-LOCAL-VISION-AGENT-SUPERVISOR-FOUNDATION-SDD`
 
 ## Fresh verification at handoff
 
 - trusted live `main`: `18ff83053f5c5d85c9bce6debab0f7fef6b79ecd`;
 - repository is writable by the owner connection;
 - implementation branch did not previously exist and was created from the current PR #808 head `3edc3f2a73b9eb9a40a2b5936114e7d9ada62533`;
+- PR #810 was created Draft and targets the parent planning branch, not `main`;
 - no Official Tibia runtime, CUA, credential, login, model, proxy, Docker or service state was modified while opening the implementation lane.
 
 ## Execution environment limitation
@@ -31,10 +43,10 @@ This is an execution-environment blocker, not a design or repository blocker.
 
 ## Required continuation
 
-Start a Codex SDD coordinator on the implementation branch. It must:
+Start `OTC-LOCAL-VISION-AGENT-SUPERVISOR-FOUNDATION-SDD` in Codex/Spark. The coordinator must:
 
-1. revalidate live `main`, PR #808 and open path ownership;
-2. create/verify an isolated worktree;
+1. revalidate live `main`, PR #808, PR #810 and open path ownership;
+2. create/verify an isolated worktree on the implementation branch;
 3. read the approved spec and implementation plan;
 4. initialize the plan-scoped `.superpowers/sdd/.../progress.md` ledger;
 5. perform the SDD preflight dependency/interface scan;

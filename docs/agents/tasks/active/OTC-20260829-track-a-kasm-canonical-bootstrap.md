@@ -7,7 +7,7 @@ project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: infrastructure
-phase: implementation_prior_boot_invalidation
+phase: implementation_complete_pending_exact_head_validation
 branch: feat/OTC-20260829-track-a-kasm-canonical-bootstrap-v2
 base_branch: main
 base_main: 08c31195fd2f44224badf1b6bdff85192495898b
@@ -69,8 +69,8 @@ depends_on:
   - docs/superpowers/specs/2026-08-29-track-a-kasm-canonical-bootstrap-design.md
 blocks:
   - LIVE_GAME_WINDOW_STATE_CAUSAL_VALIDATION
-current_blocker: PRIOR_BOOT_REGISTRATION_PRESENT_ZERO_CLIENT
-next_action: TDD the approved metadata-only boot-epoch-registration-invalidate addendum, then resume the guarded two-phase live workflow
+current_blocker: EXACT_HEAD_RESTACK_CI_REVIEW_REQUIRED
+next_action: restack onto current protected main, run exact-head CI/security review, merge repository-only implementation, then create separate trusted-main invalidation/bootstrap live admissions before any physical execution
 ---
 
 # Track A Kasm canonical bootstrap implementation

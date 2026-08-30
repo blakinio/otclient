@@ -22,7 +22,7 @@ PR #758 comment `5469433732` is V7 admission only. Executable `AUTHORIZE_CURRENT
 
 - [x] Security contract expects V7 runner/guest/label/admission/seed and new independent-runtime contract v4.
 - [x] Contract requires same-boot local X11 directory mode `1777`, `mountpoint=false`, secret-free Xvfb proof, and X11 verification before authorization/secrets.
-- [ ] Open Draft PR and prove hosted causal RED with physical job SKIPPED.
+- [x] Draft PR #818 RED head `7a8d17fc331aa5d5d2411ff8294336c44014a966`: run `33318537209`, runtime `99276293558` FAILURE exactly on missing V7 scheduling boundary, fresh audit `99276293429` FAILURE, physical `99276294001` SKIPPED.
 
 ## Task 2 — GREEN routing/admission
 

@@ -133,8 +133,8 @@ for forbidden in ("field6-v6-{0}", "molehill-otclient-v6-01", "OTClientV6Clean",
         raise SystemExit(f"FIELD6_SECURITY_CONTRACT_RED: stale physical boundary remains in workflow: {forbidden}")
 if run_attempt_guard not in workflow:
     raise SystemExit("FIELD6_SECURITY_CONTRACT_RED: live workflow missing GITHUB_RUN_ATTEMPT == 1 guard")
-if not workflow.index(provenance_marker) < workflow.index(x11_marker) < workflow.index(run_attempt_guard) < workflow.index(auth_marker) < workflow.index(secret_marker):
-    raise SystemExit("FIELD6_SECURITY_CONTRACT_RED: provenance and X11 proof must precede rerun guard, authorization and secret exposure")
+if not workflow.index(provenance_marker) < workflow.index(run_attempt_guard) < workflow.index(x11_marker) < workflow.index(auth_marker) < workflow.index(secret_marker):
+    raise SystemExit("FIELD6_SECURITY_CONTRACT_RED: rerun guard must be inside provenance before X11 proof, authorization and secret exposure")
 
 helper = read(HELPER)
 for secret_name in ("email", "password"):
@@ -169,13 +169,14 @@ for required in (
 if "molehill-otclient-v6-01" in acquire:
     raise SystemExit("FIELD6_SECURITY_CONTRACT_RED: V6 runner remains accepted by package acquisition")
 
-v3 = read(V3_CONTRACT)
+v4 = read(V4_CONTRACT)
 for required in (
-    "field6-v6-<comment_id>", EXPECTED_RUNNER, EXPECTED_GUEST, "--no-default-labels",
+    "field6-v7-<comment_id>", EXPECTED_RUNNER, EXPECTED_GUEST, "--no-default-labels",
     "no host Docker socket", EXPECTED_SEED_PATH, EXPECTED_SEED_SHA,
     "provenance mode 0644", "seed directory mode 0555", "seed mode 0444",
+    "local X11 socket directory", "mode 1777", "not a mountpoint", "secret-free Xvfb", "same boot",
 ):
-    if required not in v3:
-        raise SystemExit(f"FIELD6_SECURITY_CONTRACT_RED: V3 independent contract missing {required!r}")
+    if required not in v4:
+        raise SystemExit(f"FIELD6_SECURITY_CONTRACT_RED: V4 independent contract missing {required!r}")
 
 print("TRACK_A_CURRENT_LOGIN_FIELD6_SECURITY_CONTRACT=PASS")

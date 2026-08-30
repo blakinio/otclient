@@ -1,29 +1,29 @@
 ---
 task_id: OTC-20260828-current-login-field6-runtime
-status: implementing
+status: validating
 agent: ChatGPT
-session_id: chatgpt-20260830-field6-v7-generation
+session_id: chatgpt-20260830-field6-v7-independent-runner
 session_role: implementer
 policy_version: 2
 project_lane: otclient
 lane: RUNTIME_RESEARCH
 track_id: official-client-re
 task_kind: reverse_engineering_runtime
-phase: validate
-branch: fix/OTC-20260830-field6-v7-generation
+phase: live_admission
+branch: fix/OTC-20260830-field6-v7-independent-runner
 base_branch: main
-base_main: 5def12f5fbb5f3554b60b894df7257f00dcd39f3
+base_main: 0c7abfdbeace981e50375d7a322c414936718945
 created: 2026-08-28T19:00:00+02:00
-updated: 2026-08-30T16:48:00+02:00
+updated: 2026-08-30T17:03:00+02:00
 risk: high
-execution_class: github_hosted
-execution_mode: github_actions_static
-execution_reason: repository-only V7 generation rotation after terminal pre-login V6 Xvfb/WSLg socket failure; no V7 runtime, credential, client, login or physical mutation is authorized in this phase
+execution_class: independent_ephemeral_physical_runtime
+execution_mode: github_actions_independent_ephemeral_physical
+execution_reason: one fresh exact-current scalar-only V7 login observation on OTClientV7Clean with same-boot local X11 namespace proof and exact official-launcher seed
 persistent_session_role: none
-physical_e2e_required: false
-runtime_access: none
-runtime_owner_task: NOT_APPLICABLE
-runtime_namespace: NOT_APPLICABLE
+physical_e2e_required: true
+runtime_access: ephemeral_isolated
+runtime_owner_task: OTC-20260828-current-login-field6-runtime
+runtime_namespace: field6-runtime-ephemeral-OTC-20260828-v7-x11-seed
 canonical_registration: NOT_APPLICABLE
 canonical_lease_generation: NOT_APPLICABLE
 registration_lease_generation: NOT_APPLICABLE
@@ -31,21 +31,38 @@ gate_a: NOT_APPLICABLE
 generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
-target_uniqueness: NOT_APPLICABLE
-mutation_authorized: false
-credentials_allowed: false
-login_allowed: false
+target_uniqueness: PROVEN
+mutation_authorized: true
+credentials_allowed: true
+login_allowed: true
 relogin_allowed: false
 restart_allowed: false
 character_selection_allowed: false
 gameplay_allowed: false
-gui_input_authorized: false
-process_control_authorized: false
+gui_input_authorized: true
+process_control_authorized: true
 network_payload_capture_allowed: false
-physical_action_budget: 0
+physical_action_budget: 1
 physical_action_count: 0
 implementation_authorized: true
-live_runtime_authorization_source: NOT_APPLICABLE
+live_runtime_authorization_source: PR_758_COMMENT_5469433732
+independent_guest_name: OTClientV7Clean
+independent_runner_name: molehill-otclient-v7-01
+independent_rootfs_url: https://cloud-images.ubuntu.com/releases/noble/release-20260801/ubuntu-24.04-server-cloudimg-amd64-root.tar.xz
+independent_rootfs_sha256: 915b4be62933475c3fb5f5031aa2e159294db95fb32aaa9e8b317aadcb6c065d
+independent_runner_provenance: /etc/otclient-field6-runner-provenance
+independent_runner_provenance_schema: otclient.track-a.independent-field6-runner.v4
+independent_provenance_mode: 0644
+independent_seed_path: /opt/otclient-v7-seed/seed.tar.gz
+independent_seed_size: 412272538
+independent_seed_sha256: 64031ba091884c5b1be71416394b8ada6dac9529cfed60e7b4856c04b7e5b016
+independent_seed_dir_mode: 0555
+independent_seed_mode: 0444
+independent_x11_socket_dir: /tmp/.X11-unix
+independent_x11_socket_dir_mode: 1777
+independent_x11_socket_dir_mountpoint: false
+independent_x11_secret_free_probe: true
+independent_same_boot_required: true
 feature_scope:
   type: infrastructure
   user_facing: false
@@ -58,9 +75,9 @@ context_growth: stable
 context_score: 8
 estimate_confidence: high
 decomposition_decision: phased
-decomposition_reason: revoke terminal V6 statically first; fresh V7 X11 namespace repair and live admission require a separate trusted-main phase
+decomposition_reason: V7 physical routing/admission is the single sequential evidence chain; scalar promotion remains separate after proof
 validation_level: focused
-last_completed_step: V7 GREEN head c2fec0fcc0b376695ee2d11de79ee81174ee47ca passed exact-head field6 run 33317762701 (runtime 99274221549 SUCCESS, static audit 99274221406 SUCCESS, physical 99274221980 SKIPPED), package 33317762678/99274221335 SUCCESS, governance 33317762681/99274221424+99274221612 SUCCESS, boundary 33317762711/99274221481+99274221547 SUCCESS, CI 33317762813/99274297146 SUCCESS
+last_completed_step: PR #818 RED run 33318537209: runtime 99276293558 failed exactly on missing field6-v7 scheduling boundary; fresh audit 99276293429 failed; physical 99276294001 skipped
 session_rotation_count: 6
 heavy_validation_runs: 1
 stale_takeover_count: 0
@@ -76,7 +93,7 @@ identical_failure_retries: 0
 repair_cycles_for_current_gate: 1
 context_reconstruction_attempts: 1
 stall_warnings: 0
-related_pr: 817
+related_pr: 818
 owned_paths:
   - .github/scripts/test_track_a_current_login_field6_runtime.py
   - .github/scripts/test_track_a_current_login_field6_security_contract.py
@@ -88,8 +105,8 @@ owned_paths:
   - .github/scripts/track_a_current_login_field6_runtime_secret_wrapper.sh
   - .github/workflows/track-a-current-login-field6-runtime.yml
   - docs/agents/tasks/active/OTC-20260828-current-login-field6-runtime.md
-  - docs/agents/contracts/TRACK_A_INDEPENDENT_EPHEMERAL_PHYSICAL_RUNTIME_V3.md
-  - docs/superpowers/plans/2026-08-30-field6-v6-independent-runner.md
+  - docs/agents/contracts/TRACK_A_INDEPENDENT_EPHEMERAL_PHYSICAL_RUNTIME_V4.md
+  - docs/superpowers/plans/2026-08-30-field6-v7-independent-runner.md
   - docs/agents/evidence/OTC-20260828-current-login-field6-runtime/**
   - docs/superpowers/plans/2026-08-30-field6-v6-generation.md
 modules_touched:
@@ -210,3 +227,14 @@ AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V7 once=true
 ```
 
 It is static only and has not been posted. Current phase must remain `runtime_access: none`, `mutation_authorized: false`, `credentials_allowed: false`, `login_allowed: false`, `physical_action_budget: 0`. A later separate V7 routing/admission phase requires a brand-new guest and proof that `/tmp/.X11-unix` is a local writable X11 socket namespace rather than the WSLg read-only mount.
+
+
+# V7 independent live admission
+
+PR #758 comment `5469433732` is the non-trigger V7 owner admission. The exact V7 trigger remains unposted. the one-time label `field6-v7-<comment_id>` is derived only from that future trigger comment. That comment ID becomes the one-time runner label.
+
+Fresh `OTClientV7Clean` is isolated and held in one continuous boot. The WSLg read-only `/tmp/.X11-unix` mount was removed only inside this guest; local `/tmp/.X11-unix` is `root:root 1777`, not a mountpoint, and a secret-free Xvfb probe as `runner` created and cleaned a Unix socket. The official-launcher seed and Actions runner fences were independently reverified.
+
+Trusted workflow must independently re-prove provenance schema v4, local X11 mode/mountpoint state and a secret-free Xvfb socket before authorization or secrets. The helper refuses V7 unless `TRACK_A_FIELD6_X11_NAMESPACE_VERIFIED=1`.
+
+If the one allowed V7 login submit occurs without scalar proof, an identical V7 retry is forbidden. No relogin, restart, character selection, world entry, gameplay or network payload capture is allowed.

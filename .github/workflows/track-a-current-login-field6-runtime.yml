@@ -26,17 +26,19 @@ env:
   EXPECTED_SIZE: '52105824'
   EXPECTED_SHA: d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a
   TASK_STATE: /home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260828-current-login-field6-runtime
-  EXPECTED_INDEPENDENT_RUNNER_NAME: molehill-otclient-v6-01
-  EXPECTED_INDEPENDENT_GUEST_NAME: OTClientV6Clean
+  EXPECTED_INDEPENDENT_RUNNER_NAME: molehill-otclient-v7-01
+  EXPECTED_INDEPENDENT_GUEST_NAME: OTClientV7Clean
   EXPECTED_INDEPENDENT_ROOTFS_URL: https://cloud-images.ubuntu.com/releases/noble/release-20260801/ubuntu-24.04-server-cloudimg-amd64-root.tar.xz
   EXPECTED_INDEPENDENT_ROOTFS_SHA: 915b4be62933475c3fb5f5031aa2e159294db95fb32aaa9e8b317aadcb6c065d
   PROVENANCE_FILE: /etc/otclient-field6-runner-provenance
-  EXPECTED_SEED_PATH: /opt/otclient-v6-seed/seed.tar.gz
+  EXPECTED_SEED_PATH: /opt/otclient-v7-seed/seed.tar.gz
   EXPECTED_SEED_SIZE: '412272538'
   EXPECTED_SEED_SHA: 64031ba091884c5b1be71416394b8ada6dac9529cfed60e7b4856c04b7e5b016
   EXPECTED_PROVENANCE_MODE: '0644'
   EXPECTED_SEED_DIR_MODE: '0555'
   EXPECTED_SEED_MODE: '0444'
+  EXPECTED_X11_SOCKET_DIR: /tmp/.X11-unix
+  EXPECTED_X11_SOCKET_DIR_MODE: '1777'
 
 jobs:
   contract:
@@ -70,7 +72,7 @@ jobs:
 
   fresh-audit:
     if: github.event_name == 'pull_request'
-    name: Fresh independent V6 admission audit
+    name: Fresh independent V7 admission audit
     runs-on: ubuntu-24.04
     timeout-minutes: 4
     env:
@@ -106,7 +108,7 @@ jobs:
       github.event.comment.user.login == github.repository_owner &&
       github.event.comment.body == 'AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V7 once=true'
     name: One-shot isolated field6 observation
-    runs-on: ${{ format('field6-v6-{0}', github.event.comment.id) }}
+    runs-on: ${{ format('field6-v7-{0}', github.event.comment.id) }}
     timeout-minutes: 45
     concurrency:
       group: official-client-re-current-login-field6-runtime
@@ -115,7 +117,7 @@ jobs:
       - name: Prove independent clean guest provenance
         shell: bash
         env:
-          EXPECTED_ONE_TIME_LABEL: ${{ format('field6-v6-{0}', github.event.comment.id) }}
+          EXPECTED_ONE_TIME_LABEL: ${{ format('field6-v7-{0}', github.event.comment.id) }}
         run: |
           set -Eeuo pipefail
           test "${GITHUB_RUN_ATTEMPT:?}" = "1"
@@ -128,9 +130,10 @@ jobs:
             "$EXPECTED_INDEPENDENT_ROOTFS_URL" "$EXPECTED_INDEPENDENT_ROOTFS_SHA" \
             "$EXPECTED_INDEPENDENT_RUNNER_NAME" "$EXPECTED_ONE_TIME_LABEL" \
             "$EXPECTED_SEED_PATH" "$EXPECTED_SEED_SIZE" "$EXPECTED_SEED_SHA" \
-            "$EXPECTED_PROVENANCE_MODE" "$EXPECTED_SEED_DIR_MODE" "$EXPECTED_SEED_MODE" <<'PY'
+            "$EXPECTED_PROVENANCE_MODE" "$EXPECTED_SEED_DIR_MODE" "$EXPECTED_SEED_MODE" \
+            "$EXPECTED_X11_SOCKET_DIR" "$EXPECTED_X11_SOCKET_DIR_MODE" <<'PY'
           import hashlib, json, pathlib, re, stat, sys
-          path,guest,url,rootfs_sha,runner,label,seed_path,seed_size,seed_sha,provenance_mode,seed_dir_mode,seed_mode=sys.argv[1:]
+          path,guest,url,rootfs_sha,runner,label,seed_path,seed_size,seed_sha,provenance_mode,seed_dir_mode,seed_mode,x11_dir,x11_mode=sys.argv[1:]
           p=pathlib.Path(path)
           st=p.lstat()
           if not stat.S_ISREG(st.st_mode) or p.is_symlink(): raise SystemExit('FIELD6_PROVENANCE_NOT_REGULAR')
@@ -142,16 +145,18 @@ jobs:
             'schema','guest_name','rootfs_url','rootfs_sha256','runner_name','one_time_label',
             'generation_nonce','automount_disabled','interop_disabled','docker_socket_absent',
             'podman_socket_absent','prior_repo_state_absent','prior_runner_state_absent',
-            'seed_path','seed_size','seed_sha256','seed_preflight_verified'
+            'seed_path','seed_size','seed_sha256','seed_preflight_verified',
+            'x11_socket_dir','x11_socket_dir_mode','x11_socket_dir_mountpoint','x11_secret_free_probe','same_boot_required'
           }
           if set(data) != required: raise SystemExit('FIELD6_PROVENANCE_SCHEMA_KEYS_INVALID')
-          if data['schema'] != 'otclient.track-a.independent-field6-runner.v3': raise SystemExit('FIELD6_PROVENANCE_SCHEMA_INVALID')
-          expected={'guest_name':guest,'rootfs_url':url,'rootfs_sha256':rootfs_sha,'runner_name':runner,'one_time_label':label,'seed_path':seed_path,'seed_sha256':seed_sha}
+          if data['schema'] != 'otclient.track-a.independent-field6-runner.v4': raise SystemExit('FIELD6_PROVENANCE_SCHEMA_INVALID')
+          expected={'guest_name':guest,'rootfs_url':url,'rootfs_sha256':rootfs_sha,'runner_name':runner,'one_time_label':label,'seed_path':seed_path,'seed_sha256':seed_sha,'x11_socket_dir':x11_dir,'x11_socket_dir_mode':x11_mode}
           for key,value in expected.items():
             if data.get(key) != value: raise SystemExit('FIELD6_PROVENANCE_'+key.upper()+'_MISMATCH')
           if data.get('seed_size') != int(seed_size): raise SystemExit('FIELD6_PROVENANCE_SEED_SIZE_MISMATCH')
-          for key in ('automount_disabled','interop_disabled','docker_socket_absent','podman_socket_absent','prior_repo_state_absent','prior_runner_state_absent','seed_preflight_verified'):
+          for key in ('automount_disabled','interop_disabled','docker_socket_absent','podman_socket_absent','prior_repo_state_absent','prior_runner_state_absent','seed_preflight_verified','x11_secret_free_probe','same_boot_required'):
             if data.get(key) is not True: raise SystemExit('FIELD6_PROVENANCE_'+key.upper()+'_NOT_TRUE')
+          if data.get('x11_socket_dir_mountpoint') is not False: raise SystemExit('FIELD6_PROVENANCE_X11_MOUNTPOINT_INVALID')
           if not isinstance(data['generation_nonce'],str) or not re.fullmatch(r'[0-9a-f]{32,64}',data['generation_nonce']):
             raise SystemExit('FIELD6_PROVENANCE_GENERATION_NONCE_INVALID')
           seed=pathlib.Path(seed_path)
@@ -180,6 +185,66 @@ jobs:
           } >> "$GITHUB_ENV"
           echo TRACK_A_FIELD6_RUN_ATTEMPT=1
 
+      - name: Prove local X11 socket namespace
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "${GITHUB_RUN_ATTEMPT:?}" = "1"
+          test "${RUNNER_NAME:?}" = "$EXPECTED_INDEPENDENT_RUNNER_NAME"
+          test -d "$EXPECTED_X11_SOCKET_DIR"
+          test ! -L "$EXPECTED_X11_SOCKET_DIR"
+          if mountpoint -q "$EXPECTED_X11_SOCKET_DIR"; then
+            echo FIELD6_X11_SOCKET_DIR_MOUNTPOINT_FORBIDDEN >&2
+            exit 1
+          fi
+          mode="$(stat -Lc '%u:%g:%a' "$EXPECTED_X11_SOCKET_DIR")"
+          if [[ "$mode" != "0:0:$EXPECTED_X11_SOCKET_DIR_MODE" ]]; then
+            echo FIELD6_X11_SOCKET_DIR_MODE_INVALID >&2
+            exit 1
+          fi
+          probe_display=177
+          probe_socket="$EXPECTED_X11_SOCKET_DIR/X$probe_display"
+          probe_lock="/tmp/.X${probe_display}-lock"
+          test ! -e "$probe_socket"
+          test ! -e "$probe_lock"
+          HOME=/home/runner PATH=/usr/bin:/bin \
+            LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu \
+            LIBGL_DRIVERS_PATH=/usr/lib/x86_64-linux-gnu/dri XKB_CONFIG_ROOT=/usr/share/X11/xkb \
+            /usr/bin/Xvfb ":$probe_display" -screen 0 640x480x24 -nolisten tcp -noreset \
+            >"$RUNNER_TEMP/v7-xvfb-probe.log" 2>&1 &
+          probe_pid=$!
+          cleanup_probe() {
+            if [[ "${probe_pid:-}" =~ ^[1-9][0-9]*$ ]] && kill -0 "$probe_pid" 2>/dev/null; then
+              kill -TERM "$probe_pid" 2>/dev/null || true
+              wait "$probe_pid" 2>/dev/null || true
+            fi
+          }
+          trap cleanup_probe EXIT
+          ready=0
+          for _ in $(seq 1 80); do
+            kill -0 "$probe_pid" 2>/dev/null || break
+            if [[ -S "$probe_socket" ]]; then ready=1; break; fi
+            sleep .1
+          done
+          if [[ "$ready" != 1 ]]; then
+            cat "$RUNNER_TEMP/v7-xvfb-probe.log" >&2 || true
+            exit 1
+          fi
+          echo TRACK_A_FIELD6_X11_SOCKET_PROBE=PASS
+          kill -TERM "$probe_pid"
+          wait "$probe_pid" 2>/dev/null || true
+          probe_pid=''
+          for _ in $(seq 1 30); do
+            [[ ! -e "$probe_socket" && ! -e "$probe_lock" ]] && break
+            sleep .1
+          done
+          test ! -e "$probe_socket"
+          test ! -e "$probe_lock"
+          rm -f "$RUNNER_TEMP/v7-xvfb-probe.log"
+          trap - EXIT
+          echo TRACK_A_FIELD6_X11_NAMESPACE_VERIFIED=1 >> "$GITHUB_ENV"
+          echo TRACK_A_FIELD6_X11_NAMESPACE=PASS
+
       - name: Checkout exact trusted main
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
@@ -194,6 +259,7 @@ jobs:
           test "${GITHUB_RUN_ATTEMPT:?}" = "1"
           test "${RUNNER_NAME:?}" = "$EXPECTED_INDEPENDENT_RUNNER_NAME"
           test "${TRACK_A_FIELD6_INDEPENDENT_PROVENANCE_VERIFIED:?}" = "1"
+          test "${TRACK_A_FIELD6_X11_NAMESPACE_VERIFIED:?}" = "1"
           test "${TRACK_A_FIELD6_SYSTEM_TOOLROOT:?}" = "1"
           test "$(git rev-parse HEAD)" = "$(git ls-remote origin refs/heads/main | awk '{print $1}')"
           task="docs/agents/tasks/active/$TASK_ID.md"
@@ -225,10 +291,15 @@ jobs:
           grep -Fqx "independent_seed_path: $EXPECTED_SEED_PATH" "$task"
           grep -Fqx "independent_seed_size: $EXPECTED_SEED_SIZE" "$task"
           grep -Fqx "independent_seed_sha256: $EXPECTED_SEED_SHA" "$task"
-          grep -Fqx 'independent_runner_provenance_schema: otclient.track-a.independent-field6-runner.v3' "$task"
+          grep -Fqx 'independent_runner_provenance_schema: otclient.track-a.independent-field6-runner.v4' "$task"
           grep -Fqx "independent_provenance_mode: $EXPECTED_PROVENANCE_MODE" "$task"
           grep -Fqx "independent_seed_dir_mode: $EXPECTED_SEED_DIR_MODE" "$task"
           grep -Fqx "independent_seed_mode: $EXPECTED_SEED_MODE" "$task"
+          grep -Fqx "independent_x11_socket_dir: $EXPECTED_X11_SOCKET_DIR" "$task"
+          grep -Fqx "independent_x11_socket_dir_mode: $EXPECTED_X11_SOCKET_DIR_MODE" "$task"
+          grep -Fqx 'independent_x11_socket_dir_mountpoint: false' "$task"
+          grep -Fqx 'independent_x11_secret_free_probe: true' "$task"
+          grep -Fqx 'independent_same_boot_required: true' "$task"
           grep -Fq 'AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V7 once=true' "$task"
           python3 .github/scripts/test_track_a_agent_runtime_governance.py
           python3 .github/scripts/test_track_a_current_login_field6_runtime.py

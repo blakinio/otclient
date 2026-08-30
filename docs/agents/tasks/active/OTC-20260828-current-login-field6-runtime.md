@@ -1,29 +1,29 @@
 ---
 task_id: OTC-20260828-current-login-field6-runtime
-status: implementing
+status: validating
 agent: ChatGPT
-session_id: chatgpt-20260830-field6-v6-generation
+session_id: chatgpt-20260830-field6-v6-independent-runner
 session_role: implementer
 policy_version: 2
 project_lane: otclient
 lane: RUNTIME_RESEARCH
 track_id: official-client-re
 task_kind: reverse_engineering_runtime
-phase: validate
-branch: fix/OTC-20260830-field6-v6-generation
+phase: live_admission
+branch: fix/OTC-20260830-field6-v6-independent-runner
 base_branch: main
-base_main: d1ce0ad811cf6a4a5a3466f7e5af045f39acab31
+base_main: 8442ead31bd448becc01082d34cbe2212f36a58d
 created: 2026-08-28T19:00:00+02:00
-updated: 2026-08-30T16:08:11+02:00
+updated: 2026-08-30T16:31:07+02:00
 risk: high
-execution_class: github_hosted
-execution_mode: github_actions_static
-execution_reason: repository-only V6 generation rotation after terminal pre-action V5 provenance-readability failure; no runner registration, credential access, client execution, login or physical mutation is authorized in this phase
+execution_class: independent_ephemeral_physical_runtime
+execution_mode: github_actions_independent_ephemeral_physical
+execution_reason: one fresh exact-current scalar-only V6 login observation on brand-new OTClientV6Clean using exact official-launcher seed with runner-readable immutable permissions
 persistent_session_role: none
-physical_e2e_required: false
-runtime_access: none
-runtime_owner_task: NOT_APPLICABLE
-runtime_namespace: NOT_APPLICABLE
+physical_e2e_required: true
+runtime_access: ephemeral_isolated
+runtime_owner_task: OTC-20260828-current-login-field6-runtime
+runtime_namespace: field6-runtime-ephemeral-OTC-20260828-v6-seed
 canonical_registration: NOT_APPLICABLE
 canonical_lease_generation: NOT_APPLICABLE
 registration_lease_generation: NOT_APPLICABLE
@@ -31,21 +31,33 @@ gate_a: NOT_APPLICABLE
 generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
-target_uniqueness: NOT_APPLICABLE
-mutation_authorized: false
-credentials_allowed: false
-login_allowed: false
+target_uniqueness: PROVEN
+mutation_authorized: true
+credentials_allowed: true
+login_allowed: true
 relogin_allowed: false
 restart_allowed: false
 character_selection_allowed: false
 gameplay_allowed: false
-gui_input_authorized: false
-process_control_authorized: false
+gui_input_authorized: true
+process_control_authorized: true
 network_payload_capture_allowed: false
-physical_action_budget: 0
+physical_action_budget: 1
 physical_action_count: 0
 implementation_authorized: true
-live_runtime_authorization_source: NOT_APPLICABLE
+live_runtime_authorization_source: PR_758_COMMENT_5469210031
+independent_guest_name: OTClientV6Clean
+independent_runner_name: molehill-otclient-v6-01
+independent_rootfs_url: https://cloud-images.ubuntu.com/releases/noble/release-20260801/ubuntu-24.04-server-cloudimg-amd64-root.tar.xz
+independent_rootfs_sha256: 915b4be62933475c3fb5f5031aa2e159294db95fb32aaa9e8b317aadcb6c065d
+independent_runner_provenance: /etc/otclient-field6-runner-provenance
+independent_runner_provenance_schema: otclient.track-a.independent-field6-runner.v3
+independent_provenance_mode: 0644
+independent_seed_path: /opt/otclient-v6-seed/seed.tar.gz
+independent_seed_size: 412272538
+independent_seed_sha256: 64031ba091884c5b1be71416394b8ada6dac9529cfed60e7b4856c04b7e5b016
+independent_seed_dir_mode: 0555
+independent_seed_mode: 0444
 feature_scope:
   type: infrastructure
   user_facing: false
@@ -58,9 +70,9 @@ context_growth: stable
 context_score: 8
 estimate_confidence: high
 decomposition_decision: phased
-decomposition_reason: revoke terminal V5 statically first; a fresh V6 guest and physical routing/admission require a separate trusted-main phase
+decomposition_reason: V6 physical routing/admission is now the single sequential evidence chain; scalar promotion remains separate after proof
 validation_level: focused
-last_completed_step: PR #815 candidate b28599af6f73d024d4d56fcb6486199ca1cb8a07 passed exact-head runtime/static audit/package/governance/self-hosted boundary/CI; physical job 99269338963 skipped
+last_completed_step: PR #816 candidate 32aafc5c2b084a2198c38db192d3eb8375270751 passed exact-head runtime/security/admission/package/governance/self-hosted-boundary/CI; physical job 99272181229 skipped
 session_rotation_count: 6
 heavy_validation_runs: 1
 stale_takeover_count: 0
@@ -76,7 +88,7 @@ identical_failure_retries: 0
 repair_cycles_for_current_gate: 1
 context_reconstruction_attempts: 1
 stall_warnings: 0
-related_pr: 815
+related_pr: 816
 owned_paths:
   - .github/scripts/test_track_a_current_login_field6_runtime.py
   - .github/scripts/test_track_a_current_login_field6_security_contract.py
@@ -88,6 +100,8 @@ owned_paths:
   - .github/scripts/track_a_current_login_field6_runtime_secret_wrapper.sh
   - .github/workflows/track-a-current-login-field6-runtime.yml
   - docs/agents/tasks/active/OTC-20260828-current-login-field6-runtime.md
+  - docs/agents/contracts/TRACK_A_INDEPENDENT_EPHEMERAL_PHYSICAL_RUNTIME_V3.md
+  - docs/superpowers/plans/2026-08-30-field6-v6-independent-runner.md
   - docs/agents/evidence/OTC-20260828-current-login-field6-runtime/**
   - docs/superpowers/plans/2026-08-30-field6-v6-generation.md
 modules_touched:
@@ -182,3 +196,17 @@ After static V6 merge, create a brand-new `OTClientV6Clean` from the same pinned
 # Next action
 
 Require exact-head static runtime/security/audit/package/governance/self-hosted-boundary/CI GREEN with physical job SKIPPED, record evidence, merge with expected-head guard, then proceed to fresh V6 guest preparation and separate V6 routing/admission.
+
+
+# V6 independent live admission
+
+PR #758 comment `5469210031` is the non-trigger V6 owner admission. The exact V6 trigger remains unposted. The V6 scheduling fence is the one-time label `field6-v6-<comment_id>`, derived only from the future exact trigger comment. That comment ID becomes the one-time runner label.
+
+Fresh `OTClientV6Clean` on Molehill-PC is isolated from host drives/interop/Docker/Podman and has no prior repo or runner state. The exact official-launcher seed was copied by host control and re-hashed inside the guest. Runner-user readback proved the exact immutable-readable permission fence: provenance mode `0644`, seed directory mode `0555`, seed mode `0444`.
+
+If the one allowed V6 login submit occurs without scalar proof, an identical V6 retry is forbidden. No relogin, restart, character selection, world entry, gameplay or network payload capture is allowed.
+
+
+# V6 routing exact-head GREEN checkpoint
+
+Candidate 32aafc5c2b084a2198c38db192d3eb8375270751 on trusted base 8442ead31bd448becc01082d34cbe2212f36a58d passed hosted validation: field6 run 33317003099 (runtime 99272180811 SUCCESS, fresh V6 audit 99272180700 SUCCESS, physical 99272181229 SKIPPED); package run 33317003094 job 99272180653 SUCCESS; governance run 33317003128 jobs 99272180685/99272180822 SUCCESS; self-hosted boundary run 33317003079 jobs 99272180620/99272180753 SUCCESS; CI run 33317003291, CI / Required 99272262431 SUCCESS. No V6 trigger, runner registration, credentials, client execution or physical action occurred.

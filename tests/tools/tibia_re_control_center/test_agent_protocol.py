@@ -7,9 +7,11 @@ from tools.tibia_re_control_center.agent_protocol import (
     AgentVisualState,
     ClientIdentity,
     NamedAgentAction,
+    ResultEnvelope,
     TaskEnvelope,
 )
-from tools.tibia_re_control_center.model import ValidationError
+from tools.tibia_re_control_center.canonical import jcs_dumps
+from tools.tibia_re_control_center.model import MAX_SAFE_INTEGER, ValidationError
 
 
 def envelope(**overrides):
@@ -107,6 +109,67 @@ class AgentProtocolTests(unittest.TestCase):
         with self.assertRaises(ValidationError) as context:
             TaskEnvelope.from_mapping(envelope(trusted_main_sha="z" * 40))
         self.assertEqual(context.exception.code, "INVALID_SHA1")
+
+    def test_event_payload_base_dict_mutation_does_not_change_event_value(self):
+        event = AgentEvent.new(
+            session_id="session-1", run_id=None, provenance=AgentProvenance.SENSOR,
+            kind="observation", state_before="IDLE", state_after="OBSERVING",
+            payload={"nested": {"original": 1}},
+        )
+
+        with self.assertRaises(TypeError):
+            dict.__setitem__(event.payload, "injected", True)
+        with self.assertRaises(TypeError):
+            dict.update(event.payload, {"injected": True})
+        with self.assertRaises(TypeError):
+            dict.__setitem__(event.payload["nested"], "injected", True)
+        with self.assertRaises(TypeError):
+            dict.update(event.payload["nested"], {"injected": True})
+
+        self.assertEqual(event.payload, {"nested": {"original": 1}})
+
+    def test_event_payload_isolated_from_caller_mutation(self):
+        supplied = {"nested": {"items": [1]}}
+        event = AgentEvent.new(
+            session_id="session-1", run_id=None, provenance=AgentProvenance.SENSOR,
+            kind="observation", state_before="IDLE", state_after="OBSERVING",
+            payload=supplied,
+        )
+
+        supplied["nested"]["items"].append(2)
+        supplied["nested"]["replacement"] = True
+        supplied["replacement"] = True
+
+        self.assertEqual(event.payload, {"nested": {"items": (1,)}})
+
+    def test_event_payload_rejects_noncanonical_numbers(self):
+        for value in (float("nan"), float("inf"), float("-inf"), MAX_SAFE_INTEGER + 1, -MAX_SAFE_INTEGER - 1):
+            with self.subTest(value=value), self.assertRaises(ValidationError):
+                AgentEvent.new(
+                    session_id="session-1", run_id=None, provenance=AgentProvenance.SENSOR,
+                    kind="observation", state_before="IDLE", state_after="OBSERVING",
+                    payload={"value": value},
+                )
+
+    def test_event_payload_is_canonical_serializer_safe(self):
+        event = AgentEvent.new(
+            session_id="session-1", run_id=None, provenance=AgentProvenance.SENSOR,
+            kind="observation", state_before="IDLE", state_after="OBSERVING",
+            payload={"nested": {"items": [1, True, None]}, "ratio": 1.5},
+        )
+
+        expected = '{"nested":{"items":[1,true,null]},"ratio":1.5}'
+        self.assertEqual(jcs_dumps(event.payload), expected)
+        self.assertEqual(jcs_dumps(event.payload), expected)
+
+    def test_protocol_schema_literals_match_bindings(self):
+        self.assertEqual(TaskEnvelope.from_mapping(envelope(schema="otclient.local-agent.task.v1")).schema, "otclient.local-agent.task.v1")
+        event = AgentEvent.new(
+            session_id="session-1", run_id=None, provenance=AgentProvenance.SENSOR,
+            kind="observation", state_before="IDLE", state_after="OBSERVING",
+        )
+        self.assertEqual(event.schema, "otclient.local-agent.event.v1")
+        self.assertIn("otclient.local-agent.result.v1", ResultEnvelope.__doc__ or "")
 
 
 if __name__ == "__main__":

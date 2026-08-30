@@ -5,7 +5,9 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Mapping
+from math import isfinite
+from types import MappingProxyType
+from typing import Any, Mapping, cast
 
 from .model import (
     MAX_SAFE_INTEGER,
@@ -97,32 +99,15 @@ def _enum(value: Any, enum_type: type[Enum], field: str) -> Any:
         raise ValidationError("INVALID_ENUM", f"{field} is not an admitted value", field) from exc
 
 
-class _ImmutablePayload(dict[str, object]):
-    """A dict-shaped, JSON-friendly payload that cannot be changed."""
-
-    def _immutable(self, *args: Any, **kwargs: Any) -> None:
-        raise TypeError("payload is immutable")
-
-    __setitem__ = __delitem__ = clear = pop = popitem = setdefault = update = _immutable
-
-
-def _freeze_payload(value: Any, field: str = "payload") -> dict[str, object]:
+def _freeze_payload(value: Any, field: str = "payload") -> MappingProxyType:
     if not isinstance(value, dict):
         raise ValidationError("INVALID_FIELD", "payload must be a dictionary", field)
-    frozen: dict[str, object] = _ImmutablePayload()
+    frozen: dict[str, object] = {}
     for key, item in value.items():
         if not isinstance(key, str):
             raise ValidationError("INVALID_FIELD", "payload keys must be strings", field)
-        if isinstance(item, dict):
-            normalized = _freeze_payload(item, field)
-        elif isinstance(item, (list, tuple)):
-            normalized = tuple(_freeze_value(entry, field) for entry in item)
-        elif item is None or isinstance(item, (str, int, float, bool)):
-            normalized = item
-        else:
-            raise ValidationError("INVALID_FIELD", "payload contains an unsupported value", field)
-        dict.__setitem__(frozen, key, normalized)
-    return frozen
+        frozen[key] = _freeze_value(item, field)
+    return MappingProxyType(frozen)
 
 
 def _freeze_value(value: Any, field: str) -> object:
@@ -130,7 +115,15 @@ def _freeze_value(value: Any, field: str) -> object:
         return _freeze_payload(value, field)
     if isinstance(value, (list, tuple)):
         return tuple(_freeze_value(entry, field) for entry in value)
-    if value is None or isinstance(value, (str, int, float, bool)):
+    if value is None or isinstance(value, (str, bool)):
+        return value
+    if isinstance(value, int):
+        if abs(value) > MAX_SAFE_INTEGER:
+            raise ValidationError("INTEGER_OUT_OF_RANGE", "payload integer exceeds safe range", field)
+        return value
+    if isinstance(value, float):
+        if not isfinite(value):
+            raise ValidationError("INVALID_NUMBER", "payload floats must be finite", field)
         return value
     raise ValidationError("INVALID_FIELD", "payload contains an unsupported value", field)
 
@@ -178,8 +171,8 @@ class TaskEnvelope:
             raise ValidationError("INVALID_FIELD", "task envelope must be a mapping")
         keys = ("schema", "session_id", "task_id", "run_id", "idempotency_key", "trusted_main_sha", "client_identity", "objective", "allowed_actions", "physical_action_budget", "max_attempts", "deadline_epoch_ms", "runtime_access", "required_evidence", "secret_capability_ref")
         require_exact_keys(value, keys)
-        if value["schema"] != "TaskEnvelope.v1":
-            raise ValidationError("INVALID_SCHEMA", "schema must be TaskEnvelope.v1", "schema")
+        if value["schema"] not in ("TaskEnvelope.v1", "otclient.local-agent.task.v1"):
+            raise ValidationError("INVALID_SCHEMA", "schema is not an admitted TaskEnvelope schema", "schema")
         ids = {field: validate_opaque_id(value[field], field_name=field) for field in ("session_id", "task_id", "run_id", "idempotency_key")}
         trusted = _sha(value["trusted_main_sha"], "trusted_main_sha", _SHA40, 40)
         actions = value["allowed_actions"]
@@ -216,17 +209,19 @@ class AgentEvent:
     payload: dict[str, object]
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "payload", _freeze_payload(self.payload))
+        object.__setattr__(self, "payload", cast("dict[str, object]", _freeze_payload(self.payload)))
 
     @classmethod
     def new(cls, *, session_id: str, run_id: str | None, provenance: AgentProvenance, kind: str, state_before: str, state_after: str, observed_epoch_ms: int = 0, artifact_refs: tuple[str, ...] = (), action_id: str | None = None, payload: dict[str, object] | None = None) -> "AgentEvent":
         if not isinstance(artifact_refs, tuple):
             raise ValidationError("INVALID_FIELD", "artifact_refs must be a tuple", "artifact_refs")
-        return cls("AgentEvent.v1", validate_opaque_id(session_id, field_name="session_id"), None if run_id is None else validate_opaque_id(run_id, field_name="run_id"), 0, checked_non_negative(observed_epoch_ms, maximum=MAX_SAFE_INTEGER, field_name="observed_epoch_ms"), _enum(provenance, AgentProvenance, "provenance"), _text(kind, "kind"), _text(state_before, "state_before"), _text(state_after, "state_after"), tuple(validate_opaque_id(ref, field_name="artifact_ref") for ref in artifact_refs), None if action_id is None else validate_opaque_id(action_id, field_name="action_id"), {} if payload is None else payload)
+        return cls("otclient.local-agent.event.v1", validate_opaque_id(session_id, field_name="session_id"), None if run_id is None else validate_opaque_id(run_id, field_name="run_id"), 0, checked_non_negative(observed_epoch_ms, maximum=MAX_SAFE_INTEGER, field_name="observed_epoch_ms"), _enum(provenance, AgentProvenance, "provenance"), _text(kind, "kind"), _text(state_before, "state_before"), _text(state_after, "state_after"), tuple(validate_opaque_id(ref, field_name="artifact_ref") for ref in artifact_refs), None if action_id is None else validate_opaque_id(action_id, field_name="action_id"), {} if payload is None else payload)
 
 
 @dataclass(frozen=True)
 class ResultEnvelope:
+    """Result envelope binding for ``otclient.local-agent.result.v1``."""
+
     schema: str
     session_id: str
     run_id: str

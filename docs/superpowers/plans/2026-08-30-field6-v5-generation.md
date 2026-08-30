@@ -35,29 +35,29 @@
 - Consumes: current trusted V4 workflow/task on `main@dad71238d3da48ad9cf0bdcb45f9d0a445131f8c`.
 - Produces: a hosted contract that requires exact V5 generation text and rejects exact consumed V4 text in both executable workflow and active task.
 
-- [ ] **Step 1: Write the failing contract**
+- [x] **Step 1: Write the failing contract**
 
-Change the required current trigger from `AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V4 once=true` to `AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V5 once=true`. Replace the single V3 historical guard with a loop rejecting both consumed V3 and V4 exact trigger literals in `workflow` and `task`.
+The contract requires `AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V5 once=true` and rejects consumed V3/V4 literals in both workflow and active task.
 
-- [ ] **Step 2: Run the contract through PR CI and verify causal RED**
+- [x] **Step 2: Run the contract through PR CI and verify causal RED**
 
-Expected first relevant failure while production remains V4:
+Verified RED:
 
 ```text
+head=8c262e0d509af1927380cf36b9179ee9950c507d
+run=33305488409
+contract_job=99241188716
+fresh_audit_job=99241188630
+live_job=99241189199
+live_job_conclusion=skipped
 FIELD6_RUNTIME_CONTRACT_RED: .github/workflows/track-a-current-login-field6-runtime.yml missing ['AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V5 once=true']
 ```
 
-The `One-shot isolated field6 observation` job must be `skipped`; no self-hosted runner, secrets, client, or login may execute.
+No self-hosted runner, secrets, official client, login, or physical action executed.
 
-- [ ] **Step 3: Commit RED separately**
+- [x] **Step 3: Commit RED separately**
 
-Commit message:
-
-```text
-test(track-a): require V5 field6 generation
-```
-
-Open an early Draft PR from `fix/OTC-20260830-field6-v5-generation` so the RED run/job is durable evidence before GREEN.
+RED commit: `8c262e0d509af1927380cf36b9179ee9950c507d` (`test(track-a): require V5 field6 generation`). Draft PR #812 preserved the causal RED before GREEN.
 
 ---
 
@@ -72,61 +72,39 @@ Open an early Draft PR from `fix/OTC-20260830-field6-v5-generation` so the RED r
 - Consumes: Task 1 V5 contract.
 - Produces: trusted static V5 generation with no live authority and historical V4 revocation through current-main task/workflow text.
 
-- [ ] **Step 1: Change only the two executable generation literals in the workflow**
+- [x] **Step 1: Change only the two executable generation literals in the workflow**
 
-Replace:
+The issue-comment condition and trusted-main task grep now require V5. Runner labels, runner name, guest name, provenance schema, secret ordering, helper, acquisition path, scalar observer, artifact schema, and cleanup remain unchanged and inert in this static phase.
 
-```text
-AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V4 once=true
-```
+- [x] **Step 2: Recast the active task as static V5 generation**
 
-with:
+The active task is `runtime_access: none`, `mutation_authorized: false`, `credentials_allowed: false`, `login_allowed: false`, `physical_action_budget: 0`, and `physical_action_count: 0`. It contains V5 current-generation text and deliberately omits exact consumed V4 text.
 
-```text
-AUTHORIZE_CURRENT_LOGIN_FIELD6_RUNTIME_V5 once=true
-```
+- [x] **Step 3: Mark this plan's RED/GREEN evidence with exact run/job IDs**
 
-in the issue-comment condition and the trusted-main task grep. Do not change runner labels, runner name, guest name, provenance schema, secret ordering, helper, acquisition path, scalar observer, artifact schema, or cleanup in this generation-only PR.
-
-- [ ] **Step 2: Recast the active task as static V5 generation**
-
-Set/retain exactly:
-
-```yaml
-execution_class: github_hosted
-execution_mode: github_actions_static
-physical_e2e_required: false
-runtime_access: none
-runtime_owner_task: NOT_APPLICABLE
-runtime_namespace: NOT_APPLICABLE
-target_uniqueness: NOT_APPLICABLE
-mutation_authorized: false
-credentials_allowed: false
-login_allowed: false
-relogin_allowed: false
-restart_allowed: false
-character_selection_allowed: false
-gameplay_allowed: false
-gui_input_authorized: false
-process_control_authorized: false
-network_payload_capture_allowed: false
-physical_action_budget: 0
-physical_action_count: 0
-```
-
-The active task must contain exact current V5 trigger text as the future generation identifier but must not contain the exact consumed V4 trigger literal anywhere. Preserve V4 terminal facts without reproducing that exact consumed body. Record #811 merge SHA `dad71238d3da48ad9cf0bdcb45f9d0a445131f8c`, current host-offline state, tainted `OTClientV4Clean`, and the requirement for a brand-new successor guest before any live admission.
-
-- [ ] **Step 3: Mark this plan's RED/GREEN evidence with exact run/job IDs**
-
-After hosted results exist, update this plan with the exact RED and GREEN head/run/job identifiers; do not write future IDs speculatively.
-
-- [ ] **Step 4: Commit GREEN**
-
-Commit message:
+GREEN implementation head before final plan checkpoint:
 
 ```text
-fix(track-a): rotate field6 observer to V5 generation
+head=7da456ce23377b69ad536a71452e905bddb901ac
+field6_run=33305748938
+runtime_contract_job=99241902604 SUCCESS
+fresh_static_audit_job=99241902561 SUCCESS
+physical_live_job=99241902984 SKIPPED
+package_run=33305748946
+package_job=99241902518 SUCCESS
+governance_run=33305748935
+self_hosted_boundary_run=33305748930
+ci_run=33305749033
+ci_required_job=99241973216 SUCCESS
+yamllint=SUCCESS
+actionlint=SUCCESS
 ```
+
+The first GREEN candidate `54e3f5c6d4b9da06ac2911163fa816fe991cac04` had correct runtime/package/governance/boundary behavior but CI found exactly one formatting defect: missing final newline in `track-a-current-login-field6-runtime.yml`. Commit `7da456ce23377b69ad536a71452e905bddb901ac` fixed only that EOF defect; exact-head CI then passed.
+
+- [x] **Step 4: Commit GREEN**
+
+GREEN implementation is present on PR #812; the final plan checkpoint commit itself must receive fresh exact-head CI before merge.
 
 ---
 
@@ -143,32 +121,32 @@ fix(track-a): rotate field6 observer to V5 generation
 - Consumes: Task 2 candidate head.
 - Produces: reviewable exact-head evidence for safe merge.
 
-- [ ] **Step 1: Require hosted field6 runtime contract GREEN**
+- [x] **Step 1: Require hosted field6 runtime contract GREEN**
 
-The contract and fresh static audit jobs must be `success`; physical live job must be `skipped`.
+Verified on `7da456ce...`: runtime contract SUCCESS, fresh static audit SUCCESS, physical live job SKIPPED.
 
-- [ ] **Step 2: Require package materializer contract GREEN**
+- [x] **Step 2: Require package materializer contract GREEN**
 
-Confirm serial production/default acquisition and 45-minute live ceiling remain covered.
+Verified on `7da456ce...`: package materializer contract SUCCESS; serial production/default acquisition and 45-minute live ceiling remain covered.
 
-- [ ] **Step 3: Require governance/self-hosted-boundary/CI GREEN**
+- [x] **Step 3: Require governance/self-hosted-boundary/CI GREEN**
 
-Require Track A governance, self-hosted PR boundary, actionlint/yamllint and `CI / Required` to complete successfully for the exact final head.
+Verified on `7da456ce...`: Track A governance SUCCESS, self-hosted PR boundary SUCCESS, yamllint SUCCESS, actionlint SUCCESS, and `CI / Required` SUCCESS.
 
 - [ ] **Step 4: Fresh diff/review/main readback**
 
-Confirm only intended generation/test/task/plan files changed, unresolved review threads/reviews are zero, and protected `main` has no material overlapping drift.
+Must be repeated on the exact plan-checkpoint head created by this file update. Confirm only intended generation/test/task/plan files changed, unresolved review threads/reviews are zero, and protected `main` has no material overlapping drift.
 
 - [ ] **Step 5: Merge with expected-head guard**
 
-Squash-merge only the exact verified head and read back the resulting `main` SHA. Verify trusted `main` contains V5 current-generation text and omits exact V4 current-generation text from the active workflow/task.
+Squash-merge only the exact verified final head and read back the resulting `main` SHA. Verify trusted `main` contains V5 current-generation text and omits exact V4 current-generation text from the active workflow/task.
 
 ---
 
 ### Task 4: Stop at the external V5 routing/admission gate
 
 **Files:**
-- No code write unless the physical host returns and fresh prerequisites can be directly proven.
+- No code write until fresh physical successor prerequisites are directly proven.
 
 **Interfaces:**
 - Consumes: merged static V5 generation.
@@ -176,9 +154,9 @@ Squash-merge only the exact verified head and read back the resulting `main` SHA
 
 - [ ] **Step 1: Check the authorized `Molehill-PC` control channel**
 
-If it remains offline, do not create live authority and do not fall back to Synology.
+At the latest readback Molehill-PC is online. This must be reconfirmed after static V5 merge before physical preparation.
 
-- [ ] **Step 2: If the host returns, destroy only the tainted exact `OTClientV4Clean` target after proving ownership, then create a brand-new successor guest from the pinned Canonical rootfs and re-prove automount/interop/socket/prior-state isolation**
+- [ ] **Step 2: Destroy only the tainted exact `OTClientV4Clean` target after proving ownership, then create a brand-new successor guest from the pinned Canonical rootfs and re-prove automount/interop/socket/prior-state isolation**
 
 Do not reuse the diagnostic V4 guest.
 

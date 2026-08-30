@@ -85,7 +85,8 @@ def _text(value: Any, field: str) -> str:
 
 def _sha(value: Any, field: str, pattern: re.Pattern[str], length: int) -> str:
     if not isinstance(value, str) or not pattern.fullmatch(value):
-        raise ValidationError("INVALID_SHA256", f"{field} must be lowercase hexadecimal SHA ({length} characters)", field)
+        code = "INVALID_SHA1" if length == 40 else "INVALID_SHA256"
+        raise ValidationError(code, f"{field} must be lowercase hexadecimal SHA ({length} characters)", field)
     return value
 
 
@@ -94,6 +95,44 @@ def _enum(value: Any, enum_type: type[Enum], field: str) -> Any:
         return enum_type(value)
     except (TypeError, ValueError) as exc:
         raise ValidationError("INVALID_ENUM", f"{field} is not an admitted value", field) from exc
+
+
+class _ImmutablePayload(dict[str, object]):
+    """A dict-shaped, JSON-friendly payload that cannot be changed."""
+
+    def _immutable(self, *args: Any, **kwargs: Any) -> None:
+        raise TypeError("payload is immutable")
+
+    __setitem__ = __delitem__ = clear = pop = popitem = setdefault = update = _immutable
+
+
+def _freeze_payload(value: Any, field: str = "payload") -> dict[str, object]:
+    if not isinstance(value, dict):
+        raise ValidationError("INVALID_FIELD", "payload must be a dictionary", field)
+    frozen: dict[str, object] = _ImmutablePayload()
+    for key, item in value.items():
+        if not isinstance(key, str):
+            raise ValidationError("INVALID_FIELD", "payload keys must be strings", field)
+        if isinstance(item, dict):
+            normalized = _freeze_payload(item, field)
+        elif isinstance(item, (list, tuple)):
+            normalized = tuple(_freeze_value(entry, field) for entry in item)
+        elif item is None or isinstance(item, (str, int, float, bool)):
+            normalized = item
+        else:
+            raise ValidationError("INVALID_FIELD", "payload contains an unsupported value", field)
+        dict.__setitem__(frozen, key, normalized)
+    return frozen
+
+
+def _freeze_value(value: Any, field: str) -> object:
+    if isinstance(value, dict):
+        return _freeze_payload(value, field)
+    if isinstance(value, (list, tuple)):
+        return tuple(_freeze_value(entry, field) for entry in value)
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    raise ValidationError("INVALID_FIELD", "payload contains an unsupported value", field)
 
 
 @dataclass(frozen=True)
@@ -176,9 +215,14 @@ class AgentEvent:
     action_id: str | None
     payload: dict[str, object]
 
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "payload", _freeze_payload(self.payload))
+
     @classmethod
     def new(cls, *, session_id: str, run_id: str | None, provenance: AgentProvenance, kind: str, state_before: str, state_after: str, observed_epoch_ms: int = 0, artifact_refs: tuple[str, ...] = (), action_id: str | None = None, payload: dict[str, object] | None = None) -> "AgentEvent":
-        return cls("AgentEvent.v1", validate_opaque_id(session_id, field_name="session_id"), None if run_id is None else validate_opaque_id(run_id, field_name="run_id"), 0, checked_non_negative(observed_epoch_ms, maximum=MAX_SAFE_INTEGER, field_name="observed_epoch_ms"), _enum(provenance, AgentProvenance, "provenance"), _text(kind, "kind"), _text(state_before, "state_before"), _text(state_after, "state_after"), tuple(validate_opaque_id(ref, field_name="artifact_ref") for ref in artifact_refs), None if action_id is None else validate_opaque_id(action_id, field_name="action_id"), dict(payload or {}))
+        if not isinstance(artifact_refs, tuple):
+            raise ValidationError("INVALID_FIELD", "artifact_refs must be a tuple", "artifact_refs")
+        return cls("AgentEvent.v1", validate_opaque_id(session_id, field_name="session_id"), None if run_id is None else validate_opaque_id(run_id, field_name="run_id"), 0, checked_non_negative(observed_epoch_ms, maximum=MAX_SAFE_INTEGER, field_name="observed_epoch_ms"), _enum(provenance, AgentProvenance, "provenance"), _text(kind, "kind"), _text(state_before, "state_before"), _text(state_after, "state_after"), tuple(validate_opaque_id(ref, field_name="artifact_ref") for ref in artifact_refs), None if action_id is None else validate_opaque_id(action_id, field_name="action_id"), {} if payload is None else payload)
 
 
 @dataclass(frozen=True)

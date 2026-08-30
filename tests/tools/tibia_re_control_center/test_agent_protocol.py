@@ -73,6 +73,41 @@ class AgentProtocolTests(unittest.TestCase):
         self.assertEqual(event.seq, 0)
         self.assertEqual(event.artifact_refs, ())
 
+    def test_event_payload_is_immutable_recursively(self):
+        event = AgentEvent.new(
+            session_id="session-1", run_id=None, provenance=AgentProvenance.SENSOR,
+            kind="observation", state_before="IDLE", state_after="OBSERVING",
+            payload={"nested": {"items": [1]}},
+        )
+        with self.assertRaises(TypeError):
+            event.payload["new"] = 1
+        with self.assertRaises(TypeError):
+            event.payload["nested"]["new"] = 1
+        with self.assertRaises(AttributeError):
+            event.payload["nested"]["items"].append(2)
+        self.assertEqual(event.payload["nested"]["items"], (1,))
+
+    def test_event_payload_rejects_unsupported_shapes(self):
+        with self.assertRaises(ValidationError):
+            AgentEvent.new(session_id="session-1", run_id=None, provenance=AgentProvenance.SENSOR,
+                           kind="observation", state_before="IDLE", state_after="OBSERVING",
+                           payload={1: "non-string key"})
+        with self.assertRaises(ValidationError):
+            AgentEvent.new(session_id="session-1", run_id=None, provenance=AgentProvenance.SENSOR,
+                           kind="observation", state_before="IDLE", state_after="OBSERVING",
+                           payload={"unsupported": object()})
+
+    def test_event_rejects_bare_string_artifact_refs(self):
+        with self.assertRaises(ValidationError):
+            AgentEvent.new(session_id="session-1", run_id=None, provenance=AgentProvenance.SENSOR,
+                           kind="observation", state_before="IDLE", state_after="OBSERVING",
+                           artifact_refs="artifact-1")
+
+    def test_sha_error_code_matches_digest_length(self):
+        with self.assertRaises(ValidationError) as context:
+            TaskEnvelope.from_mapping(envelope(trusted_main_sha="z" * 40))
+        self.assertEqual(context.exception.code, "INVALID_SHA1")
+
 
 if __name__ == "__main__":
     unittest.main()

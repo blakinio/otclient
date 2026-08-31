@@ -6,6 +6,7 @@ import threading
 import time
 import uuid
 from collections.abc import Callable, Mapping
+from contextlib import nullcontext
 from dataclasses import asdict, dataclass, fields, replace
 from enum import Enum
 from typing import Any
@@ -434,7 +435,9 @@ class ControlDomainService:
         if resource.get("result") is None:
             return None
         result = copy.deepcopy(resource["result"])
-        code = 201 if resource.get("operation") in {"CREATE_RUN", "ONE_STEP_EXPERIMENT"} else 200
+        code = 201 if resource.get("operation") in {
+            "CREATE_RUN", "ONE_STEP_EXPERIMENT", "AGENT_TASK",
+        } else 200
         return DomainReply(code, result, "COMPLETED", str(result.get("status", "UNKNOWN")), resource["resource_id"])
 
     def _recover_incomplete_run(self, resource_id: str, request_id: str, operation: str, normalized: dict[str, Any]) -> DomainReply | None:
@@ -676,47 +679,78 @@ class ControlDomainService:
         return copy.deepcopy(result)
 
     def agent_submit_task(self, resource_id: str, request_id: str, normalized: dict[str, Any]) -> DomainReply:
-        del request_id
-        accepted = self.agent.submit_task(TaskEnvelope.from_mapping(normalized))
-        envelope = accepted["envelope"]
-        if not isinstance(envelope, dict):
-            raise ControlDomainError("CONTROL_AGENT_TASK_INVALID", "accepted agent task is invalid", http_status=500)
-        session_id = str(envelope["session_id"])
-        run_id = str(envelope["run_id"])
-        payload = {
-            "resource_id": resource_id,
-            "status": "ACCEPTED",
-            "accepted_new": bool(accepted["accepted_new"]),
-            "provenance": AgentProvenance.SUPERVISOR.value,
-            "session": self._safe_agent_snapshot(session_id),
-        }
+        with self.store.agent_resource_transaction():
+            resource = self.store.ensure_resource(resource_id, request_id, "AGENT_TASK", normalized)
+            prior = self._resource_reply(resource)
+            if prior is not None:
+                return prior
+            accepted = self.agent.submit_task(
+                TaskEnvelope.from_mapping(normalized),
+                operation_id=resource_id,
+            )
+            envelope = accepted["envelope"]
+            if not isinstance(envelope, dict):
+                raise ControlDomainError("CONTROL_AGENT_TASK_INVALID", "accepted agent task is invalid", http_status=500)
+            session_id = str(envelope["session_id"])
+            run_id = str(envelope["run_id"])
+            payload = {
+                "resource_id": resource_id,
+                "status": "ACCEPTED",
+                "accepted_new": bool(accepted["accepted_new"]),
+                "provenance": AgentProvenance.SUPERVISOR.value,
+                "session": self._safe_agent_snapshot(session_id),
+            }
+            self.store.finish_resource(resource_id, "COMPLETED", payload)
         return DomainReply(201, payload, "COMPLETED", "ACCEPTED", run_id)
 
     def agent_chat(self, resource_id: str, request_id: str, normalized: dict[str, Any]) -> DomainReply:
-        del request_id
-        result = self.agent.record_message(
-            normalized["session_id"],
-            AgentProvenance.OWNER,
-            normalized["text"],
-        )
-        session = result.get("session")
-        payload = {
-            "resource_id": resource_id,
-            "status": result.get("status", "RECORDED"),
-            "provenance": AgentProvenance.OWNER.value,
-            "session": self._safe_agent_snapshot(normalized["session_id"]) if session is not None else None,
-        }
+        with self.store.agent_resource_transaction():
+            resource = self.store.ensure_resource(resource_id, request_id, "AGENT_CHAT", normalized)
+            prior = self._resource_reply(resource)
+            if prior is not None:
+                return prior
+            result = self.agent.record_message(
+                normalized["session_id"],
+                AgentProvenance.OWNER,
+                normalized["text"],
+                operation_id=resource_id,
+            )
+            session = result.get("session")
+            payload = {
+                "resource_id": resource_id,
+                "status": result.get("status", "RECORDED"),
+                "provenance": AgentProvenance.OWNER.value,
+                "session": self._safe_agent_snapshot(normalized["session_id"]) if session is not None else None,
+            }
+            self.store.finish_resource(resource_id, "COMPLETED", payload)
         return DomainReply(200, payload, "COMPLETED", str(payload["status"]), normalized["session_id"])
 
     def agent_control(self, resource_id: str, request_id: str, normalized: dict[str, Any]) -> DomainReply:
-        del request_id
-        result = self.agent.owner_control(normalized["session_id"], normalized["command"])
-        payload = {
-            "resource_id": resource_id,
-            "status": result.get("status", "UNKNOWN"),
-            "provenance": AgentProvenance.OWNER.value,
-            "session": self._safe_agent_snapshot(normalized["session_id"]),
-        }
+        transaction = (
+            self.store.agent_resource_transaction()
+            if normalized["command"] in {
+                OwnerControlCommand.PAUSE.value,
+                OwnerControlCommand.SCREENSHOT.value,
+            }
+            else nullcontext()
+        )
+        with transaction:
+            resource = self.store.ensure_resource(resource_id, request_id, "AGENT_CONTROL", normalized)
+            prior = self._resource_reply(resource)
+            if prior is not None:
+                return prior
+            result = self.agent.owner_control(
+                normalized["session_id"],
+                normalized["command"],
+                operation_id=resource_id,
+            )
+            payload = {
+                "resource_id": resource_id,
+                "status": result.get("status", "UNKNOWN"),
+                "provenance": AgentProvenance.OWNER.value,
+                "session": self._safe_agent_snapshot(normalized["session_id"]),
+            }
+            self.store.finish_resource(resource_id, "COMPLETED", payload)
         return DomainReply(200, payload, "COMPLETED", str(payload["status"]), normalized["session_id"])
 
     def list_runs(self, *, offset: int = 0, limit: int = 100) -> dict[str, Any]:

@@ -404,6 +404,7 @@ class SQLitePersistentStore:
         self.control_dir.mkdir(parents=True, exist_ok=True)
         self.db_path = self.control_dir / "control-center.sqlite3"
         self._lock = threading.RLock()
+        self._transaction_depth = 0
         self._faults: dict[str, list[str]] = {}
         self.safety_flush_count = 0
         self.event_retention = max(32, min(int(event_retention), 100_000))
@@ -445,7 +446,23 @@ class SQLitePersistentStore:
     @contextmanager
     def _transaction(self, operation: str):
         with self._lock:
+            if self._transaction_depth:
+                savepoint = f"nested_{self._transaction_depth}"
+                self._db.execute(f"SAVEPOINT {savepoint}")
+                self._transaction_depth += 1
+                try:
+                    self._before_write(operation)
+                    yield
+                    self._db.execute(f"RELEASE SAVEPOINT {savepoint}")
+                except Exception:
+                    self._db.execute(f"ROLLBACK TO SAVEPOINT {savepoint}")
+                    self._db.execute(f"RELEASE SAVEPOINT {savepoint}")
+                    raise
+                finally:
+                    self._transaction_depth -= 1
+                return
             self._db.execute("BEGIN IMMEDIATE")
+            self._transaction_depth = 1
             try:
                 self._before_write(operation)
                 yield
@@ -453,6 +470,14 @@ class SQLitePersistentStore:
             except Exception:
                 self._db.execute("ROLLBACK")
                 raise
+            finally:
+                self._transaction_depth = 0
+
+    @contextmanager
+    def agent_resource_transaction(self):
+        """One SQLite commit domain for an agent resource and its event/session result."""
+        with self._transaction("agent_resource_domain"):
+            yield
 
     def _write_control_state_locked(self, state: ControlState) -> None:
         body = _dump(asdict(state))

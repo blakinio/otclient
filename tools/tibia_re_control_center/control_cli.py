@@ -128,7 +128,7 @@ def _request_id(args: argparse.Namespace, prefix: str) -> str:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Thin CLI for TIBIA RE Control Center Package B")
     parser.add_argument("--data-dir", type=Path, default=_default_data_root())
-    sub = parser.add_subparsers(dest="command", required=True)
+    sub = parser.add_subparsers(dest="subcommand", required=True)
     sub.add_parser("status")
     sub.add_parser("capabilities")
     sub.add_parser("scenarios")
@@ -159,7 +159,12 @@ def build_parser() -> argparse.ArgumentParser:
     agent_chat.add_argument("--text", required=True)
     agent_control = _agent_post_parser(sub, "agent-control", "send an owner agent control")
     agent_control.add_argument("--session", required=True)
-    agent_control.add_argument("--command", choices=("PAUSE", "STOP", "RESUME", "SCREENSHOT"), required=True)
+    agent_control.add_argument(
+        "--command",
+        dest="agent_command",
+        choices=("PAUSE", "STOP", "RESUME", "SCREENSHOT"),
+        required=True,
+    )
     agent_events = sub.add_parser("agent-events", help="poll one agent provenance timeline")
     agent_events.add_argument("--session", required=True)
     agent_events.add_argument("--cursor", type=int, required=True)
@@ -173,7 +178,7 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         client = ControlApiClient(args.data_dir)
-        command = args.command
+        command = args.subcommand
         if command == "status":
             result = client.get("/v1/status")
         elif command == "capabilities":
@@ -213,7 +218,7 @@ def main(argv: list[str] | None = None) -> int:
         elif command == "agent-control":
             result = client.post(
                 "/v1/agent/control",
-                {"session_id": args.session, "command": args.command},
+                {"session_id": args.session, "command": args.agent_command},
                 request_id=_request_id(args, "agent-control"),
             )
         elif command == "create-run":

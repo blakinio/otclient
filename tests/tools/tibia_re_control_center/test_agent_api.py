@@ -3,12 +3,15 @@ from __future__ import annotations
 import json
 import io
 import tempfile
+import threading
 import unittest
-from contextlib import redirect_stderr
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
+from tools.tibia_re_control_center.agent_session import CaptureReceipt, NullBoundedActionExecutor
 from tools.tibia_re_control_center.control_api import ControlApiServer, MAX_PAGE
-from tools.tibia_re_control_center.control_cli import build_parser
+from tools.tibia_re_control_center.control_cli import build_parser, main as cli_main
 
 from tests.tools.tibia_re_control_center.test_package_b import decode, http_call
 
@@ -39,6 +42,15 @@ def task_envelope(**overrides: object) -> dict[str, object]:
     return value
 
 
+class CountingCaptureExecutor(NullBoundedActionExecutor):
+    def __init__(self) -> None:
+        self.screenshot_calls: list[tuple[str, str]] = []
+
+    def screenshot(self, session_id: str, run_id: str) -> CaptureReceipt:
+        self.screenshot_calls.append((session_id, run_id))
+        return CaptureReceipt("CAPTURED", "capture-safe", "c" * 64, True)
+
+
 class AgentApiTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory()
@@ -48,6 +60,13 @@ class AgentApiTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.server.close()
         self.temp.cleanup()
+
+    def restart(self, *, executor: object | None = None) -> None:
+        old = self.server
+        old.close()
+        self.server = ControlApiServer(self.root).start()
+        if executor is not None:
+            self.server.domain.agent.executor = executor
 
     def post(
         self,
@@ -137,6 +156,40 @@ class AgentApiTests(unittest.TestCase):
         self.assertEqual(1, len(accepted))
         self.assertEqual("SUPERVISOR", accepted[0]["provenance"])
 
+    def test_task_lost_response_reuses_resource_across_restart_without_duplicate_acceptance(self) -> None:
+        for point in ("after_accept", "after_domain"):
+            with self.subTest(point=point):
+                suffix = point.replace("_", "-")
+                body = task_envelope(
+                    session_id=f"task-lost-{suffix}",
+                    task_id=f"task-lost-{suffix}",
+                    run_id=f"run-lost-{suffix}",
+                    idempotency_key=f"idem-lost-{suffix}",
+                )
+                request_id = f"request-task-lost-{suffix}"
+                self.server.domain.inject_test_crash_once(point)
+                status, _, interrupted = self.post("/v1/agent/tasks", body, request_id)
+                self.assertEqual(503, status, interrupted)
+                accepted = self.server.domain.store.load_request(request_id)
+                self.assertEqual("ACCEPTED", accepted.status)
+                durable_result = None
+                if point == "after_domain":
+                    resource = self.server.domain.store.get_resource(accepted.resource_id)
+                    self.assertIsNotNone(resource)
+                    durable_result = resource["result"]
+                    self.assertIsNotNone(durable_result)
+                self.restart()
+                replay_status, _, replay = self.post("/v1/agent/tasks", body, request_id)
+                self.assertEqual(201, replay_status, replay)
+                if durable_result is not None:
+                    self.assertEqual(durable_result, replay)
+                self.assertEqual(accepted.resource_id, replay["resource_id"])
+                session = self.server.domain.agent.snapshot(str(body["session_id"]))
+                self.assertEqual(1, sum(
+                    event.get("kind") == "TASK_ACCEPTED"
+                    for event in session["events"]
+                ))
+
     def test_same_request_id_with_different_envelope_conflicts_without_second_task(self) -> None:
         self.submit("agent-task-conflict")
         status, _, payload = self.post(
@@ -207,25 +260,209 @@ class AgentApiTests(unittest.TestCase):
         self.assertTrue(self.server.domain.coordinator.control_state.stop_latched)
         self.assertEqual("OWNER", [event for event in stopped["session"]["events"] if event.get("kind") == "OWNER_STOP"][-1]["provenance"])
 
-        status, _, refused = self.post(
+        generation = self.server.domain.coordinator.control_generation
+        status, _, resumed_from_stop = self.post(
             "/v1/agent/control",
             {"session_id": "agent-session-1", "command": "RESUME"},
             "agent-resume-stopped",
         )
-        self.assertEqual(200, status, refused)
-        self.assertEqual("REFUSED_GLOBAL_STOP_LATCHED", refused["status"])
-        self.assertTrue(refused["session"]["stop_latched"])
+        self.assertEqual(200, status, resumed_from_stop)
+        self.assertEqual("IDLE", resumed_from_stop["status"])
+        self.assertFalse(resumed_from_stop["session"]["stop_latched"])
+        self.assertFalse(resumed_from_stop["session"]["pause_latched"])
+        self.assertFalse(self.server.domain.coordinator.control_state.stop_latched)
+        self.assertEqual(generation + 1, self.server.domain.coordinator.control_generation)
+        self.assertEqual("NONE", resumed_from_stop["session"]["mutation_authority"])
 
-        reset_status, _, _ = self.post("/v1/reset-stop", {}, "top-level-reset")
-        self.assertEqual(200, reset_status)
-        status, _, resumed_after_reset = self.post(
+    def test_chat_lost_response_reuses_resource_across_restart_without_duplicate_owner_event(self) -> None:
+        for point in ("after_accept", "after_domain"):
+            with self.subTest(point=point):
+                suffix = point.replace("_", "-")
+                session_id = f"chat-lost-{suffix}"
+                self.submit(
+                    f"submit-chat-lost-{suffix}",
+                    session_id=session_id,
+                    task_id=f"task-chat-lost-{suffix}",
+                    run_id=f"run-chat-lost-{suffix}",
+                    idempotency_key=f"idem-chat-lost-{suffix}",
+                )
+                request_id = f"request-chat-lost-{suffix}"
+                body = {"session_id": session_id, "text": "bounded owner replay note"}
+                self.server.domain.inject_test_crash_once(point)
+                status, _, interrupted = self.post("/v1/agent/chat", body, request_id)
+                self.assertEqual(503, status, interrupted)
+                accepted = self.server.domain.store.load_request(request_id)
+                durable_result = None
+                if point == "after_domain":
+                    resource = self.server.domain.store.get_resource(accepted.resource_id)
+                    self.assertIsNotNone(resource)
+                    durable_result = resource["result"]
+                    self.assertIsNotNone(durable_result)
+                self.restart()
+                replay_status, _, replay = self.post("/v1/agent/chat", body, request_id)
+                self.assertEqual(200, replay_status, replay)
+                if durable_result is not None:
+                    self.assertEqual(durable_result, replay)
+                self.assertEqual(accepted.resource_id, replay["resource_id"])
+                session = self.server.domain.agent.snapshot(session_id)
+                matching = [
+                    event for event in session["events"]
+                    if event.get("kind") == "MESSAGE_RECORDED"
+                    and event.get("payload", {}).get("message_sha256")
+                ]
+                self.assertEqual(1, len(matching))
+
+    def test_control_lost_response_reuses_resource_without_duplicate_capture_stop_or_reset(self) -> None:
+        capture_executor = CountingCaptureExecutor()
+        self.server.domain.agent.executor = capture_executor
+        self.submit()
+        for point in ("after_accept", "after_domain"):
+            with self.subTest(command="SCREENSHOT", point=point):
+                request_id = f"screenshot-lost-{point}"
+                self.server.domain.inject_test_crash_once(point)
+                status, _, interrupted = self.post(
+                    "/v1/agent/control",
+                    {"session_id": "agent-session-1", "command": "SCREENSHOT"},
+                    request_id,
+                )
+                self.assertEqual(503, status, interrupted)
+                accepted = self.server.domain.store.load_request(request_id)
+                durable_result = None
+                if point == "after_domain":
+                    resource = self.server.domain.store.get_resource(accepted.resource_id)
+                    self.assertIsNotNone(resource)
+                    durable_result = resource["result"]
+                    self.assertIsNotNone(durable_result)
+                calls_before_replay = len(capture_executor.screenshot_calls)
+                self.restart(executor=capture_executor)
+                replay_status, _, replay = self.post(
+                    "/v1/agent/control",
+                    {"session_id": "agent-session-1", "command": "SCREENSHOT"},
+                    request_id,
+                )
+                self.assertEqual(200, replay_status, replay)
+                if durable_result is not None:
+                    self.assertEqual(durable_result, replay)
+                    self.assertEqual(calls_before_replay, len(capture_executor.screenshot_calls))
+                self.assertEqual(accepted.resource_id, replay["resource_id"])
+        session = self.server.domain.agent.snapshot("agent-session-1")
+        self.assertEqual(2, sum(event.get("kind") == "SCREENSHOT_RESULT" for event in session["events"]))
+
+        self.server.domain.inject_test_crash_once("after_domain")
+        stop_status, _, stop_interrupted = self.post(
+            "/v1/agent/control",
+            {"session_id": "agent-session-1", "command": "STOP"},
+            "stop-lost-response",
+        )
+        self.assertEqual(503, stop_status, stop_interrupted)
+        stopped_generation = self.server.domain.coordinator.control_generation
+        stop_record = self.server.domain.store.load_request("stop-lost-response")
+        stop_resource = self.server.domain.store.get_resource(stop_record.resource_id)
+        self.assertIsNotNone(stop_resource["result"])
+        self.restart(executor=capture_executor)
+        replay_status, _, replay_stop = self.post(
+            "/v1/agent/control",
+            {"session_id": "agent-session-1", "command": "STOP"},
+            "stop-lost-response",
+        )
+        self.assertEqual(200, replay_status, replay_stop)
+        self.assertEqual(stop_resource["result"], replay_stop)
+        stop_transition = self.server.domain.store.load_control_transition(stop_record.resource_id)
+        self.assertEqual(stopped_generation, stop_transition.control_generation)
+        self.assertEqual("AGENT_OWNER_STOP", stop_transition.reason_code)
+        self.assertEqual(1, sum(
+            '"reason_code":"AGENT_OWNER_STOP"' in row[0]
+            for row in self.server.domain.store._fetchall("SELECT body FROM control_history")
+        ))
+        self.assertEqual(1, sum(
+            event.get("kind") == "OWNER_STOP"
+            for event in self.server.domain.agent.snapshot("agent-session-1")["events"]
+        ))
+
+        self.server.domain.inject_test_crash_once("after_domain")
+        resume_status, _, resume_interrupted = self.post(
             "/v1/agent/control",
             {"session_id": "agent-session-1", "command": "RESUME"},
-            "agent-resume-after-reset",
+            "resume-lost-response",
         )
-        self.assertEqual(200, status, resumed_after_reset)
-        self.assertEqual("PAUSED_AUTHORITY", resumed_after_reset["status"])
-        self.assertFalse(resumed_after_reset["session"]["stop_latched"])
+        self.assertEqual(503, resume_status, resume_interrupted)
+        resumed_generation = self.server.domain.coordinator.control_generation
+        resume_record = self.server.domain.store.load_request("resume-lost-response")
+        resume_resource = self.server.domain.store.get_resource(resume_record.resource_id)
+        self.assertIsNotNone(resume_resource["result"])
+        self.restart(executor=capture_executor)
+        replay_status, _, replay_resume = self.post(
+            "/v1/agent/control",
+            {"session_id": "agent-session-1", "command": "RESUME"},
+            "resume-lost-response",
+        )
+        self.assertEqual(200, replay_status, replay_resume)
+        self.assertEqual(resume_resource["result"], replay_resume)
+        resume_transition = self.server.domain.store.load_control_transition(resume_record.resource_id)
+        self.assertEqual(resumed_generation, resume_transition.control_generation)
+        self.assertEqual("AGENT_OWNER_RESUME", resume_transition.reason_code)
+        self.assertEqual(1, sum(
+            '"reason_code":"AGENT_OWNER_RESUME"' in row[0]
+            for row in self.server.domain.store._fetchall("SELECT body FROM control_history")
+        ))
+        self.assertEqual(1, sum(
+            event.get("kind") == "OWNER_RESUME"
+            for event in self.server.domain.agent.snapshot("agent-session-1")["events"]
+        ))
+
+    def test_concurrent_agent_post_replays_share_one_domain_result(self) -> None:
+        capture_executor = CountingCaptureExecutor()
+        self.server.domain.agent.executor = capture_executor
+
+        cases = (
+            (
+                "/v1/agent/tasks",
+                task_envelope(
+                    session_id="concurrent-task-session",
+                    task_id="concurrent-task",
+                    run_id="concurrent-task-run",
+                    idempotency_key="concurrent-task-idem",
+                ),
+                "concurrent-agent-task",
+                "concurrent-task-session",
+                "TASK_ACCEPTED",
+            ),
+            (
+                "/v1/agent/chat",
+                {"session_id": "agent-session-1", "text": "one concurrent owner message"},
+                "concurrent-agent-chat",
+                "agent-session-1",
+                "MESSAGE_RECORDED",
+            ),
+            (
+                "/v1/agent/control",
+                {"session_id": "agent-session-1", "command": "SCREENSHOT"},
+                "concurrent-agent-control",
+                "agent-session-1",
+                "SCREENSHOT_RESULT",
+            ),
+        )
+        self.submit()
+        for path, body, request_id, session_id, event_kind in cases:
+            with self.subTest(path=path):
+                before = sum(
+                    event.get("kind") == event_kind
+                    for event in self.server.domain.agent.snapshot(session_id)["events"]
+                ) if self.server.domain.store.load_agent_session(session_id) is not None else 0
+                barrier = threading.Barrier(8)
+
+                def invoke() -> tuple[int, dict[str, object]]:
+                    barrier.wait(timeout=5)
+                    status, _, payload = self.post(path, body, request_id)
+                    return status, payload
+
+                with ThreadPoolExecutor(max_workers=8) as pool:
+                    results = [future.result(timeout=10) for future in [pool.submit(invoke) for _ in range(8)]]
+                self.assertTrue(all(result == results[0] for result in results))
+                self.assertIn(results[0][0], {200, 201})
+                events = self.server.domain.agent.snapshot(session_id)["events"]
+                self.assertEqual(before + 1, sum(event.get("kind") == event_kind for event in events))
+        self.assertEqual(1, len(capture_executor.screenshot_calls))
 
     def test_screenshot_is_read_only_and_zero_budget(self) -> None:
         self.submit()
@@ -378,6 +615,32 @@ class AgentApiTests(unittest.TestCase):
             with self.subTest(option=option), self.assertRaises(SystemExit):
                 with redirect_stderr(io.StringIO()):
                     parser.parse_args(["agent-chat", "--session", "session-1", "--text", "hello", "--request-id", "r", option, "value"])
+
+    def test_all_six_agent_cli_commands_execute_against_live_server(self) -> None:
+        task_path = self.root / "agent-task.json"
+        task_path.write_text(json.dumps(task_envelope()), encoding="utf-8")
+        commands = (
+            ["agent-task", "--file", str(task_path), "--request-id", "cli-agent-task"],
+            ["agent-status", "--session", "agent-session-1"],
+            ["agent-chat", "--session", "agent-session-1", "--text", "owner cli note", "--request-id", "cli-agent-chat"],
+            ["agent-control", "--session", "agent-session-1", "--command", "PAUSE", "--request-id", "cli-agent-control"],
+            ["agent-events", "--session", "agent-session-1", "--cursor", "0", "--limit", "20"],
+            ["agent-result", "--run", "agent-run-1"],
+        )
+        outputs: list[dict[str, object]] = []
+        for command in commands:
+            with self.subTest(command=command[0]):
+                stdout = io.StringIO()
+                with redirect_stdout(stdout):
+                    exit_code = cli_main(["--data-dir", str(self.root), *command])
+                self.assertEqual(0, exit_code, stdout.getvalue())
+                outputs.append(json.loads(stdout.getvalue()))
+        self.assertEqual("ACCEPTED", outputs[0]["status"])
+        self.assertEqual("agent-session-1", outputs[1]["session_id"])
+        self.assertEqual("RECORDED", outputs[2]["status"])
+        self.assertEqual("PAUSED", outputs[3]["status"])
+        self.assertTrue(outputs[4]["items"])
+        self.assertEqual("PENDING", outputs[5]["status"])
 
     def test_ui_adds_safe_agent_dashboard_and_preserves_top_level_stop_all(self) -> None:
         status, _, raw = http_call(self.server, "GET", "/", nonce=None)

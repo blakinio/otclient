@@ -377,6 +377,42 @@ class AgentSessionCoordinator:
         events, _ = self.store.list_events(cursor=0, limit=self.store.event_retention)
         return [event for event in events if event.get("session_id") == session_id]
 
+    def _operation_event(
+        self,
+        session_id: str,
+        operation_id: str | None,
+        *kinds: str,
+    ) -> dict[str, Any] | None:
+        if operation_id is None:
+            return None
+        validate_opaque_id(operation_id, field_name="operation_id", max_bytes=192)
+        admitted = set(kinds)
+        return next((
+            event for event in self._events_for(session_id)
+            if event.get("action_id") == operation_id
+            and (not admitted or event.get("kind") in admitted)
+        ), None)
+
+    def _hydrate_exact_session(self, session_id: str) -> AgentSessionRecord:
+        record = self.store.load_agent_session(session_id)
+        if record is None:
+            raise ValidationError("PERSISTENT_STATE_CORRUPT", "agent operation event is missing its session")
+        task_values = self.store.load_agent_task_for_session(session_id)
+        task = None if task_values is None else _task_from_stored(task_values["envelope"])
+        result = None if task_values is None else _result_from_stored(task_values["result"])
+        self._sessions[session_id] = record
+        if task is not None:
+            self._tasks[session_id] = task
+        if result is not None:
+            self._results[session_id] = result
+        refs = self._evidence_refs.setdefault(session_id, [])
+        for event in self._events_for(session_id):
+            for ref in event.get("artifact_refs") or ():
+                if isinstance(ref, str) and ref not in refs:
+                    refs.append(ref)
+        self._hydrate_authoritative_actions(session_id, task)
+        return record
+
     @staticmethod
     def _receipt_from_ledger(record: object) -> AgentActionReceipt:
         if record.dispatch_state == DispatchState.NOT_DISPATCHED:
@@ -588,7 +624,12 @@ class AgentSessionCoordinator:
         self._sessions[session_id] = next_record
         return next_record
 
-    def submit_task(self, envelope: TaskEnvelope) -> dict[str, object]:
+    def submit_task(
+        self,
+        envelope: TaskEnvelope,
+        *,
+        operation_id: str | None = None,
+    ) -> dict[str, object]:
         with self._lock:
             if type(envelope) is not TaskEnvelope:
                 raise ValidationError("INVALID_TASK", "task must be an exact TaskEnvelope")
@@ -600,6 +641,27 @@ class AgentSessionCoordinator:
                     "RUNTIME_ACCESS_UNAVAILABLE",
                     "the repository foundation has no runtime access",
                 )
+            prior_event = self._operation_event(
+                parsed_input.session_id,
+                operation_id,
+                "TASK_ACCEPTED",
+            )
+            if prior_event is not None:
+                accepted = self.store.load_agent_task(parsed_input.idempotency_key)
+                if accepted is None:
+                    raise ValidationError(
+                        "PERSISTENT_STATE_CORRUPT",
+                        "task operation event is missing its accepted task",
+                    )
+                persisted = _task_from_stored(accepted["envelope"])
+                if persisted != parsed_input:
+                    raise ValidationError("IDEMPOTENCY_CONFLICT", "agent task operation identity is already bound")
+                self._hydrate_exact_session(parsed_input.session_id)
+                return {
+                    "accepted_new": True,
+                    "envelope": _jsonable(accepted["envelope"]),
+                    "result": _jsonable(accepted["result"]),
+                }
             durable_session = self.store.load_agent_session(parsed_input.session_id)
             stored_task = self.store.load_agent_task_for_session(parsed_input.session_id)
             if durable_session is None and stored_task is None:
@@ -632,6 +694,7 @@ class AgentSessionCoordinator:
                     state_before=session.operational_state.value,
                     state_after=AgentOperationalState.RUNNING.value,
                     observed_epoch_ms=self._now_epoch_ms(),
+                    action_id=operation_id,
                     payload={
                         "task_id": parsed_input.task_id,
                         "runtime_access": parsed_input.runtime_access,
@@ -713,11 +776,18 @@ class AgentSessionCoordinator:
         except ValueError:
             raise ValidationError("INVALID_OWNER_CONTROL", "owner control command is invalid") from None
 
-    def _control_refusal(self, session_id: str, status: str) -> dict[str, object]:
+    def _control_refusal(
+        self,
+        session_id: str,
+        status: str,
+        *,
+        operation_id: str | None = None,
+    ) -> dict[str, object]:
         self._persist_event(
             session_id,
             provenance=AgentProvenance.OWNER,
             kind="CONTROL_REFUSED",
+            action_id=operation_id,
             payload={"status": status},
         )
         return {"status": status, "session": self.snapshot(session_id)}
@@ -727,12 +797,64 @@ class AgentSessionCoordinator:
             if candidate_session == session_id:
                 token.cancel()
 
-    def owner_control(self, session_id: str, command: OwnerControlCommand | str) -> dict[str, object]:
+    def owner_control(
+        self,
+        session_id: str,
+        command: OwnerControlCommand | str,
+        *,
+        operation_id: str | None = None,
+    ) -> dict[str, object]:
         with self._lock:
             parsed = self._command(command)
             session = self.ensure_session(session_id)
+            prior_event = self._operation_event(
+                session_id,
+                operation_id,
+                "OWNER_STOP",
+                "OWNER_PAUSE",
+                "OWNER_RESUME",
+                "SCREENSHOT_RESULT",
+                "CONTROL_REFUSED",
+            )
+            if prior_event is not None:
+                self._hydrate_exact_session(session_id)
+                status = prior_event.get("payload", {}).get("status")
+                if not isinstance(status, str):
+                    status = {
+                        "OWNER_STOP": "STOPPED",
+                        "OWNER_PAUSE": "PAUSED",
+                        "OWNER_RESUME": prior_event.get("state_after", "IDLE"),
+                    }.get(str(prior_event.get("kind")), "UNKNOWN")
+                return {"status": status, "session": self.snapshot(session_id)}
+            if parsed is OwnerControlCommand.RESUME and operation_id is not None:
+                historical_reset = self.store.load_control_transition(operation_id)
+                if (
+                    historical_reset is not None
+                    and historical_reset.transition_id == self.control.control_state.transition_id
+                    and historical_reset.reason_code == "AGENT_OWNER_RESUME"
+                    and not historical_reset.stop_latched
+                    and not historical_reset.recovery_required
+                ):
+                    self._persist_event(
+                        session_id,
+                        provenance=AgentProvenance.OWNER,
+                        kind="OWNER_RESUME",
+                        state_after=AgentOperationalState.IDLE,
+                        pause_latched=False,
+                        stop_latched=False,
+                        action_id=operation_id,
+                        payload={
+                            "authority_reconciliation_required": bool(session.current_run_id),
+                            "status": AgentOperationalState.IDLE.value,
+                        },
+                    )
+                    return {"status": "IDLE", "session": self.snapshot(session_id)}
             if parsed is OwnerControlCommand.SCREENSHOT:
-                return self._capture(session_id, AgentProvenance.OWNER)
+                return self._capture(
+                    session_id,
+                    AgentProvenance.OWNER,
+                    action_id=operation_id,
+                )
             if parsed is OwnerControlCommand.STOP:
                 if session.stop_latched:
                     return {"status": "STOPPED", "session": self.snapshot(session_id)}
@@ -750,6 +872,8 @@ class AgentSessionCoordinator:
                     state_before=session.operational_state.value,
                     state_after=AgentOperationalState.STOPPED.value,
                     observed_epoch_ms=self._now_epoch_ms(),
+                    action_id=operation_id,
+                    payload={"status": "STOPPED"},
                 )
                 persisted: list[AgentSessionRecord] = []
 
@@ -763,6 +887,7 @@ class AgentSessionCoordinator:
                     persisted.append(durable)
 
                 stopped = self.control.stop_all(
+                    transition_id=operation_id,
                     reason_code="AGENT_OWNER_STOP",
                     state_persister=persist_stop,
                 )
@@ -796,6 +921,8 @@ class AgentSessionCoordinator:
                         state_before=session.operational_state.value,
                         state_after=AgentOperationalState.PAUSED.value,
                         observed_epoch_ms=self._now_epoch_ms(),
+                        action_id=operation_id,
+                        payload={"status": "PAUSED"},
                     )
                     persisted: list[AgentSessionRecord] = []
 
@@ -816,9 +943,35 @@ class AgentSessionCoordinator:
 
             global_state = self.control.control_state
             if global_state.stop_latched:
-                return self._control_refusal(session_id, "REFUSED_GLOBAL_STOP_LATCHED")
+                if not self.control.reset_stop(
+                    transition_id=operation_id,
+                    reason_code="AGENT_OWNER_RESUME",
+                ):
+                    return self._control_refusal(
+                        session_id,
+                        "REFUSED_GLOBAL_STOP_RESET_FAILED",
+                        operation_id=operation_id,
+                    )
+                self._persist_event(
+                    session_id,
+                    provenance=AgentProvenance.OWNER,
+                    kind="OWNER_RESUME",
+                    state_after=AgentOperationalState.IDLE,
+                    pause_latched=False,
+                    stop_latched=False,
+                    action_id=operation_id,
+                    payload={
+                        "authority_reconciliation_required": bool(session.current_run_id),
+                        "status": AgentOperationalState.IDLE.value,
+                    },
+                )
+                return {"status": "IDLE", "session": self.snapshot(session_id)}
             if global_state.recovery_required:
-                return self._control_refusal(session_id, "REFUSED_GLOBAL_RECOVERY_REQUIRED")
+                return self._control_refusal(
+                    session_id,
+                    "REFUSED_GLOBAL_RECOVERY_REQUIRED",
+                    operation_id=operation_id,
+                )
             if (
                 self.control.in_memory_stop
                 or self.control.mutation_disabled
@@ -826,7 +979,11 @@ class AgentSessionCoordinator:
                 or self.control.stop_durability_unresolved
                 or self.control.activation_error is not None
             ):
-                return self._control_refusal(session_id, "REFUSED_GLOBAL_MUTATION_DISABLED")
+                return self._control_refusal(
+                    session_id,
+                    "REFUSED_GLOBAL_MUTATION_DISABLED",
+                    operation_id=operation_id,
+                )
             if not session.pause_latched and not session.stop_latched:
                 return {"status": "UNCHANGED", "session": self.snapshot(session_id)}
             target = AgentOperationalState.PAUSED_AUTHORITY if session.current_run_id else AgentOperationalState.IDLE
@@ -837,11 +994,22 @@ class AgentSessionCoordinator:
                 state_after=target,
                 pause_latched=False,
                 stop_latched=False,
-                payload={"authority_reconciliation_required": bool(session.current_run_id)},
+                action_id=operation_id,
+                payload={
+                    "authority_reconciliation_required": bool(session.current_run_id),
+                    "status": target.value,
+                },
             )
             return {"status": target.value, "session": self.snapshot(session_id)}
 
-    def record_message(self, session_id: str, provenance: AgentProvenance, text: str) -> dict[str, object]:
+    def record_message(
+        self,
+        session_id: str,
+        provenance: AgentProvenance,
+        text: str,
+        *,
+        operation_id: str | None = None,
+    ) -> dict[str, object]:
         if type(provenance) is not AgentProvenance:
             raise ValidationError("INVALID_PROVENANCE", "message provenance is invalid")
         if not isinstance(text, str) or not text.strip():
@@ -849,13 +1017,29 @@ class AgentSessionCoordinator:
         ensure_no_secret_material(text, key_path="agent_message")
         token = text.strip().upper()
         if provenance is AgentProvenance.OWNER and token in OwnerControlCommand._value2member_map_:
-            return self.owner_control(session_id, OwnerControlCommand(token))
+            return self.owner_control(
+                session_id,
+                OwnerControlCommand(token),
+                operation_id=operation_id,
+            )
         encoded = text.encode("utf-8", "strict")
         with self._lock:
+            prior_event = self._operation_event(
+                session_id,
+                operation_id,
+                "MESSAGE_RECORDED",
+            )
+            if prior_event is not None:
+                expected_hash = hashlib.sha256(encoded).hexdigest()
+                if prior_event.get("payload", {}).get("message_sha256") != expected_hash:
+                    raise ValidationError("IDEMPOTENCY_CONFLICT", "agent message operation identity is already bound")
+                self._hydrate_exact_session(session_id)
+                return {"status": "RECORDED", "session": self.snapshot(session_id)}
             self._persist_event(
                 session_id,
                 provenance=provenance,
                 kind="MESSAGE_RECORDED",
+                action_id=operation_id,
                 payload={
                     "message_sha256": hashlib.sha256(encoded).hexdigest(),
                     "message_bytes": len(encoded),

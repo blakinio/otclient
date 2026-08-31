@@ -594,27 +594,93 @@ class AgentSessionTests(unittest.TestCase):
         self.assertEqual("PAUSED_AUTHORITY", self.agent.snapshot("session-1")["operational_state"])
         self.assertEqual("REFUSED_AUTHORITY_RECONCILIATION_REQUIRED", self.propose().status)
 
-    def test_resume_refuses_global_stop_recovery_and_in_memory_blocks(self):
+    def test_resume_refuses_global_recovery_and_in_memory_blocks(self):
         self.submit()
         self.agent.owner_control("session-1", OwnerControlCommand.PAUSE)
-        self.control.control_state = replace(self.control.control_state, stop_latched=True)
-        refused = self.agent.owner_control("session-1", OwnerControlCommand.RESUME)
-        self.assertEqual("REFUSED_GLOBAL_STOP_LATCHED", refused["status"])
-        self.assertTrue(self.agent.snapshot("session-1")["pause_latched"])
-
-        self.control.control_state = replace(self.control.control_state, stop_latched=False, recovery_required=True)
+        self.control.control_state = replace(self.control.control_state, recovery_required=True)
         self.assertEqual("REFUSED_GLOBAL_RECOVERY_REQUIRED", self.agent.owner_control("session-1", "RESUME")["status"])
         self.control.control_state = replace(self.control.control_state, recovery_required=False)
         self.control.in_memory_stop = True
         self.assertEqual("REFUSED_GLOBAL_MUTATION_DISABLED", self.agent.owner_control("session-1", "RESUME")["status"])
 
-    def test_resume_never_resets_global_stop(self):
+    def test_resume_resets_global_stop_once_and_clears_only_session_control_latches(self):
+        self.submit()
+        self.agent.owner_control("session-1", OwnerControlCommand.PAUSE)
+        self.agent.owner_control("session-1", OwnerControlCommand.STOP)
+        generation = self.control.control_generation
+        resumed = self.agent.owner_control(
+            "session-1",
+            "RESUME",
+            operation_id="owner-resume-identity",
+        )
+        self.assertEqual("IDLE", resumed["status"])
+        self.assertFalse(self.control.control_state.stop_latched)
+        self.assertFalse(self.control.control_state.recovery_required)
+        self.assertEqual(generation + 1, self.control.control_generation)
+        self.assertFalse(resumed["session"]["pause_latched"])
+        self.assertFalse(resumed["session"]["stop_latched"])
+        self.assertEqual("NONE", resumed["session"]["mutation_authority"])
+        replay = self.agent.owner_control(
+            "session-1",
+            "RESUME",
+            operation_id="owner-resume-identity",
+        )
+        self.assertEqual("IDLE", replay["status"])
+        self.assertEqual(generation + 1, self.control.control_generation)
+        self.assertEqual(1, sum(
+            event.get("kind") == "OWNER_RESUME"
+            for event in self.agent.snapshot("session-1")["events"]
+        ))
+
+    def test_resume_reset_failure_keeps_global_and_session_stopped(self):
         self.submit()
         self.agent.owner_control("session-1", OwnerControlCommand.STOP)
         generation = self.control.control_generation
-        self.assertEqual("REFUSED_GLOBAL_STOP_LATCHED", self.agent.owner_control("session-1", "RESUME")["status"])
+        self.store.inject_fault("reset", "error")
+        refused = self.agent.owner_control(
+            "session-1",
+            OwnerControlCommand.RESUME,
+            operation_id="owner-resume-failed",
+        )
+        self.assertEqual("REFUSED_GLOBAL_STOP_RESET_FAILED", refused["status"])
         self.assertTrue(self.control.control_state.stop_latched)
         self.assertEqual(generation, self.control.control_generation)
+        durable = self.store.load_agent_session("session-1")
+        self.assertTrue(durable.stop_latched)
+        self.assertEqual("STOPPED", durable.operational_state.value)
+        self.assertFalse(any(
+            event.get("kind") == "OWNER_RESUME"
+            for event in self.agent.snapshot("session-1")["events"]
+        ))
+
+    def test_resume_recovers_durable_reset_when_session_event_commit_was_lost(self):
+        self.submit()
+        self.agent.owner_control("session-1", OwnerControlCommand.STOP)
+        self.store.inject_fault("agent_session_event", "error")
+        with self.assertRaises(DurabilityError):
+            self.agent.owner_control(
+                "session-1",
+                OwnerControlCommand.RESUME,
+                operation_id="owner-resume-event-gap",
+            )
+        generation = self.control.control_generation
+        self.assertFalse(self.control.control_state.stop_latched)
+        stopped = self.store.load_agent_session("session-1")
+        self.assertTrue(stopped.stop_latched)
+        self.assertEqual("STOPPED", stopped.operational_state.value)
+
+        recovered = self.agent.owner_control(
+            "session-1",
+            OwnerControlCommand.RESUME,
+            operation_id="owner-resume-event-gap",
+        )
+        self.assertEqual("IDLE", recovered["status"])
+        self.assertEqual(generation, self.control.control_generation)
+        self.assertFalse(recovered["session"]["stop_latched"])
+        self.assertEqual(1, sum(
+            event.get("kind") == "OWNER_RESUME"
+            for event in self.agent.snapshot("session-1")["events"]
+        ))
 
     def test_owner_token_parsing_precedes_message_and_non_owner_cannot_control(self):
         self.submit()

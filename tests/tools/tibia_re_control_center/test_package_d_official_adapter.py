@@ -23,6 +23,7 @@ from tools.tibia_re_control_center.model import (
     DispatchState,
     LifecycleState,
     SideEffectBudget,
+    ValidationError,
 )
 from tools.tibia_re_control_center.scenario import action_request_hash
 from tools.tibia_re_control_center.store import DeterministicDurableStore
@@ -435,7 +436,7 @@ class PackageDTrackABridgeProtocolTests(unittest.TestCase):
             "effect_count": 1,
             "action_hash": action_hash,
         }, separators=(",", ":")) + "\n"
-        module, temp, bridge, process = self._bridge_and_fake_process([ready, result])
+        _module, temp, bridge, process = self._bridge_and_fake_process([ready, result])
         request = mock.Mock(
             action_request_hash=action_hash,
             kind="turn",
@@ -457,7 +458,7 @@ class PackageDTrackABridgeProtocolTests(unittest.TestCase):
                     outcome = session.cross_once_and_reconcile(request)
                     self.assertEqual(outcome.outcome, "confirmed")
                     self.assertEqual(outcome.reason_code, None)
-                    with self.assertRaises(Exception):
+                    with self.assertRaises(ValidationError):
                         session.cross_once_and_reconcile(request)
             self.assertEqual(process.stdin.getvalue(), "COMMIT\n")
         finally:
@@ -469,7 +470,7 @@ class PackageDTrackABridgeProtocolTests(unittest.TestCase):
             "protocol": "track-a-guarded-dispatch-v1", "status": "READY",
             "action_hash": action_hash, "fence_digest": "b" * 64,
         }, separators=(",", ":")) + "\n"
-        module, temp, bridge, process = self._bridge_and_fake_process([ready])
+        _module, temp, bridge, process = self._bridge_and_fake_process([ready])
         request = mock.Mock(
             action_request_hash=action_hash, kind="turn", parameters={"direction": "NORTH"},
             dispatch_fence=mock.Mock(
@@ -490,7 +491,7 @@ class PackageDTrackABridgeProtocolTests(unittest.TestCase):
             "protocol": "track-a-guarded-dispatch-v1", "status": "READY",
             "action_hash": action_hash, "fence_digest": "b" * 64,
         }, separators=(",", ":")) + "\n"
-        module, temp, bridge, process = self._bridge_and_fake_process([ready])
+        _module, temp, bridge, process = self._bridge_and_fake_process([ready])
         request = mock.Mock(
             action_request_hash=action_hash, kind="turn", parameters={"direction": "NORTH"},
             dispatch_fence=mock.Mock(
@@ -610,7 +611,7 @@ class PackageDConcreteBridgeE2ETests(unittest.TestCase):
         }, separators=(",", ":")) + "\n"
 
     def test_concrete_bridge_confirmed_turn_full_path(self):
-        temp, module, coordinator, request = self._stack(lambda: "IN_GAME")
+        temp, _module, coordinator, request = self._stack(lambda: "IN_GAME")
         process = FakeTransitionProcess([self._ready(request.action_request_hash), self._result(request.action_request_hash, "CONFIRMED")])
         try:
             coordinator.adapter._authority_bridge._test_transport_holder["process"] = process
@@ -625,7 +626,7 @@ class PackageDConcreteBridgeE2ETests(unittest.TestCase):
             temp.cleanup()
 
     def test_concrete_bridge_ambiguous_result_is_never_retried(self):
-        temp, module, coordinator, request = self._stack(lambda: "IN_GAME")
+        temp, _module, coordinator, request = self._stack(lambda: "IN_GAME")
         process = FakeTransitionProcess([self._ready(request.action_request_hash), self._result(request.action_request_hash, "AMBIGUOUS")])
         try:
             coordinator.adapter._authority_bridge._test_transport_holder["process"] = process
@@ -638,7 +639,7 @@ class PackageDConcreteBridgeE2ETests(unittest.TestCase):
             temp.cleanup()
 
     def test_concrete_bridge_timeout_before_ready_has_zero_effect(self):
-        temp, module, coordinator, request = self._stack(lambda: "IN_GAME")
+        temp, _module, coordinator, request = self._stack(lambda: "IN_GAME")
         process = FakeTransitionProcess([])
         try:
             coordinator.adapter._authority_bridge._test_transport_holder["process"] = process
@@ -650,7 +651,7 @@ class PackageDConcreteBridgeE2ETests(unittest.TestCase):
             temp.cleanup()
 
     def test_concrete_bridge_timeout_after_commit_is_ambiguous_once(self):
-        temp, module, coordinator, request = self._stack(lambda: "IN_GAME")
+        temp, _module, coordinator, request = self._stack(lambda: "IN_GAME")
         process = FakeTransitionProcess([self._ready(request.action_request_hash)])
         try:
             coordinator.adapter._authority_bridge._test_transport_holder["process"] = process
@@ -670,7 +671,7 @@ class PackageDConcreteBridgeE2ETests(unittest.TestCase):
                 holder["stopped"] = True
                 holder["coordinator"].stop_all(reason_code="TEST_STOP")
             return "IN_GAME"
-        temp, module, coordinator, request = self._stack(state_provider)
+        temp, _module, coordinator, request = self._stack(state_provider)
         holder["coordinator"] = coordinator
         process = FakeTransitionProcess([self._ready(request.action_request_hash)])
         try:
@@ -693,7 +694,7 @@ class PackageDConcreteBridgeE2ETests(unittest.TestCase):
                 c = holder["coordinator"]
                 c.control_state = replace(c.control_state, control_generation=c.control_generation + 1)
             return "IN_GAME"
-        temp, module, coordinator, request = self._stack(state_provider)
+        temp, _module, coordinator, request = self._stack(state_provider)
         holder["coordinator"] = coordinator
         process = FakeTransitionProcess([self._ready(request.action_request_hash)])
         try:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import threading
 from typing import Any
 
 from .model import (
@@ -24,6 +25,7 @@ class DeterministicDurableStore:
         self.run_activation: dict[str, tuple[int, int]] = {}
         self.recovery_records: dict[str, dict[str, Any]] = {}
         self._faults: dict[str, list[str]] = {}
+        self._lock = threading.RLock()
         self.safety_flush_count = 0
 
     def inject_fault(self, operation: str, kind: str = "error", *, count: int = 1) -> None:
@@ -65,6 +67,29 @@ class DeterministicDurableStore:
             raise ValidationError("IDEMPOTENCY_CONFLICT", "action_id already exists with a different request hash")
         self.action_ledgers[record.action_id] = copy.deepcopy(record)
 
+    def atomic_reserve_action(
+        self,
+        record: ActionLedgerRecord,
+        previous_ledger: BudgetLedger,
+        reserved_ledger: BudgetLedger,
+    ) -> tuple[ActionLedgerRecord, BudgetLedger, bool]:
+        with self._lock:
+            existing = self.action_ledgers.get(record.action_id)
+            if existing is not None:
+                if existing.action_request_hash != record.action_request_hash:
+                    raise ValidationError("IDEMPOTENCY_CONFLICT", "action_id already exists with a different request hash")
+                current = self.budget_ledgers.get(record.run_id)
+                if current is None:
+                    raise ValidationError("BUDGET_LEDGER_MISSING", "action reservation requires its durable budget")
+                return copy.deepcopy(existing), current.clone(), False
+            current = self.budget_ledgers.get(record.run_id)
+            if current is None or current != previous_ledger:
+                raise ValidationError("BUDGET_LEDGER_STALE", "action reservation budget changed concurrently")
+            self._before_write("action_reserve")
+            self.action_ledgers[record.action_id] = copy.deepcopy(record)
+            self.budget_ledgers[reserved_ledger.run_id] = reserved_ledger.clone()
+            return copy.deepcopy(record), reserved_ledger.clone(), True
+
     def load_budget(self, run_id: str) -> BudgetLedger | None:
         value = self.budget_ledgers.get(run_id)
         return None if value is None else value.clone()
@@ -83,13 +108,19 @@ class DeterministicDurableStore:
     def load_run_activation(self, run_id: str) -> tuple[int, int] | None:
         return self.run_activation.get(run_id)
 
-    def atomic_dispatch_commit(self, record: ActionLedgerRecord, ledger: BudgetLedger) -> None:
-        self._before_write("dispatch_commit")
-        existing = self.action_ledgers.get(record.action_id)
-        if existing and existing.action_request_hash != record.action_request_hash:
-            raise ValidationError("IDEMPOTENCY_CONFLICT", "action_id already exists with a different request hash")
-        self.action_ledgers[record.action_id] = copy.deepcopy(record)
-        self.budget_ledgers[ledger.run_id] = ledger.clone()
+    def atomic_dispatch_commit(self, record: ActionLedgerRecord, ledger: BudgetLedger) -> bool:
+        with self._lock:
+            self._before_write("dispatch_commit")
+            existing = self.action_ledgers.get(record.action_id)
+            if existing is None:
+                raise ValidationError("ACTION_LEDGER_MISSING", "dispatch commit requires a durable reservation")
+            if existing.action_request_hash != record.action_request_hash:
+                raise ValidationError("IDEMPOTENCY_CONFLICT", "action_id already exists with a different request hash")
+            if existing.dispatch_state.value != "NOT_DISPATCHED":
+                return False
+            self.action_ledgers[record.action_id] = copy.deepcopy(record)
+            self.budget_ledgers[ledger.run_id] = ledger.clone()
+            return True
 
     def atomic_reconcile(self, record: ActionLedgerRecord, ledger: BudgetLedger) -> None:
         self._before_write("reconcile")

@@ -7,7 +7,7 @@ project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: implementation
-phase: implementation_execution
+phase: closeout_validation
 branch: feat/OTC-20260830-local-vision-agent-supervisor-foundation
 base_branch: docs/OTC-20260830-local-vision-agent-supervisor-discovery
 trusted_main: 9f79685f6d073c160397eeefdbc2beb27e8921ad
@@ -15,7 +15,7 @@ parent_task: OTC-20260830-local-vision-agent-supervisor-discovery
 parent_pr: 808
 implementation_pr: 810
 created: 2026-08-30T11:51:56+02:00
-updated_at: 2026-08-31T11:45:00Z
+updated_at: 2026-08-31T13:20:00Z
 risk: high
 execution_class: repository_worktree
 execution_mode: subagent_driven_development
@@ -75,8 +75,8 @@ current_environment:
   remote_desktop_commander: offline
   codex_worktree: available
   codex_subagent_dispatch: available
-current_blocker: TASK9_INDEPENDENT_SCOPED_REVIEW_REQUIRED — Architect Ruling C implementation is green but not self-approved
-next_action: independently review the Ruling C diff and Task 9 scenario I; start Task 10 only if that review is clean
+current_blocker: TASK10_CAPABLE_ENVIRONMENT_REQUIRED — exact local Package B browser E2E cannot start without Chromium/Chrome and Ruff 0.16.1 is unavailable; the unpublished branch contains the frozen implementation head that is 17 commits ahead of Draft PR #810 plus this closeout commit
+next_action: run the blocked Task 10 Ruff and real-Chromium Package B E2E on one capable exact head, then publish/freeze that head before the coordinator's separate final whole-branch review
 ---
 
 # Local vision-agent supervisor foundation implementation
@@ -267,3 +267,33 @@ Task 9 remains review-gated. A separate independent scoped re-review must
 approve this diff before Task 10 begins. Authority remains `runtime_access:none`,
 all credential/runtime/effect permissions false, physical budget/count `0/0`,
 and production executor Null/unbound.
+
+## Task 10 closeout checkpoint — 2026-08-31
+
+The required independent Task 9 Architect Ruling C scoped re-review is
+**CLEAN** at `b5f83efae16203475a61e2887ad9952e435f84fd` (Critical/Important/
+Minor `0/0/0`). The delivered boundary is `repository_control_foundation` only:
+the existing Control Center owns persistent session/provenance, bounded
+dashboard/API/CLI and five-tool MCP foundation, while `tools.tibia_re_vision`
+exports the reused PR #790 safety primitives. Production remains
+Null/unbound; CUA is disabled; credentials, Synology/Molehill transport or
+deployment, Official-runtime transitions, Hermes and physical gameplay are
+separate and unchanged.
+
+Task 10's named validation ran against frozen implementation HEAD
+`b5f83efae16203475a61e2887ad9952e435f84fd`: compileall, full Control Center
+(`457`, 3 platform skips), frozen benchmark (`34`), Package B audit, agent
+foundation audit/E2E and `git diff --check` passed. Package A and A-P1 direct
+scripts require repository-root `PYTHONPATH=.` but then pass under the exact
+current CI invocation. The named Package B browser E2E is **NOT PASS**: no
+Chromium/Chrome binary is installed. The named Ruff command is **NOT PASS**:
+the current Python environment has no `ruff`; the current CI workflow pins
+`ruff==0.16.1`, but no repository-equivalent local executable exists. These
+are real terminal blockers, not waived checks.
+
+PR #810 remains Draft at remote `09faf58f46bd7b25824075ae2f60070034502acb`
+while this local branch is 17 commits ahead at the frozen implementation head;
+no push, PR mutation or merge was performed. PR #615 remains open/Draft and
+unmerged; it is not superseded because the replacement is also unmerged. See
+the Task 10 SDD report for complete command results and the one required next
+action.

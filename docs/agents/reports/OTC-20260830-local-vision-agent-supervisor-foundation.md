@@ -207,3 +207,34 @@ Current PR/head: '#810 Draft; local ecf12922c125afa42bbceb8423f40b3bfbefd376; re
 ```
 
 The reviewer demand to avoid the private fake runtime resolver seam was adjudicated inapplicable: `agent_reconcile.py` explicitly reserves it as the sole test-only injection point while the public two-argument API remains fail-closed. Per the owner anti-loop rule, Task 9 was not sent into a third automatic fix/re-review. Task 10 remains dependent on this decision.
+
+## Task 10 closeout checkpoint — repository-control foundation
+
+Task 9 Architect Ruling C is independently re-reviewed **CLEAN** at
+`b5f83efae16203475a61e2887ad9952e435f84fd` (Critical/Important/Minor `0/0/0`).
+The delivered scope is `repository_control_foundation`: existing Control Center
+persistent session/provenance, bounded dashboard/API/CLI controls, five-tool
+MCP, fail-closed model-slot/reconciliation and fake/offline evidence; the
+reused PR #790 safety primitives remain in `tools.tibia_re_vision`.
+
+It is not autonomous Tibia, runtime, credential or gameplay readiness.
+Production executor remains Null/unbound; `runtime_access:none`, CUA disabled,
+all credential/runtime/effect permissions false and physical budget/count
+`0/0`. Credentials, Synology/Molehill transport or deployment, Official-runtime
+transitions and Hermes remain separate/unchanged.
+
+On the frozen implementation head, Task 10 compileall, full Control Center
+(`457` passed, 3 platform skips), frozen benchmark (`34` passed), Package B
+audit, agent-foundation audit/E2E and diff check pass. The genuine CI-equivalent
+Package A/A-P1 invocations with `PYTHONPATH=.` pass; their unqualified direct
+script forms lack repository-root import setup locally. The real Package B
+browser E2E is blocked before start because Chromium/Chrome is absent. Ruff is
+also unavailable (`No module named ruff`); neither unavailable command is
+treated as PASS.
+
+PR #810 remains Draft at remote
+`09faf58f46bd7b25824075ae2f60070034502acb`; local validation head is 17 commits
+ahead and has no exact-head remote checks. No push, merge, PR mutation or final
+whole-branch review occurred. PR #615 remains open because the replacement is
+unmerged. The precise command results and terminal blockers are retained in the
+plan-scoped Task 10 report.

@@ -920,6 +920,15 @@ class SQLitePersistentStore:
         )
         return None if row is None else self._agent_task_values(row, row[0])
 
+    def load_agent_task_for_run(self, run_id: str) -> dict[str, object] | None:
+        validate_opaque_id(run_id, field_name="run_id")
+        row = self._fetchone(
+            "SELECT idempotency_key,session_id,run_id,envelope_hash,body,result "
+            "FROM agent_tasks WHERE run_id=?",
+            (run_id,),
+        )
+        return None if row is None else self._agent_task_values(row, row[0])
+
     def finish_agent_task(self, idempotency_key: str, result: ResultEnvelope) -> None:
         canonical_result = _canonical_result(result)
         _ensure_persistable(canonical_result, key_path="agent_result")

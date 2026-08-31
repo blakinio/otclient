@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import uuid
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
+from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
 from .canonical import jcs_dumps
@@ -91,10 +93,36 @@ def _read_scenario(path: Path) -> dict[str, Any]:
     return value
 
 
+def _read_agent_task(path: Path) -> dict[str, Any]:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ControlClientError(0, {
+            "code": "CONTROL_AGENT_TASK_FILE_INVALID",
+            "safe_message": "agent task file is unavailable or invalid JSON",
+        }) from exc
+    if not isinstance(value, dict):
+        raise ControlClientError(0, {
+            "code": "CONTROL_AGENT_TASK_FILE_INVALID",
+            "safe_message": "agent task file must contain one JSON object",
+        })
+    return value
+
+
 def _post_parser(subparsers: Any, name: str, help_text: str) -> argparse.ArgumentParser:
     parser = subparsers.add_parser(name, help=help_text)
     parser.add_argument("--request-id", required=True)
     return parser
+
+
+def _agent_post_parser(subparsers: Any, name: str, help_text: str) -> argparse.ArgumentParser:
+    parser = subparsers.add_parser(name, help=help_text)
+    parser.add_argument("--request-id")
+    return parser
+
+
+def _request_id(args: argparse.Namespace, prefix: str) -> str:
+    return args.request_id or f"cli-{prefix}-{uuid.uuid4().hex}"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -122,6 +150,22 @@ def build_parser() -> argparse.ArgumentParser:
     for name in ("pause", "resume", "abort"):
         item = _post_parser(sub, name, f"{name} an active run")
         item.add_argument("run_id")
+    agent_status = sub.add_parser("agent-status", help="show one secret-safe agent session")
+    agent_status.add_argument("--session", required=True)
+    agent_task = _agent_post_parser(sub, "agent-task", "submit one exact TaskEnvelope.v1 JSON object")
+    agent_task.add_argument("--file", type=Path, required=True)
+    agent_chat = _agent_post_parser(sub, "agent-chat", "record an owner message without credential arguments")
+    agent_chat.add_argument("--session", required=True)
+    agent_chat.add_argument("--text", required=True)
+    agent_control = _agent_post_parser(sub, "agent-control", "send an owner agent control")
+    agent_control.add_argument("--session", required=True)
+    agent_control.add_argument("--command", choices=("PAUSE", "STOP", "RESUME", "SCREENSHOT"), required=True)
+    agent_events = sub.add_parser("agent-events", help="poll one agent provenance timeline")
+    agent_events.add_argument("--session", required=True)
+    agent_events.add_argument("--cursor", type=int, required=True)
+    agent_events.add_argument("--limit", type=int, required=True)
+    agent_result = sub.add_parser("agent-result", help="show one agent result")
+    agent_result.add_argument("--run", required=True)
     return parser
 
 
@@ -144,6 +188,34 @@ def main(argv: list[str] | None = None) -> int:
             result = client.get(f"/v1/actions/{args.action_id}")
         elif command == "events":
             result = client.get(f"/v1/events?limit={args.limit}&cursor={args.cursor}")
+        elif command == "agent-status":
+            result = client.get("/v1/agent/session?" + urlencode({"session_id": args.session}))
+        elif command == "agent-events":
+            result = client.get("/v1/agent/events?" + urlencode({
+                "session_id": args.session,
+                "cursor": args.cursor,
+                "limit": args.limit,
+            }))
+        elif command == "agent-result":
+            result = client.get("/v1/agent/result?" + urlencode({"run_id": args.run}))
+        elif command == "agent-task":
+            result = client.post(
+                "/v1/agent/tasks",
+                _read_agent_task(args.file),
+                request_id=_request_id(args, "agent-task"),
+            )
+        elif command == "agent-chat":
+            result = client.post(
+                "/v1/agent/chat",
+                {"session_id": args.session, "text": args.text},
+                request_id=_request_id(args, "agent-chat"),
+            )
+        elif command == "agent-control":
+            result = client.post(
+                "/v1/agent/control",
+                {"session_id": args.session, "command": args.command},
+                request_id=_request_id(args, "agent-control"),
+            )
         elif command == "create-run":
             result = client.post("/v1/runs", {"scenario": _read_scenario(args.scenario)}, request_id=args.request_id)
         elif command == "experiment":
@@ -154,7 +226,7 @@ def main(argv: list[str] | None = None) -> int:
         elif command == "reset-stop":
             result = client.post("/v1/reset-stop", {}, request_id=args.request_id)
         else:
-            result = client.post(f"/v1/runs/{args.run_id}/{command}", {}, request_id=args.request_id)
+            result = client.post(f"/v1/runs/{quote(args.run_id, safe='')}/{command}", {}, request_id=args.request_id)
         print(jcs_dumps(result))
         return 0
     except ControlClientError as exc:

@@ -11,6 +11,7 @@ from enum import Enum
 from typing import Any
 
 from .artifact import ArtifactStore
+from .agent_protocol import AgentProvenance, OwnerControlCommand, TaskEnvelope
 from .agent_session import AgentSessionCoordinator
 from .canonical import sha256_jcs
 from .engine import ScenarioEngine
@@ -32,7 +33,7 @@ from .persistent_store import (
     SQLitePersistentStore,
     _ensure_persistable,
 )
-from .recorder import Recorder
+from .recorder import Recorder, ensure_no_secret_material
 from .scenario import ACTION_KINDS, ValidatedScenario, validate_scenario
 
 
@@ -142,6 +143,42 @@ class ControlDomainService:
             raise SimulatedCrash(f"simulated Package B crash at {point}")
 
     def normalize_post_body(self, operation: str, body: Any) -> dict[str, Any]:
+        if operation == "AGENT_TASK":
+            if not isinstance(body, Mapping):
+                raise ControlDomainError("CONTROL_BODY_INVALID", "request body must be a JSON object")
+            try:
+                parsed = TaskEnvelope.from_mapping(body)
+                ensure_no_secret_material(asdict(parsed), key_path="agent_task")
+            except PrivacyError as exc:
+                raise ControlDomainError(
+                    "CONTROL_PRIVACY_REJECTED",
+                    "request violates the privacy boundary",
+                ) from exc
+            return _jsonable(asdict(parsed))
+        if operation == "AGENT_CHAT":
+            data = _exact_keys(body, {"session_id", "text"})
+            validate_opaque_id(data["session_id"], field_name="session_id")
+            if not isinstance(data["text"], str) or not data["text"].strip():
+                raise ControlDomainError("CONTROL_BODY_INVALID", "chat text must be a non-empty string")
+            try:
+                ensure_no_secret_material(data["text"], key_path="agent_chat.text")
+            except PrivacyError as exc:
+                raise ControlDomainError(
+                    "CONTROL_PRIVACY_REJECTED",
+                    "request violates the privacy boundary",
+                ) from exc
+            return {"session_id": data["session_id"], "text": data["text"]}
+        if operation == "AGENT_CONTROL":
+            data = _exact_keys(body, {"session_id", "command"})
+            validate_opaque_id(data["session_id"], field_name="session_id")
+            try:
+                command = OwnerControlCommand(data["command"])
+            except (TypeError, ValueError) as exc:
+                raise ControlDomainError(
+                    "CONTROL_BODY_INVALID",
+                    "agent control command is not admitted",
+                ) from exc
+            return {"session_id": data["session_id"], "command": command.value}
         if operation in {"CREATE_RUN", "ONE_STEP_EXPERIMENT"}:
             data = _exact_keys(body, {"scenario"})
             if not isinstance(data["scenario"], Mapping):
@@ -171,6 +208,9 @@ class ControlDomainService:
             "PAUSE_RUN": "pause",
             "RESUME_RUN": "resume",
             "ABORT_RUN": "abort",
+            "AGENT_TASK": "agent-task",
+            "AGENT_CHAT": "agent-chat",
+            "AGENT_CONTROL": "agent-control",
         }[operation]
 
     def _new_resource_id(self, operation: str) -> str:
@@ -271,6 +311,7 @@ class ControlDomainService:
             status = 409 if exc.code in {
                 "MUTATION_LOCALLY_BLOCKED", "RECOVERY_STATE_MISSING", "RECOVERY_STATE_CONTRADICTORY",
                 "RUN_ACTIVATION_CONFLICT", "RUN_NOT_ACTIVE", "REFUSED_MUTATION_RUN_CONFLICT",
+                "IDEMPOTENCY_CONFLICT",
             } else 400
             reply = DomainReply(
                 status,
@@ -544,6 +585,139 @@ class ControlDomainService:
         payload = {"resource_id": resource_id, "run_id": run_id, "state": state, "official_client_access": "NONE"}
         self.store.finish_resource(resource_id, "COMPLETED", payload)
         return DomainReply(200, payload, "COMPLETED", state, resource_id)
+
+    @staticmethod
+    def _latest_agent_event(events: list[dict[str, Any]], kind: str) -> dict[str, Any] | None:
+        return next((event for event in reversed(events) if event.get("kind") == kind), None)
+
+    def _safe_agent_snapshot(self, session_id: str) -> dict[str, Any]:
+        snapshot = _jsonable(self.agent.snapshot(session_id))
+        events = snapshot.get("events")
+        if not isinstance(events, list):
+            events = []
+        capture_event = self._latest_agent_event(events, "SCREENSHOT_RESULT")
+        capture: dict[str, Any] = {
+            "status": "UNAVAILABLE",
+            "artifact_ref": None,
+            "sha256": None,
+            "secret_safe": True,
+        }
+        if capture_event is not None:
+            payload = capture_event.get("payload")
+            refs = capture_event.get("artifact_refs")
+            if isinstance(payload, dict) and payload.get("secret_safe") is True:
+                capture = {
+                    "status": payload.get("status", "UNAVAILABLE"),
+                    "artifact_ref": refs[0] if isinstance(refs, list) and refs else None,
+                    "sha256": payload.get("sha256"),
+                    "secret_safe": True,
+                }
+        action_event = next(
+            (
+                event for event in reversed(events)
+                if event.get("kind") in {"ACTION_RESULT", "ACTION_REFUSED", "MODEL_ACTION_PROPOSED"}
+            ),
+            None,
+        )
+        snapshot["dashboard"] = {
+            "latest_secret_safe_capture": capture,
+            "visual": {
+                "label": "UNKNOWN",
+                "ocr": [],
+                "visual_only": True,
+                "structural_authority": False,
+            },
+            "runtime_evidence_class": "UNKNOWN",
+            "reconciliation_state": "UNKNOWN",
+            "latest_action": action_event,
+            "provenance_timeline": events,
+        }
+        ensure_no_secret_material(snapshot, key_path="agent_response")
+        return snapshot
+
+    def agent_session(self, session_id: str) -> dict[str, Any]:
+        validate_opaque_id(session_id, field_name="session_id")
+        if self.store.load_agent_session(session_id) is None:
+            raise ControlDomainError("CONTROL_AGENT_SESSION_NOT_FOUND", "agent session was not found", http_status=404)
+        return self._safe_agent_snapshot(session_id)
+
+    def agent_events(self, session_id: str, *, cursor: int, limit: int) -> dict[str, Any]:
+        validate_opaque_id(session_id, field_name="session_id")
+        if self.store.load_agent_session(session_id) is None:
+            raise ControlDomainError("CONTROL_AGENT_SESSION_NOT_FOUND", "agent session was not found", http_status=404)
+        retained, high_watermark = self.store.list_events(
+            cursor=cursor,
+            limit=self.store.event_retention,
+        )
+        items = [event for event in retained if event.get("session_id") == session_id][:limit]
+        ensure_no_secret_material(items, key_path="agent_events_response")
+        return {
+            "session_id": session_id,
+            "items": items,
+            "cursor": cursor,
+            "high_watermark": high_watermark,
+            "delivery": "BOUNDED_POLLING",
+        }
+
+    def _agent_task_for_run(self, run_id: str) -> dict[str, object] | None:
+        return self.store.load_agent_task_for_run(run_id)
+
+    def agent_result(self, run_id: str) -> dict[str, Any]:
+        validate_opaque_id(run_id, field_name="run_id")
+        task = self._agent_task_for_run(run_id)
+        if task is None:
+            raise ControlDomainError("CONTROL_AGENT_RESULT_NOT_FOUND", "agent result was not found", http_status=404)
+        result = task.get("result")
+        if result is None:
+            return {"run_id": run_id, "status": "PENDING", "result": None}
+        if not isinstance(result, dict):
+            raise ControlDomainError("CONTROL_AGENT_RESULT_INVALID", "agent result is invalid", http_status=500)
+        ensure_no_secret_material(result, key_path="agent_result_response")
+        return copy.deepcopy(result)
+
+    def agent_submit_task(self, resource_id: str, request_id: str, normalized: dict[str, Any]) -> DomainReply:
+        del request_id
+        accepted = self.agent.submit_task(TaskEnvelope.from_mapping(normalized))
+        envelope = accepted["envelope"]
+        if not isinstance(envelope, dict):
+            raise ControlDomainError("CONTROL_AGENT_TASK_INVALID", "accepted agent task is invalid", http_status=500)
+        session_id = str(envelope["session_id"])
+        run_id = str(envelope["run_id"])
+        payload = {
+            "resource_id": resource_id,
+            "status": "ACCEPTED",
+            "accepted_new": bool(accepted["accepted_new"]),
+            "provenance": AgentProvenance.SUPERVISOR.value,
+            "session": self._safe_agent_snapshot(session_id),
+        }
+        return DomainReply(201, payload, "COMPLETED", "ACCEPTED", run_id)
+
+    def agent_chat(self, resource_id: str, request_id: str, normalized: dict[str, Any]) -> DomainReply:
+        del request_id
+        result = self.agent.record_message(
+            normalized["session_id"],
+            AgentProvenance.OWNER,
+            normalized["text"],
+        )
+        session = result.get("session")
+        payload = {
+            "resource_id": resource_id,
+            "status": result.get("status", "RECORDED"),
+            "provenance": AgentProvenance.OWNER.value,
+            "session": self._safe_agent_snapshot(normalized["session_id"]) if session is not None else None,
+        }
+        return DomainReply(200, payload, "COMPLETED", str(payload["status"]), normalized["session_id"])
+
+    def agent_control(self, resource_id: str, request_id: str, normalized: dict[str, Any]) -> DomainReply:
+        del request_id
+        result = self.agent.owner_control(normalized["session_id"], normalized["command"])
+        payload = {
+            "resource_id": resource_id,
+            "status": result.get("status", "UNKNOWN"),
+            "provenance": AgentProvenance.OWNER.value,
+            "session": self._safe_agent_snapshot(normalized["session_id"]),
+        }
+        return DomainReply(200, payload, "COMPLETED", str(payload["status"]), normalized["session_id"])
 
     def list_runs(self, *, offset: int = 0, limit: int = 100) -> dict[str, Any]:
         items = []

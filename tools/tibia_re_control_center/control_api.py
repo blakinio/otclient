@@ -43,6 +43,9 @@ def _allowed_methods(path: str) -> frozenset[str]:
         "/v1/scenarios",
         "/v1/runs",
         "/v1/events",
+        "/v1/agent/session",
+        "/v1/agent/events",
+        "/v1/agent/result",
     } or _RUN_ARTIFACT_RE.fullmatch(path) or _RUN_RE.fullmatch(path) or _ACTION_RE.fullmatch(path):
         methods.add("GET")
     if path in {
@@ -50,6 +53,9 @@ def _allowed_methods(path: str) -> frozenset[str]:
         "/v1/experiments/one-step",
         "/v1/stop-all",
         "/v1/reset-stop",
+        "/v1/agent/tasks",
+        "/v1/agent/chat",
+        "/v1/agent/control",
     } or _RUN_CONTROL_RE.fullmatch(path):
         methods.add("POST")
     return frozenset(methods)
@@ -233,6 +239,24 @@ class ControlRequestHandler(BaseHTTPRequestHandler):
         second = self._bounded_int(query, "cursor" if cursor else "offset", 0, 2_147_483_647)
         return limit, second
 
+    @staticmethod
+    def _required_query(query: dict[str, list[str]], required: set[str]) -> dict[str, str]:
+        if set(query) != required:
+            raise ControlDomainError(
+                "CONTROL_QUERY_INVALID",
+                "query parameters are missing or unknown",
+            )
+        result: dict[str, str] = {}
+        for key in required:
+            values = query[key]
+            if len(values) != 1 or not values[0]:
+                raise ControlDomainError(
+                    "CONTROL_QUERY_INVALID",
+                    f"query parameter {key} must occur once and be non-empty",
+                )
+            result[key] = values[0]
+        return result
+
     def _read_body(self) -> Any:
         if self.headers.get("Transfer-Encoding") is not None:
             raise ControlDomainError("CONTROL_TRANSFER_ENCODING_REJECTED", "chunked or transformed request bodies are not admitted", http_status=400)
@@ -326,6 +350,21 @@ class ControlRequestHandler(BaseHTTPRequestHandler):
             elif path == "/v1/events":
                 limit, cursor = self._page(query, cursor=True)
                 payload = self.control.domain.events(cursor=cursor, limit=limit)
+            elif path == "/v1/agent/session":
+                values = self._required_query(query, {"session_id"})
+                payload = self.control.domain.agent_session(values["session_id"])
+            elif path == "/v1/agent/events":
+                values = self._required_query(query, {"session_id", "cursor", "limit"})
+                numeric_query = {key: query[key] for key in ("cursor", "limit")}
+                limit, cursor = self._page(numeric_query, cursor=True)
+                payload = self.control.domain.agent_events(
+                    values["session_id"],
+                    cursor=cursor,
+                    limit=limit,
+                )
+            elif path == "/v1/agent/result":
+                values = self._required_query(query, {"run_id"})
+                payload = self.control.domain.agent_result(values["run_id"])
             elif (match := _RUN_ARTIFACT_RE.fullmatch(path)) is not None:
                 if query:
                     raise ControlDomainError("CONTROL_QUERY_INVALID", "artifact view does not accept query parameters")
@@ -374,6 +413,12 @@ class ControlRequestHandler(BaseHTTPRequestHandler):
                 operation, handler = "STOP_ALL", self.control.domain.stop_all
             elif path == "/v1/reset-stop":
                 operation, handler = "RESET_STOP", self.control.domain.reset_stop
+            elif path == "/v1/agent/tasks":
+                operation, handler = "AGENT_TASK", self.control.domain.agent_submit_task
+            elif path == "/v1/agent/chat":
+                operation, handler = "AGENT_CHAT", self.control.domain.agent_chat
+            elif path == "/v1/agent/control":
+                operation, handler = "AGENT_CONTROL", self.control.domain.agent_control
             elif (match := _RUN_CONTROL_RE.fullmatch(path)) is not None:
                 run_id = unquote(match.group(1))
                 verb = match.group(2)

@@ -59,42 +59,80 @@ def _production_files() -> list[Path]:
     )
 
 
+def _forbidden_violations(path: Path, source: str) -> list[str]:
+    violations: list[str] = []
+    lowered = source.casefold()
+    for token in FORBIDDEN_TEXT:
+        if token.casefold() in lowered:
+            violations.append(f"{path} exposes forbidden {token!r}")
+    if re.search(r"\bshell\s*=\s*True\b", source):
+        violations.append(f"{path} enables shell=True")
+    if re.search(r"\bget_secret\s*\(", source):
+        violations.append(f"{path} exposes generic get_secret")
+    try:
+        tree = ast.parse(source, filename=str(path))
+    except SyntaxError as exc:
+        return violations + [f"{path} does not parse: {exc.msg}"]
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name) and node.id in {"__import__", "eval", "exec"}:
+            violations.append(f"{path} exposes dynamic import machinery")
+        if isinstance(node, ast.Constant) and node.value == "__import__":
+            violations.append(f"{path} exposes dynamic import machinery")
+        if isinstance(node, (ast.Import, ast.ImportFrom)):
+            imported = (
+                [alias.name for alias in node.names]
+                if isinstance(node, ast.Import)
+                else [node.module or ""]
+            )
+            if any(name == "subprocess" or name.startswith("subprocess.") for name in imported):
+                violations.append(f"{path} introduces subprocess in production agent modules")
+            if any(name == "importlib" or name.startswith("importlib.") for name in imported):
+                violations.append(f"{path} exposes dynamic import machinery")
+            if isinstance(node, ast.ImportFrom) and any(alias.name == "__import__" for alias in node.names):
+                violations.append(f"{path} exposes dynamic import machinery")
+        if isinstance(node, ast.Call):
+            for keyword in node.keywords:
+                if (
+                    keyword.arg == "shell"
+                    and isinstance(keyword.value, ast.Constant)
+                    and keyword.value.value is True
+                ):
+                    violations.append(f"{path} enables shell=True")
+            function = node.func
+            function_name = function.id if isinstance(function, ast.Name) else None
+            attribute_name = function.attr if isinstance(function, ast.Attribute) else None
+            if function_name in {"__import__", "eval", "exec"} or attribute_name in {"import_module", "__import__"}:
+                violations.append(f"{path} exposes dynamic import machinery")
+            if (
+                isinstance(function, ast.Name)
+                and function.id == "getattr"
+                and len(node.args) >= 2
+                and isinstance(node.args[1], ast.Constant)
+                and node.args[1].value == "__import__"
+            ):
+                violations.append(f"{path} exposes dynamic import machinery")
+        if isinstance(node, ast.Subscript) and isinstance(node.value, ast.Attribute):
+            if isinstance(node.value.value, ast.Name) and node.value.value.id == "sys" and node.value.attr == "modules":
+                violations.append(f"{path} exposes dynamic import machinery")
+        if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name):
+            if node.value.id == "sys" and node.attr == "modules":
+                violations.append(f"{path} exposes dynamic import machinery")
+    return violations
+
+
 def audit_forbidden_surfaces() -> None:
     violations: list[str] = []
     for path in _production_files():
-        source = _source(path)
-        lowered = source.casefold()
-        for token in FORBIDDEN_TEXT:
-            if token.casefold() in lowered:
-                violations.append(f"{path.relative_to(ROOT)} exposes forbidden {token!r}")
-        if re.search(r"\bshell\s*=\s*True\b", source):
-            violations.append(f"{path.relative_to(ROOT)} enables shell=True")
-        if re.search(r"\bget_secret\s*\(", source):
-            violations.append(f"{path.relative_to(ROOT)} exposes generic get_secret")
-        try:
-            tree = ast.parse(source, filename=str(path))
-        except SyntaxError as exc:
-            violations.append(f"{path.relative_to(ROOT)} does not parse: {exc.msg}")
-            continue
-        for node in ast.walk(tree):
-            if isinstance(node, (ast.Import, ast.ImportFrom)):
-                imported = (
-                    [alias.name for alias in node.names]
-                    if isinstance(node, ast.Import)
-                    else [node.module or ""]
-                )
-                if any(name == "subprocess" or name.startswith("subprocess.") for name in imported):
-                    violations.append(
-                        f"{path.relative_to(ROOT)} introduces subprocess in production agent modules"
-                    )
-            if isinstance(node, ast.Call):
-                for keyword in node.keywords:
-                    if (
-                        keyword.arg == "shell"
-                        and isinstance(keyword.value, ast.Constant)
-                        and keyword.value.value is True
-                    ):
-                        violations.append(f"{path.relative_to(ROOT)} enables shell=True")
+        path_violations = _forbidden_violations(path.relative_to(ROOT), _source(path))
+        violations.extend(path_violations)
+    dynamic_sources = (
+        "import importlib\nimportlib.import_module('subprocess')",
+        "loader = __import__\nloader('subprocess')",
+        "import sys\nsys.modules['subprocess']",
+    )
+    for source in dynamic_sources:
+        if not _forbidden_violations(Path("dynamic-subprocess.py"), source):
+            raise AssertionError("dynamic subprocess import bypassed the production surface audit")
     if violations:
         raise AssertionError("forbidden production surface(s): " + "; ".join(violations))
 
@@ -137,6 +175,34 @@ def audit_exact_model_profile() -> None:
         raise AssertionError("Task plan does not retain the exact Qwen profile")
 
 
+def _require_imported_calls(path: Path, source: str, required: set[str]) -> None:
+    try:
+        tree = ast.parse(source, filename=str(path))
+    except SyntaxError as exc:
+        raise AssertionError(f"{path} does not parse") from exc
+    bindings: dict[str, str] = {}
+    for node in tree.body:
+        if not isinstance(node, ast.ImportFrom) or node.module != "tools.tibia_re_vision.evidence":
+            continue
+        for alias in node.names:
+            bindings[alias.asname or alias.name] = alias.name
+    calls = {
+        node.func.id
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+    }
+    missing_imports = sorted(required - set(bindings.values()))
+    missing_calls = sorted(
+        symbol for symbol in required
+        if not any(local == symbol and local in calls for local, imported in bindings.items() if imported == symbol)
+    )
+    if missing_imports or missing_calls:
+        raise AssertionError(
+            f"{path} does not directly import/call PR #790 validators "
+            f"(missing_imports={missing_imports!r}, missing_calls={missing_calls!r})"
+        )
+
+
 def audit_reusable_pr790_validation() -> None:
     evidence = ROOT / "tools" / "tibia_re_vision" / "evidence.py"
     benchmark = ROOT / "tools" / "tibia-re-vision-benchmark" / "vision_benchmark.py"
@@ -144,10 +210,47 @@ def audit_reusable_pr790_validation() -> None:
     if not evidence.is_file() or not benchmark.is_file() or not frozen_tests.is_dir():
         raise AssertionError("PR #790 reusable vision benchmark surface is missing")
     evidence_source = _source(evidence)
+    evidence_tree = ast.parse(evidence_source, filename=str(evidence))
+    definitions = {
+        node.name
+        for node in ast.walk(evidence_tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+    required = {"validate_input_manifest", "validate_visual_evidence", "ensure_secret_safe"}
+    if not required.issubset(definitions):
+        raise AssertionError("PR #790 evidence validators are not defined")
+    manifest = next(
+        node
+        for node in ast.walk(evidence_tree)
+        if isinstance(node, ast.FunctionDef) and node.name == "validate_input_manifest"
+    )
+    manifest_calls = {
+        node.func.id
+        for node in ast.walk(manifest)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+    }
+    if "ensure_secret_safe" not in manifest_calls:
+        raise AssertionError("validate_input_manifest no longer enforces secret-safe metadata")
+
+    agent_source = _source(ROOT / "tools" / "tibia_re_control_center" / "agent_vision.py")
+    _require_imported_calls(
+        ROOT / "tools" / "tibia_re_control_center" / "agent_vision.py",
+        agent_source,
+        {"validate_input_manifest", "validate_visual_evidence", "ensure_secret_safe"},
+    )
     benchmark_source = _source(benchmark)
-    for symbol in ("validate_input_manifest", "validate_visual_evidence", "ensure_secret_safe"):
-        if symbol not in evidence_source or symbol not in benchmark_source:
-            raise AssertionError(f"PR #790 validation symbol {symbol} is not reused")
+    _require_imported_calls(benchmark, benchmark_source, {"validate_visual_evidence"})
+
+    try:
+        _require_imported_calls(
+            Path("comment-only.py"),
+            "# validate_visual_evidence(validate_input_manifest(...))",
+            {"validate_visual_evidence"},
+        )
+    except AssertionError:
+        pass
+    else:
+        raise AssertionError("comment-only PR #790 reuse claim was accepted")
     if not list(frozen_tests.glob("test_*.py")):
         raise AssertionError("frozen PR #790 benchmark tests are missing")
 

@@ -12,7 +12,7 @@ import hashlib
 import sys
 import tempfile
 import threading
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +23,7 @@ if str(ROOT) not in sys.path:
 from tools.tibia_re_control_center import agent_reconcile as reconcile_module
 from tools.tibia_re_control_center.agent_protocol import (
     AgentProvenance,
+    AgentOperationalState,
     AgentVisualState,
     ClientIdentity,
     NamedAgentAction,
@@ -53,17 +54,18 @@ from tools.tibia_re_control_center.agent_vision import (
     QWEN_VISION_PROFILE_ID,
     SecretSafeCapture,
 )
-from tools.tibia_re_control_center.execution import MutationCoordinator
-from tools.tibia_re_control_center.fake import FakeAdapter, ManualClock
+from tools.tibia_re_control_center.control_api import ControlApiServer
+from tools.tibia_re_control_center.control_cli import ControlApiClient, ControlClientError
+from tools.tibia_re_control_center.control_domain import ControlDomainService
 from tools.tibia_re_control_center.model import EffectBound, PrivacyError
-from tools.tibia_re_control_center.persistent_store import SQLitePersistentStore
 from tools.tibia_re_vision.evidence import UnsafeInputError
 
 
 class _TestExecutor:
     """Test-only read/capture adapter; never a production executor."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, performed_unknown: bool = False) -> None:
+        self.performed_unknown = performed_unknown
         self.execute_calls: list[object] = []
         self.screenshot_calls: list[tuple[str, str]] = []
         self.capture = CaptureReceipt("CAPTURED", "capture-safe", "c" * 64, True)
@@ -71,7 +73,34 @@ class _TestExecutor:
     def execute(self, request: object) -> AgentActionReceipt:
         self.execute_calls.append(request)
         request_id = getattr(request, "action_id", "test-action")
+        if self.performed_unknown:
+            return AgentActionReceipt(request_id, "PERFORMED_UNKNOWN", True, False, 1, ())
         return AgentActionReceipt(request_id, "PERFORMED", True, True, 1, ("effect-safe",))
+
+    def execute_guarded(
+        self,
+        delegated: object,
+        request: object,
+        *,
+        token: object,
+        final_commit_check: object,
+    ) -> AgentActionReceipt:
+        self.execute_calls.append(request)
+        receipt = delegated(
+            request,
+            token=token,
+            final_commit_check=final_commit_check,
+        )
+        if self.performed_unknown:
+            return AgentActionReceipt(
+                getattr(request, "action_id", "test-action"),
+                "PERFORMED_UNKNOWN",
+                True,
+                False,
+                receipt.low_level_event_count,
+                receipt.evidence_refs,
+            )
+        return receipt
 
     def screenshot(self, session_id: str, run_id: str) -> CaptureReceipt:
         self.screenshot_calls.append((session_id, run_id))
@@ -183,21 +212,20 @@ def _task(session_id: str, run_id: str, *, actions: tuple[NamedAgentAction, ...]
     )
 
 
-def _stack(root: Path, *, session_id: str, run_id: str) -> tuple[
-    SQLitePersistentStore,
-    FakeAdapter,
-    MutationCoordinator,
-    _TestExecutor,
-    AgentSessionCoordinator,
-]:
-    clock = ManualClock()
-    adapter = FakeAdapter(clock, allow_mutation=True)
+def _stack(
+    root: Path,
+    *,
+    session_id: str,
+    run_id: str,
+    submit: bool = True,
+    performed_unknown: bool = False,
+) -> _ApiStack:
+    domain = ControlDomainService(root, backend_epoch=f"backend-{session_id}")
+    adapter = domain.adapter
     adapter.add_capability("agent.enter_world", read=False, action=True)
     adapter.set_effect_bound("agent_enter_world", EffectBound(max_actions=1))
-    store = SQLitePersistentStore(root)
-    control = MutationCoordinator(adapter, store, clock, backend_epoch=f"backend-{session_id}")
     guarded = GuardedMutationActionExecutor(
-        control,
+        domain.coordinator,
         bindings={
             NamedAgentAction.ENTER_WORLD: GuardedActionBinding(
                 kind="agent_enter_world",
@@ -208,29 +236,56 @@ def _stack(root: Path, *, session_id: str, run_id: str) -> tuple[
         },
         source_state_provider=lambda _request: "CHARACTER_SELECT",
     )
-    executor = _TestExecutor()
-    agent = AgentSessionCoordinator(store, control, executor, guarded_executor=guarded)
-    agent._now_epoch_ms = lambda: 1_000_000
-    accepted = agent.submit_task(_task(
-        session_id,
-        run_id,
-        actions=(NamedAgentAction.ENTER_WORLD, NamedAgentAction.SCREENSHOT),
-    ), operation_id=f"accept-{session_id}")
-    assert accepted["accepted_new"] is True
-    assert accepted["envelope"]["runtime_access"] == "none"
-    return store, adapter, control, executor, agent
+    executor = _TestExecutor(performed_unknown=performed_unknown)
+    domain.agent.executor = executor
+    domain.agent.guarded_executor = guarded
+    if performed_unknown:
+        original_execute_committed = adapter.execute_committed
+
+        def uncertain_execute_committed(request: object, commit_dispatch: object) -> dict[str, object]:
+            execution = original_execute_committed(request, commit_dispatch)
+            if execution.get("committed"):
+                execution = dict(execution)
+                execution.update({
+                    "outcome": "ambiguous",
+                    "reason_code": "TEST_EXECUTOR_PERFORMED_UNKNOWN",
+                })
+            return execution
+
+        adapter.execute_committed = uncertain_execute_committed  # type: ignore[method-assign]
+
+        original_guarded_execute = guarded.execute_guarded
+
+        def fake_guarded_execute(request: object, *, token: object, final_commit_check: object) -> AgentActionReceipt:
+            return executor.execute_guarded(
+                original_guarded_execute,
+                request,
+                token=token,
+                final_commit_check=final_commit_check,
+            )
+
+        guarded.execute_guarded = fake_guarded_execute  # type: ignore[method-assign]
+    server = ControlApiServer(root, domain=domain).start()
+    stack = _ApiStack(server, executor)
+    if submit:
+        accepted = stack.client.post(
+            "/v1/agent/tasks",
+            _task_body(_task(
+                session_id,
+                run_id,
+                actions=(NamedAgentAction.ENTER_WORLD, NamedAgentAction.SCREENSHOT),
+            )),
+            request_id=f"accept-{session_id}",
+        )
+        assert accepted["accepted_new"] is True
+        assert accepted["session"]["runtime_access"] == "none"
+    return stack
 
 
-def _close(
-    store: SQLitePersistentStore,
-    control: MutationCoordinator,
-    *,
-    allow_inconclusive: bool = False,
-) -> None:
-    clean = control.clean_shutdown()
+def _close(stack: _ApiStack, *, allow_inconclusive: bool = False) -> None:
+    clean = stack.server.close()
     if not clean and not allow_inconclusive:
         raise AssertionError("offline foundation stack did not cleanly shut down")
-    store.close()
 
 
 def _propose(agent: AgentSessionCoordinator, session_id: str, action_id: str) -> AgentActionReceipt:
@@ -244,38 +299,54 @@ def _propose(agent: AgentSessionCoordinator, session_id: str, action_id: str) ->
     )
 
 
-def _trusted_context(runtime: RuntimeObservation) -> reconcile_module._ResolverStateSnapshot:
-    return reconcile_module._ResolverStateSnapshot(
-        current_session_id="session-c",
-        current_run_id="run-c",
-        current_runtime_id="fake-runtime",
-        current_runtime_instance_id="instance-c",
-        current_monotonic_ns=1_000,
-        max_age_ns=100,
-        reviewed_producers=(
-            reconcile_module._ReviewedProducerContract("fake-producer", "runtime-state-v1"),
-        ),
-        runtime_evidence=reconcile_module._RuntimeEvidenceRecord(
-            observation=runtime,
-            session_id="session-c",
-            run_id="run-c",
-            runtime_id="fake-runtime",
-            runtime_instance_id="instance-c",
-            producer_id="fake-producer",
-            producer_contract_id="runtime-state-v1",
-            observed_monotonic_ns=950,
-        ),
-    )
+class _TrustedRuntimeFixture:
+    """Test-only reviewed runtime producer for the existing trusted seam."""
 
-
-class _TrustedRuntimeResolver:
-    def __init__(self, context: reconcile_module._ResolverStateSnapshot) -> None:
-        self.context = context
+    def __init__(self, runtime: RuntimeObservation) -> None:
+        self.runtime = runtime
 
     def resolve_current_reviewed(self, runtime: RuntimeObservation) -> RuntimeObservation | None:
-        if reconcile_module._resolver_state_matches_runtime(runtime, self.context):
+        if runtime == self.runtime:
             return runtime
         return None
+
+
+@dataclass
+class _ApiStack:
+    server: ControlApiServer
+    executor: _TestExecutor
+
+    @property
+    def client(self) -> ControlApiClient:
+        return ControlApiClient(self.server.data_root)
+
+    @property
+    def domain(self) -> ControlDomainService:
+        return self.server.domain
+
+    @property
+    def adapter(self) -> Any:
+        return self.domain.adapter
+
+    @property
+    def store(self) -> Any:
+        return self.domain.store
+
+    @property
+    def control(self) -> Any:
+        return self.domain.coordinator
+
+    @property
+    def agent(self) -> AgentSessionCoordinator:
+        return self.domain.agent
+
+
+def _task_body(task: TaskEnvelope) -> dict[str, object]:
+    body = asdict(task)
+    body["client_identity"] = asdict(task.client_identity)
+    body["allowed_actions"] = [action.value for action in task.allowed_actions]
+    body["required_evidence"] = list(task.required_evidence)
+    return body
 
 
 def _vision(root: Path, screen_class: str, *, run_id: str, evidence_ref: str) -> Any:
@@ -285,10 +356,10 @@ def _vision(root: Path, screen_class: str, *, run_id: str, evidence_ref: str) ->
 def scenario_a_safe_login_evidence() -> None:
     with tempfile.TemporaryDirectory() as temporary:
         root = Path(temporary)
-        store, adapter, control, _executor, agent = _stack(root, session_id="a", run_id="run-a")
+        stack = _stack(root, session_id="a", run_id="run-a")
         try:
             accepted_events = [
-                event for event in agent.snapshot("a")["events"]
+                event for event in stack.client.get("/v1/agent/session?session_id=a")["events"]
                 if event.get("kind") == "TASK_ACCEPTED"
             ]
             assert len(accepted_events) == 1
@@ -297,9 +368,13 @@ def scenario_a_safe_login_evidence() -> None:
             runtime = RuntimeObservation("UNKNOWN", RuntimeEvidenceClass.UNKNOWN, ())
             result = reconcile_module.reconcile_state(visual, runtime)
             assert result.state is ReconciledState.LOGIN_SCREEN
-            capture = agent.owner_control("a", OwnerControlCommand.SCREENSHOT)
+            capture = stack.client.post(
+                "/v1/agent/control",
+                {"session_id": "a", "command": OwnerControlCommand.SCREENSHOT.value},
+                request_id="capture-a-control",
+            )
             assert capture["status"] == "CAPTURED"
-            completed = agent.complete_run(
+            completed = stack.agent.complete_run(
                 "a",
                 status="PASS",
                 final_state=AgentVisualState.LOGIN_SCREEN.value,
@@ -307,108 +382,138 @@ def scenario_a_safe_login_evidence() -> None:
             )
             assert completed.status.value == "PASS"
             assert completed.evidence_manifest_sha256 == "d" * 64
-            assert adapter.physical_effects == []
+            api_result = stack.client.get("/v1/agent/result?run_id=run-a")
+            assert api_result["status"] == "PASS"
+            assert stack.adapter.physical_effects == []
         finally:
-            _close(store, control)
+            _close(stack)
 
 
 def scenario_b_visual_never_promotes_world() -> None:
     with tempfile.TemporaryDirectory() as temporary:
         root = Path(temporary)
-        visual = _vision(root, "IN_GAME_VISUAL", run_id="run-b", evidence_ref="capture-b")
-        result = reconcile_module.reconcile_state(
-            visual,
-            RuntimeObservation("UNKNOWN", RuntimeEvidenceClass.UNKNOWN, ()),
-        )
-        assert result.state is ReconciledState.UNKNOWN
-        assert result.state is not ReconciledState.WORLD_CONFIRMED
+        stack = _stack(root, session_id="b", run_id="run-b", submit=False)
+        try:
+            status = stack.client.get("/v1/status")
+            assert status["official_client_access"] == "NONE"
+            visual = _vision(root, "IN_GAME_VISUAL", run_id="run-b", evidence_ref="capture-b")
+            result = reconcile_module.reconcile_state(
+                visual,
+                RuntimeObservation("UNKNOWN", RuntimeEvidenceClass.UNKNOWN, ()),
+            )
+            assert result.state is ReconciledState.UNKNOWN
+            assert result.state is not ReconciledState.WORLD_CONFIRMED
+            assert stack.adapter.physical_effects == []
+        finally:
+            _close(stack)
 
 
 def scenario_c_reviewed_runtime_conflicts_with_login_visual() -> None:
     with tempfile.TemporaryDirectory() as temporary:
         root = Path(temporary)
-        visual = _vision(root, "LOGIN_SCREEN", run_id="run-c", evidence_ref="capture-c")
-        runtime = RuntimeObservation("IN_GAME", RuntimeEvidenceClass.REVIEWED_CAUSAL, ("runtime-c",))
-        context = _trusted_context(runtime)
-        reconciler = reconcile_module._compose_trusted_reconciler(_TrustedRuntimeResolver(context))
-        result = reconciler.reconcile_state(visual, runtime)
-        assert result.state is ReconciledState.CONFLICT
+        stack = _stack(root, session_id="c", run_id="run-c", submit=False)
+        try:
+            assert stack.client.get("/v1/status")["runtime"]["adapter_kind"] == "FAKE_TEST"
+            visual = _vision(root, "LOGIN_SCREEN", run_id="run-c", evidence_ref="capture-c")
+            runtime = RuntimeObservation("IN_GAME", RuntimeEvidenceClass.REVIEWED_CAUSAL, ("runtime-c",))
+            reconciler = reconcile_module._compose_trusted_reconciler(_TrustedRuntimeFixture(runtime))
+            result = reconciler.reconcile_state(visual, runtime)
+            assert result.state is ReconciledState.CONFLICT
+            assert stack.adapter.physical_effects == []
+        finally:
+            _close(stack)
 
 
 def scenario_d_pause_dominates_proposal() -> None:
     with tempfile.TemporaryDirectory() as temporary:
         root = Path(temporary)
-        store, adapter, control, _executor, agent = _stack(root, session_id="d", run_id="run-d")
+        stack = _stack(root, session_id="d", run_id="run-d")
         try:
-            paused = agent.owner_control("d", OwnerControlCommand.PAUSE)
+            paused = stack.client.post(
+                "/v1/agent/control",
+                {"session_id": "d", "command": OwnerControlCommand.PAUSE.value},
+                request_id="pause-d-control",
+            )
             assert paused["status"] == "PAUSED"
-            receipt = _propose(agent, "d", "action-d")
+            receipt = _propose(stack.agent, "d", "action-d")
             assert receipt.status == "REFUSED_OWNER_PAUSED"
-            assert adapter.physical_effects == []
+            assert stack.adapter.physical_effects == []
         finally:
-            _close(store, control, allow_inconclusive=True)
+            _close(stack, allow_inconclusive=True)
 
 
 def scenario_e_stop_before_fake_commit() -> None:
     with tempfile.TemporaryDirectory() as temporary:
         root = Path(temporary)
-        store, adapter, control, _executor, agent = _stack(root, session_id="e", run_id="run-e")
+        stack = _stack(root, session_id="e", run_id="run-e")
         entered = threading.Event()
         release = threading.Event()
-        adapter.authority_wait_hook = lambda: (entered.set(), release.wait(timeout=2))
+        stack.adapter.authority_wait_hook = lambda: (entered.set(), release.wait(timeout=2))
         receipts: list[AgentActionReceipt] = []
-        action_thread = threading.Thread(target=lambda: receipts.append(_propose(agent, "e", "action-e")))
+        action_thread = threading.Thread(target=lambda: receipts.append(_propose(stack.agent, "e", "action-e")))
         action_thread.start()
         try:
             assert entered.wait(timeout=1)
-            stopped = agent.owner_control("e", OwnerControlCommand.STOP)
+            stopped = stack.client.post(
+                "/v1/agent/control",
+                {"session_id": "e", "command": OwnerControlCommand.STOP.value},
+                request_id="stop-e-control",
+            )
             assert stopped["status"] == "STOPPED"
             release.set()
             action_thread.join(timeout=2)
             assert not action_thread.is_alive()
             assert receipts and receipts[0].status == "NOT_PERFORMED"
-            assert adapter.physical_effects == []
+            assert stack.adapter.physical_effects == []
         finally:
             release.set()
             action_thread.join(timeout=2)
-            _close(store, control)
+            _close(stack)
 
 
 def scenario_f_idempotent_task_and_action() -> None:
     with tempfile.TemporaryDirectory() as temporary:
         root = Path(temporary)
-        store, adapter, control, _executor, agent = _stack(root, session_id="f", run_id="run-f")
+        stack = _stack(root, session_id="f", run_id="run-f")
         try:
             accepted = _task("f", "run-f", actions=(NamedAgentAction.ENTER_WORLD, NamedAgentAction.SCREENSHOT))
-            first_task = agent.submit_task(accepted, operation_id="task-f-idempotent")
-            second_task = agent.submit_task(accepted, operation_id="task-f-idempotent")
+            first_task = stack.client.post(
+                "/v1/agent/tasks",
+                _task_body(accepted),
+                request_id="task-f-idempotent",
+            )
+            second_task = stack.client.post(
+                "/v1/agent/tasks",
+                _task_body(accepted),
+                request_id="task-f-idempotent",
+            )
             assert first_task == second_task
-            first = _propose(agent, "f", "action-f")
-            second = _propose(agent, "f", "action-f")
+            first = _propose(stack.agent, "f", "action-f")
+            second = _propose(stack.agent, "f", "action-f")
             assert first.status == "PERFORMED"
             assert second.status == "PERFORMED"
-            assert len(adapter.physical_effects) == 1
+            assert len(stack.adapter.physical_effects) == 1
         finally:
-            _close(store, control)
+            _close(stack)
 
 
 def scenario_g_performed_unknown_never_replays() -> None:
     with tempfile.TemporaryDirectory() as temporary:
         root = Path(temporary)
-        store, adapter, control, _executor, agent = _stack(root, session_id="g", run_id="run-g")
+        stack = _stack(root, session_id="g", run_id="run-g", performed_unknown=True)
         try:
-            store.inject_fault("reconcile", "error")
-            first = _propose(agent, "g", "action-g")
+            first = _propose(stack.agent, "g", "action-g")
             assert first.status == "PERFORMED_UNKNOWN"
             assert first.performed is True and first.outcome_known is False
-            assert len(adapter.physical_effects) == 1
-            assert agent.snapshot("g")["run_status"] == "INCONCLUSIVE"
-            store.clear_faults()
-            replay = _propose(agent, "g", "action-g")
+            assert len(stack.adapter.physical_effects) == 1
+            assert len(stack.executor.execute_calls) == 1
+            assert stack.agent.snapshot("g")["run_status"] == "INCONCLUSIVE"
+            replay = _propose(stack.agent, "g", "action-g")
             assert replay.status == "PERFORMED_UNKNOWN"
-            assert len(adapter.physical_effects) == 1
+            assert len(stack.adapter.physical_effects) == 1
+            assert len(stack.executor.execute_calls) == 1
         finally:
-            _close(store, control, allow_inconclusive=True)
+            _close(stack, allow_inconclusive=True)
 
 
 def scenario_h_restart_preserves_owner_latches() -> None:
@@ -418,63 +523,82 @@ def scenario_h_restart_preserves_owner_latches() -> None:
     ):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            store, _adapter, control, _executor, agent = _stack(root, session_id=suffix, run_id=f"run-{suffix}")
+            first = _stack(root, session_id=suffix, run_id=f"run-{suffix}")
             try:
-                assert agent.owner_control(suffix, command)["status"] == expected
-                _close(store, control)
-                store = SQLitePersistentStore(root)
-                clock = ManualClock()
-                adapter = FakeAdapter(clock, allow_mutation=True)
-                restarted_control = MutationCoordinator(adapter, store, clock, backend_epoch=f"restart-{suffix}")
-                restarted = AgentSessionCoordinator(store, restarted_control)
-                session = restarted.ensure_session(suffix)
-                assert session.operational_state.value == expected
-                if command is OwnerControlCommand.PAUSE:
-                    assert session.pause_latched is True and session.stop_latched is False
-                else:
-                    assert session.stop_latched is True
-                assert session.operational_state.value != "RUNNING"
-                _close(store, restarted_control)
-                store = None  # type: ignore[assignment]
+                controlled = first.client.post(
+                    "/v1/agent/control",
+                    {"session_id": suffix, "command": command.value},
+                    request_id=f"{suffix}-control",
+                )
+                assert controlled["status"] == expected
+                _close(first)
+                second = _stack(root, session_id=suffix, run_id=f"run-{suffix}", submit=False)
+                try:
+                    session = second.client.get(f"/v1/agent/session?session_id={suffix}")
+                    assert session["operational_state"] == expected
+                    if command is OwnerControlCommand.PAUSE:
+                        assert session["pause_latched"] is True and session["stop_latched"] is False
+                    else:
+                        assert session["stop_latched"] is True
+                    assert session["operational_state"] != "RUNNING"
+                finally:
+                    _close(second)
             finally:
-                if store is not None:
-                    store.close()
+                if not first.server._closed:
+                    first.server.close()
 
 
 def scenario_i_foreign_model_waits_without_eviction() -> None:
-    resident = ["foreign:model"]
-    unloads: list[str] = []
-    inference_calls: list[str] = []
-    scheduler = ModelSlotScheduler(
-        ps=lambda: list(resident),
-        digest=lambda _model: QWEN_VISION_DIGEST,
-        infer=lambda model, *_args, **_kwargs: inference_calls.append(model),
-        unload=lambda model: unloads.append(model),
-    )
-    try:
-        scheduler.infer(
-            model=QWEN_VISION_MODEL,
-            expected_digest=QWEN_VISION_DIGEST,
-            image_path=Path("not-read"),
-            evidence_ref="capture-i",
-            capture_sha256="a" * 64,
-            model_profile_id=QWEN_VISION_PROFILE_ID,
-            source_monotonic_ns=0,
-            keep_alive="0s",
-            num_ctx=QWEN_NUM_CTX,
-            num_predict=QWEN_NUM_PREDICT,
+    with tempfile.TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        stack = _stack(root, session_id="i", run_id="run-i")
+        resident = ["foreign:model"]
+        unloads: list[str] = []
+        inference_calls: list[str] = []
+        scheduler = ModelSlotScheduler(
+            ps=lambda: list(resident),
+            digest=lambda _model: QWEN_VISION_DIGEST,
+            infer=lambda model, *_args, **_kwargs: inference_calls.append(model),
+            unload=lambda model: unloads.append(model),
         )
-    except ModelSlotUnavailable as exc:
-        assert exc.code == "DIFFERENT_RESIDENT_MODEL"
-    else:
-        raise AssertionError("foreign model residency was admitted")
-    assert unloads == [] and inference_calls == [] and resident == ["foreign:model"]
+        try:
+            try:
+                scheduler.infer(
+                    model=QWEN_VISION_MODEL,
+                    expected_digest=QWEN_VISION_DIGEST,
+                    image_path=Path("not-read"),
+                    evidence_ref="capture-i",
+                    capture_sha256="a" * 64,
+                    model_profile_id=QWEN_VISION_PROFILE_ID,
+                    source_monotonic_ns=0,
+                    keep_alive="0s",
+                    num_ctx=QWEN_NUM_CTX,
+                    num_predict=QWEN_NUM_PREDICT,
+                )
+            except ModelSlotUnavailable as exc:
+                assert exc.code == "DIFFERENT_RESIDENT_MODEL"
+                stack.agent._persist_event(
+                    "i",
+                    provenance=AgentProvenance.SENSOR,
+                    kind="MODEL_SLOT_WAITING",
+                    state_after=AgentOperationalState.WAITING_MODEL_SLOT,
+                    action_id="model-slot-i",
+                    payload={"status": AgentOperationalState.WAITING_MODEL_SLOT.value},
+                )
+            else:
+                raise AssertionError("foreign model residency was admitted")
+            waiting = stack.client.get("/v1/agent/session?session_id=i")
+            assert waiting["operational_state"] == AgentOperationalState.WAITING_MODEL_SLOT.value
+            assert waiting["events"][-1]["kind"] == "MODEL_SLOT_WAITING"
+            assert unloads == [] and inference_calls == [] and resident == ["foreign:model"]
+        finally:
+            _close(stack)
 
 
 def scenario_j_secret_boundaries() -> None:
     with tempfile.TemporaryDirectory() as temporary:
         root = Path(temporary)
-        store, _adapter, control, executor, agent = _stack(root, session_id="j", run_id="run-j")
+        stack = _stack(root, session_id="j", run_id="run-j")
         try:
             unsafe = _task("secret-task", "secret-run", actions=(NamedAgentAction.SCREENSHOT,))
             unsafe = unsafe.__class__(**{
@@ -482,20 +606,24 @@ def scenario_j_secret_boundaries() -> None:
                 "objective": "PASSWORD=hunter2",
             })
             try:
-                agent.submit_task(unsafe, operation_id="secret-task-op")
+                stack.agent.submit_task(unsafe, operation_id="secret-task-op")
             except PrivacyError:
                 pass
             else:
                 raise AssertionError("secret-bearing task reached persistence")
-            assert store.load_agent_session("secret-task") is None
-            before_events = len(agent.snapshot("j")["events"])
+            assert stack.store.load_agent_session("secret-task") is None
+            before_events = len(stack.client.get("/v1/agent/session?session_id=j")["events"])
             try:
-                agent.record_message("j", AgentProvenance.OWNER, "token=hunter2")
-            except PrivacyError:
-                pass
+                stack.client.post(
+                    "/v1/agent/chat",
+                    {"session_id": "j", "text": "token=hunter2"},
+                    request_id="secret-chat-op",
+                )
+            except ControlClientError as exc:
+                assert exc.payload["code"] == "CONTROL_PRIVACY_REJECTED"
             else:
                 raise AssertionError("secret-bearing chat reached persistence")
-            assert len(agent.snapshot("j")["events"]) == before_events
+            assert len(stack.client.get("/v1/agent/session?session_id=j")["events"]) == before_events
 
             fixture = _VisionFixture("LOGIN_SCREEN")
             capture_path = root / "unsafe-capture.png"
@@ -515,9 +643,9 @@ def scenario_j_secret_boundaries() -> None:
             else:
                 raise AssertionError("unsafe capture reached provider")
             assert fixture.provider_calls == []
-            assert executor.execute_calls == []
+            assert stack.executor.execute_calls == []
         finally:
-            _close(store, control)
+            _close(stack)
 
 
 def main() -> int:

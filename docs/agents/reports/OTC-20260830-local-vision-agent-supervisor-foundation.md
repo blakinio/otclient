@@ -179,3 +179,31 @@ physical_action_count: 0
 ```
 
 CUA must remain disabled. The production action executor must remain unbound/null. Do not update the stale Package D client promotion fence merely to make physical effects possible.
+
+## Continuation checkpoint — Task 9 architecture boundary
+
+Task 4 and Task 6 were fixed under the supervising architect rulings and re-reviewed clean. Tasks 7 and 8 are clean at `187ff4f1a012195175fe4ba81fdbef60d7727a1e` and `213ec25eb881f596fe2f378280c27da9ae82eb31`.
+
+Task 9 has bounded fake/offline evidence at `b548aded4fdcf273eb77f4e090246589fdc67f00`, `7e60466fa90a3c3a30a0abce509bf01b31428bcb`, and `ecf12922c125afa42bbceb8423f40b3bfbefd376`: foundation audit, Package B audit, 201 focused agent tests (one expected skip), 454 full Control Center tests (three platform skips), and 34 frozen benchmark tests passed at relevant heads. Production authority remains frozen and the executor stays Null/unbound.
+
+### ARCHITECT_REVIEW_REQUIRED
+
+The approved design and Task 9 scenario I require unexpected foreign model residency to transition the persistent session to `WAITING_MODEL_SLOT`; the scheduler currently only raises `ModelSlotUnavailable`. `AgentSessionCoordinator` and `ControlDomainService` expose no owner integration seam. Direct test persistence would be false evidence.
+
+```yaml
+Problem: missing durable scheduler-to-session WAITING_MODEL_SLOT transition
+Relevant spec: design Local model scheduler / Failure and recovery; Task 9 scenario I
+Current implementation: ModelSlotScheduler raises ModelSlotUnavailable only; AgentSessionCoordinator and ControlDomainService expose no owner integration seam
+Why normal implementation ruling is insufficient: required repair selects a cross-module session/model ownership contract absent from Task 4/5 public APIs
+Options:
+  - narrow durable coordinator transition invoked by existing sensor/scheduler failure path
+  - defer/amend scenario I to exception-only behavior
+  - broader orchestration interface
+Recommended option: narrow coordinator transition in existing Control Center
+Security/architecture consequence: preserves fail-closed single-slot semantics with no runtime/mutation authority
+Consequence if wrong: false session state or accidental second control-plane boundary
+Files/interfaces affected: agent_session.py, agent_vision.py, existing tests, possibly ControlDomainService composition
+Current PR/head: '#810 Draft; local ecf12922c125afa42bbceb8423f40b3bfbefd376; remote head remains older/unpublished'
+```
+
+The reviewer demand to avoid the private fake runtime resolver seam was adjudicated inapplicable: `agent_reconcile.py` explicitly reserves it as the sole test-only injection point while the public two-argument API remains fail-closed. Per the owner anti-loop rule, Task 9 was not sent into a third automatic fix/re-review. Task 10 remains dependent on this decision.

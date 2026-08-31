@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260830-local-vision-agent-supervisor-foundation
-status: implementing
+status: blocked
 agent: Codex SDD coordinator
 session_role: implementation_coordinator
 project_lane: otclient
@@ -15,7 +15,7 @@ parent_task: OTC-20260830-local-vision-agent-supervisor-discovery
 parent_pr: 808
 implementation_pr: 810
 created: 2026-08-30T11:51:56+02:00
-updated_at: 2026-08-30T15:48:40Z
+updated_at: 2026-08-31T11:45:00Z
 risk: high
 execution_class: repository_worktree
 execution_mode: subagent_driven_development
@@ -75,8 +75,8 @@ current_environment:
   remote_desktop_commander: offline
   codex_worktree: available
   codex_subagent_dispatch: available
-current_blocker: ARCHITECT_REVIEW_REQUIRED — Task 4 executor commit/STOP atomicity contract and Task 6 authenticated current-provenance contract
-next_action: supervising architect selects the reviewed Task 4 executor handshake/ledger contract and Task 6 trusted current-evidence context; then resume the two scoped fix/re-review loops before Task 7
+current_blocker: ARCHITECT_REVIEW_REQUIRED — Task 9 session-owned model-slot transition contract
+next_action: supervising architect rules whether the existing session coordinator receives the narrow scheduler-failure transition required by the approved spec; do not continue Task 9/10 until then
 ---
 
 # Local vision-agent supervisor foundation implementation
@@ -181,4 +181,61 @@ blockers:
   - ARCHITECT_REVIEW_REQUIRED: Task 4 executor/STOP/effect-commit protocol
   - ARCHITECT_REVIEW_REQUIRED: Task 6 current reviewed-causal provenance protocol
 next_action: Obtain supervising architect rulings for both formal packages in the SDD ledger/report, execute scoped RED-to-GREEN fixes and independent re-reviews, then dispatch Task 7 only when both dependency gates are clean.
+```
+
+## Continuation checkpoint — 2026-08-31
+
+Tasks 4 and 6 were subsequently fixed under the architect rulings and independently reviewed clean. Task 7 is clean at `187ff4f1a012195175fe4ba81fdbef60d7727a1e`; Task 8 is clean at `213ec25eb881f596fe2f378280c27da9ae82eb31`.
+
+Task 9 committed only fake/offline foundation work:
+
+- `b548aded4fdcf273eb77f4e090246589fdc67f00` — bounded A–J E2E/audit baseline;
+- `7e60466fa90a3c3a30a0abce509bf01b31428bcb` — truthful domain/API, Package B history, performed-unknown and audit hardening;
+- `ecf12922c125afa42bbceb8423f40b3bfbefd376` — audit-only closure of shadowed-validator/dynamic-import bypasses.
+
+The foundation audit, Package B audit, focused agent tests, full Control Center suite and frozen benchmark passed locally on their relevant heads. No production module, live runtime, Ollama, CUA, credentials, GUI/process/memory access or physical action was added. `physical_action_count` remains `0`.
+
+### ARCHITECT_REVIEW_REQUIRED — Task 9 model-slot/session contract
+
+```yaml
+Problem: >
+  The binding spec says the session service owns the one logical model slot and
+  unexpected foreign residency yields durable WAITING_MODEL_SLOT with no unload
+  or inference. Task 9 scenario I requires that exact outcome. The current
+  ModelSlotScheduler only raises ModelSlotUnavailable; AgentSessionCoordinator
+  has no public model-slot transition or scheduler integration, and
+  ControlDomainService has no owner seam. Test-only private persistence would
+  not prove the required transition.
+Relevant spec: >
+  design sections Local model scheduler and Failure/recovery; plan Task 9
+  scenario I; operational state enum includes WAITING_MODEL_SLOT.
+Current implementation: >
+  scheduler failure is correct and fail-closed, but it is disconnected from
+  the durable session state machine. The public reconciler remains deliberately
+  unbound; its private fake-resolver seam is test-only by design and is not
+  this blocker.
+Why normal implementation ruling is insufficient: >
+  completing the scenario requires selecting the owning cross-module contract
+  between scheduler/sensor and persistent session coordinator. A new public
+  coordinator transition or equivalent production integration changes the
+  session/model boundary, which Tasks 4/5 did not define explicitly.
+Options:
+  - add a narrow durable coordinator transition called by the existing sensor/scheduler failure path;
+  - accept scheduler exception-only behavior and amend/defer scenario I;
+  - introduce a broader orchestration interface (not recommended).
+Recommended option: >
+  add the narrow existing-Control-Center coordinator transition; it preserves
+  single-slot fail-closed behavior and provides no runtime/mutation authority.
+Security/architecture consequence: >
+  the first option makes dashboard/session state truthful without allowing
+  inference, eviction, runtime access or physical effects. Deferral leaves a
+  spec-required operational-state assertion unprovable.
+Consequence if wrong: >
+  a false WAITING_MODEL_SLOT state could hide scheduler failure, or a broader
+  interface could accidentally become a new control plane.
+Files/interfaces affected: >
+  agent_session.py, agent_vision.py and their existing tests; possibly the
+  existing ControlDomainService composition only. No API, MCP, executor,
+  runtime edge or credential interface should expand.
+Current PR/head: "#810 Draft, local ecf12922c125afa42bbceb8423f40b3bfbefd376; remote remains unpushed"
 ```

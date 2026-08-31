@@ -238,3 +238,28 @@ ahead and has no exact-head remote checks. No push, merge, PR mutation or final
 whole-branch review occurred. PR #615 remains open because the replacement is
 unmerged. The precise command results and terminal blockers are retained in the
 plan-scoped Task 10 report.
+
+## Exact-head Task 10 continuation — 2026-08-31
+
+PR #810 was published by GitHub Git-object API after normal credentialed push
+was unavailable. The original local closeout tree and the subsequent
+independently reviewed Ruff-repair tree were verified byte-identical by Git tree
+SHA at every published step. The current remote PR head is
+`89d50fe4cd82c6de97c0e1489eec3e9c2d2299d3` with tree
+`46695e77bd435e6f0e29de56d334f12bbfb830b1`.
+
+Exact-head evidence on that tree: compileall PASS; full Control Center `457`
+passed with `3` skips; vision benchmark `34` passed; Package A/A-P1/Package B
+audits PASS; agent audit PASS; offline foundation E2E PASS with
+`OFFICIAL_RUNTIME_ACCESS=NONE` and `PHYSICAL_EFFECTS=0`; Ruff `0.16.1` PASS;
+PR-base diff check PASS. The prior Ruff RED had 162 findings and was closed by
+one scoped, independently reviewed fix commit with no suppression or authority
+change.
+
+Required real Package B Chrome/Chromium+CLI E2E remains BLOCKED, not PASS: the
+exact-tree invocation failed because no local Chrome/Chromium executable exists;
+the unchanged script cannot consume a cloud browser surface; and this connector
+does not expose `workflow_dispatch` for the repository's capable existing
+workflow. The next action is one real execution on a capable runner at the
+published exact head, followed by broad final review. PR #810 stays Draft and
+PR #615 stays open.

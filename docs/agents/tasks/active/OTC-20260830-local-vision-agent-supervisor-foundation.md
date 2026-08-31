@@ -75,8 +75,8 @@ current_environment:
   remote_desktop_commander: offline
   codex_worktree: available
   codex_subagent_dispatch: available
-current_blocker: TASK10_CAPABLE_ENVIRONMENT_REQUIRED — exact local Package B browser E2E cannot start without Chromium/Chrome and Ruff 0.16.1 is unavailable; the unpublished branch contains the frozen implementation head that is 17 commits ahead of Draft PR #810 plus this closeout commit
-next_action: run the blocked Task 10 Ruff and real-Chromium Package B E2E on one capable exact head, then publish/freeze that head before the coordinator's separate final whole-branch review
+current_blocker: TASK10_REAL_BROWSER_E2E_REQUIRED — published PR #810 head `89d50fe4cd82c6de97c0e1489eec3e9c2d2299d3` has exact-tree validation for every Task 10 command except the required real Chromium/Chrome Package B E2E; no capable browser runner or workflow-dispatch capability is available in this execution environment
+next_action: run `PYTHONPATH=. python tests/tools/tibia_re_control_center/e2e_package_b.py` with a genuine Chrome/Chromium binary on published head `89d50fe4cd82c6de97c0e1489eec3e9c2d2299d3`, then perform the separate final whole-branch review
 ---
 
 # Local vision-agent supervisor foundation implementation
@@ -297,3 +297,34 @@ no push, PR mutation or merge was performed. PR #615 remains open/Draft and
 unmerged; it is not superseded because the replacement is also unmerged. See
 the Task 10 SDD report for complete command results and the one required next
 action.
+
+## Exact-head validation checkpoint — 2026-08-31
+
+The normal credentialed Git push was unavailable. Under owner direction, the
+GitHub Git-object API published tree-identical commit history without source
+reconstruction: local `bd03ec52dda20a9e967d8a5bbea1746873363283` tree
+`c61db941471362cebc03123a55d643b343260b84` became remote
+`32a6a661a7dfce3b765f14af405c93ed86424d53`; then the independently reviewed
+Task 10 Ruff repair `3cf7a6764f66d94e8450b110a9639daf2011e85d` tree
+`46695e77bd435e6f0e29de56d334f12bbfb830b1` became the published PR head
+`89d50fe4cd82c6de97c0e1489eec3e9c2d2299d3`. GitHub object API commit IDs
+differ from local IDs because it cannot reproduce local author/committer
+headers; each corresponding tree SHA was verified equal.
+
+On detached published head `89d50fe4cd82c6de97c0e1489eec3e9c2d2299d3`,
+compileall passed; full Control Center was `457` passed with `3` skips; frozen
+vision benchmark was `34` passed; Package A/A-P1/Package B and agent audits
+passed; fake/offline agent E2E emitted `AGENT_FOUNDATION_E2E=PASS`,
+`OFFICIAL_RUNTIME_ACCESS=NONE`, `PHYSICAL_EFFECTS=0`; Ruff `0.16.1` emitted
+`All checks passed!`; and PR #810-base diff check passed. The initial exact
+Ruff RED was 162 findings; one scoped, independently reviewed repair closed
+them without lint suppressions or authority changes.
+
+The only remaining gate is genuine Package B browser+CLI E2E. An independent
+validator invoked the unchanged script on exact remote `32a6a661` and it
+failed before browser launch with `RuntimeError: real Chromium/Chrome browser
+binary was not found`; no PASS marker was emitted. This environment has no
+Chrome/Chromium, no available local package candidate, and the GitHub connector
+can fetch/rerun but cannot dispatch the existing `workflow_dispatch` workflow.
+It is therefore not marked PASS. PR #810 remains Draft; no merge or PR #615
+closure occurred.

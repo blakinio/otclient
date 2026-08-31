@@ -1,7 +1,8 @@
 """Deterministic, authority-neutral reconciliation of visual and runtime evidence.
 
 This module deliberately has no runtime producer or action surface.  It only
-combines a bounded visual observation with already-reviewed runtime evidence.
+combines a bounded visual observation with runtime evidence that a separate,
+Control-Center-owned context verifies as reviewed and current.
 """
 
 from __future__ import annotations
@@ -28,6 +29,47 @@ class RuntimeObservation:
     state: str
     evidence_class: RuntimeEvidenceClass
     evidence_refs: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class ReviewedRuntimeProducer:
+    """A Control-Center-reviewed producer and its exact evidence contract."""
+
+    producer_id: str
+    contract_id: str
+
+
+@dataclass(frozen=True)
+class TrustedRuntimeEvidence:
+    """Control-Center-owned binding for one exact runtime observation."""
+
+    observation: RuntimeObservation
+    session_id: str
+    run_id: str
+    runtime_id: str
+    runtime_instance_id: str
+    producer_id: str
+    producer_contract_id: str
+    observed_monotonic_ns: int
+
+
+@dataclass(frozen=True)
+class TrustedReconciliationContext:
+    """Current Control Center facts used to verify reviewed runtime evidence.
+
+    The repository supplies no live producer.  Tests inject this narrow value
+    in place of the future Control-Center-owned resolver boundary.  Its two
+    monotonic values must come from the same Control Center clock domain.
+    """
+
+    current_session_id: str
+    current_run_id: str
+    current_runtime_id: str
+    current_runtime_instance_id: str
+    current_monotonic_ns: int
+    max_age_ns: int
+    reviewed_producers: tuple[ReviewedRuntimeProducer, ...]
+    runtime_evidence: TrustedRuntimeEvidence
 
 
 class ReconciledState(str, Enum):
@@ -178,6 +220,73 @@ def _runtime_parts(runtime: Any) -> tuple[str | None, RuntimeEvidenceClass | Non
     return runtime.state, runtime.evidence_class, tuple(refs)
 
 
+def _trusted_reviewed_runtime(
+    runtime: RuntimeObservation,
+    trusted_context: Any,
+) -> bool:
+    """Verify current provenance without interpreting opaque evidence refs."""
+    if type(trusted_context) is not TrustedReconciliationContext:
+        return False
+    evidence = trusted_context.runtime_evidence
+    if type(evidence) is not TrustedRuntimeEvidence:
+        return False
+    if type(evidence.observation) is not RuntimeObservation or evidence.observation != runtime:
+        return False
+
+    identity_values = (
+        trusted_context.current_session_id,
+        trusted_context.current_run_id,
+        trusted_context.current_runtime_id,
+        trusted_context.current_runtime_instance_id,
+        evidence.session_id,
+        evidence.run_id,
+        evidence.runtime_id,
+        evidence.runtime_instance_id,
+        evidence.producer_id,
+        evidence.producer_contract_id,
+    )
+    if any(_safe_ref(value) is None for value in identity_values):
+        return False
+    if (
+        evidence.session_id != trusted_context.current_session_id
+        or evidence.run_id != trusted_context.current_run_id
+        or evidence.runtime_id != trusted_context.current_runtime_id
+        or evidence.runtime_instance_id != trusted_context.current_runtime_instance_id
+    ):
+        return False
+
+    producers = trusted_context.reviewed_producers
+    if type(producers) is not tuple or not producers:
+        return False
+    reviewed_pairs: set[tuple[str, str]] = set()
+    for producer in producers:
+        if (
+            type(producer) is not ReviewedRuntimeProducer
+            or _safe_ref(producer.producer_id) is None
+            or _safe_ref(producer.contract_id) is None
+        ):
+            return False
+        reviewed_pairs.add((producer.producer_id, producer.contract_id))
+    if (evidence.producer_id, evidence.producer_contract_id) not in reviewed_pairs:
+        return False
+
+    current_ns = trusted_context.current_monotonic_ns
+    observed_ns = evidence.observed_monotonic_ns
+    max_age_ns = trusted_context.max_age_ns
+    if (
+        type(current_ns) is not int
+        or type(observed_ns) is not int
+        or type(max_age_ns) is not int
+        or current_ns < 0
+        or observed_ns < 0
+        or max_age_ns < 0
+        or observed_ns > current_ns
+        or current_ns - observed_ns > max_age_ns
+    ):
+        return False
+    return True
+
+
 def _result(
     state: ReconciledState,
     visual_refs: tuple[str, ...],
@@ -186,21 +295,28 @@ def _result(
     return ReconciliationResult(state, visual_refs, runtime_refs)
 
 
-def reconcile_state(visual: VisionObservation, runtime: RuntimeObservation) -> ReconciliationResult:
+def reconcile_state(
+    visual: VisionObservation,
+    runtime: RuntimeObservation,
+    *,
+    trusted_context: TrustedReconciliationContext | None = None,
+) -> ReconciliationResult:
     """Reconcile only validated current evidence, failing closed on ambiguity.
 
     ``WORLD_CONFIRMED`` is reachable only through the exact table row for an
-    ``IN_GAME`` runtime state carrying ``REVIEWED_CAUSAL`` evidence and at
-    least one retained runtime provenance reference.  Visual evidence never
-    establishes an in-game semantic state by itself.
+    ``IN_GAME`` runtime state carrying ``REVIEWED_CAUSAL`` evidence, at least
+    one retained runtime provenance reference, and a separately verified
+    current trust context.  Visual evidence and opaque provenance references
+    never establish an in-game semantic state by themselves.
     """
     visual_state, visual_refs = _visual_parts(visual)
     runtime_state, evidence_class, runtime_refs = _runtime_parts(runtime)
     if visual_state is None or runtime_state is None or evidence_class is None:
         return _result(ReconciledState.UNKNOWN, (), ())
 
-    if evidence_class is RuntimeEvidenceClass.REVIEWED_CAUSAL and not runtime_refs:
-        return _result(ReconciledState.UNKNOWN, visual_refs, runtime_refs)
+    if evidence_class is RuntimeEvidenceClass.REVIEWED_CAUSAL:
+        if not runtime_refs or not _trusted_reviewed_runtime(runtime, trusted_context):
+            return _result(ReconciledState.UNKNOWN, visual_refs, runtime_refs)
 
     rule = _RULES.get((visual_state, runtime_state, evidence_class))
     if rule is not None:
@@ -216,9 +332,12 @@ def reconcile_state(visual: VisionObservation, runtime: RuntimeObservation) -> R
 
 
 __all__ = [
+    "ReviewedRuntimeProducer",
     "ReconciledState",
     "ReconciliationResult",
     "RuntimeEvidenceClass",
     "RuntimeObservation",
+    "TrustedReconciliationContext",
+    "TrustedRuntimeEvidence",
     "reconcile_state",
 ]

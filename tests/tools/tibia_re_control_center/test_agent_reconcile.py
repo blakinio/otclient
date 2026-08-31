@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
-from dataclasses import FrozenInstanceError
+from dataclasses import FrozenInstanceError, fields, replace
 import unittest
 
 from tools.tibia_re_control_center.agent_reconcile import (
+    ReviewedRuntimeProducer,
     ReconciledState,
     RuntimeEvidenceClass,
     RuntimeObservation,
+    TrustedReconciliationContext,
+    TrustedRuntimeEvidence,
     reconcile_state,
 )
 from tools.tibia_re_control_center.agent_vision import VisionObservation
@@ -58,7 +61,254 @@ def _runtime(
     )
 
 
+def _trusted_context(
+    runtime: RuntimeObservation,
+    *,
+    current_session_id: str = "session-current",
+    current_run_id: str = "run-current",
+    current_runtime_id: str = "track-a-runtime",
+    current_runtime_instance_id: str = "instance-current",
+    evidence_session_id: str = "session-current",
+    evidence_run_id: str = "run-current",
+    evidence_runtime_id: str = "track-a-runtime",
+    evidence_runtime_instance_id: str = "instance-current",
+    producer_id: str = "reviewed-producer",
+    producer_contract_id: str = "runtime-state-v1",
+    reviewed_producer_id: str = "reviewed-producer",
+    reviewed_contract_id: str = "runtime-state-v1",
+    observed_monotonic_ns: int = 950,
+    current_monotonic_ns: int = 1_000,
+    max_age_ns: int = 100,
+) -> TrustedReconciliationContext:
+    """Build a fake Control Center-owned trust input; no live producer exists."""
+    return TrustedReconciliationContext(
+        current_session_id=current_session_id,
+        current_run_id=current_run_id,
+        current_runtime_id=current_runtime_id,
+        current_runtime_instance_id=current_runtime_instance_id,
+        current_monotonic_ns=current_monotonic_ns,
+        max_age_ns=max_age_ns,
+        reviewed_producers=(
+            ReviewedRuntimeProducer(
+                producer_id=reviewed_producer_id,
+                contract_id=reviewed_contract_id,
+            ),
+        ),
+        runtime_evidence=TrustedRuntimeEvidence(
+            observation=runtime,
+            session_id=evidence_session_id,
+            run_id=evidence_run_id,
+            runtime_id=evidence_runtime_id,
+            runtime_instance_id=evidence_runtime_instance_id,
+            producer_id=producer_id,
+            producer_contract_id=producer_contract_id,
+            observed_monotonic_ns=observed_monotonic_ns,
+        ),
+    )
+
+
 class ReconciliationTests(unittest.TestCase):
+    def test_bare_reviewed_runtime_observation_cannot_self_promote(self):
+        runtime = _runtime(
+            "IN_GAME",
+            RuntimeEvidenceClass.REVIEWED_CAUSAL,
+            ("opaque-ref-cannot-confer-authority",),
+        )
+
+        result = reconcile_state(_visual("WORLD_VISUAL"), runtime)
+
+        self.assertIs(result.state, ReconciledState.UNKNOWN)
+
+    def test_forged_runtime_observation_does_not_match_trusted_evidence(self):
+        trusted_runtime = _runtime(
+            "IN_GAME",
+            RuntimeEvidenceClass.REVIEWED_CAUSAL,
+            ("runtime:trusted",),
+        )
+        forged_runtime = _runtime(
+            "IN_GAME",
+            RuntimeEvidenceClass.REVIEWED_CAUSAL,
+            ("runtime:forged",),
+        )
+        context = _trusted_context(trusted_runtime)
+        self.assertIsNotNone(context, "trusted reconciliation context API is missing")
+
+        result = reconcile_state(
+            _visual("WORLD_VISUAL"),
+            forged_runtime,
+            trusted_context=context,
+        )
+
+        self.assertIs(result.state, ReconciledState.UNKNOWN)
+
+    def test_stale_reviewed_runtime_evidence_is_inconclusive(self):
+        runtime = _runtime(
+            "IN_GAME",
+            RuntimeEvidenceClass.REVIEWED_CAUSAL,
+            ("runtime:stale",),
+        )
+        context = _trusted_context(runtime, observed_monotonic_ns=899)
+        self.assertIsNotNone(context, "trusted reconciliation context API is missing")
+
+        result = reconcile_state(
+            _visual("WORLD_VISUAL"),
+            runtime,
+            trusted_context=context,
+        )
+
+        self.assertIs(result.state, ReconciledState.UNKNOWN)
+
+    def test_freshness_window_is_closed_and_malformed_time_fails_closed(self):
+        runtime = _runtime(
+            "IN_GAME",
+            RuntimeEvidenceClass.REVIEWED_CAUSAL,
+            ("runtime:freshness",),
+        )
+        valid_boundary = _trusted_context(runtime, observed_monotonic_ns=900)
+        invalid_contexts = (
+            _trusted_context(runtime, observed_monotonic_ns=1_001),
+            _trusted_context(runtime, current_monotonic_ns=True),
+            _trusted_context(runtime, max_age_ns=-1),
+            replace(valid_boundary, reviewed_producers=()),
+        )
+
+        boundary_result = reconcile_state(
+            _visual("WORLD_VISUAL"),
+            runtime,
+            trusted_context=valid_boundary,
+        )
+        self.assertIs(boundary_result.state, ReconciledState.WORLD_CONFIRMED)
+
+        for context in invalid_contexts:
+            with self.subTest(context=context):
+                result = reconcile_state(
+                    _visual("WORLD_VISUAL"),
+                    runtime,
+                    trusted_context=context,
+                )
+                self.assertIs(result.state, ReconciledState.UNKNOWN)
+
+    def test_wrong_session_or_run_reviewed_runtime_evidence_is_inconclusive(self):
+        runtime = _runtime(
+            "IN_GAME",
+            RuntimeEvidenceClass.REVIEWED_CAUSAL,
+            ("runtime:wrong-run",),
+        )
+        cases = (
+            ("wrong session", {"evidence_session_id": "session-other"}),
+            ("wrong run", {"evidence_run_id": "run-other"}),
+        )
+
+        for name, overrides in cases:
+            with self.subTest(name=name):
+                context = _trusted_context(runtime, **overrides)
+                self.assertIsNotNone(context, "trusted reconciliation context API is missing")
+                result = reconcile_state(
+                    _visual("WORLD_VISUAL"),
+                    runtime,
+                    trusted_context=context,
+                )
+                self.assertIs(result.state, ReconciledState.UNKNOWN)
+
+    def test_wrong_runtime_identity_or_instance_is_inconclusive(self):
+        runtime = _runtime(
+            "IN_GAME",
+            RuntimeEvidenceClass.REVIEWED_CAUSAL,
+            ("runtime:wrong-identity",),
+        )
+        cases = (
+            ("wrong runtime", {"evidence_runtime_id": "runtime-other"}),
+            ("wrong instance", {"evidence_runtime_instance_id": "instance-other"}),
+        )
+
+        for name, overrides in cases:
+            with self.subTest(name=name):
+                context = _trusted_context(runtime, **overrides)
+                self.assertIsNotNone(context, "trusted reconciliation context API is missing")
+                result = reconcile_state(
+                    _visual("WORLD_VISUAL"),
+                    runtime,
+                    trusted_context=context,
+                )
+                self.assertIs(result.state, ReconciledState.UNKNOWN)
+
+    def test_unknown_producer_or_contract_is_inconclusive(self):
+        runtime = _runtime(
+            "IN_GAME",
+            RuntimeEvidenceClass.REVIEWED_CAUSAL,
+            ("runtime:unknown-producer",),
+        )
+        cases = (
+            ("unknown producer", {"producer_id": "producer-other"}),
+            ("unknown contract", {"producer_contract_id": "runtime-state-v2"}),
+        )
+
+        for name, overrides in cases:
+            with self.subTest(name=name):
+                context = _trusted_context(runtime, **overrides)
+                self.assertIsNotNone(context, "trusted reconciliation context API is missing")
+                result = reconcile_state(
+                    _visual("WORLD_VISUAL"),
+                    runtime,
+                    trusted_context=context,
+                )
+                self.assertIs(result.state, ReconciledState.UNKNOWN)
+
+    def test_valid_current_reviewed_evidence_enables_finite_promotions_and_conflict(self):
+        cases = (
+            (
+                "world confirmed",
+                "WORLD_VISUAL",
+                "IN_GAME",
+                "runtime:world",
+                ReconciledState.WORLD_CONFIRMED,
+            ),
+            (
+                "world exit",
+                "WORLD_EXIT_VISUAL",
+                "WORLD_EXIT",
+                "runtime:exit",
+                ReconciledState.WORLD_EXIT,
+            ),
+            (
+                "trusted conflict",
+                "LOGIN_SCREEN",
+                "IN_GAME",
+                "runtime:conflict",
+                ReconciledState.CONFLICT,
+            ),
+        )
+
+        for name, visual_state, runtime_state, runtime_ref, expected in cases:
+            with self.subTest(name=name):
+                runtime = _runtime(
+                    runtime_state,
+                    RuntimeEvidenceClass.REVIEWED_CAUSAL,
+                    (runtime_ref,),
+                )
+                context = _trusted_context(runtime)
+                self.assertIsNotNone(context, "trusted reconciliation context API is missing")
+                result = reconcile_state(
+                    _visual(visual_state, evidence_ref="capture:current"),
+                    runtime,
+                    trusted_context=context,
+                )
+                self.assertIs(result.state, expected)
+                self.assertEqual(result.visual_evidence_refs, ("capture:current",))
+                self.assertEqual(result.runtime_evidence_refs, (runtime_ref,))
+
+    def test_untrusted_runtime_disagreement_cannot_create_conflict(self):
+        result = reconcile_state(
+            _visual("LOGIN_SCREEN"),
+            _runtime(
+                "IN_GAME",
+                RuntimeEvidenceClass.REVIEWED_CAUSAL,
+                ("runtime:untrusted-conflict",),
+            ),
+        )
+
+        self.assertIs(result.state, ReconciledState.UNKNOWN)
+
     def test_plan_example_visual_in_game_never_confirms_without_reviewed_runtime(self):
         visual = VisionObservation(
             screen_class="IN_GAME_VISUAL",
@@ -106,7 +356,17 @@ class ReconciliationTests(unittest.TestCase):
 
         for name, visual_state, runtime_state, evidence_class, refs, expected in cases:
             with self.subTest(name=name):
-                result = reconcile_state(_visual(visual_state), _runtime(runtime_state, evidence_class, refs))
+                runtime = _runtime(runtime_state, evidence_class, refs)
+                context = (
+                    _trusted_context(runtime)
+                    if evidence_class is RuntimeEvidenceClass.REVIEWED_CAUSAL
+                    else None
+                )
+                result = reconcile_state(
+                    _visual(visual_state),
+                    runtime,
+                    trusted_context=context,
+                )
                 self.assertIs(result.state, expected)
 
     def test_full_runtime_evidence_matrix_never_promotes_without_reviewed_causal_in_game(self):
@@ -129,9 +389,20 @@ class ReconciliationTests(unittest.TestCase):
                         runtime_state=runtime_state,
                         evidence_class=evidence_class,
                     ):
+                        runtime = _runtime(
+                            runtime_state,
+                            evidence_class,
+                            ("runtime:matrix",),
+                        )
+                        context = (
+                            _trusted_context(runtime)
+                            if evidence_class is RuntimeEvidenceClass.REVIEWED_CAUSAL
+                            else None
+                        )
                         result = reconcile_state(
                             _visual(visual_state),
-                            _runtime(runtime_state, evidence_class, ("runtime:matrix",)),
+                            runtime,
+                            trusted_context=context,
                         )
                         if result.state is ReconciledState.WORLD_CONFIRMED:
                             self.assertEqual(runtime_state, "IN_GAME")
@@ -157,7 +428,11 @@ class ReconciliationTests(unittest.TestCase):
 
         for name, visual, runtime in cases:
             with self.subTest(name=name):
-                result = reconcile_state(visual, runtime)
+                result = reconcile_state(
+                    visual,
+                    runtime,
+                    trusted_context=_trusted_context(runtime),
+                )
                 self.assertIs(result.state, ReconciledState.UNKNOWN)
                 self.assertNotIn(secret, repr(result))
 
@@ -170,7 +445,11 @@ class ReconciliationTests(unittest.TestCase):
 
         for name, visual, runtime in cases:
             with self.subTest(name=name):
-                result = reconcile_state(visual, runtime)
+                result = reconcile_state(
+                    visual,
+                    runtime,
+                    trusted_context=_trusted_context(runtime),
+                )
                 self.assertIs(result.state, ReconciledState.UNKNOWN)
                 self.assertEqual(result.visual_evidence_refs, ())
                 self.assertEqual(result.runtime_evidence_refs, ())
@@ -199,9 +478,15 @@ class ReconciliationTests(unittest.TestCase):
 
         for name, kwargs in cases:
             with self.subTest(name=name):
+                runtime = _runtime(
+                    "IN_GAME",
+                    RuntimeEvidenceClass.REVIEWED_CAUSAL,
+                    ("runtime:world",),
+                )
                 result = reconcile_state(
                     _visual("WORLD_VISUAL", **kwargs),
-                    _runtime("IN_GAME", RuntimeEvidenceClass.REVIEWED_CAUSAL, ("runtime:world",)),
+                    runtime,
+                    trusted_context=_trusted_context(runtime),
                 )
                 self.assertIs(result.state, ReconciledState.UNKNOWN)
                 self.assertEqual(result.visual_evidence_refs, ())
@@ -210,9 +495,15 @@ class ReconciliationTests(unittest.TestCase):
     def test_admitted_task5_confidence_forms_remain_reconcilable(self):
         for confidence in (None, 0.0, 0.5, 1.0):
             with self.subTest(confidence=confidence):
+                runtime = _runtime(
+                    "IN_GAME",
+                    RuntimeEvidenceClass.REVIEWED_CAUSAL,
+                    ("runtime:world",),
+                )
                 result = reconcile_state(
                     _visual("WORLD_VISUAL", confidence=confidence),
-                    _runtime("IN_GAME", RuntimeEvidenceClass.REVIEWED_CAUSAL, ("runtime:world",)),
+                    runtime,
+                    trusted_context=_trusted_context(runtime),
                 )
                 self.assertIs(result.state, ReconciledState.WORLD_CONFIRMED)
 
@@ -228,9 +519,15 @@ class ReconciliationTests(unittest.TestCase):
                 self.assertEqual(result.runtime_evidence_refs, ())
 
     def test_result_retains_immutable_visual_and_runtime_provenance(self):
+        runtime = _runtime(
+            "IN_GAME",
+            RuntimeEvidenceClass.REVIEWED_CAUSAL,
+            ("runtime:one", "runtime:two"),
+        )
         result = reconcile_state(
             _visual(evidence_ref="capture:one"),
-            _runtime("IN_GAME", RuntimeEvidenceClass.REVIEWED_CAUSAL, ("runtime:one", "runtime:two")),
+            runtime,
+            trusted_context=_trusted_context(runtime),
         )
 
         self.assertIs(result.state, ReconciledState.WORLD_CONFIRMED)
@@ -243,8 +540,22 @@ class ReconciliationTests(unittest.TestCase):
 
     def test_observation_contract_is_frozen(self):
         runtime = _runtime("IN_GAME", RuntimeEvidenceClass.REVIEWED_CAUSAL, ("runtime:world",))
+        self.assertEqual(
+            tuple(field.name for field in fields(RuntimeObservation)),
+            ("state", "evidence_class", "evidence_refs"),
+        )
         with self.assertRaises(FrozenInstanceError):
             runtime.state = "UNKNOWN"  # type: ignore[misc]
+
+    def test_trusted_provenance_types_are_immutable(self):
+        runtime = _runtime("IN_GAME", RuntimeEvidenceClass.REVIEWED_CAUSAL, ("runtime:world",))
+        context = _trusted_context(runtime)
+        with self.assertRaises(FrozenInstanceError):
+            context.current_run_id = "run-forged"  # type: ignore[misc]
+        with self.assertRaises(FrozenInstanceError):
+            context.runtime_evidence.observed_monotonic_ns = 1_000  # type: ignore[misc]
+        with self.assertRaises(FrozenInstanceError):
+            context.reviewed_producers[0].contract_id = "forged"  # type: ignore[misc]
 
 
 if __name__ == "__main__":

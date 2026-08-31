@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from collections.abc import Mapping, Sequence
 from typing import Any
 
@@ -31,10 +32,26 @@ _SECRET_VALUE_PATTERNS = (
 )
 
 
+def _validation_text(value: object) -> str:
+    """Return a compatibility-normalized view used only for privacy checks."""
+    try:
+        text = value if isinstance(value, str) else str(value)
+        return unicodedata.normalize("NFKC", text)
+    except Exception as exc:
+        raise PrivacyError(
+            "SECRET_VALUE",
+            "text could not be normalized for privacy validation",
+        ) from exc
+
+
 def ensure_no_secret_material(value: Any, *, key_path: str = "payload") -> None:
     if isinstance(value, Mapping):
         for key, child in value.items():
-            normalized = re.sub(r"[^a-z0-9]+", "_", str(key).casefold()).strip("_")
+            normalized = re.sub(
+                r"[^a-z0-9]+",
+                "_",
+                _validation_text(key).casefold(),
+            ).strip("_")
             if normalized in _SECRET_KEYS or normalized.endswith(("_password", "_token", "_nonce")):
                 raise PrivacyError("SECRET_FIELD", f"secret-class field rejected at {key_path}")
             if normalized in {"private_chat", "private_message", "raw_chat"}:
@@ -46,6 +63,7 @@ def ensure_no_secret_material(value: Any, *, key_path: str = "payload") -> None:
             ensure_no_secret_material(child, key_path=key_path)
         return
     if isinstance(value, str):
+        validation_text = _validation_text(value)
         for pattern in _SECRET_VALUE_PATTERNS:
-            if pattern.search(value):
+            if pattern.search(validation_text):
                 raise PrivacyError("SECRET_VALUE", "secret-shaped text rejected before event construction")

@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import Enum
 from math import isfinite
 from types import MappingProxyType
-from typing import Any, Mapping, cast
+from typing import Any, cast
 
 from .model import (
     MAX_SAFE_INTEGER,
@@ -147,7 +148,7 @@ class ClientIdentity:
     sha256: str
 
     @classmethod
-    def from_mapping(cls, value: Mapping[str, Any]) -> "ClientIdentity":
+    def from_mapping(cls, value: Mapping[str, Any]) -> ClientIdentity:
         if not isinstance(value, Mapping):
             raise ValidationError("INVALID_FIELD", "client_identity must be a mapping", "client_identity")
         require_exact_keys(value, ("version", "size", "sha256"))
@@ -178,7 +179,7 @@ class TaskEnvelope:
     secret_capability_ref: str | None
 
     @classmethod
-    def from_mapping(cls, value: Mapping[str, Any]) -> "TaskEnvelope":
+    def from_mapping(cls, value: Mapping[str, Any]) -> TaskEnvelope:
         if not isinstance(value, Mapping):
             raise ValidationError("INVALID_FIELD", "task envelope must be a mapping")
         keys = ("schema", "session_id", "task_id", "run_id", "idempotency_key", "trusted_main_sha", "client_identity", "objective", "allowed_actions", "physical_action_budget", "max_attempts", "deadline_epoch_ms", "runtime_access", "required_evidence", "secret_capability_ref")
@@ -224,7 +225,7 @@ class AgentEvent:
         object.__setattr__(self, "payload", cast("dict[str, object]", _freeze_payload(self.payload)))
 
     @classmethod
-    def new(cls, *, session_id: str, run_id: str | None, provenance: AgentProvenance, kind: str, state_before: str, state_after: str, observed_epoch_ms: int = 0, artifact_refs: tuple[str, ...] = (), action_id: str | None = None, payload: dict[str, object] | None = None) -> "AgentEvent":
+    def new(cls, *, session_id: str, run_id: str | None, provenance: AgentProvenance, kind: str, state_before: str, state_after: str, observed_epoch_ms: int = 0, artifact_refs: tuple[str, ...] = (), action_id: str | None = None, payload: dict[str, object] | None = None) -> AgentEvent:
         if not isinstance(artifact_refs, tuple):
             raise ValidationError("INVALID_FIELD", "artifact_refs must be a tuple", "artifact_refs")
         return cls("otclient.local-agent.event.v1", validate_opaque_id(session_id, field_name="session_id"), None if run_id is None else validate_opaque_id(run_id, field_name="run_id"), 0, checked_non_negative(observed_epoch_ms, maximum=MAX_SAFE_INTEGER, field_name="observed_epoch_ms"), _enum(provenance, AgentProvenance, "provenance"), _text(kind, "kind"), _text(state_before, "state_before"), _text(state_after, "state_after"), tuple(validate_opaque_id(ref, field_name="artifact_ref") for ref in artifact_refs), None if action_id is None else validate_opaque_id(action_id, field_name="action_id"), {} if payload is None else payload)

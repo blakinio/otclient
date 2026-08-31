@@ -290,9 +290,8 @@ def _guard_secret_safe(
         ensure_no_secret_material(value, key_path=key_path)
     except PrivacyError as exc:
         raise _PrivacyRejected("secret material is not admitted") from exc
-    if identifier or require_text:
-        if not isinstance(value, str) or not value:
-            raise _InvalidParams("a non-empty string is required")
+    if (identifier or require_text) and (not isinstance(value, str) or not value):
+        raise _InvalidParams("a non-empty string is required")
     if identifier:
         try:
             validate_opaque_id(value, field_name=key_path, max_bytes=128)

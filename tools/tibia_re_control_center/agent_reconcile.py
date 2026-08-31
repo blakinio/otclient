@@ -17,6 +17,8 @@ from .agent_vision import QWEN_VISION_PROFILE_ID, VisionObservation
 from .model import PrivacyError, ValidationError
 from .recorder import ensure_no_secret_material
 
+_ResolverError = Exception
+
 
 class RuntimeEvidenceClass(str, Enum):
     UNKNOWN = "UNKNOWN"
@@ -332,7 +334,7 @@ def _resolver_state_matches_runtime(
     current_ns = resolver_state.current_monotonic_ns
     observed_ns = evidence.observed_monotonic_ns
     max_age_ns = resolver_state.max_age_ns
-    if (
+    return not (
         type(current_ns) is not int
         or type(observed_ns) is not int
         or type(max_age_ns) is not int
@@ -341,9 +343,7 @@ def _resolver_state_matches_runtime(
         or max_age_ns < 0
         or observed_ns > current_ns
         or current_ns - observed_ns > max_age_ns
-    ):
-        return False
-    return True
+    )
 
 
 def _resolver_verified_runtime(
@@ -355,7 +355,7 @@ def _resolver_verified_runtime(
         return False
     try:
         resolved = resolver.resolve_current_reviewed(runtime)
-    except Exception:
+    except _ResolverError:
         return False
     return type(resolved) is RuntimeObservation and resolved == runtime
 
@@ -387,9 +387,11 @@ def _reconcile_state(
     if visual_state is None or runtime_state is None or evidence_class is None:
         return _result(ReconciledState.UNKNOWN, (), ())
 
-    if evidence_class is RuntimeEvidenceClass.REVIEWED_CAUSAL:
-        if not runtime_refs or not _resolver_verified_runtime(runtime, resolver):
-            return _result(ReconciledState.UNKNOWN, visual_refs, runtime_refs)
+    if (
+        evidence_class is RuntimeEvidenceClass.REVIEWED_CAUSAL
+        and (not runtime_refs or not _resolver_verified_runtime(runtime, resolver))
+    ):
+        return _result(ReconciledState.UNKNOWN, visual_refs, runtime_refs)
 
     rule = _RULES.get((visual_state, runtime_state, evidence_class))
     if rule is not None:

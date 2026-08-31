@@ -10,12 +10,15 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
-from tools.tibia_re_control_center.agent_session import CaptureReceipt, NullBoundedActionExecutor
-from tools.tibia_re_control_center.control_api import ControlApiServer, MAX_PAGE
-from tools.tibia_re_control_center.control_cli import build_parser, main as cli_main
-from tools.tibia_re_control_center.model import SimulatedCrash
-
 from tests.tools.tibia_re_control_center.test_package_b import decode, http_call
+from tools.tibia_re_control_center.agent_session import (
+    CaptureReceipt,
+    NullBoundedActionExecutor,
+)
+from tools.tibia_re_control_center.control_api import MAX_PAGE, ControlApiServer
+from tools.tibia_re_control_center.control_cli import build_parser
+from tools.tibia_re_control_center.control_cli import main as cli_main
+from tools.tibia_re_control_center.model import SimulatedCrash
 
 
 def task_envelope(**overrides: object) -> dict[str, object]:
@@ -738,9 +741,16 @@ class AgentApiTests(unittest.TestCase):
                 ) if self.server.domain.store.load_agent_session(session_id) is not None else 0
                 barrier = threading.Barrier(8)
 
-                def invoke() -> tuple[int, dict[str, object]]:
-                    barrier.wait(timeout=5)
-                    status, _, payload = self.post(path, body, request_id)
+                def invoke(
+                    current_barrier=barrier,
+                    current_path=path,
+                    current_body=body,
+                    current_request_id=request_id,
+                ) -> tuple[int, dict[str, object]]:
+                    current_barrier.wait(timeout=5)
+                    status, _, payload = self.post(
+                        current_path, current_body, current_request_id
+                    )
                     return status, payload
 
                 with ThreadPoolExecutor(max_workers=8) as pool:
@@ -928,9 +938,12 @@ class AgentApiTests(unittest.TestCase):
             with self.subTest(argv=argv):
                 self.assertIsNotNone(parser.parse_args(argv))
         for option in ("--password", "--credential", "--token", "--api-key", "--secret"):
-            with self.subTest(option=option), self.assertRaises(SystemExit):
-                with redirect_stderr(io.StringIO()):
-                    parser.parse_args(["agent-chat", "--session", "session-1", "--text", "hello", "--request-id", "r", option, "value"])
+            with (
+                self.subTest(option=option),
+                self.assertRaises(SystemExit),
+                redirect_stderr(io.StringIO()),
+            ):
+                parser.parse_args(["agent-chat", "--session", "session-1", "--text", "hello", "--request-id", "r", option, "value"])
 
     def test_all_six_agent_cli_commands_execute_against_live_server(self) -> None:
         task_path = self.root / "agent-task.json"

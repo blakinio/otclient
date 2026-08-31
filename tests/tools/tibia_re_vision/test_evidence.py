@@ -1,9 +1,9 @@
-from pathlib import Path
 import subprocess
 import sys
 import unittest
+from pathlib import Path
 
-from tools.tibia_re_vision.evidence import (  # noqa: F401
+from tools.tibia_re_vision.evidence import (
     normalize_ocr_transcription,
     validate_visual_evidence,
 )

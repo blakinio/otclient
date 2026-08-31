@@ -5,7 +5,6 @@ from tools.tibia_re_control_center.agent_protocol import (
     AgentEvent,
     AgentProvenance,
     AgentVisualState,
-    ClientIdentity,
     NamedAgentAction,
     TaskEnvelope,
 )

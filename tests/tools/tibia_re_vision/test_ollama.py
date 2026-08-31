@@ -1,6 +1,6 @@
 import unittest
 
-from tools.tibia_re_vision.ollama import admit_residency  # noqa: F401
+from tools.tibia_re_vision.ollama import admit_residency
 
 
 class ResidencyAdmissionTests(unittest.TestCase):

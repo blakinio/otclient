@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import FrozenInstanceError, fields, replace
 import unittest
+from dataclasses import FrozenInstanceError, fields, replace
 
 from tools.tibia_re_control_center import agent_reconcile as reconcile_module
 from tools.tibia_re_control_center.agent_reconcile import (
@@ -12,8 +12,10 @@ from tools.tibia_re_control_center.agent_reconcile import (
     RuntimeObservation,
     reconcile_state,
 )
-from tools.tibia_re_control_center.agent_vision import VisionObservation
-from tools.tibia_re_control_center.agent_vision import QWEN_VISION_PROFILE_ID
+from tools.tibia_re_control_center.agent_vision import (
+    QWEN_VISION_PROFILE_ID,
+    VisionObservation,
+)
 
 
 class _StringSubclass(str):

@@ -14,7 +14,6 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any
 
-from .canonical import jcs_dumps
 from .agent_protocol import (
     AgentEvent,
     AgentOperationalState,
@@ -24,7 +23,9 @@ from .agent_protocol import (
     ResultStatus,
     TaskEnvelope,
 )
+from .canonical import jcs_dumps
 from .model import (
+    MAX_SAFE_INTEGER,
     ActionLedgerRecord,
     BudgetDimension,
     BudgetLedger,
@@ -35,7 +36,6 @@ from .model import (
     DurabilityTimeout,
     EffectBound,
     LifecycleState,
-    MAX_SAFE_INTEGER,
     ValidationError,
     checked_non_negative,
     require_exact_keys,

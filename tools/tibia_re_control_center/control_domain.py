@@ -11,7 +11,6 @@ from dataclasses import asdict, dataclass, fields, replace
 from enum import Enum
 from typing import Any
 
-from .artifact import ArtifactStore
 from .agent_protocol import AgentProvenance, OwnerControlCommand, TaskEnvelope
 from .agent_session import AgentSessionCoordinator
 from .agent_vision import (
@@ -21,6 +20,7 @@ from .agent_vision import (
     VisionObservation,
     model_slot_wait_reason_code,
 )
+from .artifact import ArtifactStore
 from .canonical import sha256_jcs
 from .engine import ScenarioEngine
 from .execution import MutationCoordinator

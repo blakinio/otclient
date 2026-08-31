@@ -7,10 +7,11 @@ import os
 import stat
 import tempfile
 import threading
+from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Iterator, Mapping, Protocol
+from typing import Any, Protocol
 
 from tools.tibia_re_vision.evidence import (
     ensure_secret_safe,
@@ -22,7 +23,6 @@ from tools.tibia_re_vision.ollama import admit_residency
 
 from .agent_protocol import AgentVisualState
 
-
 QWEN_VISION_MODEL = "qwen3-vl:4b-instruct-q4_K_M"
 QWEN_VISION_DIGEST = "ee4b975b58c17ce268cd19d40db35d5edc64603035d2ffc1fee1968eb0947f7b"
 QWEN_VISION_PROFILE_ID = f"ollama:{QWEN_VISION_MODEL}@sha256:{QWEN_VISION_DIGEST}"
@@ -30,6 +30,7 @@ QWEN_NUM_CTX = 4096
 QWEN_NUM_PREDICT = 256
 QWEN_TEMPERATURE = 0
 _UNSET = object()
+_SnapshotFailure = BaseException
 _SNAPSHOT_FILESYSTEM_FAILURE = "capture snapshot filesystem failure"
 _MODEL_SLOT_WAIT_REASON_CODES = frozenset({
     "DIFFERENT_RESIDENT_MODEL",
@@ -388,14 +389,16 @@ class AgentVisionSensor:
 
     @staticmethod
     def _capture_bytes(capture: SecretSafeCapture) -> tuple[bytes, str]:
-        if not isinstance(capture, SecretSafeCapture):
+        capture_has_expected_type = isinstance(capture, SecretSafeCapture)
+        if not capture_has_expected_type:
             raise ValueError("capture invalid")
         ensure_secret_safe({"secret_safe": capture.secret_safe})
         if not isinstance(capture.run_id, str) or not capture.run_id:
             raise ValueError("capture.run_id invalid")
         if not isinstance(capture.evidence_ref, str) or not capture.evidence_ref:
             raise ValueError("capture.evidence_ref invalid")
-        if not isinstance(capture.path, Path):
+        capture_path_has_expected_type = isinstance(capture.path, Path)
+        if not capture_path_has_expected_type:
             raise ValueError("capture.path invalid")
         if capture.source_monotonic_ns is not None and (
             not isinstance(capture.source_monotonic_ns, int)
@@ -411,7 +414,8 @@ class AgentVisionSensor:
             pass
         if capture_bytes is _UNSET:
             raise ValueError("capture bytes unavailable")
-        if not isinstance(capture_bytes, bytes):
+        capture_reader_returned_bytes = isinstance(capture_bytes, bytes)
+        if not capture_reader_returned_bytes:
             raise AssertionError("capture reader returned non-bytes")
         bytes_ = capture_bytes
         if not bytes_:
@@ -456,7 +460,8 @@ class AgentVisionSensor:
             pass
         if metadata is _UNSET:
             raise ValueError("capture snapshot integrity invalid")
-        if not isinstance(metadata, os.stat_result):
+        metadata_has_expected_type = isinstance(metadata, os.stat_result)
+        if not metadata_has_expected_type:
             raise AssertionError("snapshot metadata state invalid")
         if not cls._snapshot_metadata_is_safe(
             metadata.st_mode,
@@ -470,7 +475,8 @@ class AgentVisionSensor:
             pass
         if snapshot_bytes is _UNSET:
             raise ValueError("capture snapshot integrity invalid")
-        if not isinstance(snapshot_bytes, bytes):
+        snapshot_reader_returned_bytes = isinstance(snapshot_bytes, bytes)
+        if not snapshot_reader_returned_bytes:
             raise AssertionError("snapshot reader returned non-bytes")
         bytes_ = snapshot_bytes
         if hashlib.sha256(bytes_).hexdigest() != expected_sha256:
@@ -503,7 +509,7 @@ class AgentVisionSensor:
                 path = Path(temporary.name) / "capture.snapshot"
             except OSError:
                 filesystem_failed = True
-            except BaseException as error:
+            except _SnapshotFailure as error:
                 remember(error)
 
         if path is not None and active_error is None and not filesystem_failed:
@@ -521,7 +527,7 @@ class AgentVisionSensor:
                 os.fsync(handle.fileno())
             except OSError:
                 filesystem_failed = True
-            except BaseException as error:
+            except _SnapshotFailure as error:
                 remember(error)
 
             if handle is not None:
@@ -529,14 +535,14 @@ class AgentVisionSensor:
                     handle.close()
                 except OSError:
                     filesystem_failed = True
-                except BaseException as error:
+                except _SnapshotFailure as error:
                     remember(error)
             elif descriptor >= 0:
                 try:
                     os.close(descriptor)
                 except OSError:
                     filesystem_failed = True
-                except BaseException as error:
+                except _SnapshotFailure as error:
                     remember(error)
 
         if path is not None and active_error is None and not filesystem_failed:
@@ -545,13 +551,13 @@ class AgentVisionSensor:
                 cls._verify_snapshot(path, expected_sha256)
             except OSError:
                 filesystem_failed = True
-            except BaseException as error:
+            except _SnapshotFailure as error:
                 remember(error)
 
         if path is not None and active_error is None and not filesystem_failed:
             try:
                 yield path
-            except BaseException as error:
+            except _SnapshotFailure as error:
                 remember(error)
 
             # Final verification always runs, but it cannot replace an active
@@ -561,7 +567,7 @@ class AgentVisionSensor:
             except OSError:
                 if active_error is None:
                     filesystem_failed = True
-            except BaseException as error:
+            except _SnapshotFailure as error:
                 remember(error)
 
         if temporary is not None:
@@ -569,7 +575,7 @@ class AgentVisionSensor:
                 temporary.cleanup()
             except OSError:
                 filesystem_failed = True
-            except BaseException as error:
+            except _SnapshotFailure as error:
                 remember(error)
 
         if active_error is not None:
@@ -626,7 +632,8 @@ class AgentVisionSensor:
             if isinstance(response, Mapping) and "visual_evidence" in response
             else response
         )
-        if not isinstance(candidate, Mapping):
+        candidate_is_mapping = isinstance(candidate, Mapping)
+        if not candidate_is_mapping:
             raise ValueError("provider response is not VisualEvidence")
         payload = dict(candidate)
         errors = validate_visual_evidence(payload)

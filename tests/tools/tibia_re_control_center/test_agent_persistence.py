@@ -10,6 +10,7 @@ from pathlib import Path
 from types import MappingProxyType
 from unittest.mock import patch
 
+from tools.tibia_re_control_center import persistent_store
 from tools.tibia_re_control_center.agent_protocol import (
     AgentEvent,
     AgentOperationalState,
@@ -22,7 +23,6 @@ from tools.tibia_re_control_center.agent_protocol import (
     TaskEnvelope,
 )
 from tools.tibia_re_control_center.model import DurabilityError, ValidationError
-from tools.tibia_re_control_center import persistent_store
 from tools.tibia_re_control_center.persistent_store import SQLitePersistentStore
 
 
@@ -234,9 +234,12 @@ class AgentPersistenceTests(unittest.TestCase):
             "session-1", AgentOperationalState.IDLE, None, 0, False, False, None,
         ))
         for failure in (RuntimeError("internal decoder failure"), MemoryError(), KeyboardInterrupt(), SystemExit()):
-            with self.subTest(failure=type(failure).__name__), patch.object(persistent_store, "_load", side_effect=failure):
-                with self.assertRaises(type(failure)):
-                    self.store.load_agent_session("session-1")
+            with (
+                self.subTest(failure=type(failure).__name__),
+                patch.object(persistent_store, "_load", side_effect=failure),
+                self.assertRaises(type(failure)),
+            ):
+                self.store.load_agent_session("session-1")
 
     def test_invalid_session_inputs_fail_before_transaction(self):
         cases = (

@@ -22,8 +22,8 @@ if str(ROOT) not in sys.path:
 
 from tools.tibia_re_control_center import agent_reconcile as reconcile_module
 from tools.tibia_re_control_center.agent_protocol import (
-    AgentProvenance,
     AgentOperationalState,
+    AgentProvenance,
     AgentVisualState,
     ClientIdentity,
     NamedAgentAction,
@@ -43,19 +43,18 @@ from tools.tibia_re_control_center.agent_session import (
     GuardedMutationActionExecutor,
 )
 from tools.tibia_re_control_center.agent_vision import (
+    QWEN_VISION_DIGEST,
+    QWEN_VISION_MODEL,
     AgentVisionSensor,
     ModelSlotScheduler,
     ModelSlotUnavailable,
-    QWEN_NUM_CTX,
-    QWEN_NUM_PREDICT,
-    QWEN_TEMPERATURE,
-    QWEN_VISION_DIGEST,
-    QWEN_VISION_MODEL,
-    QWEN_VISION_PROFILE_ID,
     SecretSafeCapture,
 )
 from tools.tibia_re_control_center.control_api import ControlApiServer
-from tools.tibia_re_control_center.control_cli import ControlApiClient, ControlClientError
+from tools.tibia_re_control_center.control_cli import (
+    ControlApiClient,
+    ControlClientError,
+)
 from tools.tibia_re_control_center.control_domain import ControlDomainService
 from tools.tibia_re_control_center.model import EffectBound, PrivacyError
 from tools.tibia_re_vision.evidence import UnsafeInputError
@@ -624,13 +623,20 @@ def scenario_i_foreign_model_waits_without_eviction() -> None:
             resident_state: list[str] = []
             inference_count: list[str] = []
 
-            def failing_provider(model: str, *args: object, **kwargs: object) -> object:
-                inference_count.append(model)
-                resident_state[:] = [model]
-                return provider(model, *args, **kwargs)
+            def failing_provider(
+                model: str,
+                *args: object,
+                count: list[str] = inference_count,
+                state: list[str] = resident_state,
+                candidate=provider,
+                **kwargs: object,
+            ) -> object:
+                count.append(model)
+                state[:] = [model]
+                return candidate(model, *args, **kwargs)
 
             negative_scheduler = ModelSlotScheduler(
-                ps=lambda: list(resident_state),
+                ps=lambda state=resident_state: list(state),
                 digest=lambda _model, value=digest: value,
                 infer=failing_provider,
                 unload=lambda _model: None,

@@ -3,6 +3,7 @@ from __future__ import annotations
 import tempfile
 import threading
 import unittest
+from contextlib import suppress
 from dataclasses import replace
 from pathlib import Path
 
@@ -26,7 +27,12 @@ from tools.tibia_re_control_center.agent_session import (
 from tools.tibia_re_control_center.control_domain import ControlDomainService
 from tools.tibia_re_control_center.execution import MutationCoordinator
 from tools.tibia_re_control_center.fake import FakeAdapter, ManualClock
-from tools.tibia_re_control_center.model import DurabilityError, EffectBound, PrivacyError, ValidationError
+from tools.tibia_re_control_center.model import (
+    DurabilityError,
+    EffectBound,
+    PrivacyError,
+    ValidationError,
+)
 from tools.tibia_re_control_center.persistent_store import SQLitePersistentStore
 
 
@@ -91,10 +97,8 @@ class AgentSessionTests(unittest.TestCase):
         self.agent._now_epoch_ms = lambda: self.epoch_ms
 
     def tearDown(self):
-        try:
+        with suppress(Exception):
             self.store.close()
-        except Exception:
-            pass
         self.temp.cleanup()
 
     def restart(self, *, clean=True, executor=None):

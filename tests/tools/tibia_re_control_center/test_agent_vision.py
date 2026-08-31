@@ -1,37 +1,37 @@
-from contextlib import ExitStack
 import hashlib
 import inspect
 import os
 import stat
-from functools import partial
-from pathlib import Path
 import tempfile
 import threading
 import traceback
 import unittest
+from contextlib import ExitStack
+from functools import partial
+from pathlib import Path
 from unittest.mock import patch
 
 import tools.tibia_re_control_center.agent_vision as agent_vision_module
 from tools.tibia_re_control_center.agent_protocol import AgentVisualState
 from tools.tibia_re_control_center.agent_vision import (
-    AgentVisionSensor,
-    ModelSlotScheduler,
-    ModelSlotUnavailable,
     QWEN_NUM_CTX,
     QWEN_NUM_PREDICT,
     QWEN_TEMPERATURE,
     QWEN_VISION_DIGEST,
     QWEN_VISION_MODEL,
     QWEN_VISION_PROFILE_ID,
+    AgentVisionSensor,
+    ModelSlotScheduler,
+    ModelSlotUnavailable,
     SecretSafeCapture,
 )
 from tools.tibia_re_vision.evidence import UnsafeInputError
 from tools.tibia_re_vision.ollama import run_ollama_trial
 
-
 _REAL_FDOPEN = os.fdopen
 _REAL_OS_CLOSE = os.close
 _REAL_PATH_READ_BYTES = Path.read_bytes
+_ThreadFailure = BaseException
 
 
 def _visual_evidence(capture, *, screen_class="LOGIN_SCREEN"):
@@ -409,8 +409,8 @@ class ModelSlotSchedulerTests(unittest.TestCase):
             with self.subTest(state=state):
                 resident = [[]]
 
-                def provider(call, value=state):
-                    resident[0] = value
+                def provider(call, value=state, current_resident=resident):
+                    current_resident[0] = value
                     return {"ok": True}
 
                 scheduler = self._scheduler(resident, provider=provider)
@@ -664,15 +664,15 @@ class ModelSlotSchedulerTests(unittest.TestCase):
             with self.subTest(post_state=post_state):
                 resident = [[]]
 
-                def provider(call, state=post_state):
-                    resident[0] = state
+                def provider(call, state=post_state, current_resident=resident):
+                    current_resident[0] = state
                     raise RuntimeError(provider_secret)
 
                 scheduler = self._scheduler(resident, provider=provider)
                 failure = _capture_exception(
                     self,
                     ModelSlotUnavailable,
-                    lambda: _infer(scheduler),
+                    lambda current_scheduler=scheduler: _infer(current_scheduler),
                 )
                 _assert_sanitized_exception(
                     self,
@@ -694,15 +694,15 @@ class ModelSlotSchedulerTests(unittest.TestCase):
             with self.subTest(expected_code=expected_code):
                 resident = [[]]
 
-                def provider(call, state=post_state):
-                    resident[0] = state
+                def provider(call, state=post_state, current_resident=resident):
+                    current_resident[0] = state
                     raise RuntimeError(provider_secret)
 
                 scheduler = self._scheduler(resident, provider=provider)
                 failure = _capture_exception(
                     self,
                     ModelSlotUnavailable,
-                    lambda: _infer(scheduler),
+                    lambda current_scheduler=scheduler: _infer(current_scheduler),
                 )
                 _assert_sanitized_exception(
                     self,
@@ -724,7 +724,7 @@ class ModelSlotSchedulerTests(unittest.TestCase):
                 propagated = _capture_exception(
                     self,
                     type(control_error),
-                    lambda: _infer(scheduler),
+                    lambda current_scheduler=scheduler: _infer(current_scheduler),
                 )
                 self.assertIs(control_error, propagated)
                 self.assertFalse(scheduler.owns(QWEN_VISION_MODEL))
@@ -743,24 +743,30 @@ class ModelSlotSchedulerTests(unittest.TestCase):
                     unloads = []
                     calls = []
 
-                    def provider(call, state=post_state, error=control_error):
-                        calls.append(call)
-                        if len(calls) == 1:
-                            resident[0] = [call["model"]]
+                    def provider(
+                        call,
+                        state=post_state,
+                        error=control_error,
+                        current_calls=calls,
+                        current_resident=resident,
+                    ):
+                        current_calls.append(call)
+                        if len(current_calls) == 1:
+                            current_resident[0] = [call["model"]]
                             return {"ok": True}
-                        resident[0] = state
+                        current_resident[0] = state
                         raise error
 
                     scheduler = self._scheduler(
                         resident,
                         provider=provider,
-                        unload=lambda model: unloads.append(model),
+                        unload=lambda model, current_unloads=unloads: current_unloads.append(model),
                     )
                     _infer(scheduler)
                     propagated = _capture_exception(
                         self,
                         type(control_error),
-                        lambda: _infer(scheduler),
+                        lambda current_scheduler=scheduler: _infer(current_scheduler),
                     )
                     self.assertIs(control_error, propagated)
                     self.assertEqual(expected_owned, scheduler.owns(QWEN_VISION_MODEL))
@@ -786,9 +792,15 @@ class ModelSlotSchedulerTests(unittest.TestCase):
                     resident = [[]]
                     unloads = []
 
-                    def unload(model, state=post_state, error=control_error):
-                        unloads.append(model)
-                        resident[0] = state
+                    def unload(
+                        model,
+                        state=post_state,
+                        error=control_error,
+                        current_unloads=unloads,
+                        current_resident=resident,
+                    ):
+                        current_unloads.append(model)
+                        current_resident[0] = state
                         raise error
 
                     scheduler = self._scheduler(resident, unload=unload)
@@ -824,7 +836,7 @@ class ModelSlotSchedulerTests(unittest.TestCase):
                     propagated = _capture_exception(
                         self,
                         error_type,
-                        lambda: _infer(scheduler),
+                        lambda current_scheduler=scheduler: _infer(current_scheduler),
                     )
                     self.assertIs(programmer_error, propagated)
                     self.assertFalse(scheduler.owns(QWEN_VISION_MODEL))
@@ -837,12 +849,12 @@ class ModelSlotSchedulerTests(unittest.TestCase):
                     resident = [[]]
                     ps_error = error_type("post-transition ps programmer defect")
 
-                    def provider(call, error=ps_error):
-                        resident[0] = error
+                    def provider(call, error=ps_error, current_resident=resident):
+                        current_resident[0] = error
                         return {"ok": True}
 
-                    def unload(model, error=ps_error):
-                        resident[0] = error
+                    def unload(model, error=ps_error, current_resident=resident):
+                        current_resident[0] = error
 
                     scheduler = self._scheduler(
                         resident,
@@ -853,7 +865,7 @@ class ModelSlotSchedulerTests(unittest.TestCase):
                         _infer(scheduler)
                         call = scheduler.release
                     else:
-                        call = lambda: _infer(scheduler)
+                        call = lambda current_scheduler=scheduler: _infer(current_scheduler)
 
                     propagated = _capture_exception(self, error_type, call)
                     self.assertIs(ps_error, propagated)
@@ -872,12 +884,18 @@ class ModelSlotSchedulerTests(unittest.TestCase):
                     calls = []
                     programmer_error = error_type("provider programmer defect")
 
-                    def provider(call, state=post_state, error=programmer_error):
-                        calls.append(call)
-                        if len(calls) == 1:
-                            resident[0] = [call["model"]]
+                    def provider(
+                        call,
+                        state=post_state,
+                        error=programmer_error,
+                        current_calls=calls,
+                        current_resident=resident,
+                    ):
+                        current_calls.append(call)
+                        if len(current_calls) == 1:
+                            current_resident[0] = [call["model"]]
                             return {"ok": True}
-                        resident[0] = state
+                        current_resident[0] = state
                         raise error
 
                     scheduler = self._scheduler(resident, provider=provider)
@@ -885,7 +903,7 @@ class ModelSlotSchedulerTests(unittest.TestCase):
                     propagated = _capture_exception(
                         self,
                         error_type,
-                        lambda: _infer(scheduler),
+                        lambda current_scheduler=scheduler: _infer(current_scheduler),
                     )
                     self.assertIs(programmer_error, propagated)
                     self.assertEqual(expected_owned, scheduler.owns(QWEN_VISION_MODEL))
@@ -902,8 +920,13 @@ class ModelSlotSchedulerTests(unittest.TestCase):
                     resident = [[]]
                     programmer_error = error_type("unload programmer defect")
 
-                    def unload(model, state=post_state, error=programmer_error):
-                        resident[0] = state
+                    def unload(
+                        model,
+                        state=post_state,
+                        error=programmer_error,
+                        current_resident=resident,
+                    ):
+                        current_resident[0] = state
                         raise error
 
                     scheduler = self._scheduler(resident, unload=unload)
@@ -934,15 +957,15 @@ class ModelSlotSchedulerTests(unittest.TestCase):
 
                     if seam == "ps":
                         scheduler._ps = lambda error=operational_error: (_ for _ in ()).throw(error)
-                        call = lambda: _infer(scheduler)
+                        call = lambda current_scheduler=scheduler: _infer(current_scheduler)
                     elif seam == "digest":
                         scheduler._digest = lambda model, error=operational_error: (_ for _ in ()).throw(error)
-                        call = lambda: _infer(scheduler)
+                        call = lambda current_scheduler=scheduler: _infer(current_scheduler)
                     elif seam == "infer":
                         scheduler._infer = lambda *args, error=operational_error, **kwargs: (
                             (_ for _ in ()).throw(error)
                         )
-                        call = lambda: _infer(scheduler)
+                        call = lambda current_scheduler=scheduler: _infer(current_scheduler)
                     else:
                         _infer(scheduler)
                         scheduler._unload = lambda model, error=operational_error: (
@@ -965,16 +988,21 @@ class ModelSlotSchedulerTests(unittest.TestCase):
                     resident = [[]]
                     calls = []
 
-                    def provider(call, error=primary_error):
-                        calls.append(call)
-                        if len(calls) == 1:
-                            resident[0] = [call["model"]]
+                    def provider(
+                        call,
+                        error=primary_error,
+                        current_calls=calls,
+                        current_resident=resident,
+                    ):
+                        current_calls.append(call)
+                        if len(current_calls) == 1:
+                            current_resident[0] = [call["model"]]
                             return {"ok": True}
-                        resident[0] = AssertionError("secondary residency defect")
+                        current_resident[0] = AssertionError("secondary residency defect")
                         raise error
 
-                    def unload(model, error=primary_error):
-                        resident[0] = AssertionError("secondary residency defect")
+                    def unload(model, error=primary_error, current_resident=resident):
+                        current_resident[0] = AssertionError("secondary residency defect")
                         raise error
 
                     scheduler = self._scheduler(resident, provider=provider, unload=unload)
@@ -982,7 +1010,11 @@ class ModelSlotSchedulerTests(unittest.TestCase):
                     propagated = _capture_exception(
                         self,
                         type(primary_error),
-                        (lambda: _infer(scheduler)) if seam == "infer" else scheduler.release,
+                        (
+                            lambda current_scheduler=scheduler: _infer(current_scheduler)
+                        )
+                        if seam == "infer"
+                        else scheduler.release,
                     )
                     self.assertIs(primary_error, propagated)
                     _assert_sanitized_exception(
@@ -1019,17 +1051,29 @@ class ModelSlotSchedulerTests(unittest.TestCase):
                         unloads = []
                         primary_error = primary_type("PRIMARY_TRANSITION_SENTINEL")
 
-                        def provider(call, error=primary_error):
-                            calls.append(call)
-                            if len(calls) == 1:
-                                resident[0] = [call["model"]]
+                        def provider(
+                            call,
+                            error=primary_error,
+                            current_calls=calls,
+                            current_resident=resident,
+                            current_shape_factory=shape_factory,
+                        ):
+                            current_calls.append(call)
+                            if len(current_calls) == 1:
+                                current_resident[0] = [call["model"]]
                                 return {"ok": True}
-                            resident[0] = shape_factory()
+                            current_resident[0] = current_shape_factory()
                             raise error
 
-                        def unload(model, error=primary_error):
-                            unloads.append(model)
-                            resident[0] = shape_factory()
+                        def unload(
+                            model,
+                            error=primary_error,
+                            current_unloads=unloads,
+                            current_resident=resident,
+                            current_shape_factory=shape_factory,
+                        ):
+                            current_unloads.append(model)
+                            current_resident[0] = current_shape_factory()
                             raise error
 
                         scheduler = self._scheduler(
@@ -1038,14 +1082,14 @@ class ModelSlotSchedulerTests(unittest.TestCase):
                             unload=(
                                 unload
                                 if transition == "unload"
-                                else lambda model: unloads.append(model)
+                                else lambda model, current_unloads=unloads: current_unloads.append(model)
                             ),
                         )
                         _infer(scheduler)
                         propagated = _capture_exception(
                             self,
                             primary_type,
-                            (lambda: _infer(scheduler))
+                            (lambda current_scheduler=scheduler: _infer(current_scheduler))
                             if transition == "infer"
                             else scheduler.release,
                         )
@@ -1101,12 +1145,20 @@ class ModelSlotSchedulerTests(unittest.TestCase):
                 with self.subTest(shape=shape_factory, transition=transition):
                     resident = [shape_factory() if transition == "preflight" else []]
 
-                    def provider(call):
-                        resident[0] = shape_factory()
+                    def provider(
+                        call,
+                        current_resident=resident,
+                        current_shape_factory=shape_factory,
+                    ):
+                        current_resident[0] = current_shape_factory()
                         return {"ok": True}
 
-                    def unload(model):
-                        resident[0] = shape_factory()
+                    def unload(
+                        model,
+                        current_resident=resident,
+                        current_shape_factory=shape_factory,
+                    ):
+                        current_resident[0] = current_shape_factory()
 
                     scheduler = self._scheduler(
                         resident,
@@ -1118,7 +1170,7 @@ class ModelSlotSchedulerTests(unittest.TestCase):
                         call = scheduler.release
                         expected_code = "MODEL_UNLOAD_NOT_VERIFIED"
                     else:
-                        call = lambda: _infer(scheduler)
+                        call = lambda current_scheduler=scheduler: _infer(current_scheduler)
                         expected_code = "RESIDENCY_UNKNOWN"
 
                     failure = _capture_exception(self, ModelSlotUnavailable, call)
@@ -1145,32 +1197,42 @@ class ModelSlotSchedulerTests(unittest.TestCase):
                     programmer_error = error_type("RUNTIME_PROGRAMMING_SENTINEL")
                     scheduler = self._scheduler(
                         resident,
-                        unload=lambda model: unloads.append(model),
+                        unload=lambda model, current_unloads=unloads: current_unloads.append(model),
                     )
 
                     if seam == "ps":
                         scheduler._ps = lambda error=programmer_error: (
                             (_ for _ in ()).throw(error)
                         )
-                        call = lambda: _infer(scheduler)
+                        call = lambda current_scheduler=scheduler: _infer(current_scheduler)
                     elif seam == "digest":
                         scheduler._digest = lambda model, error=programmer_error: (
                             (_ for _ in ()).throw(error)
                         )
-                        call = lambda: _infer(scheduler)
+                        call = lambda current_scheduler=scheduler: _infer(current_scheduler)
                     elif seam == "infer":
-                        def fail_infer(*args, error=programmer_error, **kwargs):
-                            resident[0] = []
+                        def fail_infer(
+                            *args,
+                            error=programmer_error,
+                            current_resident=resident,
+                            **kwargs,
+                        ):
+                            current_resident[0] = []
                             raise error
 
                         scheduler._infer = fail_infer
-                        call = lambda: _infer(scheduler)
+                        call = lambda current_scheduler=scheduler: _infer(current_scheduler)
                     else:
                         _infer(scheduler)
 
-                        def fail_unload(model, error=programmer_error):
-                            unloads.append(model)
-                            resident[0] = []
+                        def fail_unload(
+                            model,
+                            error=programmer_error,
+                            current_unloads=unloads,
+                            current_resident=resident,
+                        ):
+                            current_unloads.append(model)
+                            current_resident[0] = []
                             raise error
 
                         scheduler._unload = fail_unload
@@ -1207,9 +1269,14 @@ class ModelSlotSchedulerTests(unittest.TestCase):
                 resident = [[]]
                 unloads = []
 
-                def unload(model, state=post_state):
-                    unloads.append(model)
-                    resident[0] = state
+                def unload(
+                    model,
+                    state=post_state,
+                    current_unloads=unloads,
+                    current_resident=resident,
+                ):
+                    current_unloads.append(model)
+                    current_resident[0] = state
                     if unload_raises:
                         raise RuntimeError("unload provider failed")
 
@@ -1232,7 +1299,7 @@ class ModelSlotSchedulerTests(unittest.TestCase):
     def _thread_call(failures, call):
         try:
             call()
-        except BaseException as exc:
+        except _ThreadFailure as exc:
             failures.append(exc)
 
 
@@ -1294,7 +1361,9 @@ class AgentVisionSensorTests(unittest.TestCase):
             calls = []
             with self.subTest(body=body), tempfile.TemporaryDirectory() as raw:
                 capture = self._capture(Path(raw), body=body, secret_safe=secret_safe, digest=digest)
-                sensor = self._sensor(lambda call: calls.append(call))
+                sensor = self._sensor(
+                    lambda call, current_calls=calls: current_calls.append(call)
+                )
                 with self.assertRaises(error):
                     sensor.observe(capture)
             self.assertEqual([], calls)
@@ -1315,7 +1384,7 @@ class AgentVisionSensorTests(unittest.TestCase):
 
     def test_constructor_has_no_free_form_prompt_channel(self):
         scheduler = ModelSlotScheduler(
-            ps=lambda: [], digest=lambda model: QWEN_VISION_DIGEST,
+            ps=list, digest=lambda model: QWEN_VISION_DIGEST,
             infer=lambda *args, **kwargs: None, unload=lambda model: None,
         )
         with self.assertRaises(TypeError):
@@ -1344,17 +1413,23 @@ class AgentVisionSensorTests(unittest.TestCase):
                 capture = self._capture(directory)
                 consumed = []
 
-                def provider(call):
-                    if action == "mutate":
-                        capture.path.write_bytes(b"changed")
-                    elif action == "replace":
-                        replacement = directory / "replacement"
+                def provider(
+                    call,
+                    current_action=action,
+                    current_capture=capture,
+                    current_directory=directory,
+                    current_consumed=consumed,
+                ):
+                    if current_action == "mutate":
+                        current_capture.path.write_bytes(b"changed")
+                    elif current_action == "replace":
+                        replacement = current_directory / "replacement"
                         replacement.write_bytes(b"replacement")
-                        replacement.replace(capture.path)
+                        replacement.replace(current_capture.path)
                     else:
-                        capture.path.unlink()
-                    consumed.append(Path(call["image_path"]).read_bytes())
-                    return _visual_evidence(capture)
+                        current_capture.path.unlink()
+                    current_consumed.append(Path(call["image_path"]).read_bytes())
+                    return _visual_evidence(current_capture)
 
                 result = self._sensor(provider).observe(capture)
                 self.assertEqual([b"safe frame"], consumed)
@@ -1443,7 +1518,9 @@ class AgentVisionSensorTests(unittest.TestCase):
                 capture = self._capture(directory, filename=f"{operation}.bin")
                 calls = []
                 sensor = self._sensor(
-                    lambda call: calls.append(call) or _visual_evidence(capture)
+                    lambda call, current_calls=calls, current_capture=capture: (
+                        current_calls.append(call) or _visual_evidence(current_capture)
+                    )
                 )
                 sentinel = f"SENTINEL_SECRET_SNAPSHOT_{operation.upper()}"
                 generated_paths = []
@@ -1454,9 +1531,15 @@ class AgentVisionSensorTests(unittest.TestCase):
                         side_effect=OSError(sentinel),
                     )
                 elif operation == "exclusive_open":
-                    def fail_open(path, *args, **kwargs):
-                        generated_paths.append(str(path))
-                        raise OSError(f"{sentinel}:{path}")
+                    def fail_open(
+                        path,
+                        *args,
+                        current_paths=generated_paths,
+                        current_sentinel=sentinel,
+                        **kwargs,
+                    ):
+                        current_paths.append(str(path))
+                        raise OSError(f"{current_sentinel}:{path}")
 
                     failure_patch = patch(
                         "tools.tibia_re_control_center.agent_vision.os.open",
@@ -1468,9 +1551,11 @@ class AgentVisionSensorTests(unittest.TestCase):
                         side_effect=OSError(sentinel),
                     )
                 elif operation == "descriptor_close":
-                    def fail_descriptor_close(descriptor):
+                    def fail_descriptor_close(
+                        descriptor, current_sentinel=sentinel
+                    ):
                         _REAL_OS_CLOSE(descriptor)
-                        raise OSError(sentinel)
+                        raise OSError(current_sentinel)
 
                     failure_patch = ExitStack()
                     failure_patch.enter_context(patch(
@@ -1506,9 +1591,9 @@ class AgentVisionSensorTests(unittest.TestCase):
                         side_effect=OSError(sentinel),
                     )
                 elif operation == "read_verify":
-                    def fail_snapshot_read(path):
+                    def fail_snapshot_read(path, current_sentinel=sentinel):
                         if path.name == "capture.snapshot":
-                            raise OSError(f"{sentinel}:{path}")
+                            raise OSError(f"{current_sentinel}:{path}")
                         return _REAL_PATH_READ_BYTES(path)
 
                     failure_patch = patch.object(Path, "read_bytes", new=fail_snapshot_read)
@@ -1524,7 +1609,9 @@ class AgentVisionSensorTests(unittest.TestCase):
                     failure = _capture_exception(
                         self,
                         ValueError,
-                        lambda: sensor.observe(capture),
+                        lambda current_sensor=sensor, current_capture=capture: (
+                            current_sensor.observe(current_capture)
+                        ),
                     )
                 _assert_sanitized_exception(
                     self,
@@ -1555,20 +1642,27 @@ class AgentVisionSensorTests(unittest.TestCase):
                 capture = self._capture(Path(raw))
                 calls = []
 
-                def provider(call, error=control_error):
-                    calls.append(call)
-                    if len(calls) == 1:
+                def provider(
+                    call,
+                    error=control_error,
+                    current_calls=calls,
+                    current_capture=capture,
+                ):
+                    current_calls.append(call)
+                    if len(current_calls) == 1:
                         snapshot = Path(call["image_path"])
                         snapshot.chmod(0o600)
                         snapshot.write_bytes(b"tampered")
                         raise error
-                    return _visual_evidence(capture)
+                    return _visual_evidence(current_capture)
 
                 sensor = self._sensor(provider)
                 propagated = _capture_exception(
                     self,
                     type(control_error),
-                    lambda: sensor.observe(capture),
+                    lambda current_sensor=sensor, current_capture=capture: (
+                        current_sensor.observe(current_capture)
+                    ),
                 )
                 self.assertIs(control_error, propagated)
                 self.assertIsNone(propagated.__cause__)
@@ -1594,14 +1688,19 @@ class AgentVisionSensorTests(unittest.TestCase):
                 cleanup_parent = directory / "cleanup-primary"
                 cleanup_parent.mkdir()
 
-                def provider(call, error=active_error):
-                    calls.append(call)
-                    if len(calls) == 1:
+                def provider(
+                    call,
+                    error=active_error,
+                    current_calls=calls,
+                    current_capture=capture,
+                ):
+                    current_calls.append(call)
+                    if len(current_calls) == 1:
                         snapshot = Path(call["image_path"])
                         snapshot.chmod(0o600)
                         snapshot.write_bytes(b"tampered")
                         raise error
-                    return _visual_evidence(capture)
+                    return _visual_evidence(current_capture)
 
                 sensor = self._sensor(provider)
                 with patch(
@@ -1616,14 +1715,18 @@ class AgentVisionSensorTests(unittest.TestCase):
                         propagated = _capture_exception(
                             self,
                             ModelSlotUnavailable,
-                            lambda: sensor.observe(capture),
+                            lambda current_sensor=sensor, current_capture=capture: (
+                                current_sensor.observe(current_capture)
+                            ),
                         )
                         expected_text = "MODEL_INFERENCE_FAILED"
                     else:
                         propagated = _capture_exception(
                             self,
                             type(active_error),
-                            lambda: sensor.observe(capture),
+                            lambda current_sensor=sensor, current_capture=capture: (
+                                current_sensor.observe(current_capture)
+                            ),
                         )
                         self.assertIs(active_error, propagated)
                         expected_text = str(active_error)
@@ -1769,7 +1872,7 @@ class AgentVisionSensorTests(unittest.TestCase):
             def observe():
                 try:
                     results.append(sensor.observe(capture))
-                except BaseException as exc:
+                except _ThreadFailure as exc:
                     failures.append(exc)
 
             one = threading.Thread(target=observe)

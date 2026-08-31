@@ -5,7 +5,6 @@ non-exported loopback HTTP/CLI/UI modules backed only by the explicit FAKE_TEST 
 Official Tibia runtime/client access remains absent.
 """
 
-from .artifact import ArtifactStore
 from .agent_protocol import (
     AgentEvent,
     AgentOperationalState,
@@ -19,6 +18,7 @@ from .agent_protocol import (
     ResultStatus,
     TaskEnvelope,
 )
+from .artifact import ArtifactStore
 from .comparison import ComparisonProfile, ComparisonResult, compare_runs
 from .engine import EngineRunResult, ScenarioEngine
 from .execution import CancellationToken, MutationCoordinator

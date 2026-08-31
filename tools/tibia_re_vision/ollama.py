@@ -39,7 +39,8 @@ def _local_json_request(endpoint: str, path: str, payload: dict[str, Any] | None
     with opener.open(request, timeout=timeout) as response:
         raw = response.read()
     decoded = json.loads(raw.decode("utf-8"))
-    if not isinstance(decoded, dict):
+    decoded_is_object = isinstance(decoded, dict)
+    if not decoded_is_object:
         raise ValueError("provider response must be a JSON object")
     return decoded
 
@@ -47,11 +48,13 @@ def _local_json_request(endpoint: str, path: str, payload: dict[str, Any] | None
 def query_ollama_ps(endpoint: str = "http://127.0.0.1:11434", timeout: float = 5.0) -> list[str]:
     response = _local_json_request(endpoint, "/api/ps", timeout=timeout)
     models = response.get("models")
-    if not isinstance(models, list):
+    models_is_list = isinstance(models, list)
+    if not models_is_list:
         raise ValueError("Ollama /api/ps models missing")
     names: list[str] = []
     for entry in models:
-        if not isinstance(entry, dict):
+        entry_is_object = isinstance(entry, dict)
+        if not entry_is_object:
             raise ValueError("Ollama /api/ps model entry invalid")
         name = entry.get("name") or entry.get("model")
         if not isinstance(name, str) or not name:
@@ -67,11 +70,13 @@ def query_ollama_model_digest(
         raise ValueError("model invalid")
     response = _local_json_request(endpoint, "/api/tags", timeout=timeout)
     models = response.get("models")
-    if not isinstance(models, list):
+    models_is_list = isinstance(models, list)
+    if not models_is_list:
         raise ValueError("Ollama /api/tags models missing")
     matches = []
     for entry in models:
-        if not isinstance(entry, dict):
+        entry_is_object = isinstance(entry, dict)
+        if not entry_is_object:
             raise ValueError("Ollama /api/tags model entry invalid")
         name = entry.get("name") or entry.get("model")
         if name == model:
@@ -165,7 +170,10 @@ def run_ollama_trial(
     }
     response = _local_json_request(endpoint, "/api/chat", payload=request, timeout=timeout)
     message = response.get("message")
-    if not isinstance(message, dict) or not isinstance(message.get("content"), str):
+    message_has_content = isinstance(message, dict) and isinstance(
+        message.get("content"), str
+    )
+    if not message_has_content:
         raise ValueError("Ollama response message.content missing")
     try:
         observation = json.loads(message["content"])

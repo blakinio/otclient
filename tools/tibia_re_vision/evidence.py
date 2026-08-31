@@ -4,7 +4,6 @@ import hashlib
 from pathlib import Path
 from typing import Any
 
-
 SCREEN_CLASSES = {
     "LOGIN_SCREEN",
     "CHARACTER_SELECT",
@@ -102,7 +101,8 @@ def normalize_ocr_transcription(
     model_profile_id: str,
     source_monotonic_ns: int | None = None,
 ) -> dict[str, Any]:
-    if not isinstance(raw_text, str):
+    raw_text_is_string = isinstance(raw_text, str)
+    if not raw_text_is_string:
         raise ValueError("raw_text must be string")
     if not isinstance(evidence_ref, str) or not evidence_ref:
         raise ValueError("evidence_ref invalid")

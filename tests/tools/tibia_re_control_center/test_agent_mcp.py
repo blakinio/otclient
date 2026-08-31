@@ -10,7 +10,6 @@ from unittest.mock import patch
 
 from tools.tibia_re_control_center.control_cli import ControlClientError
 
-
 TASK = {
     "schema": "otclient.local-agent.task.v1",
     "session_id": "session-1",
@@ -783,11 +782,14 @@ class AgentMcpTests(unittest.TestCase):
         output = io.StringIO()
         errors = io.StringIO()
 
-        with patch.object(self.agent_mcp, "ControlApiClient", side_effect=AssertionError("API contact")):
-            with patch("pathlib.Path.read_text", side_effect=AssertionError("filesystem contact")):
-                with redirect_stdout(output), redirect_stderr(errors):
-                    first = self.agent_mcp.main(["--self-test"])
-                    second = self.agent_mcp.main(["--self-test"])
+        with (
+            patch.object(self.agent_mcp, "ControlApiClient", side_effect=AssertionError("API contact")),
+            patch("pathlib.Path.read_text", side_effect=AssertionError("filesystem contact")),
+            redirect_stdout(output),
+            redirect_stderr(errors),
+        ):
+            first = self.agent_mcp.main(["--self-test"])
+            second = self.agent_mcp.main(["--self-test"])
 
         self.assertEqual(0, first)
         self.assertEqual(0, second)

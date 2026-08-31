@@ -162,6 +162,11 @@ class ControlDomainService:
                     "CONTROL_PRIVACY_REJECTED",
                     "request violates the privacy boundary",
                 ) from exc
+            if parsed.physical_action_budget != 0:
+                raise ControlDomainError(
+                    "PHYSICAL_ACTION_BUDGET_UNAVAILABLE",
+                    "the repository foundation has no physical action budget",
+                )
             return _jsonable(asdict(parsed))
         if operation == "AGENT_CHAT":
             data = _exact_keys(body, {"session_id", "text"})

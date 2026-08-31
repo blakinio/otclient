@@ -656,13 +656,10 @@ class AgentSessionTests(unittest.TestCase):
     def test_resume_recovers_durable_reset_when_session_event_commit_was_lost(self):
         self.submit()
         self.agent.owner_control("session-1", OwnerControlCommand.STOP)
-        self.store.inject_fault("agent_session_event", "error")
-        with self.assertRaises(DurabilityError):
-            self.agent.owner_control(
-                "session-1",
-                OwnerControlCommand.RESUME,
-                operation_id="owner-resume-event-gap",
-            )
+        self.assertTrue(self.control.reset_stop(
+            transition_id="owner-resume-event-gap",
+            reason_code="AGENT_OWNER_RESUME",
+        ))
         generation = self.control.control_generation
         self.assertFalse(self.control.control_state.stop_latched)
         stopped = self.store.load_agent_session("session-1")

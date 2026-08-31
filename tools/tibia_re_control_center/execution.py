@@ -922,7 +922,13 @@ class MutationCoordinator:
             with self.control_transition_lock:
                 self.stop_cleanup_in_progress = False
             return persisted
-    def reset_stop(self, *, transition_id: str | None = None, reason_code: str = "EXPLICIT_RESET") -> bool:
+    def reset_stop(
+        self,
+        *,
+        transition_id: str | None = None,
+        reason_code: str = "EXPLICIT_RESET",
+        state_persister: Callable[[ControlState], None] | None = None,
+    ) -> bool:
         with self.control_transition_lock, self.dispatch_gate:
                 if self.stop_cleanup_in_progress or self.stop_durability_unresolved:
                     return False
@@ -957,7 +963,10 @@ class MutationCoordinator:
                     active_backend_epoch=self.backend_epoch,
                 )
                 try:
-                    self.store.write_control_state(next_state, operation="reset")
+                    if state_persister is None:
+                        self.store.write_control_state(next_state, operation="reset")
+                    else:
+                        state_persister(next_state)
                 except (DurabilityError, DurabilityTimeout):
                     self.in_memory_stop = True
                     self.mutation_disabled = True

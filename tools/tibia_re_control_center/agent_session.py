@@ -828,27 +828,42 @@ class AgentSessionCoordinator:
                 return {"status": status, "session": self.snapshot(session_id)}
             if parsed is OwnerControlCommand.RESUME and operation_id is not None:
                 historical_reset = self.store.load_control_transition(operation_id)
-                if (
-                    historical_reset is not None
-                    and historical_reset.transition_id == self.control.control_state.transition_id
-                    and historical_reset.reason_code == "AGENT_OWNER_RESUME"
-                    and not historical_reset.stop_latched
-                    and not historical_reset.recovery_required
-                ):
-                    self._persist_event(
-                        session_id,
-                        provenance=AgentProvenance.OWNER,
-                        kind="OWNER_RESUME",
-                        state_after=AgentOperationalState.IDLE,
-                        pause_latched=False,
-                        stop_latched=False,
-                        action_id=operation_id,
-                        payload={
-                            "authority_reconciliation_required": bool(session.current_run_id),
-                            "status": AgentOperationalState.IDLE.value,
-                        },
-                    )
-                    return {"status": "IDLE", "session": self.snapshot(session_id)}
+                if historical_reset is not None:
+                    if (
+                        historical_reset.reason_code != "AGENT_OWNER_RESUME"
+                        or historical_reset.stop_latched
+                        or historical_reset.recovery_required
+                    ):
+                        raise ValidationError(
+                            "IDEMPOTENCY_CONFLICT",
+                            "owner RESUME operation identity is bound to another control transition",
+                        )
+                    session = self._hydrate_exact_session(session_id)
+                    current_global = self.control.control_state
+                    if current_global.stop_latched or current_global.recovery_required:
+                        return {
+                            "status": session.operational_state.value,
+                            "session": self.snapshot(session_id),
+                        }
+                    if session.stop_latched or session.pause_latched:
+                        self._persist_event(
+                            session_id,
+                            provenance=AgentProvenance.OWNER,
+                            kind="OWNER_RESUME",
+                            state_after=AgentOperationalState.IDLE,
+                            pause_latched=False,
+                            stop_latched=False,
+                            action_id=operation_id,
+                            payload={
+                                "authority_reconciliation_required": bool(session.current_run_id),
+                                "status": AgentOperationalState.IDLE.value,
+                            },
+                        )
+                        return {"status": "IDLE", "session": self.snapshot(session_id)}
+                    return {
+                        "status": session.operational_state.value,
+                        "session": self.snapshot(session_id),
+                    }
             if parsed is OwnerControlCommand.SCREENSHOT:
                 return self._capture(
                     session_id,
@@ -943,28 +958,53 @@ class AgentSessionCoordinator:
 
             global_state = self.control.control_state
             if global_state.stop_latched:
-                if not self.control.reset_stop(
-                    transition_id=operation_id,
-                    reason_code="AGENT_OWNER_RESUME",
-                ):
-                    return self._control_refusal(
-                        session_id,
-                        "REFUSED_GLOBAL_STOP_RESET_FAILED",
-                        operation_id=operation_id,
-                    )
-                self._persist_event(
-                    session_id,
-                    provenance=AgentProvenance.OWNER,
-                    kind="OWNER_RESUME",
-                    state_after=AgentOperationalState.IDLE,
+                target = replace(
+                    session,
+                    operational_state=AgentOperationalState.IDLE,
                     pause_latched=False,
                     stop_latched=False,
+                )
+                owner_event = AgentEvent.new(
+                    session_id=session_id,
+                    run_id=session.current_run_id,
+                    provenance=AgentProvenance.OWNER,
+                    kind="OWNER_RESUME",
+                    state_before=session.operational_state.value,
+                    state_after=AgentOperationalState.IDLE.value,
+                    observed_epoch_ms=self._now_epoch_ms(),
                     action_id=operation_id,
                     payload={
                         "authority_reconciliation_required": bool(session.current_run_id),
                         "status": AgentOperationalState.IDLE.value,
                     },
                 )
+                persisted: list[AgentSessionRecord] = []
+
+                def persist_resume(control_state: object) -> None:
+                    durable, _ = self.store.atomic_agent_transition(
+                        target,
+                        owner_event,
+                        operation="reset",
+                        control_state=control_state,
+                    )
+                    persisted.append(durable)
+
+                if not self.control.reset_stop(
+                    transition_id=operation_id,
+                    reason_code="AGENT_OWNER_RESUME",
+                    state_persister=persist_resume,
+                ):
+                    return self._control_refusal(
+                        session_id,
+                        "REFUSED_GLOBAL_STOP_RESET_FAILED",
+                        operation_id=operation_id,
+                    )
+                if not persisted:
+                    raise ValidationError(
+                        "OWNER_RESUME_DURABILITY_FAILED",
+                        "owner RESUME is missing its atomic session transition",
+                    )
+                self._sessions[session_id] = persisted[-1]
                 return {"status": "IDLE", "session": self.snapshot(session_id)}
             if global_state.recovery_required:
                 return self._control_refusal(
@@ -1023,6 +1063,42 @@ class AgentSessionCoordinator:
                 operation_id=operation_id,
             )
         encoded = text.encode("utf-8", "strict")
+        return self.record_message_digest(
+            session_id,
+            provenance,
+            hashlib.sha256(encoded).hexdigest(),
+            len(encoded),
+            operation_id=operation_id,
+        )
+
+    def record_message_digest(
+        self,
+        session_id: str,
+        provenance: AgentProvenance,
+        message_sha256: str,
+        message_bytes: int,
+        *,
+        owner_control_command: OwnerControlCommand | str | None = None,
+        operation_id: str | None = None,
+    ) -> dict[str, object]:
+        if type(provenance) is not AgentProvenance:
+            raise ValidationError("INVALID_PROVENANCE", "message provenance is invalid")
+        if (
+            not isinstance(message_sha256, str)
+            or len(message_sha256) != 64
+            or any(character not in "0123456789abcdef" for character in message_sha256)
+        ):
+            raise ValidationError("INVALID_MESSAGE_DIGEST", "message SHA-256 is invalid")
+        if not isinstance(message_bytes, int) or isinstance(message_bytes, bool) or message_bytes < 1:
+            raise ValidationError("INVALID_MESSAGE", "message byte count must be positive")
+        if owner_control_command is not None:
+            if provenance is not AgentProvenance.OWNER:
+                raise ValidationError("INVALID_PROVENANCE", "only OWNER messages can carry control")
+            return self.owner_control(
+                session_id,
+                owner_control_command,
+                operation_id=operation_id,
+            )
         with self._lock:
             prior_event = self._operation_event(
                 session_id,
@@ -1030,8 +1106,7 @@ class AgentSessionCoordinator:
                 "MESSAGE_RECORDED",
             )
             if prior_event is not None:
-                expected_hash = hashlib.sha256(encoded).hexdigest()
-                if prior_event.get("payload", {}).get("message_sha256") != expected_hash:
+                if prior_event.get("payload", {}).get("message_sha256") != message_sha256:
                     raise ValidationError("IDEMPOTENCY_CONFLICT", "agent message operation identity is already bound")
                 self._hydrate_exact_session(session_id)
                 return {"status": "RECORDED", "session": self.snapshot(session_id)}
@@ -1041,8 +1116,8 @@ class AgentSessionCoordinator:
                 kind="MESSAGE_RECORDED",
                 action_id=operation_id,
                 payload={
-                    "message_sha256": hashlib.sha256(encoded).hexdigest(),
-                    "message_bytes": len(encoded),
+                    "message_sha256": message_sha256,
+                    "message_bytes": message_bytes,
                     "control_token_interpreted": False,
                 },
             )

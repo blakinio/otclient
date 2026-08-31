@@ -168,7 +168,12 @@ class ControlDomainService:
                     "CONTROL_PRIVACY_REJECTED",
                     "request violates the privacy boundary",
                 ) from exc
-            return {"session_id": data["session_id"], "text": data["text"]}
+            encoded = data["text"].encode("utf-8", "strict")
+            return {
+                "session_id": data["session_id"],
+                "message_sha256": hashlib.sha256(encoded).hexdigest(),
+                "message_bytes": len(encoded),
+            }
         if operation == "AGENT_CONTROL":
             data = _exact_keys(body, {"session_id", "command"})
             validate_opaque_id(data["session_id"], field_name="session_id")
@@ -288,7 +293,13 @@ class ControlDomainService:
             resource_id = existing.resource_id
         self._maybe_crash("after_accept")
         try:
-            reply = handler(resource_id, request_id, normalized)
+            handler_body = normalized
+            if operation == "AGENT_CHAT":
+                token = body["text"].strip().upper()
+                if token in OwnerControlCommand._value2member_map_:
+                    handler_body = dict(normalized)
+                    handler_body["_owner_control_command"] = token
+            reply = handler(resource_id, request_id, handler_body)
             self._maybe_crash("after_domain")
         except SimulatedCrash:
             raise
@@ -704,15 +715,31 @@ class ControlDomainService:
         return DomainReply(201, payload, "COMPLETED", "ACCEPTED", run_id)
 
     def agent_chat(self, resource_id: str, request_id: str, normalized: dict[str, Any]) -> DomainReply:
-        with self.store.agent_resource_transaction():
-            resource = self.store.ensure_resource(resource_id, request_id, "AGENT_CHAT", normalized)
+        owner_control_command = normalized.get("_owner_control_command")
+        transaction = (
+            nullcontext()
+            if owner_control_command in {
+                OwnerControlCommand.STOP.value,
+                OwnerControlCommand.RESUME.value,
+            }
+            else self.store.agent_resource_transaction()
+        )
+        resource_body = {
+            "session_id": normalized["session_id"],
+            "message_sha256": normalized["message_sha256"],
+            "message_bytes": normalized["message_bytes"],
+        }
+        with transaction:
+            resource = self.store.ensure_resource(resource_id, request_id, "AGENT_CHAT", resource_body)
             prior = self._resource_reply(resource)
             if prior is not None:
                 return prior
-            result = self.agent.record_message(
+            result = self.agent.record_message_digest(
                 normalized["session_id"],
                 AgentProvenance.OWNER,
-                normalized["text"],
+                normalized["message_sha256"],
+                normalized["message_bytes"],
+                owner_control_command=owner_control_command,
                 operation_id=resource_id,
             )
             session = result.get("session")

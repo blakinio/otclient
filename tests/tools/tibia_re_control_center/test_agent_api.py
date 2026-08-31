@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import json
+import hashlib
 import io
+import json
 import tempfile
 import threading
 import unittest
@@ -410,6 +411,136 @@ class AgentApiTests(unittest.TestCase):
             for event in self.server.domain.agent.snapshot("agent-session-1")["events"]
         ))
 
+    def test_delayed_resume_replay_never_clears_a_newer_stop(self) -> None:
+        self.submit()
+        status, _, stopped = self.post(
+            "/v1/agent/control",
+            {"session_id": "agent-session-1", "command": "STOP"},
+            "resume-gap-initial-stop",
+        )
+        self.assertEqual(200, status, stopped)
+
+        old_body = {"session_id": "agent-session-1", "command": "RESUME"}
+        self.server.domain.inject_test_crash_once("after_accept")
+        status, _, interrupted = self.post(
+            "/v1/agent/control",
+            old_body,
+            "resume-gap-old-request",
+        )
+        self.assertEqual(503, status, interrupted)
+        old_request = self.server.domain.store.load_request("resume-gap-old-request")
+        self.assertEqual("ACCEPTED", old_request.status)
+        normalized = self.server.domain.normalize_post_body("AGENT_CONTROL", old_body)
+        self.server.domain.store.ensure_resource(
+            old_request.resource_id,
+            old_request.request_id,
+            "AGENT_CONTROL",
+            normalized,
+        )
+        self.assertTrue(self.server.domain.coordinator.reset_stop(
+            transition_id=old_request.resource_id,
+            reason_code="AGENT_OWNER_RESUME",
+        ))
+        old_reset = self.server.domain.store.load_control_transition(old_request.resource_id)
+        self.assertEqual("AGENT_OWNER_RESUME", old_reset.reason_code)
+        self.assertFalse(old_reset.stop_latched)
+
+        status, _, newer_stop = self.post(
+            "/v1/stop-all",
+            {},
+            "resume-gap-newer-stop",
+        )
+        self.assertEqual(200, status, newer_stop)
+        newer_request = self.server.domain.store.load_request("resume-gap-newer-stop")
+        newer_transition = self.server.domain.store.load_control_transition(newer_request.resource_id)
+        self.assertGreater(newer_transition.control_generation, old_reset.control_generation)
+
+        barrier = threading.Barrier(8)
+
+        def replay() -> tuple[int, dict[str, object]]:
+            barrier.wait(timeout=5)
+            replay_status, _, replay_body = self.post(
+                "/v1/agent/control",
+                {"session_id": "agent-session-1", "command": "RESUME"},
+                "resume-gap-old-request",
+            )
+            return replay_status, replay_body
+
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            replies = [future.result(timeout=10) for future in [pool.submit(replay) for _ in range(8)]]
+        self.assertTrue(all(reply == replies[0] for reply in replies))
+        self.assertEqual(200, replies[0][0])
+        self.assertEqual("STOPPED", replies[0][1]["status"])
+        self.assertTrue(self.server.domain.coordinator.control_state.stop_latched)
+        self.assertEqual(newer_transition.transition_id, self.server.domain.coordinator.control_state.transition_id)
+        self.assertEqual(newer_transition.control_generation, self.server.domain.coordinator.control_generation)
+        self.assertEqual(old_reset, self.server.domain.store.load_control_transition(old_request.resource_id))
+        self.assertEqual(1, self.server.domain.store._fetchone(
+            "SELECT COUNT(*) FROM control_history WHERE transition_id=?",
+            (old_request.resource_id,),
+        )[0])
+        events = self.server.domain.agent.snapshot("agent-session-1")["events"]
+        self.assertEqual(0, sum(
+            event.get("kind") == "OWNER_RESUME" and event.get("action_id") == old_request.resource_id
+            for event in events
+        ))
+
+        replay_result = replies[0][1]
+        self.restart()
+        status, _, restarted = self.post(
+            "/v1/agent/control",
+            {"session_id": "agent-session-1", "command": "RESUME"},
+            "resume-gap-old-request",
+        )
+        self.assertEqual(200, status, restarted)
+        self.assertEqual(replay_result, restarted)
+        self.assertTrue(self.server.domain.coordinator.control_state.stop_latched)
+
+    def test_chat_stop_cleanup_failure_preserves_durable_stop_and_replays_failure(self) -> None:
+        self.submit()
+        starting_generation = self.server.domain.coordinator.control_generation
+        cleanup_calls: list[str] = []
+
+        def fail_cleanup(reason: str) -> None:
+            cleanup_calls.append(reason)
+            raise RuntimeError("cleanup failed")
+
+        self.server.domain.adapter.emergency_stop = fail_cleanup
+        body = {"session_id": "agent-session-1", "text": "STOP"}
+        status, _, failed = self.post("/v1/agent/chat", body, "chat-stop-cleanup-failure")
+        self.assertEqual(400, status, failed)
+        self.assertEqual("OWNER_STOP_CLEANUP_FAILED", failed["code"])
+        request = self.server.domain.store.load_request("chat-stop-cleanup-failure")
+        self.assertEqual("FAILED", request.status)
+        resource = self.server.domain.store.get_resource(request.resource_id)
+        self.assertIsNotNone(resource)
+        self.assertEqual({"session_id", "message_sha256", "message_bytes"}, set(resource["body"]))
+        self.assertTrue(self.server.domain.store.load_control_state().stop_latched)
+        self.assertTrue(self.server.domain.coordinator.control_state.stop_latched)
+        self.assertEqual(starting_generation + 1, self.server.domain.coordinator.control_generation)
+        durable = self.server.domain.store.load_agent_session("agent-session-1")
+        self.assertTrue(durable.stop_latched)
+        self.assertEqual("STOPPED", durable.operational_state.value)
+        events = self.server.domain.agent.snapshot("agent-session-1")["events"]
+        self.assertEqual(1, sum(
+            event.get("kind") == "OWNER_STOP" and event.get("action_id") == request.resource_id
+            for event in events
+        ))
+        self.assertEqual(["AGENT_OWNER_STOP"], cleanup_calls)
+
+        replay_status, _, replayed = self.post("/v1/agent/chat", body, "chat-stop-cleanup-failure")
+        self.assertEqual(status, replay_status)
+        self.assertEqual(failed, replayed)
+        self.assertEqual(["AGENT_OWNER_STOP"], cleanup_calls)
+        self.assertEqual(starting_generation + 1, self.server.domain.coordinator.control_generation)
+        conflict_status, _, conflict = self.post(
+            "/v1/agent/chat",
+            {"session_id": "agent-session-1", "text": "PAUSE"},
+            "chat-stop-cleanup-failure",
+        )
+        self.assertEqual(409, conflict_status, conflict)
+        self.assertEqual("CONTROL_IDEMPOTENCY_CONFLICT", conflict["code"])
+
     def test_concurrent_agent_post_replays_share_one_domain_result(self) -> None:
         capture_executor = CountingCaptureExecutor()
         self.server.domain.agent.executor = capture_executor
@@ -482,9 +613,10 @@ class AgentApiTests(unittest.TestCase):
 
     def test_owner_chat_records_hash_only_and_rejects_secret_before_persistence(self) -> None:
         self.submit()
+        unique_text = "owner-unique-raw-text-7f9090c9"
         status, _, recorded = self.post(
             "/v1/agent/chat",
-            {"session_id": "agent-session-1", "text": "Please observe the login fixture"},
+            {"session_id": "agent-session-1", "text": unique_text},
             "agent-chat-safe",
         )
         self.assertEqual(200, status, recorded)
@@ -495,13 +627,41 @@ class AgentApiTests(unittest.TestCase):
         before = recorded["session"]["last_event_seq"]
         replay_status, _, replayed = self.post(
             "/v1/agent/chat",
-            {"session_id": "agent-session-1", "text": "Please observe the login fixture"},
+            {"session_id": "agent-session-1", "text": unique_text},
             "agent-chat-safe",
         )
         self.assertEqual(200, replay_status)
         self.assertEqual(recorded, replayed)
         self.assertEqual(before, replayed["session"]["last_event_seq"])
+        request = self.server.domain.store.load_request("agent-chat-safe")
+        resource = self.server.domain.store.get_resource(request.resource_id)
+        self.assertEqual(
+            {
+                "session_id": "agent-session-1",
+                "message_sha256": hashlib.sha256(unique_text.encode("utf-8")).hexdigest(),
+                "message_bytes": len(unique_text.encode("utf-8")),
+            },
+            resource["body"],
+        )
+        persisted_json = [row[0] for row in self.server.domain.store._fetchall("SELECT body FROM requests")]
+        persisted_json += [value for row in self.server.domain.store._fetchall("SELECT body,result FROM resources") for value in row if value]
+        persisted_json += [row[0] for row in self.server.domain.store._fetchall("SELECT body FROM events")]
+        persisted_json += [row[0] for row in self.server.domain.store._fetchall("SELECT body FROM agent_sessions")]
+        self.assertNotIn(unique_text, "".join(persisted_json))
 
+        for index, (token, expected) in enumerate((("PAUSE", "PAUSED"), ("RESUME", "PAUSED_AUTHORITY"))):
+            token_status, _, token_result = self.post(
+                "/v1/agent/chat",
+                {"session_id": "agent-session-1", "text": token},
+                f"agent-chat-token-{index}",
+            )
+            self.assertEqual(200, token_status, token_result)
+            self.assertEqual(expected, token_result["status"])
+            token_request = self.server.domain.store.load_request(f"agent-chat-token-{index}")
+            token_resource = self.server.domain.store.get_resource(token_request.resource_id)
+            self.assertEqual({"session_id", "message_sha256", "message_bytes"}, set(token_resource["body"]))
+
+        before_secret = self.server.domain.agent.snapshot("agent-session-1")["last_event_seq"]
         status, _, rejected = self.post(
             "/v1/agent/chat",
             {"session_id": "agent-session-1", "text": "PASSWORD=hunter2"},
@@ -511,7 +671,7 @@ class AgentApiTests(unittest.TestCase):
         self.assertEqual("CONTROL_PRIVACY_REJECTED", rejected["code"])
         self.assertIsNone(self.server.domain.store.load_request("agent-chat-secret"))
         after = self.server.domain.agent.snapshot("agent-session-1")
-        self.assertEqual(before, after["last_event_seq"])
+        self.assertEqual(before_secret, after["last_event_seq"])
         self.assertNotIn("hunter2", json.dumps(after))
 
     def test_post_body_shapes_commands_and_transport_boundaries_are_preserved(self) -> None:

@@ -107,15 +107,19 @@ def _forbidden_violations(path: Path, source: str) -> list[str]:
                 isinstance(function, ast.Name)
                 and function.id == "getattr"
                 and len(node.args) >= 2
-                and isinstance(node.args[1], ast.Constant)
-                and node.args[1].value == "__import__"
+                and isinstance(node.args[0], ast.Name)
+                and node.args[0].id == "builtins"
             ):
                 violations.append(f"{path} exposes dynamic import machinery")
         if isinstance(node, ast.Subscript) and isinstance(node.value, ast.Attribute):
             if isinstance(node.value.value, ast.Name) and node.value.value.id == "sys" and node.value.attr == "modules":
                 violations.append(f"{path} exposes dynamic import machinery")
+            if isinstance(node.value.value, ast.Name) and node.value.value.id == "builtins" and node.value.attr == "__dict__":
+                violations.append(f"{path} exposes dynamic import machinery")
         if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name):
             if node.value.id == "sys" and node.attr == "modules":
+                violations.append(f"{path} exposes dynamic import machinery")
+            if node.value.id == "builtins" and node.attr == "__import__":
                 violations.append(f"{path} exposes dynamic import machinery")
     return violations
 
@@ -129,6 +133,7 @@ def audit_forbidden_surfaces() -> None:
         "import importlib\nimportlib.import_module('subprocess')",
         "loader = __import__\nloader('subprocess')",
         "import sys\nsys.modules['subprocess']",
+        "import builtins\nname = '__' + 'import__'\ngetattr(builtins, name)('subprocess')",
     )
     for source in dynamic_sources:
         if not _forbidden_violations(Path("dynamic-subprocess.py"), source):
@@ -186,6 +191,16 @@ def _require_imported_calls(path: Path, source: str, required: set[str]) -> None
             continue
         for alias in node.names:
             bindings[alias.asname or alias.name] = alias.name
+    shadowed = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store) and node.id in bindings:
+            shadowed.add(node.id)
+        elif isinstance(node, ast.arg) and node.arg in bindings:
+            shadowed.add(node.arg)
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and node.name in bindings:
+            shadowed.add(node.name)
+    if shadowed:
+        raise AssertionError(f"{path} shadows imported PR #790 validators: {sorted(shadowed)!r}")
     calls = {
         node.func.id
         for node in ast.walk(tree)
@@ -251,6 +266,18 @@ def audit_reusable_pr790_validation() -> None:
         pass
     else:
         raise AssertionError("comment-only PR #790 reuse claim was accepted")
+    try:
+        _require_imported_calls(
+            Path("shadowed-validator.py"),
+            "from tools.tibia_re_vision.evidence import validate_visual_evidence\n"
+            "validate_visual_evidence = lambda _: None\n"
+            "validate_visual_evidence({})",
+            {"validate_visual_evidence"},
+        )
+    except AssertionError:
+        pass
+    else:
+        raise AssertionError("shadowed PR #790 validator call was accepted")
     if not list(frozen_tests.glob("test_*.py")):
         raise AssertionError("frozen PR #790 benchmark tests are missing")
 

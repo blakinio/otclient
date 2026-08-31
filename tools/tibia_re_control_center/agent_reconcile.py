@@ -2,7 +2,7 @@
 
 This module deliberately has no runtime producer or action surface.  It only
 combines a bounded visual observation with runtime evidence that a separate,
-Control-Center-owned context verifies as reviewed and current.
+Control-Center-owned resolver verifies as reviewed and current.
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ import re
 from dataclasses import dataclass
 from enum import Enum
 from math import isfinite
-from typing import Any
+from typing import Any, Protocol
 
 from .agent_vision import QWEN_VISION_PROFILE_ID, VisionObservation
 from .model import PrivacyError, ValidationError
@@ -32,16 +32,16 @@ class RuntimeObservation:
 
 
 @dataclass(frozen=True)
-class ReviewedRuntimeProducer:
-    """A Control-Center-reviewed producer and its exact evidence contract."""
+class _ReviewedProducerContract:
+    """Resolver-owned record for a reviewed producer and exact contract."""
 
     producer_id: str
     contract_id: str
 
 
 @dataclass(frozen=True)
-class TrustedRuntimeEvidence:
-    """Control-Center-owned binding for one exact runtime observation."""
+class _RuntimeEvidenceRecord:
+    """Resolver-owned candidate binding for one runtime observation."""
 
     observation: RuntimeObservation
     session_id: str
@@ -54,12 +54,12 @@ class TrustedRuntimeEvidence:
 
 
 @dataclass(frozen=True)
-class TrustedReconciliationContext:
-    """Current Control Center facts used to verify reviewed runtime evidence.
+class _ResolverStateSnapshot:
+    """State owned and consumed only by a Control Center resolver.
 
-    The repository supplies no live producer.  Tests inject this narrow value
-    in place of the future Control-Center-owned resolver boundary.  Its two
-    monotonic values must come from the same Control Center clock domain.
+    This immutable implementation detail is not issuance and is deliberately
+    not accepted by :func:`reconcile_state`.  Its two monotonic values must
+    come from the same trusted clock domain.
     """
 
     current_session_id: str
@@ -68,8 +68,67 @@ class TrustedReconciliationContext:
     current_runtime_instance_id: str
     current_monotonic_ns: int
     max_age_ns: int
-    reviewed_producers: tuple[ReviewedRuntimeProducer, ...]
-    runtime_evidence: TrustedRuntimeEvidence
+    reviewed_producers: tuple[_ReviewedProducerContract, ...]
+    runtime_evidence: _RuntimeEvidenceRecord
+
+
+class RuntimeEvidenceResolver(Protocol):
+    """Trusted composition dependency for current reviewed runtime evidence.
+
+    The resolver owns the current session/run/runtime bindings, producer
+    registry, clock, and freshness policy.  Those facts are never supplied by
+    an ordinary reconciliation caller alongside its observation.
+    """
+
+    def resolve_current_reviewed(
+        self,
+        runtime: RuntimeObservation,
+    ) -> RuntimeObservation | None:
+        """Return the exact verified current observation, otherwise ``None``."""
+
+
+def _build_trusted_composition_seam():
+    """Close the issuance key over the private Control Center seam."""
+    issuance_key = object()
+
+    class _ResolverBoundReconciler:
+        """Reconciler issued only by the Control Center composition boundary."""
+
+        __slots__ = ("__resolver",)
+
+        def __init__(
+            self,
+            resolver: RuntimeEvidenceResolver,
+            *,
+            _issuance_key: object,
+        ) -> None:
+            if _issuance_key is not issuance_key:
+                raise TypeError("trusted reconciliation composition is required")
+            object.__setattr__(self, "_ResolverBoundReconciler__resolver", resolver)
+
+        def __setattr__(self, name: str, value: object) -> None:
+            raise AttributeError("resolver binding is immutable")
+
+        def reconcile_state(
+            self,
+            visual: VisionObservation,
+            runtime: RuntimeObservation,
+        ) -> ReconciliationResult:
+            return _reconcile_state(visual, runtime, resolver=self.__resolver)
+
+    def compose_trusted_reconciler(
+        resolver: RuntimeEvidenceResolver,
+    ) -> _ResolverBoundReconciler:
+        """Trusted seam; tests may inject a fake resolver only here."""
+        if not callable(getattr(resolver, "resolve_current_reviewed", None)):
+            raise TypeError("runtime evidence resolver is required")
+        return _ResolverBoundReconciler(resolver, _issuance_key=issuance_key)
+
+    return _ResolverBoundReconciler, compose_trusted_reconciler
+
+
+_ResolverBoundReconciler, _compose_trusted_reconciler = _build_trusted_composition_seam()
+del _build_trusted_composition_seam
 
 
 class ReconciledState(str, Enum):
@@ -220,24 +279,24 @@ def _runtime_parts(runtime: Any) -> tuple[str | None, RuntimeEvidenceClass | Non
     return runtime.state, runtime.evidence_class, tuple(refs)
 
 
-def _trusted_reviewed_runtime(
+def _resolver_state_matches_runtime(
     runtime: RuntimeObservation,
-    trusted_context: Any,
+    resolver_state: Any,
 ) -> bool:
-    """Verify current provenance without interpreting opaque evidence refs."""
-    if type(trusted_context) is not TrustedReconciliationContext:
+    """Verify resolver-owned current state without interpreting opaque refs."""
+    if type(resolver_state) is not _ResolverStateSnapshot:
         return False
-    evidence = trusted_context.runtime_evidence
-    if type(evidence) is not TrustedRuntimeEvidence:
+    evidence = resolver_state.runtime_evidence
+    if type(evidence) is not _RuntimeEvidenceRecord:
         return False
     if type(evidence.observation) is not RuntimeObservation or evidence.observation != runtime:
         return False
 
     identity_values = (
-        trusted_context.current_session_id,
-        trusted_context.current_run_id,
-        trusted_context.current_runtime_id,
-        trusted_context.current_runtime_instance_id,
+        resolver_state.current_session_id,
+        resolver_state.current_run_id,
+        resolver_state.current_runtime_id,
+        resolver_state.current_runtime_instance_id,
         evidence.session_id,
         evidence.run_id,
         evidence.runtime_id,
@@ -248,20 +307,20 @@ def _trusted_reviewed_runtime(
     if any(_safe_ref(value) is None for value in identity_values):
         return False
     if (
-        evidence.session_id != trusted_context.current_session_id
-        or evidence.run_id != trusted_context.current_run_id
-        or evidence.runtime_id != trusted_context.current_runtime_id
-        or evidence.runtime_instance_id != trusted_context.current_runtime_instance_id
+        evidence.session_id != resolver_state.current_session_id
+        or evidence.run_id != resolver_state.current_run_id
+        or evidence.runtime_id != resolver_state.current_runtime_id
+        or evidence.runtime_instance_id != resolver_state.current_runtime_instance_id
     ):
         return False
 
-    producers = trusted_context.reviewed_producers
+    producers = resolver_state.reviewed_producers
     if type(producers) is not tuple or not producers:
         return False
     reviewed_pairs: set[tuple[str, str]] = set()
     for producer in producers:
         if (
-            type(producer) is not ReviewedRuntimeProducer
+            type(producer) is not _ReviewedProducerContract
             or _safe_ref(producer.producer_id) is None
             or _safe_ref(producer.contract_id) is None
         ):
@@ -270,9 +329,9 @@ def _trusted_reviewed_runtime(
     if (evidence.producer_id, evidence.producer_contract_id) not in reviewed_pairs:
         return False
 
-    current_ns = trusted_context.current_monotonic_ns
+    current_ns = resolver_state.current_monotonic_ns
     observed_ns = evidence.observed_monotonic_ns
-    max_age_ns = trusted_context.max_age_ns
+    max_age_ns = resolver_state.max_age_ns
     if (
         type(current_ns) is not int
         or type(observed_ns) is not int
@@ -287,6 +346,20 @@ def _trusted_reviewed_runtime(
     return True
 
 
+def _resolver_verified_runtime(
+    runtime: RuntimeObservation,
+    resolver: RuntimeEvidenceResolver | None,
+) -> bool:
+    """Accept authority only from the resolver bound at trusted composition."""
+    if resolver is None:
+        return False
+    try:
+        resolved = resolver.resolve_current_reviewed(runtime)
+    except Exception:
+        return False
+    return type(resolved) is RuntimeObservation and resolved == runtime
+
+
 def _result(
     state: ReconciledState,
     visual_refs: tuple[str, ...],
@@ -295,18 +368,18 @@ def _result(
     return ReconciliationResult(state, visual_refs, runtime_refs)
 
 
-def reconcile_state(
+def _reconcile_state(
     visual: VisionObservation,
     runtime: RuntimeObservation,
     *,
-    trusted_context: TrustedReconciliationContext | None = None,
+    resolver: RuntimeEvidenceResolver | None,
 ) -> ReconciliationResult:
     """Reconcile only validated current evidence, failing closed on ambiguity.
 
     ``WORLD_CONFIRMED`` is reachable only through the exact table row for an
     ``IN_GAME`` runtime state carrying ``REVIEWED_CAUSAL`` evidence, at least
-    one retained runtime provenance reference, and a separately verified
-    current trust context.  Visual evidence and opaque provenance references
+    one retained runtime provenance reference, and a separately bound trusted
+    resolver.  Visual evidence and opaque provenance references
     never establish an in-game semantic state by themselves.
     """
     visual_state, visual_refs = _visual_parts(visual)
@@ -315,7 +388,7 @@ def reconcile_state(
         return _result(ReconciledState.UNKNOWN, (), ())
 
     if evidence_class is RuntimeEvidenceClass.REVIEWED_CAUSAL:
-        if not runtime_refs or not _trusted_reviewed_runtime(runtime, trusted_context):
+        if not runtime_refs or not _resolver_verified_runtime(runtime, resolver):
             return _result(ReconciledState.UNKNOWN, visual_refs, runtime_refs)
 
     rule = _RULES.get((visual_state, runtime_state, evidence_class))
@@ -331,13 +404,25 @@ def reconcile_state(
     return _result(ReconciledState.UNKNOWN, visual_refs, runtime_refs)
 
 
+def reconcile_state(
+    visual: VisionObservation,
+    runtime: RuntimeObservation,
+) -> ReconciliationResult:
+    """Use the production-default unbound reconciler.
+
+    The two-input compatibility API deliberately has no authority dependency,
+    so reviewed-causal runtime claims fail closed.  Trusted Control Center
+    composition uses a resolver-bound reconciler instead; this repository
+    phase supplies no production resolver.
+    """
+    return _reconcile_state(visual, runtime, resolver=None)
+
+
 __all__ = [
-    "ReviewedRuntimeProducer",
     "ReconciledState",
     "ReconciliationResult",
     "RuntimeEvidenceClass",
+    "RuntimeEvidenceResolver",
     "RuntimeObservation",
-    "TrustedReconciliationContext",
-    "TrustedRuntimeEvidence",
     "reconcile_state",
 ]

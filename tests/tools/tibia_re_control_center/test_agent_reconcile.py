@@ -5,13 +5,11 @@ from __future__ import annotations
 from dataclasses import FrozenInstanceError, fields, replace
 import unittest
 
+from tools.tibia_re_control_center import agent_reconcile as reconcile_module
 from tools.tibia_re_control_center.agent_reconcile import (
-    ReviewedRuntimeProducer,
     ReconciledState,
     RuntimeEvidenceClass,
     RuntimeObservation,
-    TrustedReconciliationContext,
-    TrustedRuntimeEvidence,
     reconcile_state,
 )
 from tools.tibia_re_control_center.agent_vision import VisionObservation
@@ -79,9 +77,9 @@ def _trusted_context(
     observed_monotonic_ns: int = 950,
     current_monotonic_ns: int = 1_000,
     max_age_ns: int = 100,
-) -> TrustedReconciliationContext:
-    """Build a fake Control Center-owned trust input; no live producer exists."""
-    return TrustedReconciliationContext(
+) -> reconcile_module._ResolverStateSnapshot:
+    """Build fake resolver-owned state; it is not authority by itself."""
+    return reconcile_module._ResolverStateSnapshot(
         current_session_id=current_session_id,
         current_run_id=current_run_id,
         current_runtime_id=current_runtime_id,
@@ -89,12 +87,12 @@ def _trusted_context(
         current_monotonic_ns=current_monotonic_ns,
         max_age_ns=max_age_ns,
         reviewed_producers=(
-            ReviewedRuntimeProducer(
+            reconcile_module._ReviewedProducerContract(
                 producer_id=reviewed_producer_id,
                 contract_id=reviewed_contract_id,
             ),
         ),
-        runtime_evidence=TrustedRuntimeEvidence(
+        runtime_evidence=reconcile_module._RuntimeEvidenceRecord(
             observation=runtime,
             session_id=evidence_session_id,
             run_id=evidence_run_id,
@@ -107,7 +105,76 @@ def _trusted_context(
     )
 
 
+class _FakeControlCenterRuntimeResolver:
+    """Fake injected only at the trusted Control Center composition seam."""
+
+    def __init__(self, context: reconcile_module._ResolverStateSnapshot) -> None:
+        self.__context = context
+
+    def resolve_current_reviewed(
+        self,
+        runtime: RuntimeObservation,
+    ) -> RuntimeObservation | None:
+        if reconcile_module._resolver_state_matches_runtime(runtime, self.__context):
+            return self.__context.runtime_evidence.observation
+        return None
+
+
+def _trusted_reconcile(
+    visual: VisionObservation,
+    runtime: RuntimeObservation,
+    context: reconcile_module._ResolverStateSnapshot,
+):
+    resolver = _FakeControlCenterRuntimeResolver(context)
+    reconciler = reconcile_module._compose_trusted_reconciler(resolver)
+    return reconciler.reconcile_state(visual, runtime)
+
+
 class ReconciliationTests(unittest.TestCase):
+    def test_caller_constructed_fact_bundle_cannot_self_grant_authority(self):
+        cases = (
+            ("WORLD_VISUAL", "IN_GAME"),
+            ("WORLD_EXIT_VISUAL", "WORLD_EXIT"),
+            ("LOGIN_SCREEN", "IN_GAME"),
+        )
+
+        for visual_state, runtime_state in cases:
+            with self.subTest(visual_state=visual_state, runtime_state=runtime_state):
+                runtime = _runtime(
+                    runtime_state,
+                    RuntimeEvidenceClass.REVIEWED_CAUSAL,
+                    ("runtime:self-selected",),
+                )
+                caller_minted_context = _trusted_context(runtime)
+
+                with self.assertRaises(TypeError):
+                    reconcile_state(
+                        _visual(visual_state),
+                        runtime,
+                        trusted_context=caller_minted_context,  # type: ignore[call-arg]
+                    )
+
+                default_result = reconcile_state(_visual(visual_state), runtime)
+                self.assertIs(default_result.state, ReconciledState.UNKNOWN)
+
+    def test_resolver_binding_requires_trusted_composition_seam(self):
+        runtime = _runtime(
+            "IN_GAME",
+            RuntimeEvidenceClass.REVIEWED_CAUSAL,
+            ("runtime:composition",),
+        )
+        resolver = _FakeControlCenterRuntimeResolver(_trusted_context(runtime))
+
+        with self.assertRaises(TypeError):
+            reconcile_module._ResolverBoundReconciler(
+                resolver,
+                _issuance_key=object(),
+            )
+
+        reconciler = reconcile_module._compose_trusted_reconciler(resolver)
+        with self.assertRaises(AttributeError):
+            reconciler.resolver = resolver
+
     def test_bare_reviewed_runtime_observation_cannot_self_promote(self):
         runtime = _runtime(
             "IN_GAME",
@@ -133,10 +200,10 @@ class ReconciliationTests(unittest.TestCase):
         context = _trusted_context(trusted_runtime)
         self.assertIsNotNone(context, "trusted reconciliation context API is missing")
 
-        result = reconcile_state(
+        result = _trusted_reconcile(
             _visual("WORLD_VISUAL"),
             forged_runtime,
-            trusted_context=context,
+            context,
         )
 
         self.assertIs(result.state, ReconciledState.UNKNOWN)
@@ -150,10 +217,10 @@ class ReconciliationTests(unittest.TestCase):
         context = _trusted_context(runtime, observed_monotonic_ns=899)
         self.assertIsNotNone(context, "trusted reconciliation context API is missing")
 
-        result = reconcile_state(
+        result = _trusted_reconcile(
             _visual("WORLD_VISUAL"),
             runtime,
-            trusted_context=context,
+            context,
         )
 
         self.assertIs(result.state, ReconciledState.UNKNOWN)
@@ -172,19 +239,19 @@ class ReconciliationTests(unittest.TestCase):
             replace(valid_boundary, reviewed_producers=()),
         )
 
-        boundary_result = reconcile_state(
+        boundary_result = _trusted_reconcile(
             _visual("WORLD_VISUAL"),
             runtime,
-            trusted_context=valid_boundary,
+            valid_boundary,
         )
         self.assertIs(boundary_result.state, ReconciledState.WORLD_CONFIRMED)
 
         for context in invalid_contexts:
             with self.subTest(context=context):
-                result = reconcile_state(
+                result = _trusted_reconcile(
                     _visual("WORLD_VISUAL"),
                     runtime,
-                    trusted_context=context,
+                    context,
                 )
                 self.assertIs(result.state, ReconciledState.UNKNOWN)
 
@@ -203,10 +270,10 @@ class ReconciliationTests(unittest.TestCase):
             with self.subTest(name=name):
                 context = _trusted_context(runtime, **overrides)
                 self.assertIsNotNone(context, "trusted reconciliation context API is missing")
-                result = reconcile_state(
+                result = _trusted_reconcile(
                     _visual("WORLD_VISUAL"),
                     runtime,
-                    trusted_context=context,
+                    context,
                 )
                 self.assertIs(result.state, ReconciledState.UNKNOWN)
 
@@ -225,10 +292,10 @@ class ReconciliationTests(unittest.TestCase):
             with self.subTest(name=name):
                 context = _trusted_context(runtime, **overrides)
                 self.assertIsNotNone(context, "trusted reconciliation context API is missing")
-                result = reconcile_state(
+                result = _trusted_reconcile(
                     _visual("WORLD_VISUAL"),
                     runtime,
-                    trusted_context=context,
+                    context,
                 )
                 self.assertIs(result.state, ReconciledState.UNKNOWN)
 
@@ -247,10 +314,10 @@ class ReconciliationTests(unittest.TestCase):
             with self.subTest(name=name):
                 context = _trusted_context(runtime, **overrides)
                 self.assertIsNotNone(context, "trusted reconciliation context API is missing")
-                result = reconcile_state(
+                result = _trusted_reconcile(
                     _visual("WORLD_VISUAL"),
                     runtime,
-                    trusted_context=context,
+                    context,
                 )
                 self.assertIs(result.state, ReconciledState.UNKNOWN)
 
@@ -288,10 +355,10 @@ class ReconciliationTests(unittest.TestCase):
                 )
                 context = _trusted_context(runtime)
                 self.assertIsNotNone(context, "trusted reconciliation context API is missing")
-                result = reconcile_state(
+                result = _trusted_reconcile(
                     _visual(visual_state, evidence_ref="capture:current"),
                     runtime,
-                    trusted_context=context,
+                    context,
                 )
                 self.assertIs(result.state, expected)
                 self.assertEqual(result.visual_evidence_refs, ("capture:current",))
@@ -362,10 +429,14 @@ class ReconciliationTests(unittest.TestCase):
                     if evidence_class is RuntimeEvidenceClass.REVIEWED_CAUSAL
                     else None
                 )
-                result = reconcile_state(
-                    _visual(visual_state),
-                    runtime,
-                    trusted_context=context,
+                result = (
+                    _trusted_reconcile(
+                        _visual(visual_state),
+                        runtime,
+                        context,
+                    )
+                    if context is not None
+                    else reconcile_state(_visual(visual_state), runtime)
                 )
                 self.assertIs(result.state, expected)
 
@@ -399,10 +470,14 @@ class ReconciliationTests(unittest.TestCase):
                             if evidence_class is RuntimeEvidenceClass.REVIEWED_CAUSAL
                             else None
                         )
-                        result = reconcile_state(
-                            _visual(visual_state),
-                            runtime,
-                            trusted_context=context,
+                        result = (
+                            _trusted_reconcile(
+                                _visual(visual_state),
+                                runtime,
+                                context,
+                            )
+                            if context is not None
+                            else reconcile_state(_visual(visual_state), runtime)
                         )
                         if result.state is ReconciledState.WORLD_CONFIRMED:
                             self.assertEqual(runtime_state, "IN_GAME")
@@ -428,10 +503,10 @@ class ReconciliationTests(unittest.TestCase):
 
         for name, visual, runtime in cases:
             with self.subTest(name=name):
-                result = reconcile_state(
+                result = _trusted_reconcile(
                     visual,
                     runtime,
-                    trusted_context=_trusted_context(runtime),
+                    _trusted_context(runtime),
                 )
                 self.assertIs(result.state, ReconciledState.UNKNOWN)
                 self.assertNotIn(secret, repr(result))
@@ -445,10 +520,10 @@ class ReconciliationTests(unittest.TestCase):
 
         for name, visual, runtime in cases:
             with self.subTest(name=name):
-                result = reconcile_state(
+                result = _trusted_reconcile(
                     visual,
                     runtime,
-                    trusted_context=_trusted_context(runtime),
+                    _trusted_context(runtime),
                 )
                 self.assertIs(result.state, ReconciledState.UNKNOWN)
                 self.assertEqual(result.visual_evidence_refs, ())
@@ -483,10 +558,10 @@ class ReconciliationTests(unittest.TestCase):
                     RuntimeEvidenceClass.REVIEWED_CAUSAL,
                     ("runtime:world",),
                 )
-                result = reconcile_state(
+                result = _trusted_reconcile(
                     _visual("WORLD_VISUAL", **kwargs),
                     runtime,
-                    trusted_context=_trusted_context(runtime),
+                    _trusted_context(runtime),
                 )
                 self.assertIs(result.state, ReconciledState.UNKNOWN)
                 self.assertEqual(result.visual_evidence_refs, ())
@@ -500,10 +575,10 @@ class ReconciliationTests(unittest.TestCase):
                     RuntimeEvidenceClass.REVIEWED_CAUSAL,
                     ("runtime:world",),
                 )
-                result = reconcile_state(
+                result = _trusted_reconcile(
                     _visual("WORLD_VISUAL", confidence=confidence),
                     runtime,
-                    trusted_context=_trusted_context(runtime),
+                    _trusted_context(runtime),
                 )
                 self.assertIs(result.state, ReconciledState.WORLD_CONFIRMED)
 
@@ -524,10 +599,10 @@ class ReconciliationTests(unittest.TestCase):
             RuntimeEvidenceClass.REVIEWED_CAUSAL,
             ("runtime:one", "runtime:two"),
         )
-        result = reconcile_state(
+        result = _trusted_reconcile(
             _visual(evidence_ref="capture:one"),
             runtime,
-            trusted_context=_trusted_context(runtime),
+            _trusted_context(runtime),
         )
 
         self.assertIs(result.state, ReconciledState.WORLD_CONFIRMED)
@@ -547,7 +622,7 @@ class ReconciliationTests(unittest.TestCase):
         with self.assertRaises(FrozenInstanceError):
             runtime.state = "UNKNOWN"  # type: ignore[misc]
 
-    def test_trusted_provenance_types_are_immutable(self):
+    def test_resolver_state_records_are_immutable_but_not_issuance(self):
         runtime = _runtime("IN_GAME", RuntimeEvidenceClass.REVIEWED_CAUSAL, ("runtime:world",))
         context = _trusted_context(runtime)
         with self.assertRaises(FrozenInstanceError):

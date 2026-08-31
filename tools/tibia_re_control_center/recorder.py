@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import copy
-import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
@@ -11,48 +10,17 @@ from .fake import ManualClock
 from .model import (
     Event,
     OrderingConfidence,
-    PrivacyError,
     ScreenshotDisposition,
     ValidationError,
     validate_opaque_id,
 )
+from .privacy import ensure_no_secret_material
 
-_SECRET_KEYS = {
-    "password", "passwd", "2fa", "otp", "auth_token", "access_token",
-    "refresh_token", "session_token", "cookie", "cookies", "authorization",
-    "control_nonce", "api_key", "private_key", "secret", "credential",
-    "credentials", "ticket",
-}
-_SECRET_VALUE_PATTERNS = (
-    re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]{8,}"),
-    re.compile(r"(?i)\b(?:OPENAI_API_KEY|API_KEY|PASSWORD|AUTH_TOKEN|SESSION_TOKEN|CONTROL_NONCE)\s*="),
-    re.compile(r"(?i)-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
-)
 _EVENT_KINDS = {
     "SYSTEM", "AUTHORITY", "ACTION", "TRACE", "NET", "STATE", "SCREEN",
     "SNAPSHOT", "ASSERTION", "RESULT", "ERROR",
 }
 _SENSITIVITIES = {"PUBLIC", "RESEARCH_INTERNAL", "PERSONAL_REDACTED", "SECRET_REJECTED"}
-
-
-def ensure_no_secret_material(value: Any, *, key_path: str = "payload") -> None:
-    if isinstance(value, Mapping):
-        for key, child in value.items():
-            normalized = str(key).lower()
-            if normalized in _SECRET_KEYS or normalized.endswith(("_password", "_token", "_nonce")):
-                raise PrivacyError("SECRET_FIELD", f"secret-class field rejected at {key_path}")
-            if normalized in {"private_chat", "private_message", "raw_chat"}:
-                raise PrivacyError("PRIVATE_CHAT", "unapproved private-chat content is not admitted")
-            ensure_no_secret_material(child, key_path=f"{key_path}.{key}")
-        return
-    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
-        for child in value:
-            ensure_no_secret_material(child, key_path=key_path)
-        return
-    if isinstance(value, str):
-        for pattern in _SECRET_VALUE_PATTERNS:
-            if pattern.search(value):
-                raise PrivacyError("SECRET_VALUE", "secret-shaped text rejected before event construction")
 
 
 def _freeze_event_value(value: Any) -> Any:

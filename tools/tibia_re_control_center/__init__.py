@@ -5,6 +5,19 @@ non-exported loopback HTTP/CLI/UI modules backed only by the explicit FAKE_TEST 
 Official Tibia runtime/client access remains absent.
 """
 
+from .agent_protocol import (
+    AgentEvent,
+    AgentOperationalState,
+    AgentProvenance,
+    AgentSessionRecord,
+    AgentVisualState,
+    ClientIdentity,
+    NamedAgentAction,
+    OwnerControlCommand,
+    ResultEnvelope,
+    ResultStatus,
+    TaskEnvelope,
+)
 from .artifact import ArtifactStore
 from .comparison import ComparisonProfile, ComparisonResult, compare_runs
 from .engine import EngineRunResult, ScenarioEngine
@@ -24,18 +37,29 @@ from .store import DeterministicDurableStore
 __all__ = [
     "ActionRequest",
     "ActionResult",
+    "AgentEvent",
+    "AgentOperationalState",
+    "AgentProvenance",
+    "AgentSessionRecord",
+    "AgentVisualState",
     "ArtifactStore",
     "Authority",
     "CancellationToken",
+    "ClientIdentity",
     "ComparisonProfile",
     "ComparisonResult",
     "DeterministicDurableStore",
     "EffectBound",
     "EngineRunResult",
     "MutationCoordinator",
+    "NamedAgentAction",
+    "OwnerControlCommand",
     "Recorder",
+    "ResultEnvelope",
+    "ResultStatus",
     "ScenarioEngine",
     "SideEffectBudget",
+    "TaskEnvelope",
     "ValidationError",
     "compare_runs",
     "parse_and_validate",

@@ -40,10 +40,75 @@ ALLOWED_PREFIXES = (
     "docs/agents/evidence/OTC-20260823-tibia-re-control-center-package-b/",
 )
 
+_PACKAGE_B_IMPLEMENTATION_SUBJECT = "feat(control-center): implement Package B local control plane (#666)"
+_PACKAGE_B_REPAIR_SUBJECT = "fix(control-center): repair Package B SQLite race and close out (#683)"
+
+
+def _resolve_package_b_commits(history: str) -> tuple[str, str]:
+    matches: dict[str, list[str]] = {
+        _PACKAGE_B_IMPLEMENTATION_SUBJECT: [],
+        _PACKAGE_B_REPAIR_SUBJECT: [],
+    }
+    for line in history.splitlines():
+        commit, separator, subject = line.partition("\x00")
+        if separator and subject in matches:
+            matches[subject].append(commit)
+    if any(len(commits) != 1 for commits in matches.values()):
+        raise RuntimeError("Package B implementation history is missing or ambiguous")
+    return (
+        matches[_PACKAGE_B_IMPLEMENTATION_SUBJECT][0],
+        matches[_PACKAGE_B_REPAIR_SUBJECT][0],
+    )
+
+
+def _audit_history_contract() -> None:
+    missing = f"one\x00{_PACKAGE_B_IMPLEMENTATION_SUBJECT}"
+    ambiguous = (
+        f"one\x00{_PACKAGE_B_IMPLEMENTATION_SUBJECT}\n"
+        f"two\x00{_PACKAGE_B_IMPLEMENTATION_SUBJECT}\n"
+        f"three\x00{_PACKAGE_B_REPAIR_SUBJECT}"
+    )
+    for history in ("", missing, ambiguous):
+        try:
+            _resolve_package_b_commits(history)
+        except RuntimeError:
+            continue
+        raise AssertionError("missing or ambiguous Package B history was accepted")
+
 
 def changed_paths() -> list[str]:
-    base = subprocess.check_output(["git", "merge-base", "origin/main", "HEAD"], cwd=ROOT, text=True).strip()
-    return subprocess.check_output(["git", "diff", "--name-only", f"{base}...HEAD"], cwd=ROOT, text=True).splitlines()
+    # This audit is a historical Package B gate.  On a stacked branch, using
+    # the current main/HEAD merge-base also includes separately authorized
+    # lanes (for example the local agent foundation) and makes the old path
+    # ownership check fail before it can audit Package B.  Resolve the exact
+    # implementation and repair commits, require one unambiguous ancestry,
+    # and audit their complete combined range.
+    history = subprocess.check_output(
+        ["git", "log", "--all", "--format=%H%x00%s"],
+        cwd=ROOT,
+        text=True,
+    )
+    package_b_impl, package_b_head = _resolve_package_b_commits(history)
+    parent_line = subprocess.check_output(
+        ["git", "rev-list", "--parents", "-n", "1", package_b_impl],
+        cwd=ROOT,
+        text=True,
+    ).strip().split()
+    if len(parent_line) != 2:
+        raise RuntimeError("Package B implementation base is missing or ambiguous")
+    ancestry = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", package_b_impl, package_b_head],
+        cwd=ROOT,
+        check=False,
+    )
+    if ancestry.returncode != 0:
+        raise RuntimeError("Package B implementation history is not an unambiguous ancestry")
+    base = parent_line[1]
+    return subprocess.check_output(
+        ["git", "diff", "--name-only", f"{base}..{package_b_head}"],
+        cwd=ROOT,
+        text=True,
+    ).splitlines()
 
 
 def raw(
@@ -70,7 +135,13 @@ def raw(
 
 
 def main() -> int:
-    unexpected = [path for path in changed_paths() if path not in ALLOWED_EXACT and not any(path.startswith(prefix) for prefix in ALLOWED_PREFIXES)]
+    _audit_history_contract()
+    unexpected = [
+        path
+        for path in changed_paths()
+        if path not in ALLOWED_EXACT
+        and not any(path.startswith(prefix) for prefix in ALLOWED_PREFIXES)
+    ]
     if unexpected:
         raise SystemExit("Package B changed paths outside its declared ownership boundary")
     production = "\n".join((ROOT / path).read_text(encoding="utf-8") for path in (

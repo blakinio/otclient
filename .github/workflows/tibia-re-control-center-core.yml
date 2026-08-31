@@ -144,10 +144,21 @@ jobs:
               'docs/agents/tasks/archive/OTC-20260821-tibia-re-control-center-package-a-p1-isolation-5.md',
               'docs/agents/tasks/archive/OTC-20260821-tibia-re-control-center-package-a-p1-isolation-6.md',
               'docs/agents/tasks/archive/OTC-20260821-tibia-re-control-center-package-a-p1-isolation-7.md',
+              'docs/agents/prompts/OTC_20260830_LOCAL_VISION_AGENT_SUPERVISOR_FOUNDATION_SDD.md',
+              'docs/agents/prompts/OTC_20260830_LOCAL_VISION_AGENT_SUPERVISOR_FOUNDATION_SDD_ALIAS.md',
+              'docs/agents/reports/OTC-20260830-local-vision-agent-supervisor-discovery.md',
+              'docs/agents/reports/OTC-20260830-local-vision-agent-supervisor-foundation.md',
+              'docs/agents/tasks/active/OTC-20260830-local-vision-agent-supervisor-discovery.md',
+              'docs/agents/tasks/active/OTC-20260830-local-vision-agent-supervisor-foundation.md',
+              'docs/superpowers/plans/2026-08-30-local-track-a-vision-agent-supervisor.md',
+              'docs/superpowers/specs/2026-08-30-local-track-a-vision-agent-supervisor-design.md',
+              'tools/tibia-re-vision-benchmark/vision_benchmark.py',
           }
           allowed_prefixes = (
               'tools/tibia_re_control_center/',
               'tests/tools/tibia_re_control_center/',
+              'tools/tibia_re_vision/',
+              'tests/tools/tibia_re_vision/',
               'docs/agents/evidence/OTC-20260823-tibia-re-control-center-package-b/',
           )
           unexpected = [

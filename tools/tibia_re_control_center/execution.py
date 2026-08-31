@@ -316,6 +316,7 @@ class MutationCoordinator:
                 raise ValidationError("REFUSED_IDEMPOTENCY_CONFLICT", "same action_id was submitted with a different semantic hash")
             return existing
         self._check_reservation_fit(run.budget, request)
+        previous_budget = run.budget.clone()
         next_budget = run.budget.clone()
         for name in EFFECT_DIMENSIONS:
             amount = getattr(request.effect_bound, name)
@@ -323,7 +324,6 @@ class MutationCoordinator:
             dimension.reserved = checked_add(dimension.reserved, amount, maximum=dimension.limit, field_name=name)
         next_budget.reservations[request.action_id] = request.effect_bound
         next_budget.updated_monotonic_ns = self.clock.now_ns()
-        self.store.write_budget(next_budget, operation="budget_reserve")
         record = ActionLedgerRecord(
             action_id=request.action_id,
             action_request_hash=request.action_request_hash,
@@ -342,13 +342,13 @@ class MutationCoordinator:
             created_monotonic_ns=self.clock.now_ns(),
             updated_monotonic_ns=self.clock.now_ns(),
         )
-        try:
-            self.store.write_action(record, operation="action_reserve")
-        except (DurabilityError, DurabilityTimeout):
-            run.budget = next_budget
-            raise
-        run.budget = next_budget
-        return record
+        durable_record, durable_budget, accepted = self.store.atomic_reserve_action(
+            record,
+            previous_budget,
+            next_budget,
+        )
+        run.budget = durable_budget
+        return record if accepted else durable_record
 
     def _release_reservation(self, run: RunState, request: ActionRequest) -> None:
         if request.action_id not in run.budget.reservations:
@@ -555,7 +555,8 @@ class MutationCoordinator:
                     session_epoch=identity.session_epoch,
                 )
                 try:
-                    self.store.atomic_dispatch_commit(committed, next_budget)
+                    if not self.store.atomic_dispatch_commit(committed, next_budget):
+                        return False
                 except (DurabilityError, DurabilityTimeout):
                     return False
                 run.budget = next_budget
@@ -707,7 +708,14 @@ class MutationCoordinator:
                     run, request, LifecycleState.TIMED_OUT_BEFORE_DISPATCH,
                     ActionStatus.TIMEOUT, "RUN_DEADLINE_EXPIRED",
                 )
-            if not self.adapter.await_authority(request):
+            try:
+                authority_available = self.adapter.await_authority(request)
+            except Exception:  # noqa: BLE001 -- this adapter phase is before the one-shot dispatch fence
+                return self._terminalize_pre_dispatch(
+                    run, request, LifecycleState.FAILED_BEFORE_DISPATCH,
+                    ActionStatus.FAIL, "AUTHORITY_WAIT_FAILED_BEFORE_DISPATCH",
+                )
+            if not authority_available:
                 return self._terminalize_pre_dispatch(
                     run, request, LifecycleState.REFUSED,
                     ActionStatus.REFUSED, "AUTHORITY_UNAVAILABLE",
@@ -866,7 +874,13 @@ class MutationCoordinator:
             self.results[request.action_id] = result
             return result
 
-    def stop_all(self, *, transition_id: str | None = None, reason_code: str = "STOP_ALL") -> bool:
+    def stop_all(
+        self,
+        *,
+        transition_id: str | None = None,
+        reason_code: str = "STOP_ALL",
+        state_persister: Callable[[ControlState], None] | None = None,
+    ) -> bool:
         with self.stop_operation_lock:
             persisted = False
             with self.run_admission_lock, self.control_transition_lock, self.dispatch_gate:
@@ -889,7 +903,10 @@ class MutationCoordinator:
                         active_backend_epoch=self.backend_epoch,
                     )
                     try:
-                        self.store.write_control_state(next_state, operation="stop")
+                        if state_persister is None:
+                            self.store.write_control_state(next_state, operation="stop")
+                        else:
+                            state_persister(next_state)
                     except (DurabilityError, DurabilityTimeout):
                         self.stop_durability_unresolved = True
                     else:
@@ -905,7 +922,13 @@ class MutationCoordinator:
             with self.control_transition_lock:
                 self.stop_cleanup_in_progress = False
             return persisted
-    def reset_stop(self, *, transition_id: str | None = None, reason_code: str = "EXPLICIT_RESET") -> bool:
+    def reset_stop(
+        self,
+        *,
+        transition_id: str | None = None,
+        reason_code: str = "EXPLICIT_RESET",
+        state_persister: Callable[[ControlState], None] | None = None,
+    ) -> bool:
         with self.control_transition_lock, self.dispatch_gate:
                 if self.stop_cleanup_in_progress or self.stop_durability_unresolved:
                     return False
@@ -940,7 +963,10 @@ class MutationCoordinator:
                     active_backend_epoch=self.backend_epoch,
                 )
                 try:
-                    self.store.write_control_state(next_state, operation="reset")
+                    if state_persister is None:
+                        self.store.write_control_state(next_state, operation="reset")
+                    else:
+                        state_persister(next_state)
                 except (DurabilityError, DurabilityTimeout):
                     self.in_memory_stop = True
                     self.mutation_disabled = True
@@ -950,8 +976,12 @@ class MutationCoordinator:
                 self.mutation_disabled = False
                 return True
 
-    def pause_run(self, run_id: str) -> None:
-        self._run(run_id).paused = True
+    def pause_run(self, run_id: str, *, durable_hook: Callable[[], None] | None = None) -> None:
+        with self.control_transition_lock, self.dispatch_gate:
+            run = self._run(run_id)
+            if durable_hook is not None:
+                durable_hook()
+            run.paused = True
 
     def resume_run(self, run_id: str) -> bool:
         run = self._run(run_id)

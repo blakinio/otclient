@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import threading
 import time
+from collections.abc import Callable, Mapping
 from dataclasses import asdict, dataclass, replace
 from enum import Enum
 from typing import Any, Protocol
@@ -20,10 +21,25 @@ from .agent_protocol import (
     ResultStatus,
     TaskEnvelope,
 )
-from .execution import MutationCoordinator
-from .model import MAX_SAFE_INTEGER, PrivacyError, ValidationError, validate_opaque_id
+from .canonical import jcs_dumps
+from .execution import CancellationToken, MutationCoordinator
+from .model import (
+    EFFECT_DIMENSIONS,
+    MAX_SAFE_INTEGER,
+    ActionRequest,
+    ActionResult,
+    Authority,
+    Confirmation,
+    DispatchFence,
+    DispatchState,
+    PrivacyError,
+    SideEffectBudget,
+    ValidationError,
+    validate_opaque_id,
+)
 from .persistent_store import SQLitePersistentStore
 from .recorder import ensure_no_secret_material
+from .scenario import action_request_hash
 
 
 @dataclass(frozen=True)
@@ -79,6 +95,208 @@ class NullBoundedActionExecutor:
         return CaptureReceipt(status="UNAVAILABLE", artifact_ref=None, sha256=None, secret_safe=True)
 
 
+@dataclass(frozen=True)
+class GuardedActionBinding:
+    """Explicit named-action translation consumed only by MutationCoordinator."""
+
+    kind: str
+    parameters: Mapping[str, object]
+    required_capability: str
+    timeout_ms: int
+
+
+class GuardedMutationActionExecutor:
+    """Narrow effect facade whose only dispatch path is MutationCoordinator."""
+
+    def __init__(
+        self,
+        control: MutationCoordinator,
+        *,
+        bindings: Mapping[NamedAgentAction, GuardedActionBinding],
+        source_state_provider: Callable[[AgentActionRequest], str],
+    ) -> None:
+        self.control = control
+        self.bindings = dict(bindings)
+        self.source_state_provider = source_state_provider
+        self._tasks: dict[str, TaskEnvelope] = {}
+        self._lock = threading.RLock()
+        for action, binding in self.bindings.items():
+            if type(action) is not NamedAgentAction or action is NamedAgentAction.SCREENSHOT:
+                raise ValidationError("INVALID_GUARDED_BINDING", "guarded bindings require mutating named actions")
+            if type(binding) is not GuardedActionBinding:
+                raise ValidationError("INVALID_GUARDED_BINDING", "guarded binding is invalid")
+            if not isinstance(binding.kind, str) or not binding.kind:
+                raise ValidationError("INVALID_GUARDED_BINDING", "guarded action kind is invalid")
+            if not isinstance(binding.parameters, Mapping):
+                raise ValidationError("INVALID_GUARDED_BINDING", "guarded action parameters are invalid")
+            if not isinstance(binding.required_capability, str) or not binding.required_capability:
+                raise ValidationError("INVALID_GUARDED_BINDING", "guarded capability is invalid")
+            if type(binding.timeout_ms) is not int or binding.timeout_ms < 1:
+                raise ValidationError("INVALID_GUARDED_BINDING", "guarded timeout is invalid")
+
+    def bind_task(self, task: TaskEnvelope, *, activate: bool = False) -> None:
+        with self._lock:
+            existing = self._tasks.get(task.run_id)
+            if existing is not None and existing != task:
+                raise ValidationError("IDEMPOTENCY_CONFLICT", "guarded run is already bound to another task")
+            self._tasks[task.run_id] = task
+        if activate:
+            self._activate_task_run(task)
+
+    def _activate_task_run(self, task: TaskEnvelope) -> None:
+        if task.run_id in self.control.runs:
+            return
+        if self.control.store.load_budget(task.run_id) is not None:
+            return
+        remaining_ms = max(
+            1,
+            task.deadline_epoch_ms - min(time.time_ns() // 1_000_000, MAX_SAFE_INTEGER),
+        )
+        runtime_seconds = max(1, min(86_400, (remaining_ms + 999) // 1_000))
+        limits = {name: task.physical_action_budget for name in EFFECT_DIMENSIONS}
+        self.control.start_run(
+            task.run_id,
+            SideEffectBudget(max_runtime_seconds=runtime_seconds, **limits),
+            mutation_capable=True,
+        )
+
+    def _binding(self, action: NamedAgentAction) -> GuardedActionBinding:
+        try:
+            return self.bindings[action]
+        except KeyError as exc:
+            raise ValidationError("GUARDED_ACTION_UNBOUND", "named action has no guarded binding") from exc
+
+    def _semantic_step_id(self, request: AgentActionRequest, binding: GuardedActionBinding) -> str:
+        body = jcs_dumps({
+            "session_id": request.session_id,
+            "run_id": request.run_id,
+            "action": request.action.value,
+            "expected_source_states": list(request.expected_source_states),
+            "deadline_epoch_ms": request.deadline_epoch_ms,
+            "secret_capability_ref": request.secret_capability_ref,
+            "kind": binding.kind,
+            "parameters": dict(binding.parameters),
+            "required_capability": binding.required_capability,
+            "timeout_ms": binding.timeout_ms,
+        })
+        return f"agent-{hashlib.sha256(body.encode('utf-8')).hexdigest()}"
+
+    def prepare(self, request: AgentActionRequest) -> ActionRequest:
+        binding = self._binding(request.action)
+        identity = self.control.adapter.identity()
+        parameters = dict(binding.parameters)
+        step_id = self._semantic_step_id(request, binding)
+        request_hash = action_request_hash(
+            schema_version=1,
+            run_id=request.run_id,
+            step_id=step_id,
+            attempt_index=0,
+            kind=binding.kind,
+            parameters=parameters,
+            timeout_ms=binding.timeout_ms,
+            required_capability=binding.required_capability,
+            required_authority=Authority.MUTATION,
+        )
+        return ActionRequest(
+            action_id=request.action_id,
+            run_id=request.run_id,
+            step_id=step_id,
+            attempt_index=0,
+            kind=binding.kind,
+            parameters=parameters,
+            timeout_ms=binding.timeout_ms,
+            required_capability=binding.required_capability,
+            required_authority=Authority.MUTATION,
+            dispatch_fence=DispatchFence(
+                expected_backend_epoch=self.control.backend_epoch,
+                expected_control_generation=self.control.control_generation,
+                expected_adapter_generation=identity.adapter_generation,
+                expected_runtime_instance_id=identity.runtime_instance_id,
+                expected_session_epoch=identity.session_epoch,
+            ),
+            effect_bound=self.control.adapter.effect_bound(binding.kind, parameters),
+            action_request_hash=request_hash,
+        )
+
+    def canonical_request_hash(self, request: AgentActionRequest) -> str:
+        return self.prepare(request).action_request_hash
+
+    def _ensure_run(self, request: AgentActionRequest) -> None:
+        with self._lock:
+            task = self._tasks.get(request.run_id)
+        if task is None:
+            raise ValidationError("GUARDED_TASK_UNBOUND", "guarded action requires its accepted task")
+        if request.run_id in self.control.runs:
+            return
+        if self.control.store.load_budget(request.run_id) is not None:
+            self.control.recover_run(request.run_id, mutation_capable=True)
+            self.control.acquire_mutation_run(request.run_id)
+            return
+        self._activate_task_run(task)
+
+    @staticmethod
+    def receipt_from_result(request: AgentActionRequest, result: ActionResult) -> AgentActionReceipt:
+        if result.dispatch_state == DispatchState.NOT_DISPATCHED:
+            status = result.reason_code if result.reason_code == "REFUSED_IDEMPOTENCY_CONFLICT" else "NOT_PERFORMED"
+            return AgentActionReceipt(request.action_id, status, False, True, 0, result.evidence_refs)
+        if (
+            result.dispatch_state == DispatchState.DISPATCHED
+            and result.authoritative_confirmation == Confirmation.PROVEN
+        ):
+            return AgentActionReceipt(
+                request.action_id,
+                "PERFORMED",
+                True,
+                True,
+                int(result.budget_effect.get("max_actions", 0)),
+                result.evidence_refs,
+            )
+        return AgentActionReceipt(
+            request.action_id,
+            "PERFORMED_UNKNOWN",
+            True,
+            False,
+            max(1, result.budget_effect.get("max_actions", 0)),
+            result.evidence_refs,
+        )
+
+    def execute_guarded(
+        self,
+        request: AgentActionRequest,
+        *,
+        token: CancellationToken,
+        final_commit_check: Callable[[], str | None],
+    ) -> AgentActionReceipt:
+        self._ensure_run(request)
+        low_level = self.prepare(request)
+
+        def combined_final_check() -> str | None:
+            reason = final_commit_check()
+            if reason is not None:
+                return reason
+            try:
+                source_state = self.source_state_provider(request)
+            except Exception:  # noqa: BLE001 -- trusted-state provider failure blocks dispatch
+                return "AUTHORITATIVE_SOURCE_STATE_UNAVAILABLE"
+            if not isinstance(source_state, str) or not source_state:
+                return "AUTHORITATIVE_SOURCE_STATE_UNAVAILABLE"
+            if request.expected_source_states and source_state not in request.expected_source_states:
+                return "AUTHORITATIVE_SOURCE_STATE_MISMATCH"
+            return None
+
+        result = self.control.execute_action(
+            low_level,
+            token=token,
+            final_commit_check=combined_final_check,
+        )
+        receipt = self.receipt_from_result(request, result)
+        if receipt.performed:
+            record = self.control.store.load_action(request.action_id)
+            count = 0 if record is None else record.effect_bound.max_actions
+            receipt = replace(receipt, low_level_event_count=count)
+        return receipt
+
+
 def _jsonable(value: Any) -> Any:
     if isinstance(value, Enum):
         return value.value
@@ -125,10 +343,21 @@ class AgentSessionCoordinator:
         store: SQLitePersistentStore,
         control: MutationCoordinator,
         executor: BoundedActionExecutor | None = None,
+        *,
+        guarded_executor: GuardedMutationActionExecutor | None = None,
     ) -> None:
         self.store = store
         self.control = control
         self.executor: BoundedActionExecutor = executor if executor is not None else NullBoundedActionExecutor()
+        if guarded_executor is not None and (
+            type(guarded_executor) is not GuardedMutationActionExecutor
+            or guarded_executor.control is not control
+        ):
+            raise ValidationError(
+                "INVALID_GUARDED_EXECUTOR",
+                "guarded executor must be the exact MutationCoordinator-backed facade for this control domain",
+            )
+        self.guarded_executor = guarded_executor
         self._lock = threading.RLock()
         self._sessions: dict[str, AgentSessionRecord] = {}
         self._tasks: dict[str, TaskEnvelope] = {}
@@ -138,6 +367,7 @@ class AgentSessionCoordinator:
         self._action_counts: dict[str, int] = {}
         self._evidence_refs: dict[str, list[str]] = {}
         self._inconclusive: set[str] = set()
+        self._inflight: dict[tuple[str, str], CancellationToken] = {}
 
     @staticmethod
     def _now_epoch_ms() -> int:
@@ -147,64 +377,64 @@ class AgentSessionCoordinator:
         events, _ = self.store.list_events(cursor=0, limit=self.store.event_retention)
         return [event for event in events if event.get("session_id") == session_id]
 
-    def _hydrate_from_events(self, session_id: str) -> None:
-        attempts = 0
-        count = 0
-        evidence: list[str] = []
-        pending: set[str] = set()
-        for event in self._events_for(session_id):
-            action_id = event.get("action_id")
-            kind = event.get("kind")
-            if (
-                kind == "ACTION_RESERVED"
-                and event.get("schema") == "otclient.local-agent.event.v1"
-                and event.get("provenance") == AgentProvenance.SUPERVISOR.value
-                and isinstance(action_id, str)
-            ):
-                attempts += 1
-                pending.add(action_id)
-            if (
-                kind != "ACTION_RESULT"
-                or event.get("schema") != "otclient.local-agent.event.v1"
-                or event.get("provenance") != AgentProvenance.RUNTIME.value
-                or not isinstance(action_id, str)
-                or action_id not in pending
-            ):
-                continue
-            payload = event.get("payload")
-            if not isinstance(payload, dict):
-                continue
-            refs = tuple(event.get("artifact_refs") or ())
-            try:
-                receipt = AgentActionReceipt(
-                    action_id=action_id,
-                    status=str(payload["status"]),
-                    performed=payload["performed"],
-                    outcome_known=payload["outcome_known"],
-                    low_level_event_count=payload["low_level_event_count"],
-                    evidence_refs=refs,
-                )
-            except (KeyError, TypeError, ValueError):
-                continue
-            receipt = self._validated_receipt(action_id, receipt)
-            self._receipts[(session_id, action_id)] = receipt
-            pending.discard(action_id)
-            if receipt.performed:
-                count += 1
-            evidence.extend(ref for ref in refs if ref not in evidence)
-            if receipt.status == "PERFORMED_UNKNOWN":
-                self._inconclusive.add(session_id)
-        for action_id in pending:
-            # A durable reservation without a result crossed a restart boundary.  The
-            # executor may have received it, so its identity is permanently latched.
-            self._receipts[(session_id, action_id)] = AgentActionReceipt(
-                action_id, "PERFORMED_UNKNOWN", True, False, 0, (),
+    @staticmethod
+    def _receipt_from_ledger(record: object) -> AgentActionReceipt:
+        if record.dispatch_state == DispatchState.NOT_DISPATCHED:
+            status = (
+                "REFUSED_IDEMPOTENCY_CONFLICT"
+                if record.reason_code == "REFUSED_IDEMPOTENCY_CONFLICT"
+                else "NOT_PERFORMED"
             )
+            return AgentActionReceipt(record.action_id, status, False, True, 0, ())
+        if (
+            record.dispatch_state == DispatchState.DISPATCHED
+            and record.authoritative_confirmation == Confirmation.PROVEN
+        ):
+            return AgentActionReceipt(
+                record.action_id,
+                "PERFORMED",
+                True,
+                True,
+                record.effect_bound.max_actions,
+                (),
+            )
+        return AgentActionReceipt(
+            record.action_id,
+            "PERFORMED_UNKNOWN",
+            True,
+            False,
+            record.effect_bound.max_actions,
+            (),
+        )
+
+    def _hydrate_authoritative_actions(self, session_id: str, task: TaskEnvelope | None) -> None:
+        if task is None:
+            self._attempts[session_id] = 0
+            self._action_counts[session_id] = 0
+            self._evidence_refs.setdefault(session_id, [])
+            return
+        actions = self.store.list_actions_for_run(task.run_id)
+        ambiguous = False
+        for record in actions:
+            receipt = self._receipt_from_ledger(record)
+            self._receipts[(session_id, record.action_id)] = receipt
+            if receipt.status == "PERFORMED_UNKNOWN":
+                ambiguous = True
+        ledger = self.store.load_budget(task.run_id)
+        if ledger is None:
+            count = 0
+        else:
+            dimension = ledger.dimensions["max_actions"]
+            count = dimension.at_risk + dimension.committed + dimension.uncertain
+            if dimension.at_risk or dimension.uncertain:
+                ambiguous = True
+        if ambiguous:
             self._inconclusive.add(session_id)
-            count += 1
-        self._attempts[session_id] = attempts
+        else:
+            self._inconclusive.discard(session_id)
+        self._attempts[session_id] = len(actions)
         self._action_counts[session_id] = count
-        self._evidence_refs[session_id] = evidence
+        self._evidence_refs.setdefault(session_id, [])
 
     def ensure_session(self, session_id: str) -> AgentSessionRecord:
         validate_opaque_id(session_id, field_name="session_id")
@@ -212,9 +442,18 @@ class AgentSessionCoordinator:
             known = self._sessions.get(session_id)
             if known is not None:
                 return known
+            task_values = self.store.load_agent_task_for_session(session_id)
+            task = None if task_values is None else _task_from_stored(task_values["envelope"])
+            result = None if task_values is None else _result_from_stored(task_values["result"])
+            if task is not None:
+                self._tasks[session_id] = task
+                if self.guarded_executor is not None:
+                    self.guarded_executor.bind_task(task)
+            if result is not None:
+                self._results[session_id] = result
             loaded = self.store.load_agent_session(session_id)
             if loaded is None:
-                loaded = AgentSessionRecord(
+                initial = AgentSessionRecord(
                     session_id=session_id,
                     operational_state=AgentOperationalState.IDLE,
                     current_run_id=None,
@@ -223,33 +462,80 @@ class AgentSessionCoordinator:
                     stop_latched=False,
                     heartbeat_epoch_ms=None,
                 )
-                self.store.write_agent_session(loaded)
-            elif loaded.stop_latched:
-                loaded = replace(loaded, operational_state=AgentOperationalState.STOPPED)
-                self.store.write_agent_session(loaded)
-            elif loaded.pause_latched:
-                loaded = replace(loaded, operational_state=AgentOperationalState.PAUSED)
-                self.store.write_agent_session(loaded)
-            elif loaded.current_run_id is not None and loaded.operational_state not in {
+                if task is None:
+                    self.store.write_agent_session(initial)
+                    loaded = initial
+                else:
+                    target_state = (
+                        AgentOperationalState.TERMINAL
+                        if result is not None
+                        else AgentOperationalState.PAUSED_AUTHORITY
+                    )
+                    target = replace(initial, operational_state=target_state, current_run_id=task.run_id)
+                    event = AgentEvent.new(
+                        session_id=session_id,
+                        run_id=task.run_id,
+                        provenance=AgentProvenance.SYSTEM,
+                        kind="TASK_STATE_HYDRATED",
+                        state_before=AgentOperationalState.IDLE.value,
+                        state_after=target_state.value,
+                        observed_epoch_ms=self._now_epoch_ms(),
+                        payload={"result_present": result is not None, "auto_resume": False},
+                    )
+                    loaded, _ = self.store.atomic_agent_transition(
+                        target,
+                        event,
+                        operation="agent_task_hydration",
+                    )
+            target_state: AgentOperationalState | None = None
+            repair_kind = "SESSION_STATE_REPAIRED"
+            if loaded.stop_latched:
+                if loaded.operational_state is not AgentOperationalState.STOPPED:
+                    target_state = AgentOperationalState.STOPPED
+            elif loaded.pause_latched and loaded.operational_state is not AgentOperationalState.PAUSED:
+                target_state = AgentOperationalState.PAUSED
+            elif result is not None and loaded.operational_state is not AgentOperationalState.TERMINAL:
+                target_state = AgentOperationalState.TERMINAL
+                repair_kind = "RESULT_STATE_HYDRATED"
+            elif task is not None and loaded.current_run_id is None:
+                target_state = AgentOperationalState.PAUSED_AUTHORITY
+                repair_kind = "TASK_STATE_HYDRATED"
+            elif (
+                loaded.current_run_id is not None
+                and loaded.current_run_id not in self.control.runs
+                and loaded.operational_state not in {
                 AgentOperationalState.TERMINAL,
                 AgentOperationalState.PAUSED_AUTHORITY,
-            }:
+                AgentOperationalState.PAUSED,
+                AgentOperationalState.STOPPED,
+                }
+            ):
+                target_state = AgentOperationalState.PAUSED_AUTHORITY
+                repair_kind = "RESTART_RECONCILIATION_REQUIRED"
+            if target_state is not None:
                 before = loaded.operational_state
-                paused = replace(loaded, operational_state=AgentOperationalState.PAUSED_AUTHORITY)
-                event = self.store.append_agent_event(AgentEvent.new(
+                target = replace(
+                    loaded,
+                    operational_state=target_state,
+                    current_run_id=loaded.current_run_id if task is None else task.run_id,
+                )
+                repair_event = AgentEvent.new(
                     session_id=session_id,
-                    run_id=loaded.current_run_id,
+                    run_id=target.current_run_id,
                     provenance=AgentProvenance.SYSTEM,
-                    kind="RESTART_RECONCILIATION_REQUIRED",
+                    kind=repair_kind,
                     state_before=before.value,
-                    state_after=AgentOperationalState.PAUSED_AUTHORITY.value,
+                    state_after=target_state.value,
                     observed_epoch_ms=self._now_epoch_ms(),
-                    payload={"auto_resume": False},
-                ))
-                loaded = replace(paused, last_event_seq=event.seq)
-                self.store.write_agent_session(loaded)
+                    payload={"auto_resume": False, "result_present": result is not None},
+                )
+                loaded, _ = self.store.atomic_agent_transition(
+                    target,
+                    repair_event,
+                    operation="agent_session_repair",
+                )
             self._sessions[session_id] = loaded
-            self._hydrate_from_events(session_id)
+            self._hydrate_authoritative_actions(session_id, task)
             return loaded
 
     def _persist_event(
@@ -267,8 +553,16 @@ class AgentSessionCoordinator:
         payload: dict[str, object] | None = None,
     ) -> AgentSessionRecord:
         record = self.ensure_session(session_id)
+        durable = self.store.load_agent_session(session_id)
+        if durable is not None:
+            record = durable
         target_state = record.operational_state if state_after is None else state_after
-        persisted = self.store.append_agent_event(AgentEvent.new(
+        if kind != "OWNER_RESUME":
+            if record.stop_latched:
+                target_state = AgentOperationalState.STOPPED
+            elif record.pause_latched and target_state is not AgentOperationalState.STOPPED:
+                target_state = AgentOperationalState.PAUSED
+        event = AgentEvent.new(
             session_id=session_id,
             run_id=record.current_run_id if run_id is None else run_id,
             provenance=provenance,
@@ -279,15 +573,18 @@ class AgentSessionCoordinator:
             artifact_refs=artifact_refs,
             action_id=action_id,
             payload={} if payload is None else payload,
-        ))
+        )
         next_record = replace(
             record,
             operational_state=target_state,
-            last_event_seq=persisted.seq,
             pause_latched=record.pause_latched if pause_latched is None else pause_latched,
             stop_latched=record.stop_latched if stop_latched is None else stop_latched,
         )
-        self.store.write_agent_session(next_record)
+        next_record, _ = self.store.atomic_agent_transition(
+            next_record,
+            event,
+            operation="agent_session_event",
+        )
         self._sessions[session_id] = next_record
         return next_record
 
@@ -303,43 +600,102 @@ class AgentSessionCoordinator:
                     "RUNTIME_ACCESS_UNAVAILABLE",
                     "the repository foundation has no runtime access",
                 )
-            session = self.ensure_session(parsed_input.session_id)
+            durable_session = self.store.load_agent_session(parsed_input.session_id)
+            stored_task = self.store.load_agent_task_for_session(parsed_input.session_id)
+            if durable_session is None and stored_task is None:
+                session = AgentSessionRecord(
+                    session_id=parsed_input.session_id,
+                    operational_state=AgentOperationalState.IDLE,
+                    current_run_id=None,
+                    last_event_seq=0,
+                    pause_latched=False,
+                    stop_latched=False,
+                    heartbeat_epoch_ms=None,
+                )
+            else:
+                session = self.ensure_session(parsed_input.session_id)
             if session.current_run_id not in {None, parsed_input.run_id} and session.operational_state is not AgentOperationalState.TERMINAL:
                 raise ValidationError("SESSION_RUN_CONFLICT", "session already has another active run")
-            accepted = self.store.accept_agent_task(parsed_input)
-            parsed = _task_from_stored(accepted["envelope"])
-            result = _result_from_stored(accepted["result"])
-            self._tasks[parsed.session_id] = parsed
-            if result is not None:
-                self._results[parsed.session_id] = result
-            if bool(accepted["accepted_new"]):
-                state = AgentOperationalState.RUNNING
-                event = self.store.append_agent_event(AgentEvent.new(
-                    session_id=parsed.session_id,
-                    run_id=parsed.run_id,
+            target = replace(
+                session,
+                operational_state=AgentOperationalState.RUNNING,
+                current_run_id=parsed_input.run_id,
+            )
+            accepted = self.store.accept_agent_task_transition(
+                parsed_input,
+                target,
+                AgentEvent.new(
+                    session_id=parsed_input.session_id,
+                    run_id=parsed_input.run_id,
                     provenance=AgentProvenance.SUPERVISOR,
                     kind="TASK_ACCEPTED",
                     state_before=session.operational_state.value,
-                    state_after=state.value,
+                    state_after=AgentOperationalState.RUNNING.value,
                     observed_epoch_ms=self._now_epoch_ms(),
                     payload={
-                        "task_id": parsed.task_id,
-                        "runtime_access": parsed.runtime_access,
-                        "physical_action_budget": parsed.physical_action_budget,
-                        "max_attempts": parsed.max_attempts,
+                        "task_id": parsed_input.task_id,
+                        "runtime_access": parsed_input.runtime_access,
+                        "physical_action_budget": parsed_input.physical_action_budget,
+                        "max_attempts": parsed_input.max_attempts,
                     },
-                ))
-                session = replace(
-                    session,
-                    operational_state=state,
-                    current_run_id=parsed.run_id,
-                    last_event_seq=event.seq,
-                )
-                self.store.write_agent_session(session)
+                ),
+            )
+            parsed = _task_from_stored(accepted["envelope"])
+            result = _result_from_stored(accepted["result"])
+            self._tasks[parsed.session_id] = parsed
+            if self.guarded_executor is not None:
+                self.guarded_executor.bind_task(parsed, activate=bool(accepted["accepted_new"]))
+            if result is not None:
+                self._results[parsed.session_id] = result
+            if bool(accepted["accepted_new"]):
+                session = self.store.load_agent_session(parsed.session_id)
+                if session is None:
+                    raise ValidationError("PERSISTENT_STATE_CORRUPT", "accepted task is missing its session")
                 self._sessions[parsed.session_id] = session
-                self._attempts[parsed.session_id] = 0
-                self._action_counts[parsed.session_id] = 0
-                self._evidence_refs[parsed.session_id] = []
+            else:
+                durable_session = self.store.load_agent_session(parsed.session_id)
+                if durable_session is not None:
+                    session = durable_session
+                    self._sessions[parsed.session_id] = durable_session
+            if not bool(accepted["accepted_new"]) and result is not None and session.operational_state is not AgentOperationalState.TERMINAL:
+                terminal = replace(session, operational_state=AgentOperationalState.TERMINAL, current_run_id=parsed.run_id)
+                terminal, _ = self.store.atomic_agent_transition(
+                    terminal,
+                    AgentEvent.new(
+                        session_id=parsed.session_id,
+                        run_id=parsed.run_id,
+                        provenance=AgentProvenance.SYSTEM,
+                        kind="RESULT_STATE_HYDRATED",
+                        state_before=session.operational_state.value,
+                        state_after=AgentOperationalState.TERMINAL.value,
+                        observed_epoch_ms=self._now_epoch_ms(),
+                        payload={"auto_resume": False},
+                    ),
+                    operation="agent_result_hydration",
+                )
+                self._sessions[parsed.session_id] = terminal
+            elif not bool(accepted["accepted_new"]) and session.current_run_id is None:
+                paused = replace(
+                    session,
+                    operational_state=AgentOperationalState.PAUSED_AUTHORITY,
+                    current_run_id=parsed.run_id,
+                )
+                paused, _ = self.store.atomic_agent_transition(
+                    paused,
+                    AgentEvent.new(
+                        session_id=parsed.session_id,
+                        run_id=parsed.run_id,
+                        provenance=AgentProvenance.SYSTEM,
+                        kind="TASK_STATE_HYDRATED",
+                        state_before=session.operational_state.value,
+                        state_after=AgentOperationalState.PAUSED_AUTHORITY.value,
+                        observed_epoch_ms=self._now_epoch_ms(),
+                        payload={"auto_resume": False},
+                    ),
+                    operation="agent_task_hydration",
+                )
+                self._sessions[parsed.session_id] = paused
+            self._hydrate_authoritative_actions(parsed.session_id, parsed)
             return {
                 "accepted_new": bool(accepted["accepted_new"]),
                 "envelope": _jsonable(accepted["envelope"]),
@@ -366,6 +722,11 @@ class AgentSessionCoordinator:
         )
         return {"status": status, "session": self.snapshot(session_id)}
 
+    def _cancel_inflight(self, session_id: str) -> None:
+        for (candidate_session, _), token in tuple(self._inflight.items()):
+            if candidate_session == session_id:
+                token.cancel()
+
     def owner_control(self, session_id: str, command: OwnerControlCommand | str) -> dict[str, object]:
         with self._lock:
             parsed = self._command(command)
@@ -375,27 +736,75 @@ class AgentSessionCoordinator:
             if parsed is OwnerControlCommand.STOP:
                 if session.stop_latched:
                     return {"status": "STOPPED", "session": self.snapshot(session_id)}
-                if not self.control.stop_all(reason_code="AGENT_OWNER_STOP"):
-                    raise ValidationError("OWNER_STOP_DURABILITY_FAILED", "owner STOP did not durably converge")
-                self._persist_event(
-                    session_id,
-                    provenance=AgentProvenance.OWNER,
-                    kind="OWNER_STOP",
-                    state_after=AgentOperationalState.STOPPED,
+                self._cancel_inflight(session_id)
+                target = replace(
+                    session,
+                    operational_state=AgentOperationalState.STOPPED,
                     stop_latched=True,
                 )
+                owner_event = AgentEvent.new(
+                    session_id=session_id,
+                    run_id=session.current_run_id,
+                    provenance=AgentProvenance.OWNER,
+                    kind="OWNER_STOP",
+                    state_before=session.operational_state.value,
+                    state_after=AgentOperationalState.STOPPED.value,
+                    observed_epoch_ms=self._now_epoch_ms(),
+                )
+                persisted: list[AgentSessionRecord] = []
+
+                def persist_stop(control_state: object) -> None:
+                    durable, _ = self.store.atomic_agent_transition(
+                        target,
+                        owner_event,
+                        operation="agent_owner_stop",
+                        control_state=control_state,
+                    )
+                    persisted.append(durable)
+
+                if not self.control.stop_all(
+                    reason_code="AGENT_OWNER_STOP",
+                    state_persister=persist_stop,
+                ):
+                    raise ValidationError("OWNER_STOP_DURABILITY_FAILED", "owner STOP did not durably converge")
+                if not persisted:
+                    raise ValidationError("OWNER_STOP_DURABILITY_FAILED", "owner STOP is missing its atomic session transition")
+                self._sessions[session_id] = persisted[-1]
                 return {"status": "STOPPED", "session": self.snapshot(session_id)}
             if parsed is OwnerControlCommand.PAUSE:
                 if session.stop_latched:
                     return {"status": "STOPPED", "session": self.snapshot(session_id)}
                 if not session.pause_latched:
-                    self._persist_event(
-                        session_id,
-                        provenance=AgentProvenance.OWNER,
-                        kind="OWNER_PAUSE",
-                        state_after=AgentOperationalState.PAUSED,
+                    self._cancel_inflight(session_id)
+                    target = replace(
+                        session,
+                        operational_state=AgentOperationalState.PAUSED,
                         pause_latched=True,
                     )
+                    owner_event = AgentEvent.new(
+                        session_id=session_id,
+                        run_id=session.current_run_id,
+                        provenance=AgentProvenance.OWNER,
+                        kind="OWNER_PAUSE",
+                        state_before=session.operational_state.value,
+                        state_after=AgentOperationalState.PAUSED.value,
+                        observed_epoch_ms=self._now_epoch_ms(),
+                    )
+                    persisted: list[AgentSessionRecord] = []
+
+                    def persist_pause() -> None:
+                        durable, _ = self.store.atomic_agent_transition(
+                            target,
+                            owner_event,
+                            operation="agent_owner_pause",
+                        )
+                        persisted.append(durable)
+
+                    if session.current_run_id in self.control.runs:
+                        self.control.pause_run(session.current_run_id, durable_hook=persist_pause)
+                    else:
+                        persist_pause()
+                    self._sessions[session_id] = persisted[-1]
                 return {"status": "PAUSED", "session": self.snapshot(session_id)}
 
             global_state = self.control.control_state
@@ -481,9 +890,15 @@ class AgentSessionCoordinator:
         action: NamedAgentAction,
         receipt: AgentActionReceipt,
     ) -> AgentActionReceipt:
-        state = self.ensure_session(session_id).operational_state
+        durable = self.store.load_agent_session(session_id)
+        state = (
+            self.ensure_session(session_id).operational_state
+            if durable is None
+            else durable.operational_state
+        )
         if receipt.status == "PERFORMED_UNKNOWN":
-            state = AgentOperationalState.PAUSED_AUTHORITY
+            if durable is None or not durable.stop_latched and not durable.pause_latched:
+                state = AgentOperationalState.PAUSED_AUTHORITY
             self._inconclusive.add(session_id)
         self._persist_event(
             session_id,
@@ -501,11 +916,26 @@ class AgentSessionCoordinator:
             },
         )
         self._receipts[(session_id, receipt.action_id)] = receipt
-        if receipt.performed:
-            self._action_counts[session_id] = self._action_counts.get(session_id, 0) + 1
         refs = self._evidence_refs.setdefault(session_id, [])
         refs.extend(ref for ref in receipt.evidence_refs if ref not in refs)
+        self._hydrate_authoritative_actions(session_id, self._tasks.get(session_id))
         return receipt
+
+    def _final_commit_guard(self, session_id: str, request: AgentActionRequest) -> str | None:
+        durable = self.store.load_agent_session(session_id)
+        if durable is None:
+            return "SESSION_STATE_MISSING"
+        if durable.stop_latched or durable.operational_state is AgentOperationalState.STOPPED:
+            return "OWNER_STOPPED"
+        if durable.pause_latched or durable.operational_state is AgentOperationalState.PAUSED:
+            return "OWNER_PAUSED"
+        if durable.operational_state is not AgentOperationalState.RUNNING:
+            return "SESSION_NOT_RUNNING"
+        if self._now_epoch_ms() >= request.deadline_epoch_ms:
+            return "AGENT_DEADLINE_EXPIRED"
+        if not self.control.mutation_admission_allowed():
+            return "SYSTEM_MUTATION_BLOCKED"
+        return None
 
     def propose_named_action(
         self,
@@ -526,14 +956,55 @@ class AgentSessionCoordinator:
             raise ValidationError("INVALID_SOURCE_STATES", "expected source states must be a tuple of non-empty strings")
         if not isinstance(current_state, str) or not current_state:
             raise ValidationError("INVALID_SOURCE_STATE", "current source state is invalid")
+        guarded_request: AgentActionRequest | None = None
+        token: CancellationToken | None = None
+        known_action_pending = False
         with self._lock:
-            duplicate = self._receipts.get((session_id, action_id))
-            if duplicate is not None:
-                return duplicate
             session = self.ensure_session(session_id)
             task = self._tasks.get(session_id)
             if task is None:
                 return self._refuse_action(session_id, action_id, action, provenance, "REFUSED_TASK_MISSING")
+            if (
+                self.guarded_executor is not None
+                and action is not NamedAgentAction.SCREENSHOT
+                and provenance is AgentProvenance.SUPERVISOR
+            ):
+                durable_budget = self.store.load_budget(task.run_id)
+                early_remaining = (
+                    task.physical_action_budget
+                    if durable_budget is None
+                    else durable_budget.dimensions["max_actions"].available()
+                )
+                early_request = AgentActionRequest(
+                    action_id=action_id,
+                    session_id=session_id,
+                    run_id=task.run_id,
+                    action=action,
+                    expected_source_states=expected_source_states,
+                    remaining_budget=early_remaining,
+                    deadline_epoch_ms=task.deadline_epoch_ms,
+                    secret_capability_ref=task.secret_capability_ref,
+                )
+                early_hash = self.guarded_executor.canonical_request_hash(early_request)
+                durable_action = self.store.load_action(action_id)
+                if durable_action is not None:
+                    if durable_action.action_request_hash != early_hash:
+                        return self._refuse_action(
+                            session_id,
+                            action_id,
+                            action,
+                            provenance,
+                            "REFUSED_IDEMPOTENCY_CONFLICT",
+                        )
+                    if durable_action.terminal or (
+                        durable_action.dispatch_state != DispatchState.NOT_DISPATCHED
+                        and not self.control.mutation_execution_lock.locked()
+                    ):
+                        receipt = self._receipt_from_ledger(durable_action)
+                        self._receipts[(session_id, action_id)] = receipt
+                        self._hydrate_authoritative_actions(session_id, task)
+                        return receipt
+                    known_action_pending = True
             if action is not NamedAgentAction.SCREENSHOT:
                 # SYSTEM/global state always precedes local owner/session state,
                 # regardless of which lower-authority actor made the proposal.
@@ -568,11 +1039,17 @@ class AgentSessionCoordinator:
                 return AgentActionReceipt(action_id, str(capture["status"]), False, True, 0, refs)
             if expected_source_states and current_state not in expected_source_states:
                 return self._refuse_action(session_id, action_id, action, provenance, "REFUSED_SOURCE_STATE_MISMATCH")
-            count = self._action_counts.get(session_id, 0)
-            if count >= task.physical_action_budget:
+            ledger = self.store.load_budget(task.run_id)
+            actions = self.store.list_actions_for_run(task.run_id)
+            if ledger is None:
+                remaining = task.physical_action_budget
+            else:
+                dimension = ledger.dimensions["max_actions"]
+                remaining = dimension.available()
+            if remaining <= 0 and not known_action_pending:
                 return self._refuse_action(session_id, action_id, action, provenance, "REFUSED_BUDGET_EXHAUSTED")
-            attempts = self._attempts.get(session_id, 0)
-            if attempts >= task.max_attempts:
+            attempts = len(actions)
+            if attempts >= task.max_attempts and not known_action_pending:
                 return self._refuse_action(session_id, action_id, action, provenance, "REFUSED_ATTEMPTS_EXHAUSTED")
             if self._now_epoch_ms() >= task.deadline_epoch_ms:
                 return self._refuse_action(session_id, action_id, action, provenance, "REFUSED_DEADLINE_EXPIRED")
@@ -583,33 +1060,70 @@ class AgentSessionCoordinator:
                 run_id=task.run_id,
                 action=action,
                 expected_source_states=expected_source_states,
-                remaining_budget=task.physical_action_budget - count,
+                remaining_budget=remaining,
                 deadline_epoch_ms=task.deadline_epoch_ms,
                 secret_capability_ref=task.secret_capability_ref,
             )
-            self._persist_event(
-                session_id,
-                provenance=AgentProvenance.SUPERVISOR,
-                kind="ACTION_RESERVED",
-                action_id=action_id,
-                payload={
-                    "action": action.value,
-                    "remaining_budget": request.remaining_budget,
-                    "attempt_index": attempts + 1,
-                },
-            )
-            self._attempts[session_id] = attempts + 1
-            # The safety state is checked again immediately before crossing the
-            # executor boundary, while this coordinator's serialization lock is held.
-            if not self.control.mutation_admission_allowed():
-                return self._record_action_receipt(
-                    session_id, action, self._zero_receipt(action_id, "NOT_PERFORMED_SYSTEM_STATE_CHANGED")
-                )
-            try:
+            if self.guarded_executor is None:
+                if type(self.executor) is not NullBoundedActionExecutor:
+                    return self._refuse_action(
+                        session_id,
+                        action_id,
+                        action,
+                        provenance,
+                        "REFUSED_EXECUTOR_UNGUARDED",
+                    )
                 received = self.executor.execute(request)
-            except Exception:  # noqa: BLE001 -- exception occurred before any receipt/effect claim
-                received = AgentActionReceipt(action_id, "NOT_PERFORMED", False, True, 0, ())
-            receipt = self._validated_receipt(action_id, received)
+                return self._record_action_receipt(
+                    session_id,
+                    action,
+                    self._validated_receipt(action_id, received),
+                )
+            expected_hash = self.guarded_executor.canonical_request_hash(request)
+            durable_action = self.store.load_action(action_id)
+            if durable_action is not None:
+                if durable_action.action_request_hash != expected_hash:
+                    return self._refuse_action(
+                        session_id,
+                        action_id,
+                        action,
+                        provenance,
+                        "REFUSED_IDEMPOTENCY_CONFLICT",
+                    )
+                if durable_action.terminal or (
+                    durable_action.dispatch_state != DispatchState.NOT_DISPATCHED
+                    and not self.control.mutation_execution_lock.locked()
+                ):
+                    receipt = self._receipt_from_ledger(durable_action)
+                    self._receipts[(session_id, action_id)] = receipt
+                    self._hydrate_authoritative_actions(session_id, task)
+                    return receipt
+            token = CancellationToken()
+            self._inflight[(session_id, action_id)] = token
+            guarded_request = request
+
+        if guarded_request is None or token is None or self.guarded_executor is None:
+            raise RuntimeError("guarded action preparation failed")
+        try:
+            receipt = self.guarded_executor.execute_guarded(
+                guarded_request,
+                token=token,
+                final_commit_check=lambda: self._final_commit_guard(session_id, guarded_request),
+            )
+        except Exception:  # noqa: BLE001 -- durable dispatch state decides replay safety
+            durable_action = self.store.load_action(action_id)
+            receipt = (
+                self._zero_receipt(action_id, "NOT_PERFORMED")
+                if durable_action is None
+                else self._receipt_from_ledger(durable_action)
+            )
+        with self._lock:
+            if self._inflight.get((session_id, action_id)) is token:
+                self._inflight.pop((session_id, action_id), None)
+            durable_action = self.store.load_action(action_id)
+            if durable_action is not None:
+                receipt = self._receipt_from_ledger(durable_action)
+            receipt = self._validated_receipt(action_id, receipt)
             return self._record_action_receipt(session_id, action, receipt)
 
     @staticmethod
@@ -699,6 +1213,15 @@ class AgentSessionCoordinator:
             task = self._tasks.get(session_id)
             if task is None:
                 raise ValidationError("AGENT_TASK_MISSING", "cannot complete a missing agent task")
+            self._hydrate_authoritative_actions(session_id, task)
+            ledger = self.store.load_budget(task.run_id)
+            if ledger is None:
+                authoritative_count = 0
+                authoritative_budget = task.physical_action_budget
+            else:
+                dimension = ledger.dimensions["max_actions"]
+                authoritative_count = dimension.at_risk + dimension.committed + dimension.uncertain
+                authoritative_budget = dimension.limit
             if result is None:
                 try:
                     parsed_status = status if isinstance(status, ResultStatus) else ResultStatus(status)
@@ -715,30 +1238,44 @@ class AgentSessionCoordinator:
                     status=parsed_status,
                     trusted_main_sha=task.trusted_main_sha,
                     final_state=final_state,
-                    action_count=self._action_counts.get(session_id, 0),
-                    physical_action_budget=task.physical_action_budget,
+                    action_count=authoritative_count,
+                    physical_action_budget=authoritative_budget,
                     evidence_manifest_sha256=evidence_manifest_sha256,
                     unresolved_conflicts=tuple(unresolved_conflicts),
                 )
             if type(result) is not ResultEnvelope:
                 raise ValidationError("INVALID_RESULT", "result must be an exact ResultEnvelope")
+            if (
+                result.session_id != session_id
+                or result.run_id != task.run_id
+                or result.trusted_main_sha != task.trusted_main_sha
+            ):
+                raise ValidationError("TASK_RESULT_MISMATCH", "agent result does not match accepted task")
+            if (
+                result.action_count != authoritative_count
+                or result.physical_action_budget != authoritative_budget
+            ):
+                raise ValidationError("RESULT_COUNTER_MISMATCH", "agent result counters must match authoritative ledgers")
             if session_id in self._inconclusive:
                 conflicts = tuple(result.unresolved_conflicts)
                 if "PERFORMED_UNKNOWN" not in conflicts:
                     conflicts += ("PERFORMED_UNKNOWN",)
                 result = replace(result, status=ResultStatus.INCONCLUSIVE, unresolved_conflicts=conflicts)
             existing = self._results.get(session_id)
-            self.store.finish_agent_task(task.idempotency_key, result)
             if existing is not None:
                 if existing != result:
                     raise ValidationError("IDEMPOTENCY_CONFLICT", "agent task result is already bound")
                 return existing
-            self._results[session_id] = result
-            self._persist_event(
-                session_id,
+            session = self.ensure_session(session_id)
+            terminal = replace(session, operational_state=AgentOperationalState.TERMINAL)
+            event = AgentEvent.new(
+                session_id=session_id,
+                run_id=task.run_id,
                 provenance=AgentProvenance.SYSTEM,
                 kind="RUN_COMPLETED",
-                state_after=AgentOperationalState.TERMINAL,
+                state_before=session.operational_state.value,
+                state_after=AgentOperationalState.TERMINAL.value,
+                observed_epoch_ms=self._now_epoch_ms(),
                 artifact_refs=(result.evidence_manifest_sha256,),
                 payload={
                     "status": result.status.value,
@@ -747,6 +1284,17 @@ class AgentSessionCoordinator:
                     "unresolved_conflicts": result.unresolved_conflicts,
                 },
             )
+            self.store.finish_agent_task_transition(
+                task.idempotency_key,
+                result,
+                terminal,
+                event,
+            )
+            self._results[session_id] = result
+            durable = self.store.load_agent_session(session_id)
+            if durable is None:
+                raise ValidationError("PERSISTENT_STATE_CORRUPT", "completed result is missing its session")
+            self._sessions[session_id] = durable
             return result
 
     def snapshot(self, session_id: str) -> dict[str, object]:
@@ -754,6 +1302,12 @@ class AgentSessionCoordinator:
             session = self.ensure_session(session_id)
             task = self._tasks.get(session_id)
             result = self._results.get(session_id)
+            self._hydrate_authoritative_actions(session_id, task)
+            ledger = None if task is None else self.store.load_budget(task.run_id)
+            if ledger is None:
+                remaining_budget = 0 if task is None else task.physical_action_budget
+            else:
+                remaining_budget = ledger.dimensions["max_actions"].available()
             events = self._events_for(session_id)
             return {
                 "session_id": session.session_id,
@@ -769,9 +1323,7 @@ class AgentSessionCoordinator:
                 "allowed_actions": [] if task is None else [action.value for action in task.allowed_actions],
                 "physical_action_budget": 0 if task is None else task.physical_action_budget,
                 "physical_action_count": self._action_counts.get(session_id, 0),
-                "remaining_physical_action_budget": 0 if task is None else max(
-                    0, task.physical_action_budget - self._action_counts.get(session_id, 0)
-                ),
+                "remaining_physical_action_budget": remaining_budget,
                 "attempt_count": self._attempts.get(session_id, 0),
                 "max_attempts": 0 if task is None else task.max_attempts,
                 "run_status": "INCONCLUSIVE" if session_id in self._inconclusive else (
@@ -780,7 +1332,7 @@ class AgentSessionCoordinator:
                 "result": None if result is None else _jsonable(asdict(result)),
                 "evidence_refs": list(self._evidence_refs.get(session_id, [])),
                 "events": events,
-                "executor": "NULL" if isinstance(self.executor, NullBoundedActionExecutor) else "INJECTED_TEST",
+                "executor": "NULL" if type(self.executor) is NullBoundedActionExecutor else "INJECTED_TEST",
                 "mutation_authority": "NONE",
                 "official_client_access": "NONE",
             }
@@ -790,7 +1342,7 @@ class AgentSessionCoordinator:
         return {
             "state": "FOUNDATION",
             "runtime_access": "none",
-            "executor": "NULL" if isinstance(self.executor, NullBoundedActionExecutor) else "INJECTED_TEST",
+            "executor": "NULL" if type(self.executor) is NullBoundedActionExecutor else "INJECTED_TEST",
             "mutation_authority": "NONE",
             "official_client_access": "NONE",
             "physical_action_budget": 0,

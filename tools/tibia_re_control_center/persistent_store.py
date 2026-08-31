@@ -8,7 +8,7 @@ import sqlite3
 import threading
 from collections.abc import Mapping
 from contextlib import contextmanager
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from enum import Enum
 from pathlib import Path
 from types import MappingProxyType
@@ -454,6 +454,47 @@ class SQLitePersistentStore:
                 self._db.execute("ROLLBACK")
                 raise
 
+    def _write_control_state_locked(self, state: ControlState) -> None:
+        body = _dump(asdict(state))
+        self._db.execute(
+            "INSERT INTO control_state(singleton,body) VALUES(1,?) "
+            "ON CONFLICT(singleton) DO UPDATE SET body=excluded.body",
+            (body,),
+        )
+        self._db.execute(
+            "INSERT INTO control_history(transition_id,body) VALUES(?,?) "
+            "ON CONFLICT(transition_id) DO NOTHING",
+            (state.transition_id, body),
+        )
+        self._db.execute(
+            "INSERT INTO meta(key,value) VALUES('initialized','1') "
+            "ON CONFLICT(key) DO UPDATE SET value='1'"
+        )
+
+    def _write_agent_session_locked(self, record: AgentSessionRecord) -> None:
+        self._db.execute(
+            "INSERT INTO agent_sessions(session_id,body) VALUES(?,?) "
+            "ON CONFLICT(session_id) DO UPDATE SET body=excluded.body",
+            (record.session_id, _dump(_agent_session_obj(record))),
+        )
+
+    def _append_agent_event_locked(self, event: AgentEvent) -> AgentEvent:
+        cursor = self._db.execute("INSERT INTO events(run_id,body) VALUES(?,?)", (event.run_id, "{}"))
+        seq = int(cursor.lastrowid)
+        if seq <= 0:
+            raise DurabilityError("agent event sequence was not committed")
+        self._before_write("agent_event_body")
+        body = _dump(_agent_event_obj(event, seq=seq))
+        cursor = self._db.execute("UPDATE events SET body=? WHERE seq=?", (body, seq))
+        if cursor.rowcount != 1:
+            raise DurabilityError("agent event body update did not persist")
+        row = self._db.execute("SELECT MAX(seq) FROM events").fetchone()
+        maximum = 0 if row is None or row[0] is None else int(row[0])
+        cutoff = maximum - self.event_retention
+        if cutoff > 0:
+            self._db.execute("DELETE FROM events WHERE seq<=?", (cutoff,))
+        return _agent_event_from(_load(body))
+
     def _fetchone(self, query: str, parameters: tuple[Any, ...] = ()) -> Any:
         with self._lock:
             return self._db.execute(query, parameters).fetchone()
@@ -497,11 +538,8 @@ class SQLitePersistentStore:
         return copy.deepcopy(state)
 
     def write_control_state(self, state: ControlState, *, operation: str = "control_state") -> None:
-        body = _dump(asdict(state))
         with self._transaction(operation):
-            self._db.execute("INSERT INTO control_state(singleton,body) VALUES(1,?) ON CONFLICT(singleton) DO UPDATE SET body=excluded.body", (body,))
-            self._db.execute("INSERT INTO control_history(transition_id,body) VALUES(?,?) ON CONFLICT(transition_id) DO NOTHING", (state.transition_id, body))
-            self._db.execute("INSERT INTO meta(key,value) VALUES('initialized','1') ON CONFLICT(key) DO UPDATE SET value='1'")
+            self._write_control_state_locked(state)
         self.initialized = True
         self.control_state = copy.deepcopy(state)
 
@@ -524,6 +562,56 @@ class SQLitePersistentStore:
         with self._transaction(operation):
             self._db.execute("INSERT INTO actions(action_id,request_hash,run_id,body) VALUES(?,?,?,?) ON CONFLICT(action_id) DO UPDATE SET body=excluded.body", (record.action_id, record.action_request_hash, record.run_id, body))
         self.action_ledgers[record.action_id] = copy.deepcopy(record)
+
+    def list_actions_for_run(self, run_id: str) -> list[ActionLedgerRecord]:
+        return [
+            _action_from(_load(row[0]))
+            for row in self._fetchall("SELECT body FROM actions WHERE run_id=? ORDER BY rowid", (run_id,))
+        ]
+
+    def atomic_reserve_action(
+        self,
+        record: ActionLedgerRecord,
+        previous_ledger: BudgetLedger,
+        reserved_ledger: BudgetLedger,
+    ) -> tuple[ActionLedgerRecord, BudgetLedger, bool]:
+        action_body = _dump(asdict(record))
+        reserved_budget_body = _dump(_budget_obj(reserved_ledger))
+        previous_budget_body = _dump(_budget_obj(previous_ledger))
+        accepted = False
+        durable_record = record
+        durable_budget = reserved_ledger
+        with self._transaction("action_reserve"):
+            row = self._db.execute(
+                "SELECT request_hash,run_id,body FROM actions WHERE action_id=?",
+                (record.action_id,),
+            ).fetchone()
+            if row is not None:
+                durable_record = _action_from(_load(row[2]))
+                if row[0] != record.action_request_hash or durable_record.action_request_hash != record.action_request_hash:
+                    raise ValidationError("IDEMPOTENCY_CONFLICT", "action_id already exists with a different request hash")
+                budget_row = self._db.execute("SELECT body FROM budgets WHERE run_id=?", (row[1],)).fetchone()
+                if budget_row is None:
+                    raise ValidationError("BUDGET_LEDGER_MISSING", "action reservation requires its durable budget")
+                durable_budget = _budget_from(_load(budget_row[0]))
+            else:
+                budget_row = self._db.execute(
+                    "SELECT body FROM budgets WHERE run_id=?", (previous_ledger.run_id,)
+                ).fetchone()
+                if budget_row is None or budget_row[0] != previous_budget_body:
+                    raise ValidationError("BUDGET_LEDGER_STALE", "action reservation budget changed concurrently")
+                self._db.execute(
+                    "INSERT INTO actions(action_id,request_hash,run_id,body) VALUES(?,?,?,?)",
+                    (record.action_id, record.action_request_hash, record.run_id, action_body),
+                )
+                self._db.execute(
+                    "UPDATE budgets SET body=? WHERE run_id=?",
+                    (reserved_budget_body, reserved_ledger.run_id),
+                )
+                accepted = True
+        self.action_ledgers[durable_record.action_id] = copy.deepcopy(durable_record)
+        self.budget_ledgers[durable_budget.run_id] = durable_budget.clone()
+        return durable_record, durable_budget, accepted
 
     def _load_budgets(self) -> dict[str, BudgetLedger]:
         return {row[0]: _budget_from(_load(row[1])) for row in self._fetchall("SELECT run_id,body FROM budgets")}
@@ -574,14 +662,30 @@ class SQLitePersistentStore:
         row = self._fetchone("SELECT body FROM recovery WHERE run_id=?", (run_id,))
         return None if row is None else _load(row[0])
 
-    def atomic_dispatch_commit(self, record: ActionLedgerRecord, ledger: BudgetLedger) -> None:
+    def atomic_dispatch_commit(self, record: ActionLedgerRecord, ledger: BudgetLedger) -> bool:
         action_body = _dump(asdict(record))
         budget_body = _dump(_budget_obj(ledger))
+        committed = False
         with self._transaction("dispatch_commit"):
-            self._db.execute("INSERT INTO actions(action_id,request_hash,run_id,body) VALUES(?,?,?,?) ON CONFLICT(action_id) DO UPDATE SET body=excluded.body", (record.action_id, record.action_request_hash, record.run_id, action_body))
-            self._db.execute("INSERT INTO budgets(run_id,body) VALUES(?,?) ON CONFLICT(run_id) DO UPDATE SET body=excluded.body", (ledger.run_id, budget_body))
-        self.action_ledgers[record.action_id] = copy.deepcopy(record)
-        self.budget_ledgers[ledger.run_id] = ledger.clone()
+            row = self._db.execute(
+                "SELECT request_hash,body FROM actions WHERE action_id=?", (record.action_id,)
+            ).fetchone()
+            if row is None:
+                raise ValidationError("ACTION_LEDGER_MISSING", "dispatch commit requires a durable reservation")
+            current = _action_from(_load(row[1]))
+            if row[0] != record.action_request_hash or current.action_request_hash != record.action_request_hash:
+                raise ValidationError("IDEMPOTENCY_CONFLICT", "action_id already exists with a different request hash")
+            if current.dispatch_state == DispatchState.NOT_DISPATCHED:
+                self._db.execute("UPDATE actions SET body=? WHERE action_id=?", (action_body, record.action_id))
+                self._db.execute(
+                    "INSERT INTO budgets(run_id,body) VALUES(?,?) ON CONFLICT(run_id) DO UPDATE SET body=excluded.body",
+                    (ledger.run_id, budget_body),
+                )
+                committed = True
+        if committed:
+            self.action_ledgers[record.action_id] = copy.deepcopy(record)
+            self.budget_ledgers[ledger.run_id] = ledger.clone()
+        return committed
 
     def atomic_reconcile(self, record: ActionLedgerRecord, ledger: BudgetLedger) -> None:
         if self.load_action(record.action_id) is None:
@@ -660,13 +764,8 @@ class SQLitePersistentStore:
         validated = _validated_agent_session_record(record)
         body_obj = _agent_session_obj(validated)
         _ensure_persistable(body_obj, key_path="agent_session")
-        body = _dump(body_obj)
         with self._transaction("agent_session"):
-            self._db.execute(
-                "INSERT INTO agent_sessions(session_id,body) VALUES(?,?) "
-                "ON CONFLICT(session_id) DO UPDATE SET body=excluded.body",
-                (validated.session_id, body),
-            )
+            self._write_agent_session_locked(validated)
 
     def load_agent_session(self, session_id: str) -> AgentSessionRecord | None:
         row = self._fetchone(
@@ -674,12 +773,62 @@ class SQLitePersistentStore:
         )
         return None if row is None else _checked_agent_session(row, session_id)
 
+    def atomic_agent_transition(
+        self,
+        record: AgentSessionRecord,
+        event: AgentEvent,
+        *,
+        operation: str,
+        control_state: ControlState | None = None,
+    ) -> tuple[AgentSessionRecord, AgentEvent]:
+        validated_record = _validated_agent_session_record(record)
+        validated_event = _validated_agent_event(event)
+        if validated_event.session_id != validated_record.session_id:
+            raise ValidationError("AGENT_TRANSITION_MISMATCH", "agent event and session identities differ")
+        if validated_event.state_after != validated_record.operational_state.value:
+            raise ValidationError("AGENT_TRANSITION_MISMATCH", "agent event and session state differ")
+        with self._transaction(operation):
+            persisted = self._append_agent_event_locked(validated_event)
+            durable_record = replace(validated_record, last_event_seq=persisted.seq)
+            self._write_agent_session_locked(durable_record)
+            if control_state is not None:
+                self._write_control_state_locked(control_state)
+        if control_state is not None:
+            self.initialized = True
+            self.control_state = copy.deepcopy(control_state)
+        return durable_record, persisted
+
     def _agent_task_values(self, row: Any, idempotency_key: str) -> dict[str, object]:
         _, canonical_envelope, _, canonical_result = _checked_agent_task_row(row, idempotency_key)
         return {
             "envelope": _jsonable(canonical_envelope),
             "result": None if canonical_result is None else _jsonable(canonical_result),
         }
+
+    def _validate_agent_result_counters_locked(
+        self,
+        task: TaskEnvelope,
+        result: ResultEnvelope,
+    ) -> None:
+        budget_row = self._db.execute("SELECT body FROM budgets WHERE run_id=?", (task.run_id,)).fetchone()
+        action_row = self._db.execute("SELECT COUNT(*) FROM actions WHERE run_id=?", (task.run_id,)).fetchone()
+        action_rows = 0 if action_row is None else int(action_row[0])
+        if budget_row is None:
+            if action_rows:
+                raise ValidationError("PERSISTENT_STATE_CORRUPT", "agent actions exist without their budget ledger")
+            authoritative_count = 0
+            authoritative_budget = task.physical_action_budget
+        else:
+            ledger = _budget_from(_load(budget_row[0]))
+            dimension = ledger.dimensions.get("max_actions")
+            if dimension is None:
+                raise ValidationError("PERSISTENT_STATE_CORRUPT", "agent budget lacks max_actions")
+            authoritative_count = dimension.at_risk + dimension.committed + dimension.uncertain
+            authoritative_budget = dimension.limit
+            if authoritative_budget != task.physical_action_budget:
+                raise ValidationError("PERSISTENT_STATE_CORRUPT", "agent task budget contradicts action ledger")
+        if result.action_count != authoritative_count or result.physical_action_budget != authoritative_budget:
+            raise ValidationError("RESULT_COUNTER_MISMATCH", "agent result counters must match authoritative ledgers")
 
     def accept_agent_task(self, envelope: TaskEnvelope) -> dict[str, object]:
         parsed, canonical_envelope = _canonical_task(envelope)
@@ -710,12 +859,66 @@ class SQLitePersistentStore:
         row = (parsed.idempotency_key, parsed.session_id, parsed.run_id, envelope_hash, body, None)
         return {"accepted_new": True, **self._agent_task_values(row, parsed.idempotency_key)}
 
+    def accept_agent_task_transition(
+        self,
+        envelope: TaskEnvelope,
+        record: AgentSessionRecord,
+        event: AgentEvent,
+    ) -> dict[str, object]:
+        parsed, canonical_envelope = _canonical_task(envelope)
+        validated_record = _validated_agent_session_record(record)
+        validated_event = _validated_agent_event(event)
+        if (
+            parsed.session_id != validated_record.session_id
+            or parsed.run_id != validated_record.current_run_id
+            or validated_event.session_id != parsed.session_id
+            or validated_event.run_id != parsed.run_id
+            or validated_event.state_after != validated_record.operational_state.value
+        ):
+            raise ValidationError("AGENT_TRANSITION_MISMATCH", "task, event, and session transition differ")
+        _ensure_persistable(canonical_envelope, key_path="agent_task")
+        body = _dump(canonical_envelope)
+        envelope_hash = hashlib.sha256(body.encode("utf-8")).hexdigest()
+        with self._transaction("agent_task_accept_transition"):
+            row = self._db.execute(
+                "SELECT idempotency_key,session_id,run_id,envelope_hash,body,result "
+                "FROM agent_tasks WHERE idempotency_key=?",
+                (parsed.idempotency_key,),
+            ).fetchone()
+            if row is not None:
+                self._agent_task_values(row, parsed.idempotency_key)
+                if row[3] != envelope_hash or row[4] != body:
+                    raise ValidationError("IDEMPOTENCY_CONFLICT", "agent task idempotency key is already bound")
+                return {"accepted_new": False, **self._agent_task_values(row, parsed.idempotency_key)}
+            run_row = self._db.execute(
+                "SELECT idempotency_key FROM agent_tasks WHERE run_id=?", (parsed.run_id,)
+            ).fetchone()
+            if run_row is not None:
+                raise ValidationError("IDEMPOTENCY_CONFLICT", "agent task run is already bound")
+            self._db.execute(
+                "INSERT INTO agent_tasks(idempotency_key,session_id,run_id,envelope_hash,body,result) "
+                "VALUES(?,?,?,?,?,NULL)",
+                (parsed.idempotency_key, parsed.session_id, parsed.run_id, envelope_hash, body),
+            )
+            persisted = self._append_agent_event_locked(validated_event)
+            self._write_agent_session_locked(replace(validated_record, last_event_seq=persisted.seq))
+        row = (parsed.idempotency_key, parsed.session_id, parsed.run_id, envelope_hash, body, None)
+        return {"accepted_new": True, **self._agent_task_values(row, parsed.idempotency_key)}
+
     def load_agent_task(self, idempotency_key: str) -> dict[str, object] | None:
         row = self._fetchone(
             "SELECT idempotency_key,session_id,run_id,envelope_hash,body,result "
             "FROM agent_tasks WHERE idempotency_key=?", (idempotency_key,)
         )
         return None if row is None else self._agent_task_values(row, idempotency_key)
+
+    def load_agent_task_for_session(self, session_id: str) -> dict[str, object] | None:
+        row = self._fetchone(
+            "SELECT idempotency_key,session_id,run_id,envelope_hash,body,result "
+            "FROM agent_tasks WHERE session_id=? ORDER BY rowid DESC LIMIT 1",
+            (session_id,),
+        )
+        return None if row is None else self._agent_task_values(row, row[0])
 
     def finish_agent_task(self, idempotency_key: str, result: ResultEnvelope) -> None:
         canonical_result = _canonical_result(result)
@@ -732,6 +935,7 @@ class SQLitePersistentStore:
             if (result.session_id != task.session_id or result.run_id != task.run_id
                     or result.trusted_main_sha != task.trusted_main_sha):
                 raise ValidationError("TASK_RESULT_MISMATCH", "agent result does not match accepted task")
+            self._validate_agent_result_counters_locked(task, result)
             if row[5] is None:
                 self._db.execute(
                     "UPDATE agent_tasks SET result=? WHERE idempotency_key=?",
@@ -740,26 +944,56 @@ class SQLitePersistentStore:
             elif row[5] != result_body:
                 raise ValidationError("IDEMPOTENCY_CONFLICT", "agent task result is already bound")
 
+    def finish_agent_task_transition(
+        self,
+        idempotency_key: str,
+        result: ResultEnvelope,
+        record: AgentSessionRecord,
+        event: AgentEvent,
+    ) -> None:
+        canonical_result = _canonical_result(result)
+        validated_record = _validated_agent_session_record(record)
+        validated_event = _validated_agent_event(event)
+        _ensure_persistable(canonical_result, key_path="agent_result")
+        result_body = _dump(canonical_result)
+        if (
+            validated_record.session_id != result.session_id
+            or validated_record.current_run_id != result.run_id
+            or validated_event.session_id != result.session_id
+            or validated_event.run_id != result.run_id
+            or validated_event.state_after != validated_record.operational_state.value
+        ):
+            raise ValidationError("AGENT_TRANSITION_MISMATCH", "result, event, and session transition differ")
+        with self._transaction("agent_task_finish_transition"):
+            row = self._db.execute(
+                "SELECT idempotency_key,session_id,run_id,envelope_hash,body,result "
+                "FROM agent_tasks WHERE idempotency_key=?", (idempotency_key,)
+            ).fetchone()
+            if row is None:
+                raise ValidationError("AGENT_TASK_MISSING", "cannot finish an unknown agent task")
+            task, _, _, _ = _checked_agent_task_row(row, idempotency_key)
+            if (
+                result.session_id != task.session_id
+                or result.run_id != task.run_id
+                or result.trusted_main_sha != task.trusted_main_sha
+            ):
+                raise ValidationError("TASK_RESULT_MISMATCH", "agent result does not match accepted task")
+            self._validate_agent_result_counters_locked(task, result)
+            if row[5] is not None:
+                if row[5] != result_body:
+                    raise ValidationError("IDEMPOTENCY_CONFLICT", "agent task result is already bound")
+                return
+            self._db.execute(
+                "UPDATE agent_tasks SET result=? WHERE idempotency_key=?",
+                (result_body, idempotency_key),
+            )
+            persisted = self._append_agent_event_locked(validated_event)
+            self._write_agent_session_locked(replace(validated_record, last_event_seq=persisted.seq))
+
     def append_agent_event(self, event: AgentEvent) -> AgentEvent:
         validated = _validated_agent_event(event)
         with self._transaction("agent_event"):
-            cursor = self._db.execute("INSERT INTO events(run_id,body) VALUES(?,?)", (validated.run_id, "{}"))
-            seq = int(cursor.lastrowid)
-            if seq <= 0:
-                raise DurabilityError("agent event sequence was not committed")
-            self._before_write("agent_event_body")
-            body_obj = _agent_event_obj(validated, seq=seq)
-            body = _dump(body_obj)
-            cursor = self._db.execute("UPDATE events SET body=? WHERE seq=?", (body, seq))
-            if cursor.rowcount != 1:
-                raise DurabilityError("agent event body update did not persist")
-            persisted = _agent_event_from(_load(body))
-            row = self._db.execute("SELECT MAX(seq) FROM events").fetchone()
-            maximum = 0 if row is None or row[0] is None else int(row[0])
-            cutoff = maximum - self.event_retention
-            if cutoff > 0:
-                self._db.execute("DELETE FROM events WHERE seq<=?", (cutoff,))
-        return persisted
+            return self._append_agent_event_locked(validated)
 
     def append_events(self, run_id: str, events: list[dict[str, Any]]) -> None:
         for event in events:

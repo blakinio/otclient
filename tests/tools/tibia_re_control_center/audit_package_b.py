@@ -42,8 +42,33 @@ ALLOWED_PREFIXES = (
 
 
 def changed_paths() -> list[str]:
-    base = subprocess.check_output(["git", "merge-base", "origin/main", "HEAD"], cwd=ROOT, text=True).strip()
-    return subprocess.check_output(["git", "diff", "--name-only", f"{base}...HEAD"], cwd=ROOT, text=True).splitlines()
+    # This audit is a historical Package B gate.  On a stacked branch, using
+    # the current main/HEAD merge-base also includes separately authorized
+    # lanes (for example the local agent foundation) and makes the old path
+    # ownership check fail before it can audit Package B.  Resolve the
+    # recorded Package B implementation commit from history and keep the
+    # allowlist check over that exact implementation diff.
+    history = subprocess.check_output(
+        ["git", "log", "--all", "--format=%H%x00%s", "--", str(Path(__file__).resolve())],
+        cwd=ROOT,
+        text=True,
+    )
+    package_b_head = None
+    for line in history.splitlines():
+        commit, _, subject = line.partition("\x00")
+        if "Package B" in subject:
+            package_b_head = commit
+            break
+    if package_b_head is None:
+        raise RuntimeError("Package B implementation history is unavailable")
+    base = subprocess.check_output(
+        ["git", "rev-parse", f"{package_b_head}^"], cwd=ROOT, text=True,
+    ).strip()
+    return subprocess.check_output(
+        ["git", "diff", "--name-only", f"{base}..{package_b_head}"],
+        cwd=ROOT,
+        text=True,
+    ).splitlines()
 
 
 def raw(

@@ -14,6 +14,13 @@ from typing import Any
 from .artifact import ArtifactStore
 from .agent_protocol import AgentProvenance, OwnerControlCommand, TaskEnvelope
 from .agent_session import AgentSessionCoordinator
+from .agent_vision import (
+    AgentVisionSensor,
+    ModelSlotUnavailable,
+    SecretSafeCapture,
+    VisionObservation,
+    model_slot_wait_reason_code,
+)
 from .canonical import sha256_jcs
 from .engine import ScenarioEngine
 from .execution import MutationCoordinator
@@ -654,6 +661,33 @@ class ControlDomainService:
         if self.store.load_agent_session(session_id) is None:
             raise ControlDomainError("CONTROL_AGENT_SESSION_NOT_FOUND", "agent session was not found", http_status=404)
         return self._safe_agent_snapshot(session_id)
+
+    def observe_agent_vision(
+        self,
+        session_id: str,
+        sensor: AgentVisionSensor,
+        capture: SecretSafeCapture,
+    ) -> VisionObservation:
+        """Run one bounded observation and durably surface ordinary slot waits."""
+        validate_opaque_id(session_id, field_name="session_id")
+        if self.store.load_agent_session(session_id) is None:
+            raise ControlDomainError(
+                "CONTROL_AGENT_SESSION_NOT_FOUND",
+                "agent session was not found",
+                http_status=404,
+            )
+        if type(sensor) is not AgentVisionSensor or type(capture) is not SecretSafeCapture:
+            raise ValidationError(
+                "INVALID_AGENT_VISION_OBSERVATION",
+                "agent vision observation requires the bounded sensor and capture contracts",
+            )
+        try:
+            return sensor.observe(capture)
+        except ModelSlotUnavailable as error:
+            reason_code = model_slot_wait_reason_code(error)
+            if reason_code is not None:
+                self.agent.wait_for_model_slot(session_id, reason_code)
+            raise
 
     def agent_events(self, session_id: str, *, cursor: int, limit: int) -> dict[str, Any]:
         validate_opaque_id(session_id, field_name="session_id")

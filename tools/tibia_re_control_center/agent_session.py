@@ -21,6 +21,7 @@ from .agent_protocol import (
     ResultStatus,
     TaskEnvelope,
 )
+from .agent_vision import ModelSlotUnavailable, model_slot_wait_reason_code
 from .canonical import jcs_dumps
 from .execution import CancellationToken, MutationCoordinator
 from .model import (
@@ -544,6 +545,7 @@ class AgentSessionCoordinator:
                 AgentOperationalState.PAUSED_AUTHORITY,
                 AgentOperationalState.PAUSED,
                 AgentOperationalState.STOPPED,
+                AgentOperationalState.WAITING_MODEL_SLOT,
                 }
             ):
                 target_state = AgentOperationalState.PAUSED_AUTHORITY
@@ -587,6 +589,7 @@ class AgentSessionCoordinator:
         action_id: str | None = None,
         artifact_refs: tuple[str, ...] = (),
         payload: dict[str, object] | None = None,
+        operation: str = "agent_session_event",
     ) -> AgentSessionRecord:
         record = self.ensure_session(session_id)
         durable = self.store.load_agent_session(session_id)
@@ -619,10 +622,54 @@ class AgentSessionCoordinator:
         next_record, _ = self.store.atomic_agent_transition(
             next_record,
             event,
-            operation="agent_session_event",
+            operation=operation,
         )
         self._sessions[session_id] = next_record
         return next_record
+
+    def wait_for_model_slot(
+        self,
+        session_id: str,
+        reason_code: str,
+    ) -> AgentSessionRecord:
+        """Durably record only an admitted model residency/ownership wait."""
+        with self._lock:
+            try:
+                admitted_reason = model_slot_wait_reason_code(
+                    ModelSlotUnavailable(reason_code),
+                )
+            except (TypeError, ValueError):
+                admitted_reason = None
+            if admitted_reason is None:
+                raise ValidationError(
+                    "INVALID_MODEL_SLOT_WAIT_REASON",
+                    "model-slot waiting requires an admitted residency or ownership reason",
+                )
+
+            record = self.ensure_session(session_id)
+            durable = self.store.load_agent_session(session_id)
+            if durable is not None:
+                record = durable
+            if (
+                record.pause_latched
+                or record.stop_latched
+                or record.operational_state in {
+                    AgentOperationalState.PAUSED,
+                    AgentOperationalState.PAUSED_AUTHORITY,
+                    AgentOperationalState.STOPPED,
+                    AgentOperationalState.TERMINAL,
+                    AgentOperationalState.WAITING_MODEL_SLOT,
+                }
+            ):
+                return record
+            return self._persist_event(
+                session_id,
+                provenance=AgentProvenance.SYSTEM,
+                kind="MODEL_SLOT_WAITING",
+                state_after=AgentOperationalState.WAITING_MODEL_SLOT,
+                payload={"reason_code": admitted_reason},
+                operation="agent_model_slot_wait",
+            )
 
     def submit_task(
         self,

@@ -31,18 +31,20 @@ QWEN_NUM_PREDICT = 256
 QWEN_TEMPERATURE = 0
 _UNSET = object()
 _SNAPSHOT_FILESYSTEM_FAILURE = "capture snapshot filesystem failure"
-_MODEL_SLOT_ERROR_CODES = frozenset({
+_MODEL_SLOT_WAIT_REASON_CODES = frozenset({
     "DIFFERENT_RESIDENT_MODEL",
-    "MODEL_DIGEST_MISMATCH",
-    "MODEL_DIGEST_UNAVAILABLE",
-    "MODEL_INFERENCE_FAILED",
     "MODEL_SLOT_NOT_OWNED",
-    "MODEL_SLOT_REENTRANT",
-    "MODEL_UNLOAD_FAILED",
-    "MODEL_UNLOAD_NOT_VERIFIED",
     "MULTIPLE_RESIDENT_MODELS",
     "RESIDENCY_UNKNOWN",
     "TARGET_NOT_OWNED",
+})
+_MODEL_SLOT_ERROR_CODES = _MODEL_SLOT_WAIT_REASON_CODES | frozenset({
+    "MODEL_DIGEST_MISMATCH",
+    "MODEL_DIGEST_UNAVAILABLE",
+    "MODEL_INFERENCE_FAILED",
+    "MODEL_SLOT_REENTRANT",
+    "MODEL_UNLOAD_FAILED",
+    "MODEL_UNLOAD_NOT_VERIFIED",
 })
 
 
@@ -67,6 +69,13 @@ class ModelSlotUnavailable(RuntimeError):
             raise ValueError("model slot error code invalid")
         self.code = code
         super().__init__(code)
+
+
+def model_slot_wait_reason_code(error: BaseException) -> str | None:
+    """Return only admitted residency/ownership reasons for durable waiting."""
+    if type(error) is not ModelSlotUnavailable:
+        return None
+    return error.code if error.code in _MODEL_SLOT_WAIT_REASON_CODES else None
 
 
 @dataclass(frozen=True)

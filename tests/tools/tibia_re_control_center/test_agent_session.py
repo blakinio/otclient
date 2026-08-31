@@ -8,6 +8,7 @@ from pathlib import Path
 
 import tools.tibia_re_control_center.agent_session as agent_session_module
 from tools.tibia_re_control_center.agent_protocol import (
+    AgentOperationalState,
     AgentProvenance,
     ClientIdentity,
     NamedAgentAction,
@@ -593,6 +594,88 @@ class AgentSessionTests(unittest.TestCase):
         self.assertFalse(replay["accepted_new"])
         self.assertEqual("PAUSED_AUTHORITY", self.agent.snapshot("session-1")["operational_state"])
         self.assertEqual("REFUSED_AUTHORITY_RECONCILIATION_REQUIRED", self.propose().status)
+
+    def test_model_slot_wait_is_atomic_bounded_and_survives_restart(self):
+        self.submit()
+        transition = getattr(self.agent, "wait_for_model_slot", None)
+        self.assertIsNotNone(
+            transition,
+            "the persistent session coordinator must own model-slot waiting",
+        )
+        before = self.agent.snapshot("session-1")
+        with self.assertRaises(ValidationError):
+            transition("session-1", "MODEL_DIGEST_MISMATCH")
+        self.assertEqual(before, self.agent.snapshot("session-1"))
+        self.store.inject_fault("agent_model_slot_wait", "error")
+        with self.assertRaises(DurabilityError):
+            transition("session-1", "DIFFERENT_RESIDENT_MODEL")
+        failed = self.agent.snapshot("session-1")
+        self.assertEqual(before["operational_state"], failed["operational_state"])
+        self.assertEqual(before["last_event_seq"], failed["last_event_seq"])
+
+        self.store.clear_faults()
+        waiting = transition("session-1", "DIFFERENT_RESIDENT_MODEL")
+        self.assertEqual(AgentOperationalState.WAITING_MODEL_SLOT, waiting.operational_state)
+        snapshot = self.agent.snapshot("session-1")
+        self.assertEqual("WAITING_MODEL_SLOT", snapshot["operational_state"])
+        event = snapshot["events"][-1]
+        self.assertEqual("SYSTEM", event["provenance"])
+        self.assertEqual("MODEL_SLOT_WAITING", event["kind"])
+        self.assertEqual("RUNNING", event["state_before"])
+        self.assertEqual("WAITING_MODEL_SLOT", event["state_after"])
+        self.assertEqual({"reason_code": "DIFFERENT_RESIDENT_MODEL"}, event["payload"])
+        self.assertEqual(before["pause_latched"], snapshot["pause_latched"])
+        self.assertEqual(before["stop_latched"], snapshot["stop_latched"])
+        self.assertEqual(before["physical_action_budget"], snapshot["physical_action_budget"])
+        self.assertEqual(before["physical_action_count"], snapshot["physical_action_count"])
+
+        self.restart(clean=True)
+        restarted = self.agent.ensure_session("session-1")
+        self.assertEqual(AgentOperationalState.WAITING_MODEL_SLOT, restarted.operational_state)
+        self.assertEqual("MODEL_SLOT_WAITING", self.agent.snapshot("session-1")["events"][-1]["kind"])
+
+    def test_model_slot_wait_never_overwrites_owner_authority_or_terminal_states(self):
+        self.submit()
+        transition = getattr(self.agent, "wait_for_model_slot", None)
+        self.assertIsNotNone(
+            transition,
+            "the persistent session coordinator must own model-slot waiting",
+        )
+
+        self.agent.owner_control("session-1", OwnerControlCommand.PAUSE)
+        self.control.control_state = replace(self.control.control_state, recovery_required=True)
+        before = self.agent.snapshot("session-1")
+        control_before = self.control.control_state
+        paused = transition("session-1", "RESIDENCY_UNKNOWN")
+        self.assertEqual(AgentOperationalState.PAUSED, paused.operational_state)
+        self.assertEqual(before, self.agent.snapshot("session-1"))
+        self.assertEqual(control_before, self.control.control_state)
+
+        self.control.control_state = replace(self.control.control_state, recovery_required=False)
+        resumed = self.agent.owner_control("session-1", OwnerControlCommand.RESUME)
+        self.assertEqual("PAUSED_AUTHORITY", resumed["status"])
+        before = self.agent.snapshot("session-1")
+        authority_paused = transition("session-1", "TARGET_NOT_OWNED")
+        self.assertEqual(AgentOperationalState.PAUSED_AUTHORITY, authority_paused.operational_state)
+        self.assertEqual(before, self.agent.snapshot("session-1"))
+
+        self.agent.owner_control("session-1", OwnerControlCommand.STOP)
+        before = self.agent.snapshot("session-1")
+        stopped = transition("session-1", "MULTIPLE_RESIDENT_MODELS")
+        self.assertEqual(AgentOperationalState.STOPPED, stopped.operational_state)
+        self.assertEqual(before, self.agent.snapshot("session-1"))
+
+        self.agent.owner_control("session-1", OwnerControlCommand.RESUME)
+        self.agent.complete_run(
+            "session-1",
+            status="PASS",
+            final_state="LOGIN_SCREEN",
+            evidence_manifest_sha256="d" * 64,
+        )
+        before = self.agent.snapshot("session-1")
+        terminal = transition("session-1", "MODEL_SLOT_NOT_OWNED")
+        self.assertEqual(AgentOperationalState.TERMINAL, terminal.operational_state)
+        self.assertEqual(before, self.agent.snapshot("session-1"))
 
     def test_resume_refuses_global_recovery_and_in_memory_blocks(self):
         self.submit()

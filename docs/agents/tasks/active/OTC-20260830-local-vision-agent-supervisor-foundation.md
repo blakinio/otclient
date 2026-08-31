@@ -75,8 +75,8 @@ current_environment:
   remote_desktop_commander: offline
   codex_worktree: available
   codex_subagent_dispatch: available
-current_blocker: ARCHITECT_REVIEW_REQUIRED — Task 9 session-owned model-slot transition contract
-next_action: supervising architect rules whether the existing session coordinator receives the narrow scheduler-failure transition required by the approved spec; do not continue Task 9/10 until then
+current_blocker: TASK9_INDEPENDENT_SCOPED_REVIEW_REQUIRED — Architect Ruling C implementation is green but not self-approved
+next_action: independently review the Ruling C diff and Task 9 scenario I; start Task 10 only if that review is clean
 ---
 
 # Local vision-agent supervisor foundation implementation
@@ -239,3 +239,31 @@ Files/interfaces affected: >
   runtime edge or credential interface should expand.
 Current PR/head: "#810 Draft, local ecf12922c125afa42bbceb8423f40b3bfbefd376; remote remains unpushed"
 ```
+
+## Architect Ruling C implementation checkpoint
+
+PR #810 review comment `5065532441` approved the narrow existing-Control-Center
+composition seam. The RED-first implementation now routes exact bounded vision
+observations through `ControlDomainService`, classifies only admitted
+residency/ownership `ModelSlotUnavailable` codes next to the scheduler contract,
+and atomically persists SYSTEM `MODEL_SLOT_WAITING` plus
+`WAITING_MODEL_SLOT` through the existing session/store transaction.
+
+Scenario I now uses the real domain/API/session/store with fake provider
+dependencies. Foreign residency causes no unload, inference, executor call, or
+physical effect; restart preserves the wait. Digest mismatch and inference
+failure are not relabeled. STOPPED, PAUSED, PAUSED_AUTHORITY, and TERMINAL
+remain dominant, and no latch, recovery state, budget, authority, or automatic
+resume is changed.
+
+Fresh implementation evidence: foundation E2E/audit and Package B audit PASS;
+112 relevant session/vision/API tests pass with one platform skip; the complete
+agent suite passes 204 tests with one platform skip; the full Control Center
+passes 457 tests with three platform skips; the frozen benchmark passes 34
+tests; compileall and diff check pass. Complete RED/GREEN evidence is in the
+plan-scoped `task-9-ruling-c-report.md`.
+
+Task 9 remains review-gated. A separate independent scoped re-review must
+approve this diff before Task 10 begins. Authority remains `runtime_access:none`,
+all credential/runtime/effect permissions false, physical budget/count `0/0`,
+and production executor Null/unbound.

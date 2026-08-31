@@ -11,6 +11,7 @@ import traceback
 import unittest
 from unittest.mock import patch
 
+import tools.tibia_re_control_center.agent_vision as agent_vision_module
 from tools.tibia_re_control_center.agent_protocol import AgentVisualState
 from tools.tibia_re_control_center.agent_vision import (
     AgentVisionSensor,
@@ -256,6 +257,29 @@ class ModelSlotSchedulerTests(unittest.TestCase):
             "model slot error code invalid",
             (code_secret,),
         )
+
+    def test_only_residency_and_ownership_failures_are_model_slot_wait_reasons(self):
+        classifier = getattr(agent_vision_module, "model_slot_wait_reason_code", None)
+        self.assertIsNotNone(
+            classifier,
+            "the scheduler error contract must classify durable slot-wait reasons",
+        )
+        cases = {
+            "DIFFERENT_RESIDENT_MODEL": "DIFFERENT_RESIDENT_MODEL",
+            "MULTIPLE_RESIDENT_MODELS": "MULTIPLE_RESIDENT_MODELS",
+            "RESIDENCY_UNKNOWN": "RESIDENCY_UNKNOWN",
+            "TARGET_NOT_OWNED": "TARGET_NOT_OWNED",
+            "MODEL_SLOT_NOT_OWNED": "MODEL_SLOT_NOT_OWNED",
+            "MODEL_DIGEST_MISMATCH": None,
+            "MODEL_DIGEST_UNAVAILABLE": None,
+            "MODEL_INFERENCE_FAILED": None,
+            "MODEL_SLOT_REENTRANT": None,
+            "MODEL_UNLOAD_FAILED": None,
+            "MODEL_UNLOAD_NOT_VERIFIED": None,
+        }
+        for code, expected in cases.items():
+            with self.subTest(code=code):
+                self.assertEqual(expected, classifier(ModelSlotUnavailable(code)))
 
     def test_zero_keep_alive_success_reconciles_empty(self):
         resident = [[]]

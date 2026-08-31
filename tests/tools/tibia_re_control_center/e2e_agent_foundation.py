@@ -353,6 +353,21 @@ def _vision(root: Path, screen_class: str, *, run_id: str, evidence_ref: str) ->
     return _VisionFixture(screen_class).observe(root, run_id=run_id, evidence_ref=evidence_ref)
 
 
+def _safe_capture(root: Path, *, run_id: str, evidence_ref: str) -> SecretSafeCapture:
+    path = root / f"{evidence_ref.replace(':', '-')}.png"
+    payload = b"synthetic secret-safe capture"
+    path.write_bytes(payload)
+    path.chmod(0o400)
+    return SecretSafeCapture(
+        run_id=run_id,
+        evidence_ref=evidence_ref,
+        path=path,
+        sha256=hashlib.sha256(payload).hexdigest(),
+        secret_safe=True,
+        source_monotonic_ns=0,
+    )
+
+
 def scenario_a_safe_login_evidence() -> None:
     with tempfile.TemporaryDirectory() as temporary:
         root = Path(temporary)
@@ -550,7 +565,8 @@ def scenario_h_restart_preserves_owner_latches() -> None:
 
 def scenario_i_foreign_model_waits_without_eviction() -> None:
     with tempfile.TemporaryDirectory() as temporary:
-        root = Path(temporary)
+        root = Path(temporary) / "foreign"
+        root.mkdir()
         stack = _stack(root, session_id="i", run_id="run-i")
         resident = ["foreign:model"]
         unloads: list[str] = []
@@ -561,38 +577,96 @@ def scenario_i_foreign_model_waits_without_eviction() -> None:
             infer=lambda model, *_args, **_kwargs: inference_calls.append(model),
             unload=lambda model: unloads.append(model),
         )
+        sensor = AgentVisionSensor(scheduler)
+        observe = getattr(stack.domain, "observe_agent_vision", None)
         try:
+            assert callable(observe), "ControlDomainService vision composition seam is required"
+            capture = _safe_capture(root, run_id="run-i", evidence_ref="capture-i")
             try:
-                scheduler.infer(
-                    model=QWEN_VISION_MODEL,
-                    expected_digest=QWEN_VISION_DIGEST,
-                    image_path=Path("not-read"),
-                    evidence_ref="capture-i",
-                    capture_sha256="a" * 64,
-                    model_profile_id=QWEN_VISION_PROFILE_ID,
-                    source_monotonic_ns=0,
-                    keep_alive="0s",
-                    num_ctx=QWEN_NUM_CTX,
-                    num_predict=QWEN_NUM_PREDICT,
-                )
+                observe("i", sensor, capture)
             except ModelSlotUnavailable as exc:
                 assert exc.code == "DIFFERENT_RESIDENT_MODEL"
-                stack.agent._persist_event(
-                    "i",
-                    provenance=AgentProvenance.SENSOR,
-                    kind="MODEL_SLOT_WAITING",
-                    state_after=AgentOperationalState.WAITING_MODEL_SLOT,
-                    action_id="model-slot-i",
-                    payload={"status": AgentOperationalState.WAITING_MODEL_SLOT.value},
-                )
             else:
                 raise AssertionError("foreign model residency was admitted")
             waiting = stack.client.get("/v1/agent/session?session_id=i")
             assert waiting["operational_state"] == AgentOperationalState.WAITING_MODEL_SLOT.value
-            assert waiting["events"][-1]["kind"] == "MODEL_SLOT_WAITING"
+            waiting_event = waiting["events"][-1]
+            assert waiting_event["kind"] == "MODEL_SLOT_WAITING"
+            assert waiting_event["provenance"] == AgentProvenance.SYSTEM.value
+            assert waiting_event["payload"] == {"reason_code": "DIFFERENT_RESIDENT_MODEL"}
             assert unloads == [] and inference_calls == [] and resident == ["foreign:model"]
+            assert stack.executor.execute_calls == []
+            assert stack.adapter.physical_effects == []
         finally:
             _close(stack)
+
+        restarted = _stack(root, session_id="i", run_id="run-i", submit=False)
+        try:
+            durable = restarted.client.get("/v1/agent/session?session_id=i")
+            assert durable["operational_state"] == AgentOperationalState.WAITING_MODEL_SLOT.value
+            assert durable["events"][-1]["payload"] == {"reason_code": "DIFFERENT_RESIDENT_MODEL"}
+            assert restarted.executor.execute_calls == []
+            assert restarted.adapter.physical_effects == []
+        finally:
+            _close(restarted)
+
+        for suffix, digest, provider in (
+            ("digest", "0" * 64, lambda *_args, **_kwargs: None),
+            (
+                "inference",
+                QWEN_VISION_DIGEST,
+                lambda model, *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("provider failed")),
+            ),
+        ):
+            negative_root = Path(temporary) / suffix
+            negative_root.mkdir()
+            negative = _stack(negative_root, session_id=f"i-{suffix}", run_id=f"run-i-{suffix}")
+            resident_state: list[str] = []
+            inference_count: list[str] = []
+
+            def failing_provider(model: str, *args: object, **kwargs: object) -> object:
+                inference_count.append(model)
+                resident_state[:] = [model]
+                return provider(model, *args, **kwargs)
+
+            negative_scheduler = ModelSlotScheduler(
+                ps=lambda: list(resident_state),
+                digest=lambda _model, value=digest: value,
+                infer=failing_provider,
+                unload=lambda _model: None,
+            )
+            negative_observe = getattr(negative.domain, "observe_agent_vision", None)
+            try:
+                assert callable(negative_observe), "ControlDomainService vision composition seam is required"
+                capture = _safe_capture(
+                    negative_root,
+                    run_id=f"run-i-{suffix}",
+                    evidence_ref=f"capture-i-{suffix}",
+                )
+                try:
+                    negative_observe(
+                        f"i-{suffix}",
+                        AgentVisionSensor(negative_scheduler),
+                        capture,
+                    )
+                except ModelSlotUnavailable as exc:
+                    expected = "MODEL_DIGEST_MISMATCH" if suffix == "digest" else "MODEL_INFERENCE_FAILED"
+                    assert exc.code == expected
+                else:
+                    raise AssertionError(f"{suffix} failure unexpectedly succeeded")
+                unchanged = negative.client.get(
+                    f"/v1/agent/session?session_id=i-{suffix}"
+                )
+                assert unchanged["operational_state"] == AgentOperationalState.RUNNING.value
+                assert not any(event["kind"] == "MODEL_SLOT_WAITING" for event in unchanged["events"])
+                assert negative.executor.execute_calls == []
+                assert negative.adapter.physical_effects == []
+                if suffix == "digest":
+                    assert inference_count == []
+                else:
+                    assert inference_count == [QWEN_VISION_MODEL]
+            finally:
+                _close(negative)
 
 
 def scenario_j_secret_boundaries() -> None:

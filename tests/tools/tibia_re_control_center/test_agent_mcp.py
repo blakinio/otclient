@@ -33,6 +33,21 @@ TASK = {
     "secret_capability_ref": None,
 }
 
+PUNCTUATED_SECRET_ASSIGNMENTS = (
+    "control.nonce=SENTINEL_PUNCTUATED_SECRET",
+    "api.key=SENTINEL_PUNCTUATED_SECRET",
+    "private.key=SENTINEL_PUNCTUATED_SECRET",
+    "control:nonce=SENTINEL_PUNCTUATED_SECRET",
+    "api:key=SENTINEL_PUNCTUATED_SECRET",
+    "private:key=SENTINEL_PUNCTUATED_SECRET",
+    "control/nonce=SENTINEL_PUNCTUATED_SECRET",
+    "api/key=SENTINEL_PUNCTUATED_SECRET",
+    "private/key=SENTINEL_PUNCTUATED_SECRET",
+    "control.::/nonce=SENTINEL_PUNCTUATED_SECRET",
+    "api/.:key=SENTINEL_PUNCTUATED_SECRET",
+    "private:_./key=SENTINEL_PUNCTUATED_SECRET",
+)
+
 
 class FakeControlApiClient:
     def __init__(self) -> None:
@@ -312,6 +327,19 @@ class AgentMcpTests(unittest.TestCase):
                 self.assertEqual({"jsonrpc": "2.0", "id": request_id, "result": {}}, response)
         self.assertEqual([], self.client.calls)
 
+    def test_punctuated_secret_assignments_in_rpc_ids_reject_with_null_id_without_dispatch(self) -> None:
+        for request_id in PUNCTUATED_SECRET_ASSIGNMENTS:
+            with self.subTest(request_id=request_id):
+                response = self.server.handle(call(
+                    "agent_result", {"run_id": "run-1"}, request_id,
+                ))
+                encoded = json.dumps(response)
+                self.assertIn("error", response)
+                self.assertEqual(-32600, response["error"]["code"])
+                self.assertIsNone(response["id"])
+                self.assertNotIn("SENTINEL_PUNCTUATED_SECRET", encoded)
+        self.assertEqual([], self.client.calls)
+
     def test_secret_shaped_task_keys_and_values_are_rejected_before_api_call(self) -> None:
         cases: list[dict[str, object]] = []
         for key in ("password", "api_token", "credential", "authorization", "private_key"):
@@ -400,6 +428,43 @@ class AgentMcpTests(unittest.TestCase):
                 encoded = json.dumps(response)
                 self.assertEqual(-32602, response["error"]["code"])
                 self.assertNotIn(sentinel, encoded)
+        self.assertEqual([], self.client.calls)
+
+    def test_punctuated_secret_assignments_in_every_outer_id_reject_before_dispatch(self) -> None:
+        for assignment in PUNCTUATED_SECRET_ASSIGNMENTS:
+            requests = (
+                call("agent_control", {
+                    "request_id": assignment,
+                    "session_id": "session-1",
+                    "command": "PAUSE",
+                }),
+                call("agent_session_status", {"session_id": assignment}),
+                call("agent_result", {"run_id": assignment}),
+            )
+            for boundary, request in zip(("request_id", "session_id", "run_id"), requests):
+                with self.subTest(boundary=boundary, assignment=assignment):
+                    response = self.server.handle(request)
+                    encoded = json.dumps(response)
+                    self.assertIn("error", response)
+                    self.assertEqual(-32602, response["error"]["code"])
+                    self.assertNotIn("SENTINEL_PUNCTUATED_SECRET", encoded)
+        self.assertEqual([], self.client.calls)
+
+    def test_punctuated_secret_assignments_in_scalar_and_nested_task_text_reject_before_dispatch(self) -> None:
+        for assignment in PUNCTUATED_SECRET_ASSIGNMENTS:
+            scalar_task = json.loads(json.dumps(TASK))
+            scalar_task["objective"] = assignment
+            nested_task = json.loads(json.dumps(TASK))
+            nested_task["client_identity"]["version"] = assignment
+            for boundary, task in (("scalar", scalar_task), ("nested", nested_task)):
+                with self.subTest(boundary=boundary, assignment=assignment):
+                    response = self.server.handle(call("agent_submit_task", {
+                        "request_id": "punctuated-task", "task": task,
+                    }))
+                    encoded = json.dumps(response)
+                    self.assertIn("error", response)
+                    self.assertEqual(-32602, response["error"]["code"])
+                    self.assertNotIn("SENTINEL_PUNCTUATED_SECRET", encoded)
         self.assertEqual([], self.client.calls)
 
     def test_opaque_secret_capability_ref_is_not_resolved_or_rejected(self) -> None:
@@ -503,6 +568,61 @@ class AgentMcpTests(unittest.TestCase):
                 self.assertEqual(expected, json.loads(response["result"]["content"][0]["text"]))
                 self.assertLess(len(encoded), 1024)
                 self.assertNotIn(sentinel, encoded)
+
+    def test_punctuated_secret_assignments_in_scalar_and_nested_api_success_are_fixed_safe_errors(self) -> None:
+        expected = {
+            "code": "MCP_UNSAFE_API_RESPONSE",
+            "safe_message": "Control API response violated the MCP privacy boundary",
+        }
+        for assignment in PUNCTUATED_SECRET_ASSIGNMENTS:
+            payloads = (
+                {"status": "OK", "note": assignment},
+                {"status": "OK", "items": [{"note": assignment}]},
+            )
+            for boundary, payload in zip(("scalar", "nested"), payloads):
+                with self.subTest(boundary=boundary, assignment=assignment):
+                    self.client.response = payload
+                    response = self.server.handle(call("agent_result", {"run_id": "run-1"}))
+                    encoded = json.dumps(response)
+                    self.assertTrue(response["result"]["isError"])
+                    self.assertEqual(expected, json.loads(response["result"]["content"][0]["text"]))
+                    self.assertLess(len(encoded), 1024)
+                    self.assertNotIn("SENTINEL_PUNCTUATED_SECRET", encoded)
+
+    def test_safe_dotted_slashed_and_colon_text_is_not_a_privacy_false_positive(self) -> None:
+        safe_rpc_id = "rpc.safe/path:1"
+        self.assertEqual(
+            {"jsonrpc": "2.0", "id": safe_rpc_id, "result": {}},
+            self.server.handle(rpc("ping", {}, safe_rpc_id)),
+        )
+
+        status = self.server.handle(call(
+            "agent_session_status", {"session_id": "session.safe:1"}, 2,
+        ))
+        self.assert_tool_payload(status, {"status": "OK"})
+
+        task = json.loads(json.dumps(TASK))
+        task["objective"] = "inspect fixture.safe/path:revision-1"
+        task["client_identity"]["version"] = "fixture.safe/path:revision-1"
+        task["secret_capability_ref"] = "opaque.capability:1"
+        submitted = self.server.handle(call("agent_submit_task", {
+            "request_id": "request.safe:1", "task": task,
+        }, 3))
+        self.assert_tool_payload(submitted, {"status": "OK"})
+
+        safe_response = {
+            "status": "OK",
+            "note": "fixture.safe/path:revision-1",
+            "nested": [{"ref": "opaque.capability:1"}],
+        }
+        self.client.response = json.loads(json.dumps(safe_response))
+        result = self.server.handle(call("agent_result", {"run_id": "run.safe:1"}, 4))
+        self.assert_tool_payload(result, safe_response)
+        self.assertEqual([
+            ("GET", "/v1/agent/session?session_id=session.safe%3A1"),
+            ("POST", "/v1/agent/tasks", task, "request.safe:1"),
+            ("GET", "/v1/agent/result?run_id=run.safe%3A1"),
+        ], self.client.calls)
 
     def test_success_payload_type_and_size_are_guarded_before_output(self) -> None:
         cases = (

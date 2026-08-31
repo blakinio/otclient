@@ -14,15 +14,18 @@ _SECRET_KEYS = {
     "control_nonce", "api_key", "api_token", "private_key", "secret", "credential",
     "credentials", "ticket", "token",
 }
+_SECRET_NAME_SEPARATOR = r"[^A-Za-z0-9]*"
 _SECRET_VALUE_PATTERNS = (
     re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]{8,}"),
     re.compile(
-        r"(?i)\b(?:"
-        r"OPENAI[-_\s]*API[-_\s]*KEY|API[-_\s]*(?:KEY|TOKEN)|PASSWORD|PASSWD|TOKEN|"
-        r"AUTH[-_\s]*TOKEN|ACCESS[-_\s]*TOKEN|REFRESH[-_\s]*TOKEN|"
-        r"SESSION[-_\s]*TOKEN|CONTROL[-_\s]*NONCE|AUTHORIZATION|"
-        r"CREDENTIALS?|SECRET|PRIVATE[-_\s]*KEY"
-        r")\b\s*[:=]\s*\S+"
+        rf"(?i)\b(?:"
+        rf"OPENAI{_SECRET_NAME_SEPARATOR}API{_SECRET_NAME_SEPARATOR}KEY|"
+        rf"API{_SECRET_NAME_SEPARATOR}(?:KEY|TOKEN)|PASSWORD|PASSWD|TOKEN|"
+        rf"AUTH{_SECRET_NAME_SEPARATOR}TOKEN|ACCESS{_SECRET_NAME_SEPARATOR}TOKEN|"
+        rf"REFRESH{_SECRET_NAME_SEPARATOR}TOKEN|SESSION{_SECRET_NAME_SEPARATOR}TOKEN|"
+        rf"CONTROL{_SECRET_NAME_SEPARATOR}NONCE|AUTHORIZATION|CREDENTIALS?|SECRET|"
+        rf"PRIVATE{_SECRET_NAME_SEPARATOR}KEY"
+        rf")\b\s*[:=]\s*\S+"
     ),
     re.compile(r"(?i)-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
 )

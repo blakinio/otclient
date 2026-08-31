@@ -819,6 +819,12 @@ class AgentSessionCoordinator:
             if prior_event is not None:
                 self._hydrate_exact_session(session_id)
                 status = prior_event.get("payload", {}).get("status")
+                if parsed is OwnerControlCommand.RESUME and prior_event.get("kind") == "OWNER_RESUME":
+                    current_global = self.control.control_state
+                    if current_global.stop_latched:
+                        status = "REFUSED_GLOBAL_STOP_LATCHED"
+                    elif current_global.recovery_required:
+                        status = "REFUSED_GLOBAL_RECOVERY_REQUIRED"
                 if not isinstance(status, str):
                     status = {
                         "OWNER_STOP": "STOPPED",

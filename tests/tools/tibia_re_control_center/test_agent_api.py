@@ -13,6 +13,7 @@ from pathlib import Path
 from tools.tibia_re_control_center.agent_session import CaptureReceipt, NullBoundedActionExecutor
 from tools.tibia_re_control_center.control_api import ControlApiServer, MAX_PAGE
 from tools.tibia_re_control_center.control_cli import build_parser, main as cli_main
+from tools.tibia_re_control_center.model import SimulatedCrash
 
 from tests.tools.tibia_re_control_center.test_package_b import decode, http_call
 
@@ -495,6 +496,161 @@ class AgentApiTests(unittest.TestCase):
         self.assertEqual(200, status, restarted)
         self.assertEqual(replay_result, restarted)
         self.assertTrue(self.server.domain.coordinator.control_state.stop_latched)
+
+    def test_committed_resume_with_incomplete_resource_replays_under_current_stop_precedence(self) -> None:
+        self.submit()
+
+        def interrupt_resource_completion(request_id: str) -> tuple[object, object]:
+            original_finish = self.server.domain.store.finish_resource
+            finish_calls = 0
+
+            def crash_finish(resource_id: str, state: str, result: dict[str, object]) -> None:
+                nonlocal finish_calls
+                finish_calls += 1
+                raise SimulatedCrash("simulated crash before agent control resource completion")
+
+            self.server.domain.store.finish_resource = crash_finish  # type: ignore[method-assign]
+            try:
+                status, _, interrupted = self.post(
+                    "/v1/agent/control",
+                    {"session_id": "agent-session-1", "command": "RESUME"},
+                    request_id,
+                )
+            finally:
+                self.server.domain.store.finish_resource = original_finish  # type: ignore[method-assign]
+            self.assertEqual(503, status, interrupted)
+            self.assertEqual(1, finish_calls)
+            request = self.server.domain.store.load_request(request_id)
+            self.assertEqual("ACCEPTED", request.status)
+            resource = self.server.domain.store.get_resource(request.resource_id)
+            self.assertIsNotNone(resource)
+            self.assertIsNone(resource["result"])
+            transition = self.server.domain.store.load_control_transition(request.resource_id)
+            self.assertIsNotNone(transition)
+            self.assertEqual("AGENT_OWNER_RESUME", transition.reason_code)
+            self.assertFalse(transition.stop_latched)
+            self.assertEqual(1, sum(
+                event.get("kind") == "OWNER_RESUME"
+                and event.get("action_id") == request.resource_id
+                for event in self.server.domain.agent.snapshot("agent-session-1")["events"]
+            ))
+            return request, transition
+
+        status, _, stopped = self.post(
+            "/v1/agent/control",
+            {"session_id": "agent-session-1", "command": "STOP"},
+            "resource-gap-initial-stop",
+        )
+        self.assertEqual(200, status, stopped)
+        recovered_request, recovered_transition = interrupt_resource_completion(
+            "resource-gap-resume-without-newer-stop"
+        )
+        recovered_generation = self.server.domain.coordinator.control_generation
+        recovered_events = self.server.domain.agent.snapshot("agent-session-1")["events"]
+        status, _, recovered = self.post(
+            "/v1/agent/control",
+            {"session_id": "agent-session-1", "command": "RESUME"},
+            recovered_request.request_id,
+        )
+        self.assertEqual(200, status, recovered)
+        self.assertEqual("IDLE", recovered["status"])
+        self.assertEqual("IDLE", recovered["session"]["operational_state"])
+        self.assertEqual(recovered_generation, self.server.domain.coordinator.control_generation)
+        self.assertEqual(
+            recovered_transition,
+            self.server.domain.store.load_control_transition(recovered_request.resource_id),
+        )
+        self.assertEqual(recovered_events, self.server.domain.agent.snapshot("agent-session-1")["events"])
+        self.assertEqual("COMPLETED", self.server.domain.store.load_request(recovered_request.request_id).status)
+        self.assertEqual(
+            recovered,
+            self.server.domain.store.get_resource(recovered_request.resource_id)["result"],
+        )
+
+        status, _, stopped_again = self.post(
+            "/v1/agent/control",
+            {"session_id": "agent-session-1", "command": "STOP"},
+            "resource-gap-second-stop",
+        )
+        self.assertEqual(200, status, stopped_again)
+        old_request, old_resume = interrupt_resource_completion("resource-gap-old-resume")
+        old_resume_event_count = sum(
+            event.get("kind") == "OWNER_RESUME"
+            and event.get("action_id") == old_request.resource_id
+            for event in self.server.domain.agent.snapshot("agent-session-1")["events"]
+        )
+
+        status, _, newer_stop = self.post("/v1/stop-all", {}, "resource-gap-newer-stop")
+        self.assertEqual(200, status, newer_stop)
+        newer_request = self.server.domain.store.load_request("resource-gap-newer-stop")
+        newer_transition = self.server.domain.store.load_control_transition(newer_request.resource_id)
+        self.assertGreater(newer_transition.control_generation, old_resume.control_generation)
+
+        self.restart()
+        restarted_session = self.server.domain.agent.snapshot("agent-session-1")
+        self.assertEqual("PAUSED_AUTHORITY", restarted_session["operational_state"])
+        events_before_replay = restarted_session["events"]
+        history_before_replay = self.server.domain.store._fetchone(
+            "SELECT COUNT(*) FROM control_history"
+        )[0]
+        current_stop_before_replay = self.server.domain.coordinator.control_state
+        self.assertTrue(current_stop_before_replay.stop_latched)
+        generation_before_replay = self.server.domain.coordinator.control_generation
+        barrier = threading.Barrier(8)
+
+        def replay() -> tuple[int, dict[str, object]]:
+            barrier.wait(timeout=5)
+            replay_status, _, replay_body = self.post(
+                "/v1/agent/control",
+                {"session_id": "agent-session-1", "command": "RESUME"},
+                old_request.request_id,
+            )
+            return replay_status, replay_body
+
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            futures = [pool.submit(replay) for _ in range(8)]
+            replies = [future.result(timeout=10) for future in futures]
+
+        self.assertTrue(all(reply == replies[0] for reply in replies))
+        self.assertEqual(200, replies[0][0])
+        replay_body = replies[0][1]
+        self.assertEqual("REFUSED_GLOBAL_STOP_LATCHED", replay_body["status"])
+        self.assertEqual("PAUSED_AUTHORITY", replay_body["session"]["operational_state"])
+        self.assertFalse(replay_body["session"]["stop_latched"])
+        self.assertEqual("NONE", replay_body["session"]["mutation_authority"])
+        self.assertEqual(generation_before_replay, self.server.domain.coordinator.control_generation)
+        self.assertEqual(current_stop_before_replay, self.server.domain.coordinator.control_state)
+        self.assertEqual(
+            newer_transition,
+            self.server.domain.store.load_control_transition(newer_request.resource_id),
+        )
+        self.assertEqual(old_resume, self.server.domain.store.load_control_transition(old_request.resource_id))
+        self.assertEqual(history_before_replay, self.server.domain.store._fetchone(
+            "SELECT COUNT(*) FROM control_history"
+        )[0])
+        self.assertEqual(events_before_replay, self.server.domain.agent.snapshot("agent-session-1")["events"])
+        self.assertEqual(old_resume_event_count, sum(
+            event.get("kind") == "OWNER_RESUME"
+            and event.get("action_id") == old_request.resource_id
+            for event in self.server.domain.agent.snapshot("agent-session-1")["events"]
+        ))
+        resource = self.server.domain.store.get_resource(old_request.resource_id)
+        self.assertEqual(replay_body, resource["result"])
+        self.assertEqual("COMPLETED", self.server.domain.store.load_request(old_request.request_id).status)
+
+        self.restart()
+        status, _, restarted_replay = self.post(
+            "/v1/agent/control",
+            {"session_id": "agent-session-1", "command": "RESUME"},
+            old_request.request_id,
+        )
+        self.assertEqual(200, status, restarted_replay)
+        self.assertEqual(replay_body, restarted_replay)
+        self.assertTrue(self.server.domain.coordinator.control_state.stop_latched)
+        self.assertEqual(
+            newer_transition,
+            self.server.domain.store.load_control_transition(newer_request.resource_id),
+        )
 
     def test_chat_stop_cleanup_failure_preserves_durable_stop_and_replays_failure(self) -> None:
         self.submit()

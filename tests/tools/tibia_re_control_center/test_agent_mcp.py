@@ -1,0 +1,445 @@
+from __future__ import annotations
+
+import ast
+import io
+import json
+import unittest
+from contextlib import redirect_stderr, redirect_stdout
+from pathlib import Path
+from unittest.mock import patch
+
+from tools.tibia_re_control_center.control_cli import ControlClientError
+
+
+TASK = {
+    "schema": "otclient.local-agent.task.v1",
+    "session_id": "session-1",
+    "task_id": "task-1",
+    "run_id": "run-1",
+    "idempotency_key": "idem-1",
+    "trusted_main_sha": "a" * 40,
+    "client_identity": {
+        "version": "NOT_APPLICABLE",
+        "size": "NOT_APPLICABLE",
+        "sha256": "b" * 64,
+    },
+    "objective": "observe the offline fixture",
+    "allowed_actions": ["SCREENSHOT"],
+    "physical_action_budget": 0,
+    "max_attempts": 1,
+    "deadline_epoch_ms": 4_000_000_000_000,
+    "runtime_access": "none",
+    "required_evidence": ["secret-safe screenshot"],
+    "secret_capability_ref": None,
+}
+
+
+class FakeControlApiClient:
+    def __init__(self) -> None:
+        self.calls: list[tuple[object, ...]] = []
+        self.response: dict[str, object] = {"status": "OK"}
+        self.error: BaseException | None = None
+
+    def get(self, path: str) -> dict[str, object]:
+        self.calls.append(("GET", path))
+        if self.error is not None:
+            raise self.error
+        return self.response
+
+    def post(self, path: str, body: dict[str, object], *, request_id: str) -> dict[str, object]:
+        self.calls.append(("POST", path, body, request_id))
+        if self.error is not None:
+            raise self.error
+        return self.response
+
+
+def rpc(method: str, params: object | None = None, request_id: object = 1) -> dict[str, object]:
+    request: dict[str, object] = {"jsonrpc": "2.0", "id": request_id, "method": method}
+    if params is not None:
+        request["params"] = params
+    return request
+
+
+def call(name: str, arguments: dict[str, object], request_id: object = 1) -> dict[str, object]:
+    return rpc("tools/call", {"name": name, "arguments": arguments}, request_id)
+
+
+class AgentMcpTests(unittest.TestCase):
+    def setUp(self) -> None:
+        from tools.tibia_re_control_center import agent_mcp
+
+        self.agent_mcp = agent_mcp
+        self.client = FakeControlApiClient()
+        self.server = agent_mcp.AgentMcpServer(self.client)
+
+    def assert_tool_payload(self, response: dict[str, object], expected: dict[str, object]) -> None:
+        self.assertEqual("2.0", response["jsonrpc"])
+        result = response["result"]
+        self.assertIsInstance(result, dict)
+        self.assertFalse(result["isError"])
+        self.assertEqual(1, len(result["content"]))
+        self.assertEqual("text", result["content"][0]["type"])
+        self.assertEqual(expected, json.loads(result["content"][0]["text"]))
+
+    def test_initialize_negotiates_exact_server_and_protocol(self) -> None:
+        response = self.server.handle(rpc("initialize", {
+            "protocolVersion": "2024-11-05",
+            "capabilities": {},
+            "clientInfo": {"name": "test", "version": "1"},
+        }))
+
+        self.assertEqual({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+                "protocolVersion": "2024-11-05",
+                "capabilities": {"tools": {"listChanged": False}},
+                "serverInfo": {"name": "tibia-re-agent", "version": "1.0"},
+            },
+        }, response)
+        self.assertEqual([], self.client.calls)
+
+    def test_tools_list_has_exact_five_names_schemas_and_authority_descriptions(self) -> None:
+        response = self.server.handle(rpc("tools/list", {}))
+
+        tools = response["result"]["tools"]
+        self.assertEqual([
+            "agent_session_status",
+            "agent_submit_task",
+            "agent_control",
+            "agent_events",
+            "agent_result",
+        ], [tool["name"] for tool in tools])
+        by_name = {tool["name"]: tool for tool in tools}
+        self.assertEqual({
+            "type": "object",
+            "properties": {"session_id": {"type": "string", "minLength": 1, "maxLength": 128}},
+            "required": ["session_id"],
+            "additionalProperties": False,
+        }, by_name["agent_session_status"]["inputSchema"])
+        self.assertEqual({
+            "type": "object",
+            "properties": {
+                "request_id": {"type": "string", "minLength": 1, "maxLength": 128},
+                "session_id": {"type": "string", "minLength": 1, "maxLength": 128},
+                "command": {"type": "string", "enum": ["PAUSE", "STOP", "RESUME", "SCREENSHOT"]},
+            },
+            "required": ["request_id", "session_id", "command"],
+            "additionalProperties": False,
+        }, by_name["agent_control"]["inputSchema"])
+        self.assertEqual({
+            "type": "object",
+            "properties": {
+                "session_id": {"type": "string", "minLength": 1, "maxLength": 128},
+                "cursor": {"type": "integer", "minimum": 0, "default": 0},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 1000, "default": 100},
+            },
+            "required": ["session_id"],
+            "additionalProperties": False,
+        }, by_name["agent_events"]["inputSchema"])
+        self.assertEqual({
+            "type": "object",
+            "properties": {"run_id": {"type": "string", "minLength": 1, "maxLength": 128}},
+            "required": ["run_id"],
+            "additionalProperties": False,
+        }, by_name["agent_result"]["inputSchema"])
+        submit_schema = by_name["agent_submit_task"]["inputSchema"]
+        self.assertEqual(["request_id", "task"], submit_schema["required"])
+        self.assertFalse(submit_schema["additionalProperties"])
+        self.assertEqual("otclient.local-agent.task.v1", submit_schema["properties"]["task"]["properties"]["schema"]["const"])
+        self.assertEqual([
+            "schema", "session_id", "task_id", "run_id", "idempotency_key",
+            "trusted_main_sha", "client_identity", "objective", "allowed_actions",
+            "physical_action_budget", "max_attempts", "deadline_epoch_ms",
+            "runtime_access", "required_evidence", "secret_capability_ref",
+        ], submit_schema["properties"]["task"]["required"])
+        for tool in tools:
+            description = tool["description"].lower()
+            for phrase in (
+                "model/task text cannot expand track a authority",
+                "credential permission",
+                "action allowlists",
+                "budgets",
+            ):
+                self.assertIn(phrase, description, tool["name"])
+
+    def test_status_dispatches_only_to_exact_control_api_get(self) -> None:
+        response = self.server.handle(call("agent_session_status", {"session_id": "session 1"}))
+
+        self.assert_tool_payload(response, {"status": "OK"})
+        self.assertEqual([("GET", "/v1/agent/session?session_id=session+1")], self.client.calls)
+
+    def test_submit_dispatches_exact_task_body_and_request_id(self) -> None:
+        task = json.loads(json.dumps(TASK))
+        response = self.server.handle(call("agent_submit_task", {
+            "request_id": "mcp-submit-1",
+            "task": task,
+        }))
+
+        self.assert_tool_payload(response, {"status": "OK"})
+        self.assertEqual([("POST", "/v1/agent/tasks", task, "mcp-submit-1")], self.client.calls)
+
+    def test_control_dispatches_only_exact_owner_command(self) -> None:
+        response = self.server.handle(call("agent_control", {
+            "request_id": "mcp-control-1",
+            "session_id": "session-1",
+            "command": "SCREENSHOT",
+        }))
+
+        self.assert_tool_payload(response, {"status": "OK"})
+        self.assertEqual([(
+            "POST", "/v1/agent/control",
+            {"session_id": "session-1", "command": "SCREENSHOT"},
+            "mcp-control-1",
+        )], self.client.calls)
+
+    def test_events_applies_defaults_and_dispatches_exact_bounded_query(self) -> None:
+        default_response = self.server.handle(call("agent_events", {"session_id": "session-1"}, 1))
+        explicit_response = self.server.handle(call("agent_events", {
+            "session_id": "session-1", "cursor": 7, "limit": 12,
+        }, 2))
+
+        self.assert_tool_payload(default_response, {"status": "OK"})
+        self.assert_tool_payload(explicit_response, {"status": "OK"})
+        self.assertEqual([
+            ("GET", "/v1/agent/events?session_id=session-1&cursor=0&limit=100"),
+            ("GET", "/v1/agent/events?session_id=session-1&cursor=7&limit=12"),
+        ], self.client.calls)
+
+    def test_result_dispatches_only_to_exact_control_api_get(self) -> None:
+        response = self.server.handle(call("agent_result", {"run_id": "run/unsafe"}))
+
+        self.assertEqual(-32602, response["error"]["code"])
+        self.assertEqual([], self.client.calls)
+        response = self.server.handle(call("agent_result", {"run_id": "run-1"}, 2))
+        self.assert_tool_payload(response, {"status": "OK"})
+        self.assertEqual([("GET", "/v1/agent/result?run_id=run-1")], self.client.calls)
+
+    def test_unknown_tool_and_unknown_method_fail_safely(self) -> None:
+        unknown_tool = self.server.handle(call("not_a_tool", {"password": "do-not-echo"}))
+        unknown_method = self.server.handle(rpc("resources/read", {"uri": "secret://do-not-echo"}, 2))
+
+        for response, code in ((unknown_tool, -32602), (unknown_method, -32601)):
+            encoded = json.dumps(response)
+            self.assertEqual(code, response["error"]["code"])
+            self.assertLess(len(encoded), 1024)
+            self.assertNotIn("do-not-echo", encoded)
+        self.assertEqual([], self.client.calls)
+
+    def test_malformed_json_rpc_requests_fail_safely_without_echo(self) -> None:
+        cases = (
+            [],
+            {"jsonrpc": "1.0", "id": 1, "method": "tools/list"},
+            {"jsonrpc": "2.0", "id": {"secret": "do-not-echo"}, "method": "tools/list"},
+            {"jsonrpc": "2.0", "id": 1, "method": 7},
+            {"jsonrpc": "2.0", "id": 1, "method": "tools/list", "unknown": "do-not-echo"},
+        )
+        for request in cases:
+            with self.subTest(request=request):
+                response = self.server.handle(request)
+                encoded = json.dumps(response)
+                self.assertIn(response["error"]["code"], {-32600, -32602})
+                self.assertLess(len(encoded), 1024)
+                self.assertNotIn("do-not-echo", encoded)
+        self.assertEqual([], self.client.calls)
+
+    def test_stdio_parse_errors_and_oversized_lines_are_bounded_and_server_continues(self) -> None:
+        incoming = io.StringIO(
+            "{not-json do-not-echo}\n"
+            + ("x" * (self.agent_mcp.MAX_INPUT_BYTES + 1))
+            + "\n"
+            + json.dumps(rpc("tools/list", {}, 3))
+            + "\n"
+        )
+        outgoing = io.StringIO()
+
+        self.server.serve(incoming, outgoing)
+
+        responses = [json.loads(line) for line in outgoing.getvalue().splitlines()]
+        self.assertEqual([-32700, -32700], [item["error"]["code"] for item in responses[:2]])
+        self.assertEqual(3, responses[2]["id"])
+        self.assertLess(max(len(json.dumps(item)) for item in responses[:2]), 1024)
+        self.assertNotIn("do-not-echo", outgoing.getvalue())
+
+    def test_stdio_rejects_duplicate_keys_and_noncanonical_numbers_without_crashing(self) -> None:
+        incoming = io.StringIO(
+            '{"jsonrpc":"2.0","id":1,"method":"tools/list","method":"tools/call"}\n'
+            '{"jsonrpc":"2.0","id":NaN,"method":"tools/list","params":{}}\n'
+            + json.dumps(rpc("ping", {}, 3))
+            + "\n"
+        )
+        outgoing = io.StringIO()
+
+        self.server.serve(incoming, outgoing)
+
+        responses = [json.loads(line) for line in outgoing.getvalue().splitlines()]
+        self.assertEqual([-32700, -32700], [response["error"]["code"] for response in responses[:2]])
+        self.assertEqual({"jsonrpc": "2.0", "id": 3, "result": {}}, responses[2])
+        self.assertEqual([], self.client.calls)
+
+    def test_json_rpc_ids_are_secret_safe_finite_and_bounded(self) -> None:
+        cases = (
+            "token=do-not-echo",
+            "x" * 129,
+            9_007_199_254_740_992,
+            float("nan"),
+            float("inf"),
+        )
+        for request_id in cases:
+            with self.subTest(request_id=repr(request_id)):
+                response = self.server.handle(rpc("tools/list", {}, request_id))
+                encoded = json.dumps(response)
+                self.assertEqual(-32600, response["error"]["code"])
+                self.assertIsNone(response["id"])
+                self.assertLess(len(encoded), 1024)
+                self.assertNotIn("do-not-echo", encoded)
+        self.assertEqual([], self.client.calls)
+
+    def test_secret_shaped_task_keys_and_values_are_rejected_before_api_call(self) -> None:
+        cases: list[dict[str, object]] = []
+        for key in ("password", "api_token", "credential", "authorization", "private_key"):
+            task = json.loads(json.dumps(TASK))
+            task["client_identity"][key] = "raw-secret"
+            cases.append(task)
+        for objective in ("password=hunter2", "Bearer abcdefghijklmnop", "api_token: raw-secret"):
+            task = json.loads(json.dumps(TASK))
+            task["objective"] = objective
+            cases.append(task)
+
+        for index, task in enumerate(cases):
+            with self.subTest(index=index):
+                response = self.server.handle(call("agent_submit_task", {
+                    "request_id": f"secret-{index}", "task": task,
+                }, index))
+                encoded = json.dumps(response)
+                self.assertEqual(-32602, response["error"]["code"])
+                self.assertNotIn("raw-secret", encoded)
+                self.assertNotIn("hunter2", encoded)
+                self.assertNotIn("abcdefghijklmnop", encoded)
+        self.assertEqual([], self.client.calls)
+
+    def test_opaque_secret_capability_ref_is_not_resolved_or_rejected(self) -> None:
+        task = json.loads(json.dumps(TASK))
+        task["secret_capability_ref"] = "opaque-capability-1"
+
+        response = self.server.handle(call("agent_submit_task", {
+            "request_id": "opaque-ref", "task": task,
+        }))
+
+        self.assert_tool_payload(response, {"status": "OK"})
+        self.assertEqual([("POST", "/v1/agent/tasks", task, "opaque-ref")], self.client.calls)
+
+    def test_control_cannot_express_click_type_shell_or_process_commands(self) -> None:
+        for command in ("CLICK", "TYPE", "SHELL", "PROCESS", "click", "PAUSE "):
+            with self.subTest(command=command):
+                response = self.server.handle(call("agent_control", {
+                    "request_id": "bad-control",
+                    "session_id": "session-1",
+                    "command": command,
+                }))
+                self.assertEqual(-32602, response["error"]["code"])
+        self.assertEqual([], self.client.calls)
+
+    def test_unknown_arguments_wrong_types_and_out_of_range_pages_fail_before_api(self) -> None:
+        cases = (
+            call("agent_session_status", {"session_id": "session-1", "extra": True}),
+            call("agent_session_status", {"session_id": 7}),
+            call("agent_control", {"request_id": "r", "session_id": "s"}),
+            call("agent_events", {"session_id": "s", "cursor": -1}),
+            call("agent_events", {"session_id": "s", "limit": 0}),
+            call("agent_events", {"session_id": "s", "limit": 1001}),
+            call("agent_result", {"run_id": ""}),
+        )
+        for request in cases:
+            with self.subTest(request=request):
+                response = self.server.handle(request)
+                self.assertEqual(-32602, response["error"]["code"])
+        self.assertEqual([], self.client.calls)
+
+    def test_control_api_errors_are_bounded_and_never_forward_raw_payload_secrets(self) -> None:
+        self.client.error = ControlClientError(503, {
+            "code": "CONTROL_CONNECT_FAILED",
+            "safe_message": "token=raw-api-secret " + ("x" * 20_000),
+            "nonce": "raw-nonce-secret",
+        })
+
+        response = self.server.handle(call("agent_result", {"run_id": "run-1"}))
+
+        encoded = json.dumps(response)
+        self.assertEqual("2.0", response["jsonrpc"])
+        self.assertTrue(response["result"]["isError"])
+        payload = json.loads(response["result"]["content"][0]["text"])
+        self.assertEqual({
+            "code": "CONTROL_CONNECT_FAILED",
+            "safe_message": "Control API request failed safely",
+            "status": 503,
+        }, payload)
+        self.assertLess(len(encoded), 1024)
+        self.assertNotIn("raw-api-secret", encoded)
+        self.assertNotIn("raw-nonce-secret", encoded)
+
+    def test_unexpected_client_errors_are_fixed_bounded_tool_errors(self) -> None:
+        self.client.error = RuntimeError("password=do-not-echo")
+
+        response = self.server.handle(call("agent_session_status", {"session_id": "session-1"}))
+
+        encoded = json.dumps(response)
+        self.assertTrue(response["result"]["isError"])
+        self.assertLess(len(encoded), 1024)
+        self.assertNotIn("do-not-echo", encoded)
+        self.assertEqual("MCP_INTERNAL_ERROR", json.loads(response["result"]["content"][0]["text"])["code"])
+
+    def test_notifications_have_no_response_and_ping_stays_offline(self) -> None:
+        initialized = {"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}}
+
+        self.assertIsNone(self.server.handle(initialized))
+        self.assertEqual({"jsonrpc": "2.0", "id": 2, "result": {}}, self.server.handle(rpc("ping", {}, 2)))
+        self.assertEqual([], self.client.calls)
+
+    def test_self_test_is_deterministic_and_constructs_no_control_client(self) -> None:
+        output = io.StringIO()
+        errors = io.StringIO()
+
+        with patch.object(self.agent_mcp, "ControlApiClient", side_effect=AssertionError("API contact")):
+            with patch("pathlib.Path.read_text", side_effect=AssertionError("filesystem contact")):
+                with redirect_stdout(output), redirect_stderr(errors):
+                    first = self.agent_mcp.main(["--self-test"])
+                    second = self.agent_mcp.main(["--self-test"])
+
+        self.assertEqual(0, first)
+        self.assertEqual(0, second)
+        self.assertEqual(output.getvalue().splitlines()[0], output.getvalue().splitlines()[1])
+        self.assertEqual({"ok": True, "protocolVersion": "2024-11-05", "server": "tibia-re-agent", "tools": 5}, json.loads(output.getvalue().splitlines()[0]))
+        self.assertEqual("", errors.getvalue())
+
+    def test_module_imports_and_calls_are_statically_isolated(self) -> None:
+        source_path = Path(self.agent_mcp.__file__)
+        tree = ast.parse(source_path.read_text(encoding="utf-8"))
+        forbidden_modules = {
+            "subprocess", "docker", "ollama", "official_adapter",
+            "track_a_authority_bridge", "persistent_store", "store",
+        }
+        imported: set[str] = set()
+        called_names: set[str] = set()
+        called_attributes: set[str] = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                imported.update(alias.name for alias in node.names)
+            elif isinstance(node, ast.ImportFrom):
+                imported.add(node.module or "")
+            elif isinstance(node, ast.Call):
+                if isinstance(node.func, ast.Name):
+                    called_names.add(node.func.id)
+                elif isinstance(node.func, ast.Attribute):
+                    called_attributes.add(node.func.attr)
+
+        for module in imported:
+            self.assertFalse(any(part in module.lower() for part in forbidden_modules), module)
+        for name in ("open", "exec", "eval", "compile", "__import__"):
+            self.assertNotIn(name, called_names)
+        for attribute in ("read_text", "write_text", "unlink", "mkdir", "system", "popen"):
+            self.assertNotIn(attribute, called_attributes)
+
+
+if __name__ == "__main__":
+    unittest.main()

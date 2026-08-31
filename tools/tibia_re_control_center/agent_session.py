@@ -762,14 +762,21 @@ class AgentSessionCoordinator:
                     )
                     persisted.append(durable)
 
-                if not self.control.stop_all(
+                stopped = self.control.stop_all(
                     reason_code="AGENT_OWNER_STOP",
                     state_persister=persist_stop,
-                ):
+                )
+                if persisted:
+                    self._sessions[session_id] = persisted[-1]
+                if not stopped:
+                    if persisted:
+                        raise ValidationError(
+                            "OWNER_STOP_CLEANUP_FAILED",
+                            "owner STOP is durable but harness cleanup did not converge",
+                        )
                     raise ValidationError("OWNER_STOP_DURABILITY_FAILED", "owner STOP did not durably converge")
                 if not persisted:
                     raise ValidationError("OWNER_STOP_DURABILITY_FAILED", "owner STOP is missing its atomic session transition")
-                self._sessions[session_id] = persisted[-1]
                 return {"status": "STOPPED", "session": self.snapshot(session_id)}
             if parsed is OwnerControlCommand.PAUSE:
                 if session.stop_latched:

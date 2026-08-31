@@ -376,6 +376,87 @@ class AgentSessionTests(unittest.TestCase):
         self.assertEqual(before_control.stop_latched, control.stop_latched)
         self.assertFalse(any(event.get("kind") == "OWNER_STOP" for event in self.agent.snapshot("session-1")["events"]))
 
+    def test_failed_active_pause_rolls_back_run_flag_but_keeps_inflight_cancelled(self):
+        self.use_guarded()
+        self.submit()
+        entered = threading.Event()
+        release = threading.Event()
+        replies = []
+
+        def wait_for_authority():
+            entered.set()
+            release.wait(timeout=2)
+
+        self.adapter.authority_wait_hook = wait_for_authority
+        action_thread = threading.Thread(target=lambda: replies.append(self.propose("pause-fault-action")))
+        action_thread.start()
+        self.assertTrue(entered.wait(timeout=1))
+        token = self.agent._inflight[("session-1", "pause-fault-action")]
+        self.store.inject_fault("agent_owner_pause", "error")
+        try:
+            with self.assertRaises(DurabilityError):
+                self.agent.owner_control("session-1", OwnerControlCommand.PAUSE)
+            durable = self.store.load_agent_session("session-1")
+            self.assertFalse(durable.pause_latched)
+            self.assertEqual("RUNNING", durable.operational_state.value)
+            self.assertFalse(any(
+                event.get("kind") == "OWNER_PAUSE"
+                for event in self.agent.snapshot("session-1")["events"]
+            ))
+            self.assertFalse(self.control.runs["run-1"].paused)
+            self.assertTrue(token.cancelled)
+        finally:
+            release.set()
+            action_thread.join(timeout=2)
+        self.assertFalse(action_thread.is_alive())
+        self.assertEqual("NOT_PERFORMED", replies[0].status)
+        self.assertEqual([], self.adapter.physical_effects)
+
+        self.adapter.authority_wait_hook = None
+        paused = self.agent.owner_control("session-1", OwnerControlCommand.PAUSE)
+        self.assertEqual("PAUSED", paused["status"])
+        self.assertTrue(self.control.runs["run-1"].paused)
+        self.assertEqual("REFUSED_OWNER_PAUSED", self.propose("after-valid-pause").status)
+        self.assertEqual([], self.adapter.physical_effects)
+
+    def test_stop_cleanup_failure_preserves_durable_and_cached_stop_idempotently(self):
+        self.use_guarded()
+        self.submit()
+        starting_generation = self.control.control_generation
+
+        def fail_cleanup(reason):
+            del reason
+            self.adapter.emergency_stop_calls += 1
+            raise RuntimeError("cleanup failed")
+
+        self.adapter.emergency_stop = fail_cleanup
+        with self.assertRaises(ValidationError) as raised:
+            self.agent.owner_control("session-1", OwnerControlCommand.STOP)
+
+        durable = self.store.load_agent_session("session-1")
+        self.assertTrue(durable.stop_latched)
+        self.assertEqual("STOPPED", durable.operational_state.value)
+        snapshot = self.agent.snapshot("session-1")
+        self.assertTrue(snapshot["stop_latched"])
+        self.assertEqual("STOPPED", snapshot["operational_state"])
+        self.assertTrue(self.control.control_state.stop_latched)
+        self.assertEqual(starting_generation + 1, self.control.control_generation)
+        self.assertEqual("OWNER_STOP_CLEANUP_FAILED", raised.exception.code)
+        self.assertEqual(1, self.adapter.emergency_stop_calls)
+        self.assertEqual(1, sum(
+            event.get("kind") == "OWNER_STOP"
+            for event in snapshot["events"]
+        ))
+
+        retried = self.agent.owner_control("session-1", OwnerControlCommand.STOP)
+        self.assertEqual("STOPPED", retried["status"])
+        self.assertEqual(starting_generation + 1, self.control.control_generation)
+        self.assertEqual(1, self.adapter.emergency_stop_calls)
+        self.assertEqual(1, sum(
+            event.get("kind") == "OWNER_STOP"
+            for event in retried["session"]["events"]
+        ))
+
     def test_event_pruning_cannot_erase_action_budget_or_ambiguity(self):
         guarded = self.use_guarded()
         self.submit()

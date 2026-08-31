@@ -970,9 +970,9 @@ class MutationCoordinator:
     def pause_run(self, run_id: str, *, durable_hook: Callable[[], None] | None = None) -> None:
         with self.control_transition_lock, self.dispatch_gate:
             run = self._run(run_id)
-            run.paused = True
             if durable_hook is not None:
                 durable_hook()
+            run.paused = True
 
     def resume_run(self, run_id: str) -> bool:
         run = self._run(run_id)

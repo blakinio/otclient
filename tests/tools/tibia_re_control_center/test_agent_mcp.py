@@ -37,16 +37,16 @@ TASK = {
 class FakeControlApiClient:
     def __init__(self) -> None:
         self.calls: list[tuple[object, ...]] = []
-        self.response: dict[str, object] = {"status": "OK"}
+        self.response: object = {"status": "OK"}
         self.error: BaseException | None = None
 
-    def get(self, path: str) -> dict[str, object]:
+    def get(self, path: str) -> object:
         self.calls.append(("GET", path))
         if self.error is not None:
             raise self.error
         return self.response
 
-    def post(self, path: str, body: dict[str, object], *, request_id: str) -> dict[str, object]:
+    def post(self, path: str, body: dict[str, object], *, request_id: str) -> object:
         self.calls.append(("POST", path, body, request_id))
         if self.error is not None:
             raise self.error
@@ -277,22 +277,39 @@ class AgentMcpTests(unittest.TestCase):
         self.assertEqual({"jsonrpc": "2.0", "id": 3, "result": {}}, responses[2])
         self.assertEqual([], self.client.calls)
 
-    def test_json_rpc_ids_are_secret_safe_finite_and_bounded(self) -> None:
+    def test_json_rpc_ids_reject_null_secret_aliases_and_non_integer_numbers_without_dispatch(self) -> None:
+        sentinel = "SENTINEL_RPC_SECRET"
         cases = (
-            "token=do-not-echo",
+            None,
+            f"secret={sentinel}",
+            f"CrEdEnTiAl:{sentinel}",
+            f"CONTROL-NONCE={sentinel}",
+            f"api_key={sentinel}",
+            f"Authorization: Bearer {sentinel}12345678",
+            f"PRIVATE-KEY={sentinel}",
             "x" * 129,
             9_007_199_254_740_992,
+            1.5,
             float("nan"),
             float("inf"),
         )
         for request_id in cases:
             with self.subTest(request_id=repr(request_id)):
-                response = self.server.handle(rpc("tools/list", {}, request_id))
+                response = self.server.handle(call(
+                    "agent_result", {"run_id": "run-1"}, request_id,
+                ))
                 encoded = json.dumps(response)
                 self.assertEqual(-32600, response["error"]["code"])
                 self.assertIsNone(response["id"])
                 self.assertLess(len(encoded), 1024)
-                self.assertNotIn("do-not-echo", encoded)
+                self.assertNotIn(sentinel, encoded)
+        self.assertEqual([], self.client.calls)
+
+    def test_valid_string_and_json_safe_integer_rpc_ids_remain_admitted(self) -> None:
+        for request_id in ("rpc-safe-1", -9_007_199_254_740_991, 0, 9_007_199_254_740_991):
+            with self.subTest(request_id=request_id):
+                response = self.server.handle(rpc("ping", {}, request_id))
+                self.assertEqual({"jsonrpc": "2.0", "id": request_id, "result": {}}, response)
         self.assertEqual([], self.client.calls)
 
     def test_secret_shaped_task_keys_and_values_are_rejected_before_api_call(self) -> None:
@@ -318,6 +335,73 @@ class AgentMcpTests(unittest.TestCase):
                 self.assertNotIn("abcdefghijklmnop", encoded)
         self.assertEqual([], self.client.calls)
 
+    def test_all_outer_ids_and_nested_task_text_use_the_control_privacy_vocabulary(self) -> None:
+        cases: list[tuple[str, dict[str, object], str]] = [
+            (
+                "agent_session_status",
+                {"session_id": "CrEdEnTiAl=SENTINEL_SESSION"},
+                "SENTINEL_SESSION",
+            ),
+            (
+                "agent_control",
+                {
+                    "request_id": "control_nonce=SENTINEL_REQUEST",
+                    "session_id": "session-1",
+                    "command": "PAUSE",
+                },
+                "SENTINEL_REQUEST",
+            ),
+            (
+                "agent_control",
+                {
+                    "request_id": "request-1",
+                    "session_id": "Authorization: Bearer SENTINEL_SESSION_BEARER",
+                    "command": "PAUSE",
+                },
+                "SENTINEL_SESSION_BEARER",
+            ),
+            (
+                "agent_events",
+                {"session_id": "API-KEY=SENTINEL_EVENTS"},
+                "SENTINEL_EVENTS",
+            ),
+            (
+                "agent_result",
+                {"run_id": "private-key=SENTINEL_RUN"},
+                "SENTINEL_RUN",
+            ),
+        ]
+        task_text_cases = (
+            ("objective", "api_key=SENTINEL_OBJECTIVE"),
+            ("session_id", "credential=SENTINEL_TASK_SESSION"),
+            ("task_id", "SeCrEt=SENTINEL_TASK_ID"),
+            ("run_id", "CONTROL-NONCE=SENTINEL_TASK_RUN"),
+            ("idempotency_key", "AUTHORIZATION=SENTINEL_TASK_IDEMPOTENCY"),
+        )
+        for field, value in task_text_cases:
+            task = json.loads(json.dumps(TASK))
+            task[field] = value
+            cases.append((
+                "agent_submit_task",
+                {"request_id": "submit-safe", "task": task},
+                "SENTINEL" + value.split("SENTINEL", 1)[1],
+            ))
+        nested_task = json.loads(json.dumps(TASK))
+        nested_task["client_identity"]["version"] = "PRIVATE-KEY=SENTINEL_NESTED"
+        cases.append((
+            "agent_submit_task",
+            {"request_id": "submit-nested", "task": nested_task},
+            "SENTINEL_NESTED",
+        ))
+
+        for index, (name, arguments, sentinel) in enumerate(cases):
+            with self.subTest(index=index, name=name):
+                response = self.server.handle(call(name, arguments, index + 1))
+                encoded = json.dumps(response)
+                self.assertEqual(-32602, response["error"]["code"])
+                self.assertNotIn(sentinel, encoded)
+        self.assertEqual([], self.client.calls)
+
     def test_opaque_secret_capability_ref_is_not_resolved_or_rejected(self) -> None:
         task = json.loads(json.dumps(TASK))
         task["secret_capability_ref"] = "opaque-capability-1"
@@ -328,6 +412,15 @@ class AgentMcpTests(unittest.TestCase):
 
         self.assert_tool_payload(response, {"status": "OK"})
         self.assertEqual([("POST", "/v1/agent/tasks", task, "opaque-ref")], self.client.calls)
+
+        self.client.calls.clear()
+        task["secret_capability_ref"] = "credential=SENTINEL_CAPABILITY_REF"
+        rejected = self.server.handle(call("agent_submit_task", {
+            "request_id": "opaque-ref-secret", "task": task,
+        }))
+        self.assertEqual(-32602, rejected["error"]["code"])
+        self.assertNotIn("SENTINEL_CAPABILITY_REF", json.dumps(rejected))
+        self.assertEqual([], self.client.calls)
 
     def test_control_cannot_express_click_type_shell_or_process_commands(self) -> None:
         for command in ("CLICK", "TYPE", "SHELL", "PROCESS", "click", "PAUSE "):
@@ -388,6 +481,43 @@ class AgentMcpTests(unittest.TestCase):
         self.assertLess(len(encoded), 1024)
         self.assertNotIn("do-not-echo", encoded)
         self.assertEqual("MCP_INTERNAL_ERROR", json.loads(response["result"]["content"][0]["text"])["code"])
+
+    def test_secret_bearing_success_payloads_become_one_fixed_safe_tool_error(self) -> None:
+        sentinel = "SENTINEL_API_SUCCESS_SECRET"
+        cases = (
+            {"status": "OK", "nested": {"control_nonce": sentinel}},
+            {"status": "OK", "items": [{"note": f"Api-Key={sentinel}"}]},
+            {"status": "OK", "nested": [{"Authorization": f"Bearer {sentinel}12345678"}]},
+            {"status": "OK", "private-key": sentinel},
+        )
+        expected = {
+            "code": "MCP_UNSAFE_API_RESPONSE",
+            "safe_message": "Control API response violated the MCP privacy boundary",
+        }
+        for payload in cases:
+            with self.subTest(payload=payload):
+                self.client.response = payload
+                response = self.server.handle(call("agent_result", {"run_id": "run-1"}))
+                encoded = json.dumps(response)
+                self.assertTrue(response["result"]["isError"])
+                self.assertEqual(expected, json.loads(response["result"]["content"][0]["text"]))
+                self.assertLess(len(encoded), 1024)
+                self.assertNotIn(sentinel, encoded)
+
+    def test_success_payload_type_and_size_are_guarded_before_output(self) -> None:
+        cases = (
+            (["not", "a", "mapping"], "MCP_INVALID_API_RESPONSE"),
+            ({"not_json": object()}, "MCP_INVALID_API_RESPONSE"),
+            ({"large": "x" * (self.agent_mcp.MAX_RESULT_BYTES + 1)}, "MCP_API_RESPONSE_TOO_LARGE"),
+        )
+        for payload, expected_code in cases:
+            with self.subTest(expected_code=expected_code):
+                self.client.response = payload
+                response = self.server.handle(call("agent_result", {"run_id": "run-1"}))
+                self.assertTrue(response["result"]["isError"])
+                result = json.loads(response["result"]["content"][0]["text"])
+                self.assertEqual(expected_code, result["code"])
+                self.assertLess(len(json.dumps(response)), 1024)
 
     def test_notifications_have_no_response_and_ping_stays_offline(self) -> None:
         initialized = {"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}}

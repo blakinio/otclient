@@ -8,11 +8,13 @@ import re
 import sys
 from math import isfinite
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from urllib.parse import urlencode
 
 from .canonical import jcs_dumps
 from .control_cli import ControlApiClient, ControlClientError, _default_data_root
+from .model import PrivacyError, ValidationError, validate_opaque_id
+from .privacy import ensure_no_secret_material
 
 SERVER_NAME = "tibia-re-agent"
 SERVER_VERSION = "1.0"
@@ -56,14 +58,6 @@ _TASK_KEYS = (
     "runtime_access",
     "required_evidence",
     "secret_capability_ref",
-)
-_SECRET_KEY = re.compile(
-    r"(^|_)(?:password|passwd|token|credential|authorization|auth|api_?key|private_?key|secret)(?:_|$)",
-    re.IGNORECASE,
-)
-_SECRET_TEXT = re.compile(
-    r"(?:\b(?:password|passwd|token|api[_-]?token|access[_-]?token|authorization)\b\s*[:=]\s*\S+|\bbearer\s+\S{8,})",
-    re.IGNORECASE,
 )
 _SAFE_CODE = re.compile(r"^[A-Z][A-Z0-9_]{0,63}$")
 _SHA40 = re.compile(r"^[0-9a-f]{40}$")
@@ -211,6 +205,10 @@ class _InvalidParams(ValueError):
     pass
 
 
+class _PrivacyRejected(_InvalidParams):
+    pass
+
+
 class _DuplicateKey(ValueError):
     pass
 
@@ -236,20 +234,80 @@ def _exact_mapping(value: object, keys: set[str]) -> dict[str, object]:
     return value
 
 
-def _text(value: object, *, identifier: bool = False) -> str:
-    if not isinstance(value, str) or not value:
-        raise _InvalidParams("a non-empty string is required")
+def _validate_json_structure(
+    value: object,
+    *,
+    depth: int = 0,
+    count: list[int] | None = None,
+) -> None:
+    if count is None:
+        count = [0]
+    count[0] += 1
+    if count[0] > 4_096 or depth > 32:
+        raise _InvalidParams("value exceeds the admitted structure bounds")
+    if isinstance(value, dict):
+        for key, child in value.items():
+            if not isinstance(key, str):
+                raise _InvalidParams("mapping keys must be strings")
+            try:
+                key.encode("utf-8", "strict")
+            except UnicodeEncodeError as exc:
+                raise _InvalidParams("mapping keys must be valid UTF-8") from exc
+            _validate_json_structure(child, depth=depth + 1, count=count)
+        return
+    if isinstance(value, (list, tuple)):
+        for child in value:
+            _validate_json_structure(child, depth=depth + 1, count=count)
+        return
+    if isinstance(value, str):
+        try:
+            value.encode("utf-8", "strict")
+        except UnicodeEncodeError as exc:
+            raise _InvalidParams("text must be valid UTF-8") from exc
+        return
+    if value is None or isinstance(value, bool):
+        return
+    if isinstance(value, int):
+        if abs(value) > MAX_SAFE_INTEGER:
+            raise _InvalidParams("integer is outside the JSON-safe range")
+        return
+    if isinstance(value, float):
+        if not isfinite(value):
+            raise _InvalidParams("number must be finite")
+        return
+    raise _InvalidParams("value contains an unsupported JSON type")
+
+
+def _guard_secret_safe(
+    value: object,
+    *,
+    identifier: bool = False,
+    require_text: bool = False,
+    key_path: str,
+) -> object:
+    _validate_json_structure(value)
     try:
-        encoded = value.encode("utf-8", "strict")
-    except UnicodeEncodeError as exc:
-        raise _InvalidParams("text must be valid UTF-8") from exc
-    if identifier and (
-        len(encoded) > 128
-        or any(character in value for character in ("/", "\\", "\x00"))
-        or value in {".", ".."}
-    ):
-        raise _InvalidParams("identifier is outside the admitted grammar")
+        ensure_no_secret_material(value, key_path=key_path)
+    except PrivacyError as exc:
+        raise _PrivacyRejected("secret material is not admitted") from exc
+    if identifier or require_text:
+        if not isinstance(value, str) or not value:
+            raise _InvalidParams("a non-empty string is required")
+    if identifier:
+        try:
+            validate_opaque_id(value, field_name=key_path, max_bytes=128)
+        except ValidationError as exc:
+            raise _InvalidParams("identifier is outside the admitted grammar") from exc
     return value
+
+
+def _text(value: object, *, identifier: bool = False, key_path: str = "mcp.text") -> str:
+    return cast(str, _guard_secret_safe(
+        value,
+        identifier=identifier,
+        require_text=True,
+        key_path=key_path,
+    ))
 
 
 def _integer(value: object, minimum: int, maximum: int) -> int:
@@ -258,33 +316,10 @@ def _integer(value: object, minimum: int, maximum: int) -> int:
     return value
 
 
-def _scan_secret_material(value: object, *, key: str = "", depth: int = 0, count: list[int] | None = None) -> None:
-    if count is None:
-        count = [0]
-    count[0] += 1
-    if count[0] > 4_096 or depth > 32:
-        raise _InvalidParams("task exceeds the admitted structure bounds")
-    if key != "secret_capability_ref" and _SECRET_KEY.search(key):
-        raise _InvalidParams("secret-shaped task fields are forbidden")
-    if isinstance(value, str):
-        if _SECRET_TEXT.search(value):
-            raise _InvalidParams("secret-shaped task text is forbidden")
-        return
-    if isinstance(value, dict):
-        for child_key, child in value.items():
-            if not isinstance(child_key, str):
-                raise _InvalidParams("task keys must be strings")
-            _scan_secret_material(child, key=child_key, depth=depth + 1, count=count)
-        return
-    if isinstance(value, (list, tuple)):
-        for child in value:
-            _scan_secret_material(child, key=key, depth=depth + 1, count=count)
-
-
 def _validate_task(value: object) -> dict[str, object]:
     if not isinstance(value, dict):
         raise _InvalidParams("task must be a mapping")
-    _scan_secret_material(value)
+    _guard_secret_safe(value, key_path="mcp.task")
     task = _exact_mapping(value, set(_TASK_KEYS))
     if task["schema"] != "otclient.local-agent.task.v1":
         raise _InvalidParams("task schema is not admitted")
@@ -361,38 +396,60 @@ def _rpc_error(request_id: object, code: int, message: str) -> dict[str, object]
 
 
 def _safe_rpc_id(value: object) -> bool:
-    if value is None:
-        return True
     if isinstance(value, bool):
         return False
     if isinstance(value, str):
         try:
             encoded = value.encode("utf-8", "strict")
-        except UnicodeEncodeError:
+            _guard_secret_safe(value, key_path="jsonrpc.id")
+        except (UnicodeEncodeError, _InvalidParams):
             return False
-        return len(encoded) <= 128 and _SECRET_TEXT.search(value) is None
+        return len(encoded) <= 128
     if isinstance(value, int):
         return abs(value) <= MAX_SAFE_INTEGER
-    if isinstance(value, float):
-        return isfinite(value) and abs(value) <= MAX_SAFE_INTEGER
     return False
 
 
-def _tool_payload(payload: dict[str, object], *, is_error: bool = False) -> dict[str, object]:
+def _fixed_tool_error(code: str, safe_message: str) -> dict[str, object]:
+    return {
+        "content": [{"type": "text", "text": jcs_dumps({
+            "code": code,
+            "safe_message": safe_message,
+        })}],
+        "isError": True,
+    }
+
+
+def _tool_payload(payload: object, *, is_error: bool = False) -> dict[str, object]:
+    if not isinstance(payload, dict):
+        return _fixed_tool_error(
+            "MCP_INVALID_API_RESPONSE",
+            "Control API response was not valid JSON",
+        )
+    try:
+        _guard_secret_safe(payload, key_path="control_api.response")
+    except _PrivacyRejected:
+        return _fixed_tool_error(
+            "MCP_UNSAFE_API_RESPONSE",
+            "Control API response violated the MCP privacy boundary",
+        )
+    except _InvalidParams:
+        return _fixed_tool_error(
+            "MCP_INVALID_API_RESPONSE",
+            "Control API response was not valid JSON",
+        )
     try:
         text = jcs_dumps(payload)
-    except (TypeError, ValueError):
-        text = jcs_dumps({
-            "code": "MCP_INVALID_API_RESPONSE",
-            "safe_message": "Control API response was not valid JSON",
-        })
-        is_error = True
+    except (TypeError, ValueError, RecursionError):
+        return _fixed_tool_error(
+            "MCP_INVALID_API_RESPONSE",
+            "Control API response was not valid JSON",
+        )
     if len(text.encode("utf-8")) > MAX_RESULT_BYTES:
-        text = jcs_dumps({
-            "code": "MCP_API_RESPONSE_TOO_LARGE",
-            "safe_message": "Control API response exceeded the MCP result bound",
-        })
-        is_error = True
+        return _fixed_tool_error(
+            "MCP_API_RESPONSE_TOO_LARGE",
+            "Control API response exceeded the MCP result bound",
+        )
     return {"content": [{"type": "text", "text": text}], "isError": is_error}
 
 
@@ -432,8 +489,6 @@ class AgentMcpServer:
                 }))
             else:
                 raise _InvalidParams("unknown tool")
-            if not isinstance(payload, dict):
-                raise TypeError("Control API response is not a mapping")
             return _tool_payload(payload)
         except ControlClientError as exc:
             code = exc.payload.get("code")

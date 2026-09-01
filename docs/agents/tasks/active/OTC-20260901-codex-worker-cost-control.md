@@ -1,18 +1,18 @@
 ---
 task_id: OTC-20260901-codex-worker-cost-control
-status: validating
+status: ready
 agent: ChatGPT
 session_role: coordinator_cost_guard_maintainer
 project_lane: otclient
 lane: AGENT-ORCHESTRATION
 track_id: repository-governance
 task_kind: documentation
-phase: exact_head_validation
+phase: exact_head_ready
 branch: docs/OTC-20260901-codex-cost-control
 base_branch: main
 base_sha: 427a9e3ddca0f2c184b75741fb9b067a8a6520e5
 created: 2026-09-01T23:48:30+02:00
-updated_at: 2026-09-02T00:02:29+02:00
+updated_at: 2026-09-02T00:04:48+02:00
 risk: low
 execution_class: local_owner_pc
 execution_mode: remote_desktop_plus_github
@@ -64,9 +64,9 @@ blocks: []
 cross_repository_task_ids: []
 related_pr: 849
 invocation_started_at: 2026-09-01T23:48:30+02:00
-last_progress_at: 2026-09-02T00:02:29+02:00
-ci_checks_for_current_head: 0
-ci_check_generation: pr849-bound-pending
+last_progress_at: 2026-09-02T00:04:48+02:00
+ci_checks_for_current_head: 2
+ci_check_generation: green-2f29896a989e
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -74,8 +74,12 @@ identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 0
 stall_warnings: 0
-current_blocker: exact-head GitHub CI/governance pending after PR #849 binding
-next_action: publish this PR-bound checkpoint, then require exact-head CI/governance, zero review findings, prompt-contract 1.2.0 readback and current-main freshness before readiness/merge
+audit_result: PASS
+audit_evidence: deterministic prompt-contract 1.2.0 readback, 8-path scope, local dispatcher 33/33 tests, zero GitHub review findings
+e2e_result: NOT_APPLICABLE
+e2e_reason: documentation/prompt/execution-policy hardening only; no product/runtime/input/credential behavior changed
+current_blocker: none
+next_action: publish this readiness checkpoint, require its final exact-head CI/governance and unchanged review/main freshness, then mark Ready and squash-merge PR #849
 ---
 
 # Codex worker cost-control guard
@@ -88,12 +92,12 @@ Persist the measured root causes of the 2026-09-01 coordinator token burn and ma
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-02T00:02:29+02:00
-head: d1d30ca45aad70c918eee7db759428dd50da59b2
-head_semantics: cost_control_content_commit_after_current_main_restack
+updated_at: 2026-09-02T00:04:48+02:00
+head: 2f29896a989e655cfaf900fd5d19b9bc222f535e
+head_semantics: last_verified_exact_head_before_readiness_checkpoint
 branch: docs/OTC-20260901-codex-cost-control
 pr: 849
-status: validating
+status: ready
 context_routes:
   - agent-governance
   - codex-model-routing
@@ -109,6 +113,7 @@ owned_paths:
   - docs/agents/programs/OTC_VISION_P2_READONLY_COORDINATION_V1.md
   - docs/agents/programs/OTC_VISION_P2_READONLY_PROMPT_EVAL_V1.md
 proven:
+  - PR #849 exact head 2f29896a989e655cfaf900fd5d19b9bc222f535e passed CI run 33564319173 and Track A governance run 33564319040 with zero review threads/reviews and behind=0 from main.
   - direct Codex executions bypassed the local bounded dispatcher, verified GitHub snapshot and context budget.
   - an edge-transport Terra/high session repeatedly waited for CI and exceeded 23 million cumulative context tokens while the primary Codex rate-limit telemetry reached 94 percent used.
   - the same exact edge-transport head received two Sol/medium audits before material head change.
@@ -154,5 +159,5 @@ validation:
     result: PASS
     evidence: TRACK_A_AGENT_RUNTIME_GOVERNANCE_PASS=true.
 blockers: []
-next_action: publish this PR-bound checkpoint, then require exact-head CI/governance, zero review findings, prompt-contract 1.2.0 readback and current-main freshness before readiness/merge
+next_action: publish this readiness checkpoint, require its final exact-head CI/governance and unchanged review/main freshness, then mark Ready and squash-merge PR #849
 ```

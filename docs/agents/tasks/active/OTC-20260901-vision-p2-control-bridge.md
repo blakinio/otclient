@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260901-vision-p2-control-bridge
-status: validating
+status: waiting
 agent: chatgpt-gpt-5.6-sol
 session_role: phase2_worker
 worker_alias: OTC-VISION-P2-CONTROL-BRIDGE
@@ -14,7 +14,7 @@ branch: feat/OTC-20260901-vision-p2-control-bridge
 base_branch: main
 base_main: d1cb8722c3116a0e0aeb72b9b360712f43151f17
 created: 2026-09-01T16:27:39+02:00
-updated_at: 2026-09-01T23:06:00+02:00
+updated_at: 2026-09-01T23:08:00+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: isolated_worker_branch
@@ -75,10 +75,10 @@ depends_on:
   - main e883543403d5430d7b1d287f59043b23c98f37d6
 related_prs:
   - PR #830 Wave 1 worker Draft
-current_blocker: exact-head coordinator review 5500323278 returned two material authority/lifetime findings for repair
-next_action: push the restacked authority/lifetime repair with a lease and inspect fresh exact-head checks
+current_blocker: fresh exact-head GitHub validation is queued for the restacked repair
+next_action: after the queued exact-head Track A, Package A, Package B and CI checks complete, request coordinator re-review of Draft PR #830
 invocation_started_at: 2026-09-01T16:49:00+02:00
-last_progress_at: 2026-09-01T23:06:00+02:00
+last_progress_at: 2026-09-01T23:08:00+02:00
 ci_checks_for_current_head: 4
 ci_check_generation: exact-head-green-274955658
 terminal_ci_wait_started_at: null
@@ -174,11 +174,11 @@ runtime_access: none
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T23:06:00+02:00
+updated_at: 2026-09-01T23:08:00+02:00
 head: d41deb135f212517f7931a54b2dae9b1d7746bf2
 branch: feat/OTC-20260901-vision-p2-control-bridge
 pr: 830
-status: validating
+status: waiting
 context_routes:
   - phase-2-read-only-coordination
   - track-a-governance
@@ -211,6 +211,7 @@ proven:
   - this invocation performed no Synology/Kasm/Official Tibia observation or mutation and used runtime_access none.
 derived:
   - focused authority/lifetime repair tests (20), full WSL relevant suite (263, 1 skipped), foundation audit, Package A/P1 audits, Package B audit and Package B Chrome/CLI/restart E2E pass on the repair tree.
+  - restacked repair checkpoint 58b6bfddab1001b7ca538af9c331061f508dd6d5 was force-pushed with an exact expected remote lease; first aggregate PR observation shows its workflow generation queued, with no requested changes or review threads.
 unknown:
   - independent coordinator reclassification of repaired Draft PR #830.
 conflicts: []
@@ -276,7 +277,7 @@ validation:
     result: PASS
     evidence: all required safety, authority, Chrome/CLI/restart and physical-0/0 assertions passed; Package A scripts require module invocation from repository root.
 blockers: []
-next_action: push implementation commit d41deb135f212517f7931a54b2dae9b1d7746bf2 and this checkpoint using force-with-lease, then inspect fresh exact-head required checks.
+next_action: after the queued exact-head Track A, Package A, Package B and CI checks complete, request coordinator re-review of Draft PR #830.
 ```
 
 ## Recovery checkpoint
@@ -287,19 +288,19 @@ recovery:
   generation: 1
   session_id: control-bridge-repair-20260901T230401+0200
   session_started_at: 2026-09-01T22:16:27+02:00
-  checkpointed_at: 2026-09-01T23:06:00+02:00
-  last_progress_at: 2026-09-01T23:06:00+02:00
+  checkpointed_at: 2026-09-01T23:08:00+02:00
+  last_progress_at: 2026-09-01T23:08:00+02:00
   phase: validating
   exact_head: d41deb135f212517f7931a54b2dae9b1d7746bf2
   pull_request: 830
-  active_operation: publish restacked repair with force-with-lease
+  active_operation: ordinary exact-head GitHub validation wait
   external_run_ids: []
   operation_started_at: null
   wait_deadline_at: null
-  check_generation: repair-pending-push
-  checks_used: 0
-  status: active
+  check_generation: exact-head-58b6bfdda
+  checks_used: 1
+  status: waiting
   safe_to_resume: true
-  resume_condition: repair checkpoint is published and exact-head GitHub checks exist
-  next_action: push with force-with-lease, then inspect the aggregate exact-head required checks once
+  resume_condition: aggregate exact-head Track A, Package A, Package B and CI checks complete
+  next_action: inspect the one aggregate exact-head check snapshot, then request coordinator re-review if green
 ```

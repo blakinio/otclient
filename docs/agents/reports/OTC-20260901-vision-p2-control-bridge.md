@@ -136,3 +136,8 @@ execution has the pre-existing import-path limitation and is not a product failu
 Fresh exact-head audit, Package A/Package B/Track A and CI remain pending after
 the repair commit is published. The Draft PR remains coordinator-owned for
 classification; this worker will not merge or promote it.
+
+The restacked repair/checkpoint was force-pushed with an exact remote lease.
+The first aggregate observation of the new PR head found its workflow generation
+queued; no requested changes or review threads are present. Per the ordinary-CI
+limit, this worker is now waiting for the next invocation rather than polling.

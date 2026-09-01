@@ -13,8 +13,9 @@ base_branch: main
 trusted_main: 565bce8d70311048380556014978666771da598c
 parent_task: OTC-20260830-local-vision-agent-supervisor-foundation
 parent_pr: 820
+implementation_pr: 822
 created: 2026-09-01T00:00:00+02:00
-updated_at: 2026-09-01T13:24:00Z
+updated_at: 2026-09-01T13:28:00Z
 risk: high
 execution_class: repository_github_only
 execution_mode: chat
@@ -58,6 +59,9 @@ owned_paths:
   - docs/agents/programs/OTC_VISION_P2_READONLY_PROMPT_EVAL_V1.md
   - docs/agents/prompts/OTC_20260901_VISION_P2_READONLY_MULTIAGENT.md
   - docs/agents/prompts/OTC_20260901_VISION_P2_READONLY_ALIASES.md
+related_prs:
+  - PR #821: closed superseded; Ready-for-review connector mutation failed on GitHub GraphQL fullDatabaseId field
+  - PR #822: non-draft replacement from the same branch/base; current implementation PR
 reuses:
   - docs/superpowers/specs/2026-08-30-local-track-a-vision-agent-supervisor-design.md
   - docs/agents/prompts/OTCLIENT_TIBIA_RE_PARALLEL_RUNTIME_AGENT_PROMPTS_V1.md structural pattern only
@@ -122,17 +126,18 @@ The outgoing worker must not leave a stale `implementing` state on effort/contex
 - [x] Owner alias registry contains wave order and effort recommendation.
 - [x] Manual prompt eval matrix covers positive, negative, boundary, injection, continuation and closeout cases.
 - [x] Fresh proportionate prompt audit is recorded as `MANUAL STATIC CONTRACT REVIEW: PASS`; no automated/behavioral model-eval pass is claimed. A separate executable behavioral validator is unavailable in this GitHub-only session, matching the repository's established manual-static prompt-eval precedent.
-- [ ] Exact-head repository checks required for this documentation change are green on the final head before merge/readiness.
+- [x] Superseded Draft PR #821 is intentionally closed; replacement PR #822 is non-draft from the same branch/base.
+- [ ] Exact-head repository checks required for this documentation change are green on the final replacement head before merge.
 - [ ] PR/task lifecycle is truthful and terminal according to repository closeout rules.
 
 ## Context checkpoint
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T13:24:00Z
-head: bc4571e6e7ca653e722716a6e80669c5251976df
+updated_at: 2026-09-01T13:28:00Z
+head: 3d8d660db94bbf53bc896222167cef4231c357f3
 branch: docs/OTC-20260901-local-vision-agent-runtime-edge-readonly-prompts
-pr: 821
+pr: 822
 status: validating
 context_routes:
   - prompting-standard
@@ -148,19 +153,20 @@ owned_paths:
   - docs/agents/prompts/OTC_20260901_VISION_P2_READONLY_ALIASES.md
 proven:
   - main at task start is the verified merged foundation commit 565bce8d70311048380556014978666771da598c.
-  - PR 821 is Draft from the dedicated docs branch to main.
+  - PR 821 is intentionally closed superseded after the connector's Ready-for-review GraphQL fullDatabaseId failure; no scope or head rewrite was used for the replacement.
+  - PR 822 is the current non-draft implementation PR from the same branch to main.
   - exact-head readback confirms eight canonical aliases with consistent names in the prompt family and owner registry.
   - coordination and common contracts preserve mutation_authorized false and physical action budget/count zero.
   - older parallel-runtime anti-idle/input permission is explicitly non-authoritative and Phase 2 anti-idle/GUI input is false/forbidden.
   - checkpoint after every meaningful subtask, pre-heavy checkpointing, ROTATE semantics and one-line new-window continuation are explicit.
-  - prompt eval now records documented-manual-static review of 26 scenarios with every case PASS and zero allowed safety regression; it explicitly does not claim automated model behavior.
-  - prior exact head 1ee5dc4f3801fb0b0a956acc0c62a548705d7411 passed both CI and Track A agent runtime governance before the final eval-record change.
+  - prompt eval records documented-manual-static review of 26 scenarios with every case PASS and zero allowed safety regression; it explicitly does not claim automated model behavior.
+  - replacement entry head 3d8d660db94bbf53bc896222167cef4231c357f3 passed both CI and Track A agent runtime governance before this PR-number reconciliation commit.
 derived:
   - one common contract plus alias missions is safer than eight duplicated common contracts because safety/checkpoint changes remain single-source.
   - the old parallel-runtime prompt may be reused only structurally because its anti-idle/input authority is broader than Phase 2.
   - the repository's prior parallel-agent prompt-eval precedent supports documented manual static contract review when an executable model harness is unavailable, provided no automated behavior claim is made.
 unknown:
-  - exact required GitHub checks on the final head created by this checkpoint update.
+  - exact required GitHub checks on the replacement head created by this task reconciliation commit.
 conflicts: []
 first_failure:
   marker: none
@@ -168,6 +174,7 @@ first_failure:
 rejected_hypotheses:
   - direct reuse of OTCLIENT_TIBIA_RE_PARALLEL_RUNTIME_AGENT_PROMPTS_V1 is safe: rejected because it contains anti-idle/input authority not allowed by Phase 2.
   - absence of an executable model-harness makes static prompt review impossible: rejected by current PROMPT_EVAL_STANDARD allowance and the repository's existing documented-manual-static evaluation precedent.
+  - PR 821 can be promoted Draft-to-Ready through the connected mutation: rejected by reproducible GitHub GraphQL fullDatabaseId schema error; replacement PR 822 preserves the same branch/base safely.
 changed_paths:
   - docs/agents/tasks/active/OTC-20260901-local-vision-agent-runtime-edge-readonly-prompts.md
   - docs/agents/programs/OTC_VISION_P2_READONLY_COORDINATION_V1.md
@@ -177,16 +184,19 @@ changed_paths:
 validation:
   - command: exact-head GitHub readback of prompt-package files
     result: PASS
-    evidence: eight aliases, read-only authority and durable continuation contract read back from PR 821 branch
+    evidence: eight aliases, read-only authority and durable continuation contract read back from the prompt branch
   - command: manual structural prompt review against OTC_VISION_P2_READONLY_PROMPT_EVAL_V1
     result: PASS
     evidence: P2-E01 through P2-E26 PASS; no safety-critical regression; automated model trials explicitly NOT CLAIMED
   - command: manual continuation contract review against CONTEXT_HANDOFF.md and ANTI_STALL_AND_EXECUTION_BUDGET.md
     result: PASS
     evidence: checkpoint per meaningful subtask/material event, pre-heavy checkpoint, ready/waiting/blocked plus one next_action, ROTATE/new-window resume without chat
-  - command: GitHub Actions on 1ee5dc4f3801fb0b0a956acc0c62a548705d7411
+  - command: GitHub Actions on 3d8d660db94bbf53bc896222167cef4231c357f3
     result: PASS
     evidence: CI success; Track A agent runtime governance success
+  - command: PR readiness transition and replacement hygiene
+    result: PASS
+    evidence: #821 closed superseded after connector schema failure; #822 opened non-draft from same branch/base
 blockers: []
-next_action: verify CI and Track A agent runtime governance on the new exact PR 821 head, then perform ready/merge closeout if no material review finding exists
+next_action: verify CI and Track A agent runtime governance on the new exact PR 822 head, then merge under repository protection if no material review finding exists
 ```

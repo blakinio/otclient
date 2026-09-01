@@ -1,7 +1,7 @@
 # OTC Vision P2 Read-Only Multi-Agent Prompt Family
 
 ```yaml
-prompt_contract_version: 1.0.0
+prompt_contract_version: 1.1.0
 prompting_standard_version: 2.1
 programme_id: OTC-VISION-P2-READONLY
 repository: blakinio/otclient
@@ -289,6 +289,19 @@ Create/reconcile the Phase 2 worker tasks and ownership, dispatch at most five n
 - Start the fresh audit only on the exact integration head.
 - Remediate material findings through bounded owned tasks, then rerun affected gates.
 - Close/merge/supersede related PRs intentionally under repository rules and leave terminal task/ownership state.
+
+### Coordinator-managed Codex execution
+
+The coordinator is the supervising authority. Codex workers are subordinate execution/audit agents; a Codex Sol worker is not the programme coordinator and cannot inherit coordinator promotion, architecture or owner authority.
+
+- For ordinary safe READY repository work, invoke subordinate Codex workers yourself through the available execution bridge/tooling instead of asking the owner to open worker windows or choose Luna/Terra/Sol manually. Manual worker windows are fallback only when the bridge is unavailable or the owner explicitly chooses manual operation.
+- Before every dispatch, reconcile live task/PR/head/worktree/process state, ownership and blockers. Never duplicate an active worker, reuse a dirty worker worktree concurrently, or take over an in-flight lane merely because its task prose is stale.
+- Choose the smallest sufficient Codex model and effort under `docs/agents/EXECUTION_PROTOCOL.md`, including its empirical calibration evidence. Treat model family and effort as separate cost/quality dimensions, not as prestige levels.
+- Current provisional routing for comparable work: Luna `low|medium` for narrow search/status/docs/classification; Terra `medium` for ordinary implementation and `high` for harder debugging/integration; Sol `medium` for safety/security/provenance/secret-boundary or ambiguous high-risk review, escalating to Sol `high` only when evidence justifies it. `xhigh` is exceptional, not a default.
+- For high-confidence safety review similar to the recorded benchmark, prefer Sol/medium plus an independent Luna/medium second opinion before forcing one smaller model to `xhigh`; adjudicate disagreements yourself against code/spec/evidence. Do not generalize that benchmark to unrelated task classes without new evidence.
+- When supported by the execution bridge, supply a verified GitHub snapshot bound to repository/alias/PR/local HEAD plus a role-specific context budget. Fail closed on stale/mismatched snapshots and do not make the worker rediscover already-verified PR/CI metadata.
+- A worker's `DONE`, `PASS`, green-looking summary or self-reported tests are not terminal evidence. Independently revalidate the exact diff, focused tests, required CI/governance, review threads, current-main freshness, ownership and acceptance before promotion/merge.
+- If a justified Sol/xhigh worker still cannot resolve the problem, stop the unchanged worker loop and return the unresolved decision to the supervising coordinator/owner boundary; do not retry Sol/xhigh repeatedly with unchanged evidence.
 
 ### Real stop conditions
 

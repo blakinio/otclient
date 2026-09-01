@@ -58,7 +58,7 @@ The older `OTCLIENT_TIBIA_RE_PARALLEL_RUNTIME_AGENT_PROMPTS_V1.md` is a structur
 
 | Alias | Mission | Default task shape | Recommended agent | Effort |
 |---|---|---|---|---|
-| `OTC-VISION-P2-COORDINATOR` | programme control, dispatch, review, integration, barriers and closeout | autonomous programme | Chat/GitHub for coordination; Codex only for integration edits | xhigh |
+| `OTC-VISION-P2-COORDINATOR` | programme control, Codex worker dispatch, review, integration, barriers and closeout | autonomous programme | Chat/GitHub supervising coordinator; invokes subordinate Codex workers for execution/audit | xhigh coordinator reasoning; worker model/effort dynamic |
 | `OTC-VISION-P2-RUNTIME-ADMISSION` | exact Synology/Kasm/runtime/client identity and read-only admission | discovery-first -> validation | Codex | xhigh |
 | `OTC-VISION-P2-CAPTURE-EDGE` | secret-safe read-only screenshot/crop/hash producer | phased implementation | Codex | high |
 | `OTC-VISION-P2-RUNTIME-SIGNALS` | reviewed current runtime-signal provenance/freshness adapters | discovery-first -> implementation | Codex | xhigh |
@@ -69,11 +69,19 @@ The older `OTCLIENT_TIBIA_RE_PARALLEL_RUNTIME_AGENT_PROMPTS_V1.md` is a structur
 
 Effort is a quality recommendation, not an authority field. Model/provider use remains governed by current trusted-base owner-funded-AI rules. Do not infer direct Spark authorization from this document.
 
+### Coordinator-managed Codex dispatch
+
+The coordinator normally owns worker dispatch as part of the same owner invocation. When an authorized Codex execution bridge/tool is available, it should select and invoke subordinate workers itself rather than asking the owner to open separate chats or choose a model/effort. Manual worker windows remain a fallback only.
+
+Before dispatch, reconcile live task/PR/head/worktree/process state and ownership; do not duplicate an active worker or concurrently reuse a dirty worktree. Choose the smallest sufficient Codex model/effort using `EXECUTION_PROTOCOL.md` and its empirical benchmark evidence, provide verified bounded PR/CI context when supported, and independently verify worker results before classification/promotion. Codex workers never inherit coordinator authority merely because the selected family is Sol.
+
+For safety/security/provenance/secret-boundary work similar to the recorded benchmark, Sol/medium is a preferred first high-quality audit route and an independent Luna/medium may be added for higher confidence before expensive single-worker `xhigh`. These are provisional benchmark tie-breakers, not a global ranking. Terra/high remains a justified harder implementation/debug route; Terra/xhigh and Luna/xhigh are not automatic escalation steps.
+
 ## Dependency graph and waves
 
 ### Wave 0 — coordinator setup
 
-The coordinator refreshes live `main`, #820 terminal state, open PRs, active tasks, ownership and current runtime governance. It creates or reconciles the concrete worker task records, unique branches/worktrees and Draft PRs before write-capable dispatch.
+The coordinator refreshes live `main`, #820 terminal state, open PRs, active tasks, ownership and current runtime governance. It creates or reconciles the concrete worker task records, unique branches/worktrees and Draft PRs before write-capable dispatch, then normally invokes the eligible subordinate Codex workers itself when execution tooling is available.
 
 ### Wave 1 — up to five workers in parallel
 

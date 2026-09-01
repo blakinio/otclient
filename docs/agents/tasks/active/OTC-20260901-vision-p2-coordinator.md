@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260901-vision-p2-coordinator
-status: validating
+status: waiting
 agent: ChatGPT
 session_role: programme_coordinator
 worker_alias: OTC-VISION-P2-COORDINATOR
@@ -9,12 +9,12 @@ project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: coordination
-phase: wave_1_dispatch_validation
+phase: wave_1_workers_dispatch_ready
 branch: docs/OTC-20260901-vision-p2-coordinator-wave1
 base_branch: main
 base_main: 0fe1ecb3569f1d8372209c857ab57f3b626c29ae
 created: 2026-09-01T15:45:26+02:00
-updated_at: 2026-09-01T16:34:17+02:00
+updated_at: 2026-09-01T16:36:46+02:00
 risk: high
 execution_mode: chat_github
 run_scope: autonomous_program
@@ -67,12 +67,12 @@ related_prs:
   - PR #828 runtime-signals worker Draft
   - PR #829 edge-transport worker Draft
   - PR #830 control-bridge worker Draft
-current_blocker: GITHUB_PR_HEAD_SYNC_PENDING
-next_action: reconcile GitHub PR #826-#830 head metadata to the already-published final worker branch refs and verify exact-head required checks before dispatch
+current_blocker: SEPARATE_WORKER_EXECUTION_CHANNEL_REQUIRED
+next_action: dispatch the five prepared Wave 1 aliases in separate Codex/agent worker sessions against Draft PRs #826-#830; each session first validates its pre-bound task/branch/worktree/PR and then begins repository/static RED-to-GREEN TDD with runtime_access none
 invocation_started_at: 2026-09-01T15:35:00+02:00
-last_progress_at: 2026-09-01T16:34:17+02:00
+last_progress_at: 2026-09-01T16:36:46+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: wave1-worker-pr-head-reconciliation
+ci_check_generation: wave1-dispatch-ready
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -100,11 +100,11 @@ Reconcile Phase 2 live state, release stale foundation ownership, create exact n
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T16:34:17+02:00
-head: 52d0134fe72a7fd8a42b82841fe9a9f03cca49ff
+updated_at: 2026-09-01T16:36:46+02:00
+head: bd62ba81fd9ec29a24f12f5c42ca5d535a36250a
 branch: docs/OTC-20260901-vision-p2-coordinator-wave1
 pr: 825
-status: validating
+status: waiting
 context_routes:
   - phase-2-read-only-coordination
   - autonomous-program
@@ -113,46 +113,47 @@ context_routes:
 owned_paths:
   - docs/agents/tasks/active/OTC-20260901-vision-p2-coordinator.md
 proven:
-  - PR 824 merged and refreshed main remains 0fe1ecb3569f1d8372209c857ab57f3b626c29ae.
-  - five isolated Wave 1 worktrees/branches were created from exact refreshed main.
-  - pairwise worker ownership scan returned WORKER_OVERLAPS={} and refreshed-main exact ownership scan returned MAIN_ACTIVE_EXACT_CONFLICTS=[].
-  - all five bootstrap task records pass checkpoint validation, Track A runtime governance and git diff --check locally.
-  - Draft PRs 826 through 830 exist and remain Draft.
-  - OTC-VISION-P2-RUNTIME-ADMISSION: Draft PR 826, branch feat/OTC-20260901-vision-p2-runtime-admission, worktree C:/Users/barte/otclient-vision-p2-runtime-admission, remote branch head 2d2bb627965e0155e8f52210d1c8c6cab5610b53; current PR API head 751eda3b7bc0d790e35971f99f7c37b2d2520627 is stale and does not yet match.
-  - OTC-VISION-P2-CAPTURE-EDGE: Draft PR 827, branch feat/OTC-20260901-vision-p2-capture-edge, worktree C:/Users/barte/otclient-vision-p2-capture-edge, remote branch head dd40d914fa5d05cdf5ff2957cc798ee7aa336d9b; current PR API head 9b98779ba8844c7b014d1ee62c3097831383729d is stale and does not yet match.
-  - OTC-VISION-P2-RUNTIME-SIGNALS: Draft PR 828, branch feat/OTC-20260901-vision-p2-runtime-signals, worktree C:/Users/barte/otclient-vision-p2-runtime-signals, remote branch head 11fc18820cc22303d6857361eb3404f5f1844ffa; current PR API head 160f8d1d93e8f09a05c58cd2f3d0f388ac322035 is stale and does not yet match.
-  - OTC-VISION-P2-EDGE-TRANSPORT: Draft PR 829, branch feat/OTC-20260901-vision-p2-edge-transport, worktree C:/Users/barte/otclient-vision-p2-edge-transport, remote branch head 2ba5a90629c2b3cab3094948bfa3a1fda2b1fb0b; current PR API head 2f79d907f3372f7c8215fb6f4e2034547038ecb8 is stale and does not yet match.
-  - OTC-VISION-P2-CONTROL-BRIDGE: Draft PR 830, branch feat/OTC-20260901-vision-p2-control-bridge, worktree C:/Users/barte/otclient-vision-p2-control-bridge, remote branch head 7d5ccdb80aa523c3128bef0b8e4faef4450146fe; current PR API head 4cfc3a94fd4bff9a6548f9fce6cd185d8bccbaae is stale and does not yet match.
-  - git ls-remote proves all five final PR-binding commits are published on their source branches.
-  - runtime_access remains none for coordinator and all five workers; no real-runtime observation is authorized or claimed.
+  - PR 824 merged and refreshed main is 0fe1ecb3569f1d8372209c857ab57f3b626c29ae.
+  - five isolated Wave 1 branches/worktrees/tasks and Draft PRs 826-830 were created from exact refreshed main with pairwise and refreshed-main ownership overlap equal to zero.
+  - each worker task is PR-bound, status ready, agent unclaimed, runtime_access none and all mutation/effect authorities false with physical action budget/count 0/0.
+  - OTC-VISION-P2-RUNTIME-ADMISSION: Draft PR 826 is Draft/CLEAN and live PR head equals published branch head 2d2bb627965e0155e8f52210d1c8c6cab5610b53; CI / Required plus both Track A governance jobs are SUCCESS.
+  - OTC-VISION-P2-CAPTURE-EDGE: Draft PR 827 is Draft/CLEAN and live PR head equals published branch head dd40d914fa5d05cdf5ff2957cc798ee7aa336d9b; CI / Required plus both Track A governance jobs are SUCCESS.
+  - OTC-VISION-P2-RUNTIME-SIGNALS: Draft PR 828 is Draft/CLEAN and live PR head equals published branch head 11fc18820cc22303d6857361eb3404f5f1844ffa; CI / Required plus both Track A governance jobs are SUCCESS.
+  - OTC-VISION-P2-EDGE-TRANSPORT: Draft PR 829 is Draft/CLEAN and live PR head equals published branch head 2ba5a90629c2b3cab3094948bfa3a1fda2b1fb0b; CI / Required plus both Track A governance jobs are SUCCESS.
+  - OTC-VISION-P2-CONTROL-BRIDGE: Draft PR 830 is Draft/CLEAN and live PR head equals published branch head 7d5ccdb80aa523c3128bef0b8e4faef4450146fe; CI / Required plus both Track A governance jobs are SUCCESS.
+  - the prior GitHub PR-head metadata lag is resolved for all five worker PRs.
+  - local codex executable is absent on Molehill-PC; GitHub tools expose no Codex code-worker dispatch; plugin discovery found no executable Codex worker connector (Codex Security is a scanner, not a worker launcher).
 derived:
-  - repository-side worker bootstrap is structurally complete, but worker dispatch is not yet valid until PR metadata points at each final branch head and fresh exact-head checks exist for that generation.
+  - repository/GitHub Wave 1 bootstrap is complete and all five workers are safe to start concurrently for repository/static work.
+  - actual official-runtime observation remains serialized and is not authorized for any worker at this checkpoint.
 unknown:
-  - exact convergence time/state of GitHub PR head metadata for PRs 826 through 830.
-  - exact-head GitHub CI/governance results for the final PR-binding commits after PR metadata convergence.
-conflicts:
-  - Git remote branch refs are ahead of current GitHub pull-request REST head metadata for all five worker Draft PRs.
+  - worker implementation, focused test, review, integration and later runtime-evidence outcomes.
+conflicts: []
 first_failure:
-  marker: WAVE1-PR-HEAD-METADATA-STALE
-  evidence: direct git ls-remote versus gh api pulls/{pr} head.sha comparison returned match=False for PRs 826-830 after successful pushes.
+  marker: WORKER-EXECUTION-CHANNEL-UNAVAILABLE
+  evidence: coordinator environment can prepare Git/GitHub/worktrees but cannot create the required separate Codex/agent execution sessions; codex CLI is not installed and available connectors/plugins do not expose a code-worker launcher.
 rejected_hypotheses:
-  - worker binding commits were not pushed: rejected by git ls-remote exact refs.
-  - workers overlap each other or current main ownership: rejected by pairwise and refreshed-main exact ownership scans.
+  - worker PR head metadata is still stale: rejected by live gh PR readback matching all five published remote branch refs.
+  - worker bootstrap CI/governance is pending or failed: rejected by exact-head SUCCESS on CI / Required and both Track A governance jobs for PRs 826-830.
+  - coordinator may silently implement all five worker lanes in one session: rejected by the binding multi-agent role/ownership/independent-review contract.
 changed_paths:
   - docs/agents/tasks/active/OTC-20260901-vision-p2-coordinator.md
 validation:
-  - command: five worker checkpoint validators
+  - command: pairwise worker plus refreshed-main exact ownership scan
     result: PASS
-    evidence: every worker task checkpoint validates after PR binding edits.
-  - command: five local Track A governance validations after binding commits
+    evidence: WORKER_OVERLAPS={} and MAIN_ACTIVE_EXACT_CONFLICTS=[].
+  - command: five worker PR live head and statusCheckRollup readback
     result: PASS
-    evidence: each lane reported TRACK_A_AGENT_RUNTIME_CHANGED_TASKS=1, BRANCH_BOUND_TASKS=1 and GOVERNANCE_PASS=true.
-  - command: git ls-remote plus gh api PR head comparison
-    result: FAIL
-    evidence: five remote source refs are final binding commits but PR REST head.sha values still show first bootstrap commits.
+    evidence: PRs 826-830 each match final binding branch head, remain Draft/CLEAN, and exact-head required CI/governance are SUCCESS.
+  - command: worker branch local governance/checkpoint/diff validation
+    result: PASS
+    evidence: all five workers passed branch-bound Track A governance, checkpoint schema and git diff --check after PR binding.
+  - command: worker execution-channel discovery
+    result: BLOCKED
+    evidence: local codex not installed; no available connector/plugin provides separate Codex code-worker execution.
 blockers:
-  - GITHUB_PR_HEAD_SYNC_PENDING for PRs 826-830.
-next_action: reconcile GitHub PR #826-#830 head metadata to the already-published final worker branch refs and verify exact-head required checks before dispatch.
+  - separate Codex/agent worker sessions must be launched outside this coordinator session.
+next_action: dispatch the five prepared Wave 1 aliases in separate Codex/agent worker sessions against Draft PRs #826-#830; each session first validates its pre-bound task/branch/worktree/PR and then begins repository/static RED-to-GREEN TDD with runtime_access none.
 ```
 ## Planned Wave 1 ownership
 
@@ -173,12 +174,12 @@ Repository/static execution defaults to `github_hosted` with `runtime_access: no
 - `W0-AUDIT-003` — **material medium**, duplicate `execution_class` keys in the coordinator frontmatter after admission remediation. Evidence: direct fresh task read showed both `github_coordination` and `github_hosted`. Impact: ambiguous machine-readable contract. Disposition: removed the duplicate and retained the routing-contract value `github_hosted`. Final verification: pending fresh exact-head CI/checkpoint validation.
 ## Wave 1 dispatch ledger
 
-| Alias | Draft PR | Branch | Worktree | Published final branch head | Current PR API head at checkpoint |
+| Alias | Draft PR | Branch | Worktree | Final branch/PR head | Exact-head gates |
 |---|---:|---|---|---|---|
-| `OTC-VISION-P2-RUNTIME-ADMISSION` | #826 | `feat/OTC-20260901-vision-p2-runtime-admission` | `C:/Users/barte/otclient-vision-p2-runtime-admission` | `2d2bb627965e0155e8f52210d1c8c6cab5610b53` | `751eda3b7bc0d790e35971f99f7c37b2d2520627` |
-| `OTC-VISION-P2-CAPTURE-EDGE` | #827 | `feat/OTC-20260901-vision-p2-capture-edge` | `C:/Users/barte/otclient-vision-p2-capture-edge` | `dd40d914fa5d05cdf5ff2957cc798ee7aa336d9b` | `9b98779ba8844c7b014d1ee62c3097831383729d` |
-| `OTC-VISION-P2-RUNTIME-SIGNALS` | #828 | `feat/OTC-20260901-vision-p2-runtime-signals` | `C:/Users/barte/otclient-vision-p2-runtime-signals` | `11fc18820cc22303d6857361eb3404f5f1844ffa` | `160f8d1d93e8f09a05c58cd2f3d0f388ac322035` |
-| `OTC-VISION-P2-EDGE-TRANSPORT` | #829 | `feat/OTC-20260901-vision-p2-edge-transport` | `C:/Users/barte/otclient-vision-p2-edge-transport` | `2ba5a90629c2b3cab3094948bfa3a1fda2b1fb0b` | `2f79d907f3372f7c8215fb6f4e2034547038ecb8` |
-| `OTC-VISION-P2-CONTROL-BRIDGE` | #830 | `feat/OTC-20260901-vision-p2-control-bridge` | `C:/Users/barte/otclient-vision-p2-control-bridge` | `7d5ccdb80aa523c3128bef0b8e4faef4450146fe` | `4cfc3a94fd4bff9a6548f9fce6cd185d8bccbaae` |
+| `OTC-VISION-P2-RUNTIME-ADMISSION` | #826 | `feat/OTC-20260901-vision-p2-runtime-admission` | `C:/Users/barte/otclient-vision-p2-runtime-admission` | `2d2bb627965e0155e8f52210d1c8c6cab5610b53` | CI Required + Track A governance: PASS |
+| `OTC-VISION-P2-CAPTURE-EDGE` | #827 | `feat/OTC-20260901-vision-p2-capture-edge` | `C:/Users/barte/otclient-vision-p2-capture-edge` | `dd40d914fa5d05cdf5ff2957cc798ee7aa336d9b` | CI Required + Track A governance: PASS |
+| `OTC-VISION-P2-RUNTIME-SIGNALS` | #828 | `feat/OTC-20260901-vision-p2-runtime-signals` | `C:/Users/barte/otclient-vision-p2-runtime-signals` | `11fc18820cc22303d6857361eb3404f5f1844ffa` | CI Required + Track A governance: PASS |
+| `OTC-VISION-P2-EDGE-TRANSPORT` | #829 | `feat/OTC-20260901-vision-p2-edge-transport` | `C:/Users/barte/otclient-vision-p2-edge-transport` | `2ba5a90629c2b3cab3094948bfa3a1fda2b1fb0b` | CI Required + Track A governance: PASS |
+| `OTC-VISION-P2-CONTROL-BRIDGE` | #830 | `feat/OTC-20260901-vision-p2-control-bridge` | `C:/Users/barte/otclient-vision-p2-control-bridge` | `7d5ccdb80aa523c3128bef0b8e4faef4450146fe` | CI Required + Track A governance: PASS |
 
-All five tasks are `status: ready`, `agent: unclaimed`, `runtime_access: none`. They are not dispatched while the PR-head mismatch above remains.
+All five tasks are `status: ready`, `agent: unclaimed`, `runtime_access: none`, and overlap-free. They are repository/GitHub dispatch-ready; the only remaining Wave 1 start dependency is creation of separate worker execution sessions.

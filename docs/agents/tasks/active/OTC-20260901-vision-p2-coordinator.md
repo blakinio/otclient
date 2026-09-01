@@ -14,7 +14,7 @@ branch: docs/OTC-20260901-vision-p2-coordinator-spark-stop
 base_branch: main
 base_main: 89fbc39753d48b1391d6f4a7e2a3e967c74a8c79
 created: 2026-09-01T15:45:26+02:00
-updated_at: 2026-09-01T23:38:33+02:00
+updated_at: 2026-09-01T23:38:59+02:00
 risk: high
 execution_mode: chat_github
 run_scope: autonomous_program
@@ -71,10 +71,11 @@ related_prs:
   - PR #836 coordinator post-repair checkpoint
   - PR #843 coordinator benchmark reconciliation checkpoint
   - PR #846 trusted-composition integration Draft
+  - PR #847 coordinator Spark real-stop checkpoint
 current_blocker: CODEX_SPARK_QUOTA_EXHAUSTED_AND_EDGE_TRANSPORT_AUTH_PROOF_RFR
 next_action: after Spark quota reset, dispatch the existing #829 proof-boundary repair and #846 trusted-composition implementation; independently re-review exact heads before any Wave 2 or live observation
 invocation_started_at: 2026-09-01T17:47:00+02:00
-last_progress_at: 2026-09-01T23:38:33+02:00
+last_progress_at: 2026-09-01T23:38:59+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: coordinator-spark-stop-final
 terminal_ci_wait_started_at: null
@@ -103,11 +104,11 @@ Coordinate independently reviewed Wave 1 slices through current-main validation,
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T23:38:33+02:00
-head: 89fbc39753d48b1391d6f4a7e2a3e967c74a8c79
-head_semantics: merged_coordinator_checkpoint_main_before_final_spark_stop_delta
+updated_at: 2026-09-01T23:38:59+02:00
+head: 49abf4b96f678d9ce9fe318fc105d0b42f1c8191
+head_semantics: spark_stop_checkpoint_commit_before_pr_binding
 branch: docs/OTC-20260901-vision-p2-coordinator-benchmark-reconcile
-pr: 843
+pr: 847
 status: blocked
 context_routes:
   - phase-2-read-only-coordination

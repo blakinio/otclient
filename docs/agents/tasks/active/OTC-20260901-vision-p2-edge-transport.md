@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260901-vision-p2-edge-transport
-status: validating
+status: waiting
 agent: ChatGPT
 session_role: phase2_worker
 worker_alias: OTC-VISION-P2-EDGE-TRANSPORT
@@ -9,12 +9,12 @@ project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: implementation
-phase: worker_current_main_restack_validated
+phase: worker_exact_head_ci_passed_return_to_coordinator
 branch: feat/OTC-20260901-vision-p2-edge-transport
 base_branch: main
 base_main: d1cb8722c3116a0e0aeb72b9b360712f43151f17
 created: 2026-09-01T16:27:39+02:00
-updated_at: 2026-09-01T22:49:31+02:00
+updated_at: 2026-09-01T22:52:27+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: isolated_worker_branch
@@ -66,11 +66,11 @@ depends_on:
 related_prs:
   - PR #829 Wave 1 worker Draft
 current_blocker: none; prior Package A failure combined stale-base path-boundary drift with a reproducible unowned test_agent_session concurrency flake
-next_action: verify the remote branch lease, force-with-lease publish this current-main validated checkpoint to Draft PR #829, then obtain one fresh exact-head CI snapshot
+next_action: coordinator must classify Draft PR #829; worker must not mark it ready, promote, or merge.
 invocation_started_at: 2026-09-01T17:03:28+02:00
-last_progress_at: 2026-09-01T22:49:31+02:00
-ci_checks_for_current_head: 0
-ci_check_generation: restack-d1cb872-local
+last_progress_at: 2026-09-01T22:52:27+02:00
+ci_checks_for_current_head: 1
+ci_check_generation: ca565c49-exact-head
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -175,8 +175,6 @@ derived:
   - the remaining observed session concurrency failure is an unrelated flaky gate in a path owned by OTC-VISION-P2-CONTROL-BRIDGE; this worker must not edit it.
   - a new exact head should be published and validated before deciding whether that external flake is an actual current blocker.
 unknown:
-  - exact-head CI outcome after publishing the d1cb872 restack checkpoint.
-  - whether the unowned concurrency flake will recur in the next Package A run.
   - coordinator classification after a valid exact-head run.
 conflicts: []
 first_failure:
@@ -211,7 +209,7 @@ validation:
     result: PASS
     evidence: EDGE_TRANSPORT_FRESH_AUDIT_FINDINGS=0.
 blockers: []
-next_action: verify the remote branch lease, force-with-lease publish this current-main validated checkpoint to Draft PR #829, then obtain one fresh exact-head CI snapshot.
+next_action: coordinator must classify Draft PR #829; worker must not mark it ready, promote, or merge.
 ```
 
 ## Recovery checkpoint
@@ -222,19 +220,19 @@ recovery:
   generation: 1
   session_id: 2026-09-01T22:49:31+02:00
   session_started_at: 2026-09-01T22:43:34+02:00
-  checkpointed_at: 2026-09-01T22:49:31+02:00
-  last_progress_at: 2026-09-01T22:49:31+02:00
-  phase: publish-current-main-restack
-  exact_head: c23f404143ad092687a1b365fc836c73893b86e7
+  checkpointed_at: 2026-09-01T22:52:27+02:00
+  last_progress_at: 2026-09-01T22:52:27+02:00
+  phase: exact-head-ci-passed-return-to-coordinator
+  exact_head: ca565c49fd2ab222f247ad11bf2742ca5bf4d780
   pull_request: 829
-  active_operation: scoped force-with-lease publication
-  external_run_ids: []
-  operation_started_at: null
+  active_operation: none
+  external_run_ids: [33557712369, 33557712221, 33557712165, 33557712147]
+  operation_started_at: 2026-09-01T22:51:00+02:00
   wait_deadline_at: null
-  check_generation: restack-d1cb872
-  checks_used: 0
-  status: active
+  check_generation: ca565c49-exact-head
+  checks_used: 1
+  status: waiting_for_coordinator_classification
   safe_to_resume: true
-  resume_condition: origin branch remains fd84ad1d0b2dec127b4bcf00f43361e6fa72681f
-  next_action: commit this checkpoint, force-with-lease publish the rebased branch, then inspect the aggregate PR check snapshot once.
+  resume_condition: coordinator classification of the green Draft PR.
+  next_action: leave PR #829 Draft and return this exact-head evidence to the coordinator.
 ```

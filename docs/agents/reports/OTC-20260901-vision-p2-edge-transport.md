@@ -143,3 +143,9 @@ After the latest restack, focused edge transport remains `30/30 PASS`, protocol+
 `main` advanced again to `d1cb8722c3116a0e0aeb72b9b360712f43151f17`. The worker branch was cleanly restacked onto that exact trusted base; `origin/main...HEAD` still names exactly the four declared worker-owned paths. Fresh local validation on the restacked tree passed: focused edge transport `30/30`, protocol plus edge transport `47/47`, Ruff, `py_compile`, and `git diff --check`.
 
 No runtime access or physical action occurred. The required next evidence is a fresh exact-head hosted CI snapshot after the Draft PR branch is safely force-with-lease published.
+
+## Exact-head hosted evidence
+
+Draft PR #829 was safely force-with-lease updated to exact head `ca565c49fd2ab222f247ad11bf2742ca5bf4d780` on base `d1cb8722c3116a0e0aeb72b9b360712f43151f17`. All required checks for that head passed: CI run `33557712369`, Package A run `33557712221`, Package B run `33557712165`, and Track A runtime governance run `33557712147`. Package B's browser/CLI E2E also passed. This is hosted test evidence only; it does not alter the no-runtime, no-physical-action classification.
+
+The PR remains Draft. Coordinator classification is required; the worker has not marked it ready, promoted it, or merged it.

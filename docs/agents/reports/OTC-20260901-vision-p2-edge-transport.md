@@ -129,3 +129,11 @@ The hosted Ubuntu interpreter did not raise `RecursionError` for the test's fixe
 The repair makes that exception-boundary test deterministic by injecting `RecursionError` at the parser seam and asserting the existing safe mapping. The real payload-depth and metadata-size protections remain separately exercised by non-mocked tests, so no safety criterion is weakened.
 
 Local results after the repair remain focused `30/30 PASS` and protocol+transport `47/47 PASS`. A fresh exact-head hosted run is required after publication; no runtime access or physical action is involved.
+
+## Second current-main restack after PR #841
+
+While the repaired exact-head workflows were running, `main` advanced from `e8835434...` to `f37d2241b32de40171c0afc17bb2443593ef8c7a` through PR #841. Package A's path-boundary audit used the older PR-event base and therefore treated the newly merged #841 governance/benchmark files as unexpected changes. A clean rebase onto current `main` restores the intended four-path worker diff without any transport behavior change.
+
+The same Package A run showed one additional failure in the pre-existing unowned `test_agent_session.test_concurrent_duplicate_action_executes_once`; Package B on the same head passed. A local repeated probe reproduced that test as flaky (five passes followed by the same `REFUSED_BUDGET_EXHAUSTED` versus `PERFORMED` mismatch). `test_agent_session.py` is outside this worker's ownership and belongs to the Control Bridge lane, so no out-of-scope repair was attempted.
+
+After the latest restack, focused edge transport remains `30/30 PASS`, protocol+transport remains `47/47 PASS`, the diff is still limited to the four declared paths, and the fresh independent edge-transport validator reports zero findings. A new exact-head hosted run will determine whether the external concurrency flake remains a live gate.

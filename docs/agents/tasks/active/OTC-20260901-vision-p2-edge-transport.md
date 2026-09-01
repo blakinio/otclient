@@ -9,12 +9,12 @@ project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: implementation
-phase: worker_ci_portability_repair_ready
+phase: worker_current_main_restack_ready
 branch: feat/OTC-20260901-vision-p2-edge-transport
 base_branch: main
-base_main: e883543403d5430d7b1d287f59043b23c98f37d6
+base_main: f37d2241b32de40171c0afc17bb2443593ef8c7a
 created: 2026-09-01T16:27:39+02:00
-updated_at: 2026-09-01T22:37:15+02:00
+updated_at: 2026-09-01T22:43:34+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: isolated_worker_branch
@@ -62,15 +62,15 @@ owned_paths:
 depends_on:
   - PR #820 merged foundation
   - PR #824 merged Wave 0 coordinator cleanup
-  - current main e883543403d5430d7b1d287f59043b23c98f37d6 after PR #839
+  - current main f37d2241b32de40171c0afc17bb2443593ef8c7a after PR #841
 related_prs:
   - PR #829 Wave 1 worker Draft
-current_blocker: exact-head Package A/B CI failed only on an interpreter-dependent recursion-depth test; deterministic test repair is local and awaits publication
-next_action: commit the deterministic parser-recursion test repair and CI checkpoint, rerun owned local gates, push the new head, then observe its exact-head CI
+current_blocker: none; prior Package A failure combined stale-base path-boundary drift with a reproducible unowned test_agent_session concurrency flake
+next_action: commit the current-main restack checkpoint, rerun owned local gates and fresh audit, force-with-lease publish PR #829, then observe exact-head CI once
 invocation_started_at: 2026-09-01T17:03:28+02:00
-last_progress_at: 2026-09-01T22:37:15+02:00
-ci_checks_for_current_head: 2
-ci_check_generation: draft-d6c3a1e5-ci-failure-isolated
+last_progress_at: 2026-09-01T22:43:34+02:00
+ci_checks_for_current_head: 0
+ci_check_generation: restack-f37d2241-local
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -144,13 +144,13 @@ runtime_access: none
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T22:37:15+02:00
-head: d6c3a1e5b1b253c11dea52bb10cf83c45b75d103
-head_semantics: published_exact_head_with_ci_failure_before_test_portability_repair_commit
+updated_at: 2026-09-01T22:43:34+02:00
+head: 9cfcf1ca5d4ac248f61225cd03df362e2ad70228
+head_semantics: current_main_restack_head_before_final_checkpoint_commit
 branch: feat/OTC-20260901-vision-p2-edge-transport
 pr: 829
 status: validating
-phase: worker_ci_portability_repair_ready
+phase: worker_current_main_restack_ready
 context_routes:
   - phase-2-read-only-coordination
   - track-a-governance
@@ -161,48 +161,52 @@ owned_paths:
   - tools/tibia_re_control_center/agent_edge_transport.py
   - tests/tools/tibia_re_control_center/test_agent_edge_transport.py
 proven:
-  - Draft PR #829 published exact head d6c3a1e5b1b253c11dea52bb10cf83c45b75d103 against main e883543403d5430d7b1d287f59043b23c98f37d6 with only four declared owned paths.
-  - exact-head CI and Track A governance passed; Package A run 33555788479 and Package B run 33555788277 each failed only the same edge-transport recursion test.
-  - both failed workflow logs report test_receiver_converts_json_recursion_failure_to_validation_error expected EDGE_FRAME_INVALID but received MISSING_FIELD on Ubuntu; all other 522 tests passed there with three skips.
-  - the failure is an interpreter-dependent test assumption: fixed nesting depth 2000 does not reliably force json.loads RecursionError across environments.
-  - production already explicitly converts RecursionError from json.loads into EDGE_FRAME_INVALID; no production behavior change is required for this CI repair.
-  - the repaired test deterministically injects RecursionError at the parser seam and verifies the existing safe boundary mapping independent of interpreter recursion depth.
-  - local repaired focused test passes; focused suite passes 30/30 and component suite passes 47/47.
-  - Windows full discovery still has five reproducible unowned agent_api/agent_vision environment-specific errors; the prior Linux CI run proves those same tests pass on the hosted runner and they are not caused by this edge transport slice.
-  - runtime_access remains none; no live runtime observation, mutation or physical action occurred.
+  - current main advanced after the prior PR event to f37d2241b32de40171c0afc17bb2443593ef8c7a via PR #841; this branch rebased cleanly onto that exact main.
+  - current diff against main remains exactly the four declared owned paths with no shared Control Center integration file.
+  - prior head 15bcb86626edf9a21404459ec41d44d3ea516eae fixed the task-owned recursion-test portability failure: Package B then passed fully and Package A edge-transport tests all passed.
+  - Package A run 33556598887 failed its path-boundary audit because the PR event base was e8835434 while main had advanced through #841; the reported unexpected paths are now part of current main and disappear from current main...HEAD diff after restack.
+  - the same Package A run also hit test_agent_session.test_concurrent_duplicate_action_executes_once; that path is unowned by this worker and Package B on the same exact head passed.
+  - a local 12-run probe reproduced the unowned concurrency test as flaky: five consecutive passes followed by the same REFUSED_BUDGET_EXHAUSTED versus PERFORMED mismatch.
+  - focused edge transport passes 30/30 and protocol+transport passes 47/47 after the latest restack.
+  - fresh independent temp-validator audit of edge-transport authority, endpoint, control-surface and artifact invariants reports zero findings.
+  - runtime_access remains none and physical action count/budget remain 0/0; no live runtime operation occurred.
 derived:
-  - the exact-head Package A/B failures belong to this task-owned test but not to production transport semantics; deterministic test repair is the smallest valid CI fix.
-  - the worker must publish a new head and obtain fresh exact-head CI before returning the Draft PR for coordinator classification.
+  - restacking onto current main removes the Package A stale-base path-boundary false failure without changing worker behavior.
+  - the remaining observed session concurrency failure is an unrelated flaky gate in a path owned by OTC-VISION-P2-CONTROL-BRIDGE; this worker must not edit it.
+  - a new exact head should be published and validated before deciding whether that external flake is an actual current blocker.
 unknown:
-  - exact-head CI outcome after publishing the deterministic recursion-test repair.
-  - coordinator independent classification after a green exact head.
+  - exact-head CI outcome after publishing the f37d2241 restack.
+  - whether the unowned concurrency flake will recur in the next Package A run.
+  - coordinator classification after a valid exact-head run.
 conflicts: []
 first_failure:
-  marker: CI-RECURSION-TEST-PORTABILITY
-  evidence: Package A run 33555788479 and Package B run 33555788277 fail only test_receiver_converts_json_recursion_failure_to_validation_error on d6c3a1e5b1b253c11dea52bb10cf83c45b75d103.
+  marker: PRIOR-PACKAGE-A-STALE-BASE-AND-UNOWNED-FLAKE
+  evidence: run 33556598887 path audit listed PR #841 files as unexpected from stale base e8835434, while deterministic core failed only test_agent_session.test_concurrent_duplicate_action_executes_once; current diff and local repeated probe isolate both causes.
 rejected_hypotheses:
-  - production RecursionError mapping is absent: rejected by source inspection and deterministic repaired test.
-  - Package A/B contain broader regressions caused by edge transport: rejected; hosted logs show exactly one failure and independent Package A/B audits plus Package B browser E2E pass.
-  - local Windows full-discovery errors are caused by edge transport: rejected; they are in unowned agent_api/agent_vision surfaces and hosted Linux exact-head execution passes those cases.
+  - recursion portability repair is still failing hosted Linux: rejected; Package A log shows the repaired edge recursion test PASS and Package B is fully SUCCESS.
+  - Package A path-boundary failure is caused by worker scope expansion: rejected; current main...HEAD diff contains only four declared worker paths.
+  - session concurrency failure is deterministic edge-transport damage: rejected; no import edge exists and the same unowned test alternates PASS/FAIL under repeated local execution.
 changed_paths:
   - docs/agents/tasks/active/OTC-20260901-vision-p2-edge-transport.md
   - docs/agents/reports/OTC-20260901-vision-p2-edge-transport.md
   - tools/tibia_re_control_center/agent_edge_transport.py
   - tests/tools/tibia_re_control_center/test_agent_edge_transport.py
 validation:
-  - command: GitHub exact-head workflow snapshot for d6c3a1e5b1b253c11dea52bb10cf83c45b75d103
+  - command: exact-head workflows for 15bcb86626edf9a21404459ec41d44d3ea516eae
     result: FAIL
-    evidence: CI SUCCESS; Track A governance SUCCESS; Package A/B fail the same single portability test.
-  - command: gh run view 33555788479 --log-failed; gh run view 33555788277 --log-failed
+    evidence: Package B, CI and Track A governance SUCCESS; Package A failure isolated to stale-base path audit plus one unowned concurrency flake, while every edge-transport test passed.
+  - command: git rebase origin/main at f37d2241b32de40171c0afc17bb2443593ef8c7a; git diff --name-status origin/main...HEAD
     result: PASS
-    evidence: first actionable error isolated to the fixed-depth recursion expectation; hosted suite otherwise reports 522 passes and three skips.
-  - command: deterministic repaired recursion-boundary test
+    evidence: clean rebase and exactly four owned changed paths.
+  - command: focused edge transport and protocol+transport suites after restack
     result: PASS
-    evidence: injected RecursionError is converted to ValidationError code EDGE_FRAME_INVALID.
-  - command: focused and protocol+transport suites after repair
+    evidence: 30/30 and 47/47.
+  - command: repeated unowned test_agent_session concurrent-duplicate probe
+    result: FAIL
+    evidence: five passes then same CI failure signature, establishing external flakiness; no worker-owned edit made.
+  - command: fresh temp validator audit
     result: PASS
-    evidence: 30/30 and 47/47 locally.
-blockers:
-  - fresh exact-head CI is required after publishing the repair.
-next_action: commit the deterministic parser-recursion test repair and CI checkpoint, rerun owned local gates, push the new head, then observe its exact-head CI.
+    evidence: EDGE_TRANSPORT_FRESH_AUDIT_FINDINGS=0.
+blockers: []
+next_action: commit the current-main restack checkpoint, rerun owned local gates and fresh audit, force-with-lease publish PR #829, then observe exact-head CI once.
 ```

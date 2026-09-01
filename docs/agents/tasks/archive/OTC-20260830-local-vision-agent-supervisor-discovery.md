@@ -1,18 +1,18 @@
 ---
 task_id: OTC-20260830-local-vision-agent-supervisor-discovery
-status: waiting
+status: completed
 agent: ChatGPT
 session_role: coordinator
 project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: discovery
-phase: implementation_planning
+phase: terminal_closeout
 branch: docs/OTC-20260830-local-vision-agent-supervisor-discovery
 base_branch: main
 base_main: 18ff83053f5c5d85c9bce6debab0f7fef6b79ecd
 created: 2026-08-30T10:39:00+02:00
-updated_at: 2026-08-30T11:44:10+02:00
+updated_at: 2026-09-01T15:50:43+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: chat_github
@@ -55,11 +55,7 @@ physical_action_count: 0
 approved_architecture: approach_c
 approved_spec: docs/superpowers/specs/2026-08-30-local-track-a-vision-agent-supervisor-design.md
 implementation_plan: docs/superpowers/plans/2026-08-30-local-track-a-vision-agent-supervisor.md
-owned_paths:
-  - docs/agents/tasks/active/OTC-20260830-local-vision-agent-supervisor-discovery.md
-  - docs/agents/reports/OTC-20260830-local-vision-agent-supervisor-discovery.md
-  - docs/superpowers/specs/2026-08-30-local-track-a-vision-agent-supervisor-design.md
-  - docs/superpowers/plans/2026-08-30-local-track-a-vision-agent-supervisor.md
+owned_paths: []
 modules_touched:
   - track-a-runtime-governance
   - tibia-re-control-center
@@ -82,8 +78,10 @@ depends_on:
 blocks:
   - TRACK_A_AUTONOMOUS_VISION_GUI_RESEARCH
 last_completed_step: owner approved the written design; implementation plan docs/superpowers/plans/2026-08-30-local-track-a-vision-agent-supervisor.md was committed, refined after self-review, and now maps the approved design onto existing Control Center and PR #790 reuse without enabling any runtime/effect path
-current_blocker: OWNER_IMPLEMENTATION_EXECUTION_AUTHORIZATION_REQUIRED
-next_action: owner selects and authorizes one repository-only implementation workflow — Subagent-Driven (recommended) or Inline Execution — while preserving runtime_access:none and all physical/credential authorities false
+current_blocker: none
+next_action: none
+completed_at: 2026-09-01T15:50:43+02:00
+terminal_disposition: superseded_by_merged_foundation
 ---
 
 # Local vision-agent supervisor discovery
@@ -101,3 +99,50 @@ Implementation plan:
 Planning reconciliation found that the approved persistent control/session plane should extend the existing `tools/tibia_re_control_center` foundation rather than create another backend. The plan keeps the production action executor unbound and separates Molehill deployment, Synology transport, Track A read-only binding, credential brokerage and current-client physical actions into later authorization boundaries.
 
 This task is intentionally waiting for implementation workflow selection. It still grants no live-client observation, credentials, login, character selection, GUI input, process control, process-memory access or gameplay authority.
+
+## Terminal closeout - 2026-09-01
+
+The discovery/design task is terminal because its approved architecture and plan were consumed by the implementation subsequently merged through PR #820.
+
+Live lifecycle evidence at closeout:
+
+- PR #820 is merged (`565bce8d70311048380556014978666771da598c`) and contains the accepted foundation replacement.
+- PR #808 was closed on 2026-09-01T13:50:22Z after #820 merge.
+- PR #810 was closed on 2026-09-01T13:50:29Z after #820 merge.
+- No Official Tibia runtime observation, input, credential use, process control, process-memory access, packet/payload capture, or physical action was performed by this lifecycle cleanup.
+- Ownership is released; this archived record claims no writable paths.
+
+## Context checkpoint
+
+```yaml
+checkpoint_version: 1
+updated_at: 2026-09-01T15:50:43+02:00
+head: 21fedc04809f0f78a1ff673edb2804a83ab5fedb
+branch: main
+pr: 820
+status: completed
+context_routes:
+  - local-vision-agent-supervisor-foundation
+  - phase-2-read-only-coordination
+owned_paths: []
+proven:
+  - PR 820 merged the accepted local vision-agent supervisor foundation.
+  - historical Draft PRs 808 and 810 are closed after the successful replacement merge.
+  - this task no longer owns repository paths.
+derived:
+  - Phase 2 coordinator may allocate non-overlapping worker ownership from refreshed main.
+unknown: []
+conflicts: []
+first_failure:
+  marker: none
+  evidence: none
+rejected_hypotheses: []
+changed_paths:
+  - docs/agents/tasks/archive/OTC-20260830-local-vision-agent-supervisor-discovery.md
+validation:
+  - command: live GitHub lifecycle readback
+    result: PASS
+    evidence: PR 820 merged; PRs 808 and 810 closed
+blockers: []
+next_action: preserve this archived task as terminal; all future Phase 2 work must use the OTC-VISION-P2-READONLY worker tasks
+```

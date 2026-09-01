@@ -1,13 +1,13 @@
 ---
 task_id: OTC-20260830-local-vision-agent-supervisor-foundation
-status: blocked
+status: completed
 agent: Codex SDD coordinator
 session_role: implementation_coordinator
 project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: implementation
-phase: closeout_validation
+phase: terminal_closeout
 branch: feat/OTC-20260830-local-vision-agent-supervisor-foundation
 base_branch: docs/OTC-20260830-local-vision-agent-supervisor-discovery
 trusted_main: 9f79685f6d073c160397eeefdbc2beb27e8921ad
@@ -15,7 +15,7 @@ parent_task: OTC-20260830-local-vision-agent-supervisor-discovery
 parent_pr: 808
 implementation_pr: 810
 created: 2026-08-30T11:51:56+02:00
-updated_at: 2026-08-31T13:20:00Z
+updated_at: 2026-09-01T15:50:43+02:00
 risk: high
 execution_class: repository_worktree
 execution_mode: subagent_driven_development
@@ -57,15 +57,7 @@ approved_spec: docs/superpowers/specs/2026-08-30-local-track-a-vision-agent-supe
 implementation_plan: docs/superpowers/plans/2026-08-30-local-track-a-vision-agent-supervisor.md
 canonical_prompt: docs/agents/prompts/OTC_20260830_LOCAL_VISION_AGENT_SUPERVISOR_FOUNDATION_SDD.md
 alias_prompt: docs/agents/prompts/OTC_20260830_LOCAL_VISION_AGENT_SUPERVISOR_FOUNDATION_SDD_ALIAS.md
-owned_paths:
-  - docs/agents/tasks/active/OTC-20260830-local-vision-agent-supervisor-foundation.md
-  - docs/agents/reports/OTC-20260830-local-vision-agent-supervisor-foundation.md
-  - docs/agents/prompts/OTC_20260830_LOCAL_VISION_AGENT_SUPERVISOR_FOUNDATION_SDD.md
-  - docs/agents/prompts/OTC_20260830_LOCAL_VISION_AGENT_SUPERVISOR_FOUNDATION_SDD_ALIAS.md
-  - tools/tibia_re_vision/
-  - tools/tibia_re_control_center/
-  - tests/tools/tibia_re_vision/
-  - tests/tools/tibia_re_control_center/
+owned_paths: []
 related_prs:
   - PR #810: stacked Draft implementation lane
   - PR #808: stacked documentation/design/planning parent; keep Draft until its own closeout gate
@@ -75,8 +67,10 @@ current_environment:
   remote_desktop_commander: offline
   codex_worktree: available
   codex_subagent_dispatch: available
-current_blocker: TASK10_REAL_BROWSER_E2E_REQUIRED — published PR #810 head `89d50fe4cd82c6de97c0e1489eec3e9c2d2299d3` has exact-tree validation for every Task 10 command except the required real Chromium/Chrome Package B E2E; no capable browser runner or workflow-dispatch capability is available in this execution environment
-next_action: run `PYTHONPATH=. python tests/tools/tibia_re_control_center/e2e_package_b.py` with a genuine Chrome/Chromium binary on published head `89d50fe4cd82c6de97c0e1489eec3e9c2d2299d3`, then perform the separate final whole-branch review
+current_blocker: none
+next_action: none
+completed_at: 2026-09-01T15:50:43+02:00
+terminal_disposition: merged_via_pr_820
 ---
 
 # Local vision-agent supervisor foundation implementation
@@ -103,7 +97,7 @@ Use `superpowers:using-git-worktrees`, `superpowers:subagent-driven-development`
 
 The Codex execution environment is available. Live Git/GitHub state was reconciled, an isolated worktree was verified, the clean baseline passed, and the plan-scoped SDD ledger contains the required dependency/interface scan and rulings. Tasks 1, 2, 3, and 5 are complete with clean independent reviews. Task 4 and Task 6 each reached a binding architecture boundary after independent adversarial review; ordinary independent findings in Task 6 were fixed and re-reviewed clean. Tasks 7–10 remain dependency-blocked and were not dispatched.
 
-## Context checkpoint
+## Historical context checkpoint
 
 ```yaml
 checkpoint_version: 1
@@ -328,3 +322,50 @@ Chrome/Chromium, no available local package candidate, and the GitHub connector
 can fetch/rerun but cannot dispatch the existing `workflow_dispatch` workflow.
 It is therefore not marked PASS. PR #810 remains Draft; no merge or PR #615
 closure occurred.
+
+## Terminal closeout - 2026-09-01
+
+The foundation implementation task is terminal because the exact implementation branch was integrated to main through PR #820; the earlier stacked Draft PR #810 is historical only.
+
+Live lifecycle evidence at closeout:
+
+- PR #820 is merged (`565bce8d70311048380556014978666771da598c`) and contains the accepted foundation replacement.
+- PR #808 was closed on 2026-09-01T13:50:22Z after #820 merge.
+- PR #810 was closed on 2026-09-01T13:50:29Z after #820 merge.
+- No Official Tibia runtime observation, input, credential use, process control, process-memory access, packet/payload capture, or physical action was performed by this lifecycle cleanup.
+- Ownership is released; this archived record claims no writable paths.
+
+## Context checkpoint
+
+```yaml
+checkpoint_version: 1
+updated_at: 2026-09-01T15:50:43+02:00
+head: 21fedc04809f0f78a1ff673edb2804a83ab5fedb
+branch: main
+pr: 820
+status: completed
+context_routes:
+  - local-vision-agent-supervisor-foundation
+  - phase-2-read-only-coordination
+owned_paths: []
+proven:
+  - PR 820 merged the accepted local vision-agent supervisor foundation.
+  - historical Draft PRs 808 and 810 are closed after the successful replacement merge.
+  - this task no longer owns repository paths.
+derived:
+  - Phase 2 coordinator may allocate non-overlapping worker ownership from refreshed main.
+unknown: []
+conflicts: []
+first_failure:
+  marker: none
+  evidence: none
+rejected_hypotheses: []
+changed_paths:
+  - docs/agents/tasks/archive/OTC-20260830-local-vision-agent-supervisor-foundation.md
+validation:
+  - command: live GitHub lifecycle readback
+    result: PASS
+    evidence: PR 820 merged; PRs 808 and 810 closed
+blockers: []
+next_action: preserve this archived task as terminal; all future Phase 2 work must use the OTC-VISION-P2-READONLY worker tasks
+```

@@ -119,3 +119,13 @@ Fresh post-restack results:
 - Ruff / py_compile / checkpoint validator / Track A governance / `git diff --check`: PASS.
 
 No live runtime observation or physical action was performed. The next gate is publication to Draft PR #829 and exact-head hosted CI; coordinator classification remains mandatory before any promotion.
+
+## Exact-head CI portability repair
+
+Published head `d6c3a1e5b1b253c11dea52bb10cf83c45b75d103` passed the repository `CI` and Track A governance workflows. Package A run `33555788479` and Package B run `33555788277` each failed exactly one test: `test_receiver_converts_json_recursion_failure_to_validation_error`; their independent audit jobs passed, and Package B browser/CLI E2E passed.
+
+The hosted Ubuntu interpreter did not raise `RecursionError` for the test's fixed 2000-level JSON nesting, so verification continued to exact-key validation and returned `MISSING_FIELD`. This was a portability defect in the test assumption, not an absent production catch: `EdgeTransportVerifier.verify()` already maps a real `json.loads` `RecursionError` to `EDGE_FRAME_INVALID`.
+
+The repair makes that exception-boundary test deterministic by injecting `RecursionError` at the parser seam and asserting the existing safe mapping. The real payload-depth and metadata-size protections remain separately exercised by non-mocked tests, so no safety criterion is weakened.
+
+Local results after the repair remain focused `30/30 PASS` and protocol+transport `47/47 PASS`. A fresh exact-head hosted run is required after publication; no runtime access or physical action is involved.

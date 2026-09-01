@@ -910,11 +910,23 @@ class AgentEdgeTransportTests(unittest.TestCase):
         self.assertEqual(1, verifier.last_accepted_sequence)
 
     def test_receiver_converts_json_recursion_failure_to_validation_error(self):
+        import tools.tibia_re_control_center.agent_edge_transport as transport
         from tools.tibia_re_control_center.model import ValidationError
 
-        packet = (b'{"x":' * 2000) + b'0' + (b'}' * 2000)
-        with self.assertRaises(ValidationError) as raised:
-            EdgeTransportVerifier(expected_peer_id="synology-edge", expected_peer_auth_key=EDGE_KEY).verify(packet, now_epoch_ms=1_000)
+        original_loads = transport.json.loads
+
+        def recursion_failure(*_args, **_kwargs):
+            raise RecursionError("synthetic parser recursion boundary")
+
+        transport.json.loads = recursion_failure
+        try:
+            with self.assertRaises(ValidationError) as raised:
+                EdgeTransportVerifier(
+                    expected_peer_id="synology-edge",
+                    expected_peer_auth_key=EDGE_KEY,
+                ).verify(b"{}", now_epoch_ms=1_000)
+        finally:
+            transport.json.loads = original_loads
         self.assertEqual("EDGE_FRAME_INVALID", raised.exception.code)
 
 if __name__ == "__main__":

@@ -9,12 +9,12 @@ project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: implementation
-phase: worker_restack_validation_complete
+phase: worker_ci_portability_repair_ready
 branch: feat/OTC-20260901-vision-p2-edge-transport
 base_branch: main
 base_main: e883543403d5430d7b1d287f59043b23c98f37d6
 created: 2026-09-01T16:27:39+02:00
-updated_at: 2026-09-01T22:27:55+02:00
+updated_at: 2026-09-01T22:37:15+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: isolated_worker_branch
@@ -65,12 +65,12 @@ depends_on:
   - current main e883543403d5430d7b1d287f59043b23c98f37d6 after PR #839
 related_prs:
   - PR #829 Wave 1 worker Draft
-current_blocker: none
-next_action: commit this post-restack checkpoint, rerun exact local gates, force-with-lease push Draft PR #829, then observe the first exact-head CI snapshot
+current_blocker: exact-head Package A/B CI failed only on an interpreter-dependent recursion-depth test; deterministic test repair is local and awaits publication
+next_action: commit the deterministic parser-recursion test repair and CI checkpoint, rerun owned local gates, push the new head, then observe its exact-head CI
 invocation_started_at: 2026-09-01T17:03:28+02:00
-last_progress_at: 2026-09-01T22:27:55+02:00
-ci_checks_for_current_head: 0
-ci_check_generation: post-pr839-restack-local-pass
+last_progress_at: 2026-09-01T22:37:15+02:00
+ci_checks_for_current_head: 2
+ci_check_generation: draft-d6c3a1e5-ci-failure-isolated
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -144,13 +144,13 @@ runtime_access: none
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T22:27:55+02:00
-head: 9d525694dcef97b7197a6b15e8d5dbed61c8bcfe
-head_semantics: post_pr839_restack_head_before_final_checkpoint_commit
+updated_at: 2026-09-01T22:37:15+02:00
+head: d6c3a1e5b1b253c11dea52bb10cf83c45b75d103
+head_semantics: published_exact_head_with_ci_failure_before_test_portability_repair_commit
 branch: feat/OTC-20260901-vision-p2-edge-transport
 pr: 829
 status: validating
-phase: worker_restack_validation_complete
+phase: worker_ci_portability_repair_ready
 context_routes:
   - phase-2-read-only-coordination
   - track-a-governance
@@ -161,49 +161,48 @@ owned_paths:
   - tools/tibia_re_control_center/agent_edge_transport.py
   - tests/tools/tibia_re_control_center/test_agent_edge_transport.py
 proven:
-  - PR #839 merged as e883543403d5430d7b1d287f59043b23c98f37d6 and this worker branch rebased cleanly onto that current main.
-  - current diff against main contains only the four declared owned paths and no shared Control Center integration path.
-  - runtime_access remains none; all mutation/runtime-effect authority remains false and physical action count/budget remain 0/0.
-  - outbound-only transport mutually authenticates peers with distinct directional HMAC-SHA256 keys and grants no runtime/action authority.
-  - metadata is bounded, versioned, freshness/connection/replay fenced, deep-snapshotted before privacy checks and rejects generic shell/process/GUI/secret-getter surfaces.
-  - endpoint resolution is restricted to explicit loopback/private/link-local CIDRs and rejects public/reserved destinations.
-  - artifact descriptors bind SHA-256, exact size and media type; bytes travel separately with exact receiver integrity checks.
-  - verifier replay/connection state commits atomically under one RLock so concurrent duplicate sequence acceptance is prevented.
-  - post-restack focused suite passes 30/30 and protocol+transport component suite passes 47/47; Ruff, py_compile, Track A governance and git diff --check pass.
+  - Draft PR #829 published exact head d6c3a1e5b1b253c11dea52bb10cf83c45b75d103 against main e883543403d5430d7b1d287f59043b23c98f37d6 with only four declared owned paths.
+  - exact-head CI and Track A governance passed; Package A run 33555788479 and Package B run 33555788277 each failed only the same edge-transport recursion test.
+  - both failed workflow logs report test_receiver_converts_json_recursion_failure_to_validation_error expected EDGE_FRAME_INVALID but received MISSING_FIELD on Ubuntu; all other 522 tests passed there with three skips.
+  - the failure is an interpreter-dependent test assumption: fixed nesting depth 2000 does not reliably force json.loads RecursionError across environments.
+  - production already explicitly converts RecursionError from json.loads into EDGE_FRAME_INVALID; no production behavior change is required for this CI repair.
+  - the repaired test deterministically injects RecursionError at the parser seam and verifies the existing safe boundary mapping independent of interpreter recursion depth.
+  - local repaired focused test passes; focused suite passes 30/30 and component suite passes 47/47.
+  - Windows full discovery still has five reproducible unowned agent_api/agent_vision environment-specific errors; the prior Linux CI run proves those same tests pass on the hosted runner and they are not caused by this edge transport slice.
+  - runtime_access remains none; no live runtime observation, mutation or physical action occurred.
 derived:
-  - repository/static transport producer is locally coherent on current main and ready for Draft PR publication and coordinator classification.
-  - peer authentication remains authority-neutral and cannot establish Track A admission, semantic state, evidence freshness or action authority.
+  - the exact-head Package A/B failures belong to this task-owned test but not to production transport semantics; deterministic test repair is the smallest valid CI fix.
+  - the worker must publish a new head and obtain fresh exact-head CI before returning the Draft PR for coordinator classification.
 unknown:
-  - exact-head GitHub CI/review outcome after publication.
-  - coordinator independent classification after publication.
-  - real Synology/Kasm/Official Tibia transport evidence; none authorized or attempted.
+  - exact-head CI outcome after publishing the deterministic recursion-test repair.
+  - coordinator independent classification after a green exact head.
 conflicts: []
 first_failure:
-  marker: none
-  evidence: all currently required local owned-slice and governance checks pass after current-main restack.
+  marker: CI-RECURSION-TEST-PORTABILITY
+  evidence: Package A run 33555788479 and Package B run 33555788277 fail only test_receiver_converts_json_recursion_failure_to_validation_error on d6c3a1e5b1b253c11dea52bb10cf83c45b75d103.
 rejected_hypotheses:
-  - GIL alone makes verifier replay updates atomic: rejected by deterministic two-thread falsification and repaired with explicit locking.
-  - nested payloads are safe with a shallow copy before privacy admission: rejected by mutation regression and repaired with a deep snapshot.
-  - ipaddress.is_private alone defines the intended LAN trust boundary: rejected; explicit admitted CIDRs are enforced.
-  - transport authentication grants runtime/action authority: rejected by fixed authority-neutral envelope and tests.
+  - production RecursionError mapping is absent: rejected by source inspection and deterministic repaired test.
+  - Package A/B contain broader regressions caused by edge transport: rejected; hosted logs show exactly one failure and independent Package A/B audits plus Package B browser E2E pass.
+  - local Windows full-discovery errors are caused by edge transport: rejected; they are in unowned agent_api/agent_vision surfaces and hosted Linux exact-head execution passes those cases.
 changed_paths:
   - docs/agents/tasks/active/OTC-20260901-vision-p2-edge-transport.md
   - docs/agents/reports/OTC-20260901-vision-p2-edge-transport.md
   - tools/tibia_re_control_center/agent_edge_transport.py
   - tests/tools/tibia_re_control_center/test_agent_edge_transport.py
 validation:
-  - command: python -m unittest tests.tools.tibia_re_control_center.test_agent_edge_transport -q
+  - command: GitHub exact-head workflow snapshot for d6c3a1e5b1b253c11dea52bb10cf83c45b75d103
+    result: FAIL
+    evidence: CI SUCCESS; Track A governance SUCCESS; Package A/B fail the same single portability test.
+  - command: gh run view 33555788479 --log-failed; gh run view 33555788277 --log-failed
     result: PASS
-    evidence: 30 tests, zero failures/errors after restack.
-  - command: python -m unittest tests.tools.tibia_re_control_center.test_agent_protocol tests.tools.tibia_re_control_center.test_agent_edge_transport -q
+    evidence: first actionable error isolated to the fixed-depth recursion expectation; hosted suite otherwise reports 522 passes and three skips.
+  - command: deterministic repaired recursion-boundary test
     result: PASS
-    evidence: 47 tests, zero failures/errors after restack.
-  - command: python -m ruff check <owned implementation/test>; python -m py_compile <owned implementation/test>; git diff --check origin/main...HEAD
+    evidence: injected RecursionError is converted to ValidationError code EDGE_FRAME_INVALID.
+  - command: focused and protocol+transport suites after repair
     result: PASS
-    evidence: static and diff hygiene clean.
-  - command: python .github/scripts/test_track_a_agent_runtime_governance.py --changed-from origin/main --expected-branch feat/OTC-20260901-vision-p2-edge-transport
-    result: PASS
-    evidence: TRACK_A_AGENT_RUNTIME_GOVERNANCE_PASS=true.
-blockers: []
-next_action: commit this post-restack checkpoint, rerun exact local gates, force-with-lease push Draft PR #829, then observe the first exact-head CI snapshot.
+    evidence: 30/30 and 47/47 locally.
+blockers:
+  - fresh exact-head CI is required after publishing the repair.
+next_action: commit the deterministic parser-recursion test repair and CI checkpoint, rerun owned local gates, push the new head, then observe its exact-head CI.
 ```

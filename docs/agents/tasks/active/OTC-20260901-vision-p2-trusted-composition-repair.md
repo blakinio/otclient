@@ -14,7 +14,7 @@ branch: feat/OTC-20260901-vision-p2-trusted-composition-repair
 base_branch: main
 base_main: 103fa3071ee4d82d7dff934034e2442c32bd3a81
 created: 2026-09-01T23:28:41+02:00
-updated_at: 2026-09-01T23:28:41+02:00
+updated_at: 2026-09-01T23:31:29+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: isolated_worker_branch
@@ -75,6 +75,7 @@ related_prs:
   - PR #829 edge-transport source Draft
   - PR #830 control-bridge source Draft
   - PR #843 coordinator reconciliation Draft
+  - PR #846 trusted-composition repair Draft
 current_blocker: CODEX_SPARK_QUOTA_EXHAUSTED_UNTIL_2026-09-02T04:15+02:00_AND_PR_829_RETURN_FOR_REPAIR
 next_action: after Spark quota reset, integrate exact accepted source slices into this isolated branch, keep runtime access none, and implement the trusted composition root without reintroducing caller-mintable authority
 invocation_started_at: null
@@ -113,11 +114,11 @@ This is a coordinator-assigned bounded repair task, not a new conceptual program
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T23:28:41+02:00
-head: 103fa3071ee4d82d7dff934034e2442c32bd3a81
-head_semantics: trusted_main_at_scaffold_before_task_commit
+updated_at: 2026-09-01T23:31:29+02:00
+head: c82392787
+head_semantics: scaffold_commit_before_pr_binding_checkpoint
 branch: feat/OTC-20260901-vision-p2-trusted-composition-repair
-pr: PENDING
+pr: 846
 status: blocked
 context_routes:
   - phase-2-read-only-coordination

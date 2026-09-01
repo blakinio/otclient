@@ -87,3 +87,16 @@ Fresh results:
 - Ruff / py_compile / checkpoint validator / Track A governance / `git diff --check`: PASS.
 
 The commit is intentionally not pushed on the stale dispatch base. It waits for runtime-signals promotion PR #839, then will be restacked once on the resulting trusted main and revalidated before Draft PR #829 publication.
+
+## Concurrent replay-window falsification and repair
+
+Independent review after the first local checkpoint found that `EdgeTransportVerifier` updated replay/connection state without synchronization. A deterministic two-thread barrier test forced both verifications of the same signed `sequence=1` frame past validation before state commit; both were accepted, disproving the intended replay guarantee under concurrent receiver use.
+
+The repair at `9fce716178820920cac1f605fc5402910c1bed6e` adds one verifier state `RLock`, keeps expensive parse/HMAC/payload validation outside the atomic state commit, then serializes the final replay check, connection binding and sequence advance. `bind_connection()` uses the same state lock. Invalid frames therefore still do not reserve sequence state, while concurrent duplicates can no longer both commit.
+
+Fresh results after repair:
+- focused edge transport: `30/30 PASS`;
+- protocol + edge transport: `47/47 PASS`;
+- Ruff / py_compile / checkpoint validator / Track A governance / `git diff --check`: PASS.
+
+The branch remains local-only until PR #839 merges, after which it will be restacked once on trusted current main and revalidated before Draft PR #829 publication.

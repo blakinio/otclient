@@ -1,7 +1,7 @@
 ---
 task_id: OTC-20260901-vision-p2-capture-edge
-status: ready
-agent: unclaimed
+status: validating
+agent: ChatGPT
 session_role: phase2_worker
 worker_alias: OTC-VISION-P2-CAPTURE-EDGE
 programme_id: OTC-VISION-P2-READONLY
@@ -9,12 +9,12 @@ project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: implementation
-phase: dispatch_ready
+phase: worker_local_validation
 branch: feat/OTC-20260901-vision-p2-capture-edge
 base_branch: main
 base_main: 0fe1ecb3569f1d8372209c857ab57f3b626c29ae
 created: 2026-09-01T16:27:39+02:00
-updated_at: 2026-09-01T16:31:41+02:00
+updated_at: 2026-09-01T17:57:37+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: isolated_worker_branch
@@ -66,11 +66,11 @@ depends_on:
 related_prs:
   - PR #827 Wave 1 worker Draft
 current_blocker: none
-next_action: launch OTC-VISION-P2-CAPTURE-EDGE in its isolated worker session, verify Draft PR #827 still matches this branch/worktree/ownership, read binding contracts, then write the first RED focused test at tests/tools/tibia_re_vision/test_capture_edge.py with runtime_access none
-invocation_started_at: null
-last_progress_at: 2026-09-01T16:31:41+02:00
+next_action: commit and publish the worker implementation/report checkpoint, then verify exact-head GitHub CI/governance and return Draft PR #827 to OTC-VISION-P2-COORDINATOR for classification
+invocation_started_at: 2026-09-01T16:58:39+02:00
+last_progress_at: 2026-09-01T17:57:37+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: pr-bound-bootstrap
+ci_check_generation: implementation-unpublished
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -144,11 +144,11 @@ runtime_access: none
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T16:31:41+02:00
-head: 9b98779ba8844c7b014d1ee62c3097831383729d
+updated_at: 2026-09-01T17:57:37+02:00
+head: dd40d914fa5d05cdf5ff2957cc798ee7aa336d9b
 branch: feat/OTC-20260901-vision-p2-capture-edge
 pr: 827
-status: ready
+status: validating
 context_routes:
   - phase-2-read-only-coordination
   - track-a-governance
@@ -159,35 +159,47 @@ owned_paths:
   - tools/tibia_re_vision/capture_edge.py
   - tests/tools/tibia_re_vision/test_capture_edge.py
 proven:
-  - branch and isolated worktree were created by the coordinator from exact main 0fe1ecb3569f1d8372209c857ab57f3b626c29ae.
-  - Draft PR 827 exists for this exact worker branch and was opened from bootstrap head 9b98779ba8844c7b014d1ee62c3097831383729d.
-  - PR 820 and PR 824 are merged prerequisites.
-  - coordinator pairwise and refreshed-main ownership scans found no overlap for this worker ownership set.
-  - bootstrap checkpoint, Track A runtime governance and git diff --check passed before PR binding.
-  - runtime_access is none; all mutation/runtime-effect authorities remain false and physical action budget/count are 0/0.
+  - Draft PR 827 remains the pre-bound worker PR; local branch/worktree ownership was revalidated before implementation.
+  - runtime_access is none; all mutation/runtime-effect authorities are false and physical action budget/count are 0/0.
+  - RED-to-GREEN focused tests cover exact binding/freshness, secret-safe in-memory masking, crop/full hash binding, content addressing, blank/black/change metadata, downstream integrity/currentness, fixed read-only Kasm/X11/ffmpeg command construction, geometry-drift refusal, final binding-race refusal, and absence of an unchecked public vision-conversion bypass.
+  - focused capture-edge suite passes 11/11; capture-edge plus existing vision-evidence suite passes 15/15; targeted py_compile passes.
+  - Track A runtime governance, checkpoint validation and git diff --check pass locally for the worker branch before publication.
+  - the one broader agent_vision error and foundation synthetic-E2E failure reproduce unchanged from clean committed head dd40d914fa5d05cdf5ff2957cc798ee7aa336d9b and are pre-existing outside worker ownership.
 derived:
-  - the isolated worker may begin repository/static RED-to-GREEN work only after its own session revalidates this task, Draft PR, branch, worktree and ownership.
+  - the worker implementation is ready to publish for exact-head CI and coordinator classification, but is not a claim of real-runtime capture success.
 unknown:
-  - implementation, focused test, review and exact-head CI outcomes.
-  - any future real-runtime evidence; none is authorized or claimed at bootstrap.
+  - exact-head GitHub CI/governance outcome after publication.
+  - independent coordinator review/integration disposition.
+  - real admitted Linux/Synology/Kasm read-only runtime verification; not authorized in this worker checkpoint.
 conflicts: []
 first_failure:
-  marker: none
-  evidence: no current failure; worker session has not yet claimed execution.
+  marker: RED-CAPTURE-EDGE-MODULE-ABSENT
+  evidence: the first focused test failed because tools.tibia_re_vision.capture_edge did not exist; subsequent behavior slices were also proven through focused RED before GREEN implementation.
 rejected_hypotheses:
   - fake or hosted evidence can satisfy real-runtime acceptance: rejected by the Phase 2 contract.
+  - the broad agent_vision snapshot error is caused by capture-edge changes: rejected by identical clean-baseline reproduction at dd40d914fa5d05cdf5ff2957cc798ee7aa336d9b.
+  - the foundation synthetic E2E failure is caused by capture-edge changes: rejected by identical clean-baseline reproduction at dd40d914fa5d05cdf5ff2957cc798ee7aa336d9b.
 changed_paths:
   - docs/agents/tasks/active/OTC-20260901-vision-p2-capture-edge.md
+  - docs/agents/reports/OTC-20260901-vision-p2-capture-edge.md
+  - tools/tibia_re_vision/capture_edge.py
+  - tests/tools/tibia_re_vision/test_capture_edge.py
 validation:
-  - command: coordinator refreshed-main and pairwise ownership scans
+  - command: python -m unittest tests/tools/tibia_re_vision/test_capture_edge.py
     result: PASS
-    evidence: no worker-worker or active-main exact ownership conflicts.
-  - command: bootstrap Track A governance and checkpoint validation
+    evidence: 11 tests, 0 failures/errors.
+  - command: python -m py_compile tools/tibia_re_vision/capture_edge.py tests/tools/tibia_re_vision/test_capture_edge.py
     result: PASS
-    evidence: task was branch-bound and runtime_access none admission was valid before Draft PR binding.
-  - command: live Draft PR creation readback
+    evidence: both files compile under local Python 3.12.
+  - command: python -m unittest tests/tools/tibia_re_vision/test_evidence.py tests/tools/tibia_re_vision/test_capture_edge.py
     result: PASS
-    evidence: PR 827 opened Draft against main from feat/OTC-20260901-vision-p2-capture-edge at 9b98779ba8844c7b014d1ee62c3097831383729d.
+    evidence: 15 tests, 0 failures/errors.
+  - command: Track A runtime governance validator for changed-from 0fe1ecb3569f1d8372209c857ab57f3b626c29ae and expected worker branch
+    result: PASS
+    evidence: TRACK_A_AGENT_RUNTIME_GOVERNANCE_PASS=true.
+  - command: broader test_agent_vision and synthetic foundation E2E baseline comparison
+    result: FAIL
+    evidence: both observed failures reproduce from clean archive of committed head dd40d914fa5d05cdf5ff2957cc798ee7aa336d9b; no worker-owned file is involved.
 blockers: []
-next_action: launch OTC-VISION-P2-CAPTURE-EDGE in its isolated worker session, verify Draft PR #827 still matches this branch/worktree/ownership, read binding contracts, then write the first RED focused test at tests/tools/tibia_re_vision/test_capture_edge.py with runtime_access none.
+next_action: commit and publish the worker implementation/report checkpoint, then verify exact-head GitHub CI/governance and return Draft PR #827 to OTC-VISION-P2-COORDINATOR for classification.
 ```

@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "observed_date": "2026-09-01",
+  "source": "owner_pc_codex_session_jsonl_summary",
+  "scope": "Vision P2 coordinator worker burst after empirical routing rollout",
+  "interpretation_caution": "total_tokens are cumulative context/session telemetry with large cached-input components and are not additive billing or quota units; overlapping rate-limit deltas are not additive",
+  "root_causes": [
+    "direct codex exec bypassed the bounded dispatcher and verified GitHub/context-profile guards",
+    "workers performed CI waiting/polling instead of returning control to the coordinator",
+    "workers chased moving main with repeated restacks and new exact-head workflow generations",
+    "same exact-head same-family security review was repeated before material head change",
+    "provider quota pressure caused Spark substitution rather than a real stop"
+  ],
+  "representative_runs": [
+    {
+      "alias": "OTC-VISION-P2-EDGE-TRANSPORT",
+      "model": "gpt-5.6-terra",
+      "effort": "high",
+      "observed_total_tokens": 23282110,
+      "observed_cached_input_tokens": 22923008,
+      "primary_rate_limit_used_percent": 94,
+      "finding": "worker repeatedly issued Start-Sleep while waiting for one remaining CI workflow"
+    },
+    {
+      "alias": "OTC-VISION-P2-CAPTURE-EDGE",
+      "model": "gpt-5.6-sol",
+      "effort": "medium",
+      "observed_total_tokens": 954332,
+      "observed_cached_input_tokens": 844032,
+      "comparison": "bounded benchmark Sol/medium on the frozen capture-edge task used about 56921 tokens",
+      "finding": "same model class became far more expensive when full bootstrap/context discovery replaced the bounded bridge"
+    },
+    {
+      "alias": "OTC-VISION-P2-EDGE-TRANSPORT",
+      "model": "gpt-5.6-sol",
+      "effort": "medium",
+      "same_exact_head": "fe258ecdb65cbc6802b54d2adff57ecb4357865a",
+      "duplicate_audit_observed_total_tokens": [2087123, 1270750],
+      "finding": "two material security reviews ran against the unchanged exact head before repair"
+    },
+    {
+      "alias": "OTC-VISION-P2-CAPTURE-EDGE",
+      "model": "gpt-5.6-terra",
+      "effort": "high",
+      "observed_total_tokens": 12199945,
+      "finding": "repair session carried broad repeated context rather than a bounded repair-only slice"
+    },
+    {
+      "model": "gpt-5.3-codex-spark",
+      "runs": [
+        {"alias": "OTC-VISION-P2-CAPTURE-EDGE", "effort": "high", "observed_total_tokens": 1721559},
+        {"alias": "OTC-VISION-P2-EDGE-TRANSPORT", "effort": "high", "observed_total_tokens": 1573310},
+        {"alias": "OTC-VISION-P2-CONTROL-BRIDGE", "effort": "medium", "observed_total_tokens": 1499766}
+      ],
+      "spark_primary_five_hour_used_percent": 100,
+      "finding": "Spark was used as quota spillover after other Codex work and reached its separate short-window limit"
+    }
+  ],
+  "bounded_bridge_validation": {
+    "local_test_suite": "33/33 PASS",
+    "hard_auditor_budget": {"max_seconds": 300, "max_tool_actions": 20},
+    "hard_implementer_budget": {"max_seconds": 900, "max_tool_actions": 60},
+    "forbidden_worker_coordination": ["CI wait/poll", "status-only", "restack-only", "push-only", "checkpoint-only", "PR metadata-only"],
+    "forbidden_event_patterns": ["Start-Sleep", "gh run watch", "gh pr checks --watch", "git rebase", "git pull", "git merge origin/main"],
+    "audit_dedup": "alias+PR+exact-head+model+effort+prompt-hash",
+    "second_opinion": "different model and explicit final-confidence stage only"
+  }
+}

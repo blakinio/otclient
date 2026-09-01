@@ -1,7 +1,7 @@
 # OTC Vision P2 Read-Only — Owner Alias Registry
 
 ```yaml
-alias_registry_version: 1.1.0
+alias_registry_version: 1.2.0
 programme_id: OTC-VISION-P2-READONLY
 repository: blakinio/otclient
 canonical_prompt_family: docs/agents/prompts/OTC_20260901_VISION_P2_READONLY_MULTIAGENT.md
@@ -17,6 +17,8 @@ Uruchom OTC-VISION-P2-COORDINATOR autonomicznie.
 ```
 
 The coordinator must refresh live state, create/reconcile concrete worker tasks/branches/ownership and prepare Wave 1. When coordinator-managed Codex execution is available, it also selects and invokes the subordinate workers itself. Do not manually invent worker branches, select worker models/effort, or duplicate tasks when the coordinator can resolve and dispatch them.
+
+For the five Wave 1 aliases supported by the owner-PC bounded bridge, use that bridge as the mandatory normal execution path while it is available. Direct `codex exec` is not a convenience fallback. Real dispatch requires a fresh verified GitHub snapshot and bounded role profile. CI/status/restack/checkpoint-only work remains coordinator work, and worker quota exhaustion never authorizes automatic provider/Spark spillover.
 
 ## Wave 1 — up to five workers
 
@@ -85,7 +87,7 @@ Worker effort values in this table are historical risk recommendations, not mand
 
 ## Spark note
 
-Do not treat this registry as standing permission for direct owner-funded Spark use. Current trusted-base `AGENTS.md` and the owner's current invocation decide whether a specific model/provider is authorized. The repository's central advisory Spark PR pre-review remains separate from worker execution.
+Do not treat this registry as standing permission for direct owner-funded Spark use. Current trusted-base `AGENTS.md` and the owner's current invocation decide whether a specific model/provider is authorized. The repository's central advisory Spark PR pre-review remains separate from worker execution. Low/exhausted Luna/Terra/Sol quota is not itself a routing reason or authorization to spill execution into Spark; persist the budget stop and wait/rotate unless Spark has an independent authorized task reason.
 
 ## Phase boundary
 

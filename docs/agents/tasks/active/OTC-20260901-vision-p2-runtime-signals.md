@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260901-vision-p2-runtime-signals
-status: validating
+status: waiting
 agent: ChatGPT
 session_role: phase2_worker
 worker_alias: OTC-VISION-P2-RUNTIME-SIGNALS
@@ -9,12 +9,12 @@ project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: implementation
-phase: repository_static_validation
+phase: waiting_shared_ci_repair
 branch: feat/OTC-20260901-vision-p2-runtime-signals
 base_branch: main
 base_main: 0fe1ecb3569f1d8372209c857ab57f3b626c29ae
 created: 2026-09-01T16:27:39+02:00
-updated_at: 2026-09-01T17:59:16+02:00
+updated_at: 2026-09-01T18:08:48+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: isolated_worker_branch
@@ -65,12 +65,12 @@ depends_on:
   - main 0fe1ecb3569f1d8372209c857ab57f3b626c29ae
 related_prs:
   - PR #828 Wave 1 worker Draft
-current_blocker: none
-next_action: publish this coherent checkpoint, inspect exact-head GitHub CI for Draft PR #828, then return the worker result to OTC-VISION-P2-COORDINATOR
+current_blocker: shared Package A path-boundary audit rejects Phase-2 durable docs; coordinator repair PR #833 is open and outside this worker owned_paths
+next_action: after coordinator PR #833 merges, refresh/rebase this worker on current main without changing the accepted contract, rerun exact-head PR #828 checks, and return the result to OTC-VISION-P2-COORDINATOR
 invocation_started_at: 2026-09-01T17:02:17+02:00
-last_progress_at: 2026-09-01T17:59:16+02:00
-ci_checks_for_current_head: 0
-ci_check_generation: admission-bound-exact-head-pending-publish
+last_progress_at: 2026-09-01T18:08:48+02:00
+ci_checks_for_current_head: 1
+ci_check_generation: package-a-path-boundary-blocked
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -144,11 +144,11 @@ runtime_access: none
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T17:59:16+02:00
-head: f360f29c5de53cafaa09952eb98138ae3b2c6c5a
+updated_at: 2026-09-01T18:08:48+02:00
+head: 426a9aaf15c440531fb9d0bc315f382bf5465ea0
 branch: feat/OTC-20260901-vision-p2-runtime-signals
 pr: 828
-status: validating
+status: waiting
 context_routes:
   - phase-2-read-only-coordination
   - track-a-governance
@@ -173,13 +173,16 @@ derived:
   - no production REVIEWED_CAUSAL producer is hard-coded because current repository evidence does not safely qualify one under this task authority; later coordinator integration must bind only separately reviewed current producers.
   - the local slice is coherent for publication and exact-head hosted validation; clean-head baseline failures are not owned by this worker and must not be repaired here.
 unknown:
-  - exact-head GitHub CI outcome after the implementation checkpoint is published.
+  - merge/terminal outcome of coordinator-owned CI repair PR #833.
+  - final exact-head GitHub outcome for PR #828 after #833 merges and this worker is refreshed on current main.
   - coordinator classification and any later serialized real read-only observation evidence.
 conflicts: []
 first_failure:
-  marker: EXACT_HEAD_CI_NOT_RUN
-  evidence: admission-bound implementation is published through f360f29c5de53cafaa09952eb98138ae3b2c6c5a; this checkpoint correction has not yet been published or checked by exact-head GitHub CI.
+  marker: PACKAGE_A_CHANGED_PATHS_REJECT_PHASE2_DURABLE_DOCS
+  evidence: exact-head Package A run 33529133500 job 99927496940 failed only at Verify declared Package A path boundary; deterministic Package A core, CI / Required, both Track A governance jobs and all Package B jobs passed.
 rejected_hypotheses:
+  - runtime-signals implementation caused the exact-head CI failure: rejected; the failed audit reports only Phase-2 documentation paths, while the implementation/test prefixes are already allowed and Package A deterministic core passed.
+  - this worker should edit the shared Package A workflow: rejected by exact owned_paths; coordinator PR #833 already owns the narrow repair.
   - the five full-suite errors were introduced by runtime-signals changes: rejected because the exact three failing test methods reproduce on clean head 11fc18820 with the local implementation stashed.
   - structural/QMeta/window/model evidence may assert IN_GAME: rejected by the binding Phase 2 contract and enforced by contract validation.
   - fake/hosted evidence can satisfy real-runtime acceptance: rejected; this report makes no real-runtime claim.
@@ -198,15 +201,13 @@ validation:
   - command: python -m unittest discover -s tools/tibia-re-vision-benchmark/tests -p test_*.py -q
     result: PASS
     evidence: 34 tests passed.
-  - command: python -m ruff check tools/tibia_re_control_center/agent_runtime_signals.py tests/tools/tibia_re_control_center/test_agent_runtime_signals.py
-    result: PASS
-    evidence: All checks passed.
-  - command: clean-head reproduction with local implementation stashed
-    result: PASS
-    evidence: all three excluded baseline methods fail on clean 11fc18820 with the same ConnectionResetError / ModelSlotUnavailable classes.
-  - command: git diff 0fe1ecb..origin/main -- <owned paths>
-    result: PASS
-    evidence: no owned-path overlap on refreshed main ca1a71b5852f6e00ba144ed183af470555c51f56.
-blockers: []
-next_action: publish this coherent checkpoint, inspect exact-head GitHub CI for Draft PR #828, then return the worker result to OTC-VISION-P2-COORDINATOR.
+  - command: GitHub Actions exact head 426a9aaf15c440531fb9d0bc315f382bf5465ea0
+    result: FAIL
+    evidence: CI run 33529133602 PASS required; Track A run 33529133440 both PASS; Package B run 33529133331 all PASS; Package A run 33529133500 deterministic core PASS but falsification job 99927496940 failed only on historical changed-path allowlist.
+  - command: exact Package A failed-job log
+    result: BLOCKED
+    evidence: unexpected paths are this worker report/task plus coordinator task; coordinator PR #833 owns the bounded workflow repair.
+blockers:
+  - shared Package A Phase-2 durable-doc path boundary is pending coordinator PR #833; no worker-owned repair remains
+next_action: after coordinator PR #833 merges, refresh/rebase this worker on current main without changing the accepted contract, rerun exact-head PR #828 checks, and return the result to OTC-VISION-P2-COORDINATOR.
 ```

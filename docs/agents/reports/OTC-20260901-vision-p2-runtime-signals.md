@@ -85,3 +85,26 @@ No fix was attempted because those files are outside this worker's owned paths a
 Real Official Tibia observation remains NOT RUN and unauthorized here. No exact current client PID/session/display/runtime claim, process-memory read, packet/payload capture, model inference, GUI input, credentials, login, process control or physical action occurred.
 
 The coordinator must classify this Draft PR and integrate it with the separately owned runtime-admission, capture, edge-transport and Control-Bridge slices before any serialized read-only observation or Phase 2 E2E can satisfy programme-level acceptance.
+
+## Exact-head GitHub classification - 426a9aaf1
+
+Exact worker head `426a9aaf15c440531fb9d0bc315f382bf5465ea0` was validated by GitHub Actions. All observed implementation/regression gates passed except one shared historical Package A changed-path audit:
+
+- `CI` run `33529133602`: `CI / Required` PASS; syntax/workflow, Lua and informational static-analysis jobs PASS; build/startup jobs correctly skipped for this path class.
+- `Track A agent runtime governance` run `33529133440`: deterministic admission-policy audit PASS and fresh admission behavior audit PASS.
+- `TIBIA RE Control Center Package B` run `33529133331`: full regression PASS, fresh falsification audit PASS, real Chromium + CLI loopback E2E PASS.
+- `TIBIA RE Control Center Package A` run `33529133500`: deterministic core PASS; `Fresh Package A falsification audit` FAIL only at job `99927496940`, step `Verify declared Package A path boundary`.
+
+The failed job log reports exactly:
+
+```text
+Package A changed unexpected paths: [
+  'docs/agents/reports/OTC-20260901-vision-p2-runtime-signals.md',
+  'docs/agents/tasks/active/OTC-20260901-vision-p2-coordinator.md',
+  'docs/agents/tasks/active/OTC-20260901-vision-p2-runtime-signals.md'
+]
+```
+
+The workflow used historical `BASE_SHA=0fe1ecb3569f1d8372209c857ab57f3b626c29ae`; its code/test prefixes already admit this worker's implementation files, while its old exact documentation allowlist does not admit current Phase-2 durable task/report paths or the coordinator task added on `main`. This is therefore a shared CI-governance blocker outside this worker's exact `owned_paths`, not a runtime-signals implementation failure.
+
+The coordinator has already opened non-draft PR `#833` (`ci(track-a): admit vision P2 durable docs`) at `c9c8fe0430d0a0ba2297a53db84d3f4840031d58`. That PR narrowly adds the bounded Phase-2 active-task/archive-task/report prefixes to the existing Package A audit. This worker does not duplicate or modify that shared repair.

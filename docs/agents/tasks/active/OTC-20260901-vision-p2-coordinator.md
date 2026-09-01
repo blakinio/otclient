@@ -12,9 +12,9 @@ task_kind: coordination
 phase: wave_1_ci_repair
 branch: ci/OTC-20260901-vision-p2-package-a-path-boundary
 base_branch: main
-base_main: 11bb95ebf34ce4fb7d46529393862d493250a202
+base_main: 2df0aa64c4578832f41acbf66339310c07724fb4
 created: 2026-09-01T15:45:26+02:00
-updated_at: 2026-09-01T18:11:38+02:00
+updated_at: 2026-09-01T18:15:30+02:00
 risk: high
 execution_mode: chat_github
 run_scope: autonomous_program
@@ -65,6 +65,7 @@ depends_on:
   - PR #823 merged Phase 2 prompt-package closeout
   - PR #825 merged Wave 1 dispatch checkpoint
   - PR #831 merged Codex routing policy
+  - PR #834 merged Codex routing policy closeout
 blocks:
   - PR #826 exact-head Package A revalidation
   - PR #828 exact-head Package A revalidation
@@ -80,16 +81,16 @@ related_prs:
   - PR #832 closed superseded coordinator repair Draft
   - PR #833 active coordinator Package A repair
 current_blocker: PR_833_FINAL_EXACT_HEAD_VALIDATION
-next_action: validate PR #833 exact head after strict-base rebase; if Package A, CI / Required, Track A governance, self-hosted boundary and PR hygiene are green, squash-merge #833 and refresh affected worker lanes
+next_action: validate PR #833 exact head on current main; if Package A, CI / Required, Track A governance, self-hosted boundary and PR hygiene are green and main is unchanged, squash-merge #833 and refresh affected worker lanes
 invocation_started_at: 2026-09-01T17:47:00+02:00
-last_progress_at: 2026-09-01T18:11:38+02:00
+last_progress_at: 2026-09-01T18:15:30+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: strict-base-final
+ci_check_generation: current-main-final
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 2
+repair_cycles_for_current_gate: 3
 context_reconstruction_attempts: 1
 stall_warnings: 0
 ---
@@ -98,7 +99,7 @@ stall_warnings: 0
 
 ## Objective
 
-Coordinate Phase 2 read-only runtime-edge integration, classify worker outputs, repair shared governance blockers, serialize any later real read-only observation, and drive the programme through exact-head integration/E2E closeout without entering Phase 3+.
+Coordinate Phase 2 read-only runtime-edge integration, independently classify workers, repair shared governance blockers, serialize any later real read-only observation, and drive the programme through exact-head integration/E2E closeout without entering Phase 3+.
 
 ## Binding authority
 
@@ -111,87 +112,87 @@ Coordinate Phase 2 read-only runtime-edge integration, classify worker outputs, 
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T18:11:38+02:00
-head: e90cee2cf1895ff0f04cd5801cdaabddefd6a539
-head_semantics: strict-base repair commit before this checkpoint-only docs commit
+updated_at: 2026-09-01T18:15:30+02:00
+head: d37c33df3453853aec49ed91afd38379e266dc69
+head_semantics: current-main repair commit before this checkpoint-only docs commit
 branch: ci/OTC-20260901-vision-p2-package-a-path-boundary
 pr: 833
 status: validating
-context_routes:
-  - phase-2-read-only-coordination
-  - track-a-governance
-  - ci-repair
+context_routes: [phase-2-read-only-coordination, track-a-governance, ci-repair]
 owned_paths:
   - docs/agents/tasks/active/OTC-20260901-vision-p2-coordinator.md
   - .github/workflows/tibia-re-control-center-core.yml
 proven:
-  - PR 826 exact head 0dbd823f6c89895e919f9bc07f7e99ecac9f31a6 completed static runtime-admission implementation with focused 14/14 PASS, Ruff PASS and compileall PASS; its Package A failure is on mandatory Phase 2 durable docs, and later serialized read-only runtime observation is still required.
-  - PR 828 exact head 426a9aaf15c440531fb9d0bc315f382bf5465ea0 has CI, Track A governance and Package B SUCCESS plus Package A deterministic core SUCCESS; its Fresh Package A failure rejects only Phase 2 durable docs.
-  - PR 830 exact head 3036ee5bc3e05765c4eb6988602cc9b0187b7696 has CI and Package B SUCCESS plus Package A deterministic core SUCCESS; its Fresh Package A failure rejects only its Phase 2 durable docs.
-  - PR 830 has an additional independent worker-owned governance defect: exact task bytes begin with UTF-8 BOM EF BB BF before YAML delimiter. Worker received RETURN_FOR_REPAIR for a BOM-only correction and fresh governance validation.
-  - PR 827 exact head 8685f7c6a8dae9e41d71f0acbe70a89a35a0ef38 published the static capture-edge slice with exact-head CI and Track A governance SUCCESS and no live runtime claim.
+  - PR 826 static runtime-admission implementation is complete at 0dbd823f6c89895e919f9bc07f7e99ecac9f31a6 with focused 14/14 PASS, Ruff PASS and compileall PASS; its Package A failure is the shared durable-doc path defect and later serialized read-only observation remains required.
+  - PR 828 at 426a9aaf15c440531fb9d0bc315f382bf5465ea0 has CI, Track A governance and Package B SUCCESS plus Package A deterministic core SUCCESS; its Fresh Package A failure is the same shared durable-doc defect.
+  - PR 827 at 8685f7c6a8dae9e41d71f0acbe70a89a35a0ef38 passed CI/governance, but coordinator independent review found its public empty secret policy can self-certify secret_safe and persist an unmasked frame without machine-checkable proof that the surface is secret-free; PR 827 was returned for repair in comment 5496909848.
+  - PR 830 advanced to fc684f62ab9b4e79e23fab58c6fda942b8b969be; its UTF-8 BOM is removed (task bytes now begin directly with ---) and exact-head Track A governance is SUCCESS. Its Package A failure remains the shared old-workflow defect.
+  - coordinator independent review also found PR 830 currently treats caller-declared runtime_access read_only and opaque runtime refs as sufficient rather than consuming validated #826 runtime admission and #828 runtime-signal contracts; PR 830 was returned for integration repair in comment 5496928156.
   - PR 829 remains dispatch-only at 2ba5a90629c2b3cab3094948bfa3a1fda2b1fb0b with no implementation handoff.
-  - the shared Package A root cause is the changed-path allowlist omitting mandatory `OTC-20260901-vision-p2-*` task/archive/report namespaces; the repair adds only those three programme-scoped prefixes.
+  - Package A root cause is the changed-path allowlist omitting mandatory OTC-20260901-vision-p2 task/archive/report namespaces; coordinator repair adds only those three programme-scoped prefixes.
   - Draft #832 was closed only because the connected Draft-to-Ready mutation fails on Repository.fullDatabaseId; non-draft replacement #833 uses the same bounded repair.
-  - the repair previously passed exact-head Package A, CI, Track A governance and self-hosted boundary on c9c8fe0430d0a0ba2297a53db84d3f4840031d58 with zero review threads/reviews.
-  - main advanced independently through PR #831 to 11bb95ebf34ce4fb7d46529393862d493250a202; #831 touched only EXECUTION_PROTOCOL.md and its own task record, so there is no path overlap.
-  - a merge-commit restack was content-correct and passed exact-head checks on 4f57c1cb4a406c226682325aeb761c12be14aadc, including check-run `CI / Required` 99930254269 SUCCESS, but GitHub strict ruleset still classified PR #833 as `mergeable_state: behind` and rejected merge with required status check expected.
-  - repository ruleset `Protect main` requires strict up-to-date status checks, linear history, squash merge and context `CI / Required`.
-  - to satisfy the strict-base requirement without changing the two-file diff, the feature branch was rewritten to single-parent commit e90cee2cf1895ff0f04cd5801cdaabddefd6a539 directly on current main 11bb95ebf34ce4fb7d46529393862d493250a202 using the exact verified workflow/task blobs.
+  - repair content has repeatedly passed Package A, CI, Track A governance and self-hosted boundary on exact heads c9c8fe0430d0a0ba2297a53db84d3f4840031d58 and 4f57c1cb4a406c226682325aeb761c12be14aadc.
+  - repository ruleset 18840974 requires strict up-to-date status context CI / Required, linear history, squash merge and resolved review threads.
+  - first merge attempt on 4f57c1cb4a406c226682325aeb761c12be14aadc was rejected despite CI / Required 99930254269 SUCCESS because GitHub classified the merge-commit restack as behind under the strict rule.
+  - branch was rewritten as single-parent on main 11bb95eb, then main independently advanced through non-overlapping lifecycle PR #834 to 2df0aa64c4578832f41acbf66339310c07724fb4.
+  - PR #834 changes only the Codex routing-policy task active-to-archive lifecycle and does not overlap either repair path.
+  - branch has now been rewritten again as single-parent repair commit d37c33df3453853aec49ed91afd38379e266dc69 directly on current main 2df0aa64c4578832f41acbf66339310c07724fb4 with the same verified two-file repair content.
   - no Phase 2 live runtime observation, credentials, GUI input, process control, process-memory access, payload capture or physical action occurred.
 derived:
-  - PRs 826, 828 and the Package A portion of 830 are blocked by one coordinator-owned deterministic governance defect rather than by their implementation code.
-  - PR 830 independently remains blocked by its worker-owned BOM defect even after the shared workflow repair lands.
-  - old worker failures must be revalidated against repaired trusted main; #833 success alone does not retroactively green their exact heads.
-  - single-parent strict-base history is the appropriate repository-compatible replacement for the merge-commit restack that GitHub classified behind.
+  - PRs 826, 828 and the Package A portion of 830 share one coordinator-owned deterministic governance blocker.
+  - PR 827 and PR 830 have separate worker-owned/integration findings that remain real after the shared workflow repair.
+  - old worker check failures must be rerun against repaired trusted main; #833 success cannot retroactively change an old exact-head result.
 unknown:
   - exact final PR #833 head created by this checkpoint commit and its fresh final GitHub Actions results.
-  - final independent coordinator classification of PR #827 after requirements review.
-  - current Synology/Kasm target identity/availability for a future serialized read-only observation window.
+  - future worker repair outcomes for #827/#830 and implementation outcome for #829.
+  - current Synology/Kasm target identity/availability for any later serialized read-only observation.
 conflicts: []
 first_failure:
   marker: PACKAGE_A_CHANGED_PATHS_REJECT_PHASE2_DURABLE_DOCS
-  evidence: exact worker Package A logs reject mandatory Phase 2 task/report paths while deterministic implementation tests pass.
+  evidence: PR 826/828/830 Fresh Package A logs reject mandatory Phase 2 durable paths while deterministic implementation jobs succeed.
 rejected_hypotheses:
-  - rerunning unchanged worker Package A failures can clear them: rejected because path classification is deterministic.
-  - workers should edit shared workflow governance outside their owned paths: rejected by Phase 2 ownership contract.
-  - PR 830 governance failure is the same Package A defect: rejected by exact byte-level BOM proof.
-  - green workflow-level CI alone proves mergeability: rejected by first #833 merge attempt and strict ruleset readback; `CI / Required` plus up-to-date branch state are both enforced.
+  - unchanged worker Package A reruns can fix the blocker: rejected because path classification is deterministic.
+  - workers may edit shared workflow outside owned paths: rejected by ownership contract.
+  - PR 830 governance and Package A failures were one cause: rejected by independent BOM byte proof and separate Package A log.
+  - green CI workflow alone proves strict mergeability: rejected by ruleset readback and first merge rejection.
 changed_paths:
   - .github/workflows/tibia-re-control-center-core.yml
   - docs/agents/tasks/active/OTC-20260901-vision-p2-coordinator.md
 validation:
-  - command: inspect PR 826/828/830 Package A failure jobs
+  - command: exact worker Package A log inspection
     result: PASS
-    evidence: each Fresh Package A job fails in declared-path verification on Phase 2 durable docs while deterministic core succeeds.
-  - command: inspect PR 830 governance job and exact task bytes
+    evidence: PR 826/828/830 failures are path-boundary-only; Package A deterministic core succeeds.
+  - command: PR 830 BOM revalidation
     result: PASS
-    evidence: validator reports no YAML front matter and blob base64 prefix 77u/ proves UTF-8 BOM before `---`.
-  - command: PR #833 exact-head verification on c9c8fe0430d0a0ba2297a53db84d3f4840031d58
+    evidence: current task base64 begins LS0t (---), not 77u/; Track A governance run 33530326530 SUCCESS.
+  - command: independent PR 827 requirements/diff review
+    result: FAIL_MATERIAL_FINDING
+    evidence: empty secret policy can persist unmasked bytes and set secret_safe=True without a proof object; returned in comment 5496909848.
+  - command: independent PR 830 integration review
+    result: FAIL_MATERIAL_FINDING
+    evidence: read_only bridge admission is caller-string driven and runtime states accept opaque refs rather than validating #826/#828 producer contracts; returned in comment 5496928156.
+  - command: inspect ruleset 18840974 and exact required check
     result: PASS
-    evidence: Package A 33529248053, CI 33529248341, Track A governance 33529248011 and self-hosted boundary 33529248114 SUCCESS; zero review threads/reviews.
-  - command: PR #833 exact-head verification on 4f57c1cb4a406c226682325aeb761c12be14aadc
-    result: PASS_BUT_NOT_MERGEABLE
-    evidence: Package A 33529868217, CI 33529868662, Track A governance 33529868040 and self-hosted boundary 33529868041 SUCCESS; check-run CI / Required 99930254269 SUCCESS; PR remained mergeable_state behind under strict ruleset and merge API rejected it.
-  - command: inspect ruleset 18840974
+    evidence: strict CI / Required plus linear/squash/review-thread rules are active; prior exact check CI / Required 99930254269 was SUCCESS but branch was behind.
+  - command: compare PR #834 to repair scope
     result: PASS
-    evidence: active Protect main ruleset requires linear history, squash PRs, resolved threads and strict required status context CI / Required.
-  - command: strict-base branch rewrite
+    evidence: #834 changes only docs/agents/tasks/{active,archive}/OTC-20260901-codex-model-effort-routing-policy.md.
+  - command: current-main single-parent restack
     result: PASS_PENDING_FINAL_CI
-    evidence: e90cee2cf1895ff0f04cd5801cdaabddefd6a539 has sole parent current main 11bb95ebf34ce4fb7d46529393862d493250a202 and preserves the exact verified two-path repair tree.
+    evidence: d37c33df3453853aec49ed91afd38379e266dc69 has sole parent 2df0aa64c4578832f41acbf66339310c07724fb4 and preserves exact repair blobs.
 blockers:
-  - final exact-head CI and PR hygiene on the checkpointed strict-base branch are pending.
-next_action: validate PR #833 exact head after strict-base rebase; if Package A, CI / Required, Track A governance, self-hosted boundary and PR hygiene are green, squash-merge #833 and refresh affected worker lanes.
+  - final exact-head PR #833 checks and hygiene are pending on current main.
+next_action: validate PR #833 exact head on current main; if Package A, CI / Required, Track A governance, self-hosted boundary and PR hygiene are green and main is unchanged, squash-merge #833 and refresh affected worker lanes.
 ```
 
 ## Wave 1 live ledger
 
 | Alias | Draft PR | Current durable state | Coordinator classification |
 |---|---:|---|---|
-| `OTC-VISION-P2-RUNTIME-ADMISSION` | #826 | static implementation complete; shared Package A blocker confirmed; later serialized read-only observation still required | `RETURN_FOR_EVIDENCE` after shared repair |
-| `OTC-VISION-P2-CAPTURE-EDGE` | #827 | static implementation published; exact-head CI + Track A governance green | pending independent requirements/diff classification |
-| `OTC-VISION-P2-RUNTIME-SIGNALS` | #828 | static implementation published; CI/governance/Package B green; shared Package A blocker confirmed | `RETURN_FOR_REVALIDATION` after shared repair |
+| `OTC-VISION-P2-RUNTIME-ADMISSION` | #826 | static implementation complete; shared Package A blocker; later serialized read-only observation required | `RETURN_FOR_EVIDENCE` after shared repair |
+| `OTC-VISION-P2-CAPTURE-EDGE` | #827 | static implementation published; independent secret-safety finding open | `RETURN_FOR_REPAIR` |
+| `OTC-VISION-P2-RUNTIME-SIGNALS` | #828 | static implementation published; shared Package A blocker | `RETURN_FOR_REVALIDATION` after shared repair |
 | `OTC-VISION-P2-EDGE-TRANSPORT` | #829 | dispatch-ready only; no implementation handoff | pending worker execution |
-| `OTC-VISION-P2-CONTROL-BRIDGE` | #830 | static implementation published; shared Package A blocker plus BOM governance blocker | `RETURN_FOR_REPAIR` |
+| `OTC-VISION-P2-CONTROL-BRIDGE` | #830 | BOM fixed; shared Package A blocker plus missing validated #826/#828 producer binding | `RETURN_FOR_REPAIR` |
 
 Actual Official Tibia runtime observation remains serialized to one worker and requires a fresh persisted `read_only` admission before observation. Mutation, credentials, login/relogin, gameplay, GUI/anti-idle input, process control, process memory, network payload capture and physical actions remain forbidden with budget/count `0/0`.

@@ -121,3 +121,17 @@ Package A changed unexpected paths: [
 The workflow used historical `BASE_SHA=0fe1ecb3569f1d8372209c857ab57f3b626c29ae`; its code/test prefixes already admit this worker's implementation files, while its old exact documentation allowlist does not admit current Phase-2 durable task/report paths or the coordinator task added on `main`. This is therefore a shared CI-governance blocker outside this worker's exact `owned_paths`, not a runtime-signals implementation failure.
 
 The coordinator has already opened non-draft PR `#833` (`ci(track-a): admit vision P2 durable docs`) at `c9c8fe0430d0a0ba2297a53db84d3f4840031d58`. That PR narrowly adds the bounded Phase-2 active-task/archive-task/report prefixes to the existing Package A audit. This worker does not duplicate or modify that shared repair.
+
+## Post-runtime-admission integration restack
+
+After coordinator promotion PR #838 merged, this worker was restacked conflict-free onto `main@fb0c489f2ed166e872c4f197c6a78375a8576685` without changing the accepted runtime-signals contract. The implementation/checkpoint head before this docs update is `8a2e334495a6b072221f08324130afaee2ac6915`.
+
+Fresh local validation:
+
+- focused runtime-signals: `21/21 PASS`;
+- canonical frozen benchmark `python -m unittest discover -s tools/tibia-re-vision-benchmark/tests -v`: `34/34 PASS`;
+- Ruff and targeted `py_compile`: PASS;
+- Track A runtime governance, checkpoint validator and `git diff --check`: PASS;
+- exact changed paths remain the four declared worker-owned paths.
+
+Exact-head hosted CI / Package A / Package B / Track A are pending publication of this post-admission checkpoint. No live runtime evidence is claimed or authorized.

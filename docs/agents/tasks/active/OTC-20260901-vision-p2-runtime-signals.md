@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260901-vision-p2-runtime-signals
-status: ready
+status: validating
 agent: ChatGPT
 session_role: phase2_worker
 worker_alias: OTC-VISION-P2-RUNTIME-SIGNALS
@@ -9,12 +9,12 @@ project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: implementation
-phase: worker_revalidation_ready_for_coordinator
+phase: worker_post_admission_revalidation
 branch: feat/OTC-20260901-vision-p2-runtime-signals
 base_branch: main
-base_main: 54a20bbd8721e92d069974af14d6ebd2f4f5a55d
+base_main: fb0c489f2ed166e872c4f197c6a78375a8576685
 created: 2026-09-01T16:27:39+02:00
-updated_at: 2026-09-01T18:54:35+02:00
+updated_at: 2026-09-01T20:49:40+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: isolated_worker_branch
@@ -65,14 +65,14 @@ depends_on:
   - main 0fe1ecb3569f1d8372209c857ab57f3b626c29ae
 related_prs:
   - PR #828 Wave 1 worker Draft
-current_blocker: none
-next_action: return current-main-green Draft PR #828 to OTC-VISION-P2-COORDINATOR for integration classification; worker must not self-promote or merge
+current_blocker: exact-head CI / Package A / Package B / Track A pending after restack onto merged runtime-admission producer
+next_action: publish post-admission restack checkpoint, wait for exact-head hosted gates, then return Draft PR #828 to coordinator for promotion
 invocation_started_at: 2026-09-01T17:02:17+02:00
-last_progress_at: 2026-09-01T18:54:35+02:00
-ci_checks_for_current_head: 4
-ci_check_generation: current-main-green-9d751f340e0a
-terminal_ci_wait_started_at: 2026-09-01T18:52:09+02:00
-terminal_ci_checks_for_current_generation: 4
+last_progress_at: 2026-09-01T20:49:40+02:00
+ci_checks_for_current_head: 0
+ci_check_generation: post-admission-8a2e334495a6
+terminal_ci_wait_started_at: 2026-09-01T20:49:40+02:00
+terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
@@ -144,11 +144,13 @@ runtime_access: none
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T18:54:35+02:00
-head: d240e63c51d672356e1f9b396f14cfda10b0dc45
+updated_at: 2026-09-01T20:49:40+02:00
+head: 8a2e334495a6b072221f08324130afaee2ac6915
+head_semantics: implementation_and_prior_checkpoint_after_rebase_before_current_docs_checkpoint
 branch: feat/OTC-20260901-vision-p2-runtime-signals
 pr: 828
-status: ready
+status: validating
+phase: worker_post_admission_revalidation
 context_routes:
   - phase-2-read-only-coordination
   - track-a-governance
@@ -159,27 +161,26 @@ owned_paths:
   - tools/tibia_re_control_center/agent_runtime_signals.py
   - tests/tools/tibia_re_control_center/test_agent_runtime_signals.py
 proven:
-  - coordinator independent review comment 5496967667 accepts the bounded repository/static runtime-signal producer contract with no live-runtime claim.
-  - shared Package A durable-doc repair #833 and coordinator checkpoint #836 are merged into trusted current main 54a20bbd8721e92d069974af14d6ebd2f4f5a55d.
-  - worker branch restacked conflict-free onto trusted current main; main changes none of the four worker-owned paths.
-  - accepted runtime-signal contract is unchanged: sample payload cannot author semantic authority, reviewed-source handles are resolver-owned, exact runtime/admission hash and clock-domain binding remain fail-closed.
-  - fresh post-restack focused runtime-signals suite passes 21/21; Ruff and py_compile pass.
-  - fresh frozen vision benchmark passes 34/34.
-  - fresh Track A runtime governance, checkpoint validation and git diff --check pass; changed paths remain exactly four worker-owned files.
-  - exact head 9d751f340e0a9d1331d7f854795a7aa9d4b93425 passed CI 33534363910, Package A 33534363711, Package B 33534363817 and Track A governance 33534363709.
+  - coordinator independent review accepted the bounded repository/static runtime-signal producer contract.
+  - runtime-admission producer promotion PR #838 is merged into trusted main fb0c489f2ed166e872c4f197c6a78375a8576685.
+  - branch restacked conflict-free onto fb0c489f2ed166e872c4f197c6a78375a8576685; main changed none of this worker's four owned paths.
+  - runtime-signal contract is unchanged: samples cannot author semantic authority; reviewed-source resolver ownership, exact runtime/admission hash and clock-domain binding remain fail-closed.
+  - post-restack focused runtime-signals suite passes 21/21.
+  - canonical frozen vision benchmark command python -m unittest discover -s tools/tibia-re-vision-benchmark/tests -v passes 34/34.
+  - Ruff, py_compile, Track A governance, checkpoint validation and git diff --check pass.
   - no Official Tibia observation, model inference, credentials, GUI input, process control, process memory, payload capture or physical action occurred.
 derived:
-  - current-main repository/static revalidation is green locally and on exact-head hosted checks.
-  - consumer/integration must still construct runtime-signal binding only from an accepted current #826 admission; this worker does not self-grant that authority.
+  - accepted runtime-signals producer is locally current with the now-merged runtime-admission producer dependency.
+  - coordinator promotion remains separate from any live runtime claim.
 unknown:
-  - coordinator promotion/integration disposition after fresh hosted validation.
+  - exact-head CI / Package A / Package B / Track A results after publication of this post-admission checkpoint.
 conflicts: []
 first_failure:
-  marker: historical-package-a-path-boundary
-  evidence: prior exact generation failed only the old Phase-2 durable-doc allowlist; repair #833 is merged and fresh validation is required.
+  marker: INVALID-LOCAL-BENCHMARK-COMMAND
+  evidence: an attempted nonexistent tests.tools.tibia_re_vision.test_benchmark module failed; repo evidence then identified the canonical 34-test command, which passes.
 rejected_hypotheses:
-  - old Package A failure remains current after #833: rejected; this restack must obtain new exact-head results.
-  - sample/model payload may self-select runtime state or evidence class: rejected by accepted typed contract and focused tests.
+  - the invalid benchmark command indicates a runtime-signals regression: rejected because the requested module does not exist and the canonical 34-test harness passes.
+  - runtime-admission promotion changes worker-owned runtime-signals paths: rejected by zero owned-path overlap.
 changed_paths:
   - docs/agents/tasks/active/OTC-20260901-vision-p2-runtime-signals.md
   - docs/agents/reports/OTC-20260901-vision-p2-runtime-signals.md
@@ -188,19 +189,17 @@ changed_paths:
 validation:
   - command: python -m unittest tests.tools.tibia_re_control_center.test_agent_runtime_signals -q
     result: PASS
-    evidence: 21 tests, zero failures/errors after current-main restack.
-  - command: Ruff and py_compile on runtime-signals implementation and test
-    result: PASS
-    evidence: both static checks pass.
-  - command: frozen vision benchmark
+    evidence: 21 tests, zero failures/errors.
+  - command: python -m unittest discover -s tools/tibia-re-vision-benchmark/tests -v
     result: PASS
     evidence: 34 tests, zero failures/errors.
-  - command: Track A governance checkpoint validator and git diff --check
+  - command: Ruff and py_compile on runtime-signals implementation/test
     result: PASS
-    evidence: governance and checkpoint pass; exact changed paths remain four worker-owned files.
-  - command: GitHub exact-head hosted gates on 9d751f340e0a9d1331d7f854795a7aa9d4b93425
+    evidence: static validation clean.
+  - command: Track A governance changed-from fb0c489f2ed166e872c4f197c6a78375a8576685; checkpoint validator; git diff --check
     result: PASS
-    evidence: CI 33534363910, Package A 33534363711, Package B 33534363817 and Track A governance 33534363709 all conclude success.
-blockers: []
-next_action: return current-main-green Draft PR #828 to OTC-VISION-P2-COORDINATOR for integration classification; worker must not self-promote or merge.
+    evidence: governance/checkpoint/whitespace gates pass.
+blockers:
+  - exact-head hosted gates pending after publication.
+next_action: publish this checkpoint, wait for exact-head hosted gates, then return Draft PR #828 to coordinator for promotion.
 ```

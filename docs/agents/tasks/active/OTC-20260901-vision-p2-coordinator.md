@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260901-vision-p2-coordinator
-status: waiting
+status: implementing
 agent: ChatGPT
 session_role: programme_coordinator
 worker_alias: OTC-VISION-P2-COORDINATOR
@@ -9,12 +9,12 @@ project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: coordination
-phase: wave_1_workers_dispatch_ready
-branch: docs/OTC-20260901-vision-p2-coordinator-wave1
+phase: wave_1_classification
+branch: docs/OTC-20260901-vision-p2-wave1-classification
 base_branch: main
-base_main: 0fe1ecb3569f1d8372209c857ab57f3b626c29ae
+base_main: 2df0aa64c4578832f41acbf66339310c07724fb4
 created: 2026-09-01T15:45:26+02:00
-updated_at: 2026-09-01T16:36:46+02:00
+updated_at: 2026-09-01T18:07:00+02:00
 risk: high
 execution_mode: chat_github
 run_scope: autonomous_program
@@ -67,10 +67,10 @@ related_prs:
   - PR #828 runtime-signals worker Draft
   - PR #829 edge-transport worker Draft
   - PR #830 control-bridge worker Draft
-current_blocker: SEPARATE_WORKER_EXECUTION_CHANNEL_REQUIRED
-next_action: dispatch the five prepared Wave 1 aliases in separate Codex/agent worker sessions against Draft PRs #826-#830; each session first validates its pre-bound task/branch/worktree/PR and then begins repository/static RED-to-GREEN TDD with runtime_access none
+current_blocker: none
+next_action: independently classify exact-head Draft PR #827 against the approved capture-edge contract, then persist ACCEPT/RETURN evidence without merging the worker
 invocation_started_at: 2026-09-01T15:35:00+02:00
-last_progress_at: 2026-09-01T16:36:46+02:00
+last_progress_at: 2026-09-01T18:07:00+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: wave1-dispatch-ready
 terminal_ci_wait_started_at: null
@@ -100,11 +100,11 @@ Reconcile Phase 2 live state, release stale foundation ownership, create exact n
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T16:36:46+02:00
-head: bd62ba81fd9ec29a24f12f5c42ca5d535a36250a
-branch: docs/OTC-20260901-vision-p2-coordinator-wave1
-pr: 825
-status: waiting
+updated_at: 2026-09-01T18:07:00+02:00
+head: 2df0aa64c4578832f41acbf66339310c07724fb4
+branch: docs/OTC-20260901-vision-p2-wave1-classification
+pr: NOT_CREATED
+status: implementing
 context_routes:
   - phase-2-read-only-coordination
   - autonomous-program
@@ -153,7 +153,7 @@ validation:
     evidence: local codex not installed; no available connector/plugin provides separate Codex code-worker execution.
 blockers:
   - separate Codex/agent worker sessions must be launched outside this coordinator session.
-next_action: dispatch the five prepared Wave 1 aliases in separate Codex/agent worker sessions against Draft PRs #826-#830; each session first validates its pre-bound task/branch/worktree/PR and then begins repository/static RED-to-GREEN TDD with runtime_access none.
+next_action: independently classify exact-head Draft PR #827 against the approved capture-edge contract, then persist ACCEPT/RETURN evidence without merging the worker.
 ```
 ## Planned Wave 1 ownership
 

@@ -14,7 +14,7 @@ branch: docs/OTC-20260901-vision-p2-wave1-classification
 base_branch: main
 base_main: 2df0aa64c4578832f41acbf66339310c07724fb4
 created: 2026-09-01T15:45:26+02:00
-updated_at: 2026-09-01T18:07:00+02:00
+updated_at: 2026-09-01T18:14:25+02:00
 risk: high
 execution_mode: chat_github
 run_scope: autonomous_program
@@ -68,11 +68,11 @@ related_prs:
   - PR #829 edge-transport worker Draft
   - PR #830 control-bridge worker Draft
 current_blocker: none
-next_action: independently classify exact-head Draft PR #827 against the approved capture-edge contract, then persist ACCEPT/RETURN evidence without merging the worker
+next_action: independently classify exact-head Draft PR #828 runtime-signals slice while preserving PR #829 as in-flight in its separate worker
 invocation_started_at: 2026-09-01T15:35:00+02:00
-last_progress_at: 2026-09-01T18:07:00+02:00
+last_progress_at: 2026-09-01T18:14:25+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: wave1-dispatch-ready
+ci_check_generation: wave1-classification
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -100,61 +100,58 @@ Reconcile Phase 2 live state, release stale foundation ownership, create exact n
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T18:07:00+02:00
-head: 995ba7353db8df5fe0804a652771f1c50ee78d9d
+updated_at: 2026-09-01T18:14:25+02:00
+head: 0dc44ab1d
 branch: docs/OTC-20260901-vision-p2-wave1-classification
 pr: 835
 status: implementing
 context_routes:
   - phase-2-read-only-coordination
   - autonomous-program
-  - delivery-closeout
-  - track-a-governance
+  - worker-classification
 owned_paths:
   - docs/agents/tasks/active/OTC-20260901-vision-p2-coordinator.md
 proven:
-  - PR 824 merged and refreshed main is 0fe1ecb3569f1d8372209c857ab57f3b626c29ae.
-  - five isolated Wave 1 branches/worktrees/tasks and Draft PRs 826-830 were created from exact refreshed main with pairwise and refreshed-main ownership overlap equal to zero.
-  - each worker task is PR-bound, status ready, agent unclaimed, runtime_access none and all mutation/effect authorities false with physical action budget/count 0/0.
-  - OTC-VISION-P2-RUNTIME-ADMISSION: Draft PR 826 is Draft/CLEAN and live PR head equals published branch head 2d2bb627965e0155e8f52210d1c8c6cab5610b53; CI / Required plus both Track A governance jobs are SUCCESS.
-  - OTC-VISION-P2-CAPTURE-EDGE: Draft PR 827 is Draft/CLEAN and live PR head equals published branch head dd40d914fa5d05cdf5ff2957cc798ee7aa336d9b; CI / Required plus both Track A governance jobs are SUCCESS.
-  - OTC-VISION-P2-RUNTIME-SIGNALS: Draft PR 828 is Draft/CLEAN and live PR head equals published branch head 11fc18820cc22303d6857361eb3404f5f1844ffa; CI / Required plus both Track A governance jobs are SUCCESS.
-  - OTC-VISION-P2-EDGE-TRANSPORT: Draft PR 829 is Draft/CLEAN and live PR head equals published branch head 2ba5a90629c2b3cab3094948bfa3a1fda2b1fb0b; CI / Required plus both Track A governance jobs are SUCCESS.
-  - OTC-VISION-P2-CONTROL-BRIDGE: Draft PR 830 is Draft/CLEAN and live PR head equals published branch head 7d5ccdb80aa523c3128bef0b8e4faef4450146fe; CI / Required plus both Track A governance jobs are SUCCESS.
-  - the prior GitHub PR-head metadata lag is resolved for all five worker PRs.
-  - local codex executable is absent on Molehill-PC; GitHub tools expose no Codex code-worker dispatch; plugin discovery found no executable Codex worker connector (Codex Security is a scanner, not a worker launcher).
+  - current main is 2df0aa64c4578832f41acbf66339310c07724fb4 and changes no capture-edge owned path.
+  - PR 827 exact head cc957a25ddb4c40e1416bec60eff03c38fda3ad9 remains Draft, has four worker-owned changed files, zero review threads, and exact-head CI 33529427451 plus Track A governance 33529426895 SUCCESS.
+  - independent coordinator execution of the exact-head capture suite passes 11/11; py_compile passes; AST audit finds shell=True count 0 and CaptureEvidence exposes only validated_vision_capture as public handoff.
+  - independent diff review confirms pre/post/final runtime binding checks, pre/post geometry checks, in-memory secret masking before persistence, crop-to-full hash binding, content addressing and fixed read-only xdotool/ffmpeg command vocabulary.
+  - PR 829 has uncommitted worker-owned implementation in its separate worktree and status validating, so coordinator does not edit or duplicate that lane.
 derived:
-  - repository/GitHub Wave 1 bootstrap is complete and all five workers are safe to start concurrently for repository/static work.
-  - actual official-runtime observation remains serialized and is not authorized for any worker at this checkpoint.
+  - PR 827 repository/static capture-edge slice is classified ACCEPT.
+  - shared MODULE_CATALOG/CHANGELOG wiring and real admitted Linux/Synology/Kasm read-only E2E remain coordinator/integration obligations and are not worker defects.
 unknown:
-  - worker implementation, focused test, review, integration and later runtime-evidence outcomes.
+  - PR 828 runtime-signals coordinator classification.
+  - PR 826 workflow-boundary remediation disposition, PR 829 published outcome, and PR 830 classification/integration outcome.
 conflicts: []
 first_failure:
-  marker: WORKER-EXECUTION-CHANNEL-UNAVAILABLE
-  evidence: coordinator environment can prepare Git/GitHub/worktrees but cannot create the required separate Codex/agent execution sessions; codex CLI is not installed and available connectors/plugins do not expose a code-worker launcher.
+  marker: none
+  evidence: no current blocker for classifying completed worker slices; runtime_access remains none.
 rejected_hypotheses:
-  - worker PR head metadata is still stale: rejected by live gh PR readback matching all five published remote branch refs.
-  - worker bootstrap CI/governance is pending or failed: rejected by exact-head SUCCESS on CI / Required and both Track A governance jobs for PRs 826-830.
-  - coordinator may silently implement all five worker lanes in one session: rejected by the binding multi-agent role/ownership/independent-review contract.
+  - capture-edge worker self-report is sufficient for acceptance: rejected; coordinator reran focused tests and independently reviewed exact diff/API surface.
+  - coordinator may take over in-flight PR 829 implementation: rejected by live dirty validating worker worktree and one-worker-per-branch ownership.
 changed_paths:
   - docs/agents/tasks/active/OTC-20260901-vision-p2-coordinator.md
 validation:
-  - command: pairwise worker plus refreshed-main exact ownership scan
+  - command: GitHub PR 827 exact-head workflow and review-thread readback
     result: PASS
-    evidence: WORKER_OVERLAPS={} and MAIN_ACTIVE_EXACT_CONFLICTS=[].
-  - command: five worker PR live head and statusCheckRollup readback
+    evidence: CI 33529427451 SUCCESS; Track A governance 33529426895 SUCCESS; zero review threads.
+  - command: python -m unittest tests/tools/tibia_re_vision/test_capture_edge.py on cc957a25
     result: PASS
-    evidence: PRs 826-830 each match final binding branch head, remain Draft/CLEAN, and exact-head required CI/governance are SUCCESS.
-  - command: worker branch local governance/checkpoint/diff validation
+    evidence: 11 tests, zero failures/errors.
+  - command: capture-edge AST/public-surface audit
     result: PASS
-    evidence: all five workers passed branch-bound Track A governance, checkpoint schema and git diff --check after PR binding.
-  - command: worker execution-channel discovery
-    result: BLOCKED
-    evidence: local codex not installed; no available connector/plugin provides separate Codex code-worker execution.
-blockers:
-  - separate Codex/agent worker sessions must be launched outside this coordinator session.
-next_action: independently classify exact-head Draft PR #827 against the approved capture-edge contract, then persist ACCEPT/RETURN evidence without merging the worker.
+    evidence: shell=True=0; one subprocess.run boundary; CaptureEvidence public methods equal validated_vision_capture only.
+blockers: []
+next_action: independently classify exact-head Draft PR #828 runtime-signals slice while preserving PR #829 as in-flight in its separate worker.
 ```
+
+## Wave 1 classification ledger
+
+| Worker | PR | Coordinator classification | Evidence boundary |
+|---|---:|---|---|
+| `OTC-VISION-P2-CAPTURE-EDGE` | #827 | **ACCEPT** | Repository/static contract accepted at `cc957a25...`; no live-runtime success claimed; shared docs/integration and real read-only E2E remain coordinator-owned. |
+
 ## Planned Wave 1 ownership
 
 This map is coordinator-owned dispatch intent and becomes write-capable only after PR #824 merges, refreshed-main overlap checks pass, and each worker has its own concrete task/branch/worktree/Draft PR. Shared indexes such as `docs/agents/MODULE_CATALOG.md` are excluded.

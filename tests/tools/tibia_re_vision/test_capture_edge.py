@@ -11,9 +11,12 @@ from pathlib import Path
 _capture_edge = importlib.import_module("tools.tibia_re_vision.capture_edge") if importlib.util.find_spec("tools.tibia_re_vision.capture_edge") else None
 
 
-def _masked_policy():
-    return _capture_edge.SecretSafetyPolicy.mask_regions(
-        (_capture_edge.PixelRegion(x=0, y=0, width=1, height=1),)
+def _reviewed_policy(geometry, *, policy_id="fixture-mask-v1"):
+    return _capture_edge.ReviewedSecretMaskPolicy(
+        policy_id=policy_id,
+        expected_width=geometry.width,
+        expected_height=geometry.height,
+        secret_regions=(_capture_edge.PixelRegion(x=0, y=0, width=1, height=1),),
     )
 
 
@@ -44,28 +47,77 @@ class _GeometryDriftSource(_FrameSource):
 
 
 class CaptureEdgeTests(unittest.TestCase):
-    def test_unproven_empty_secret_policy_fails_before_frame_capture_or_persistence(self):
+    def test_reviewed_secret_policy_is_bound_to_edge_not_each_capture(self):
+        self.assertTrue(
+            hasattr(_capture_edge, "ReviewedSecretMaskPolicy"),
+            "capture edge must expose a reviewed composition-time mask policy",
+        )
         binding = _binding()
-        geometry = _capture_edge.WindowGeometry(x=0, y=0, width=1, height=1)
-        source = _FrameSource(geometry, bytes((9, 8, 7)))
+        geometry = _capture_edge.WindowGeometry(x=0, y=0, width=2, height=1)
+        policy = _capture_edge.ReviewedSecretMaskPolicy(
+            policy_id="fixture-login-mask-v1",
+            expected_width=2,
+            expected_height=1,
+            secret_regions=(_capture_edge.PixelRegion(0, 0, 1, 1),),
+        )
+        source = _FrameSource(geometry, bytes((9, 8, 7, 1, 2, 3)))
         edge = _capture_edge.CaptureEdge(
             binding_reader=lambda: binding,
             frame_source=source,
             monotonic_ns=iter((1_100, 1_200)).__next__,
+            secret_policy=policy,
+        )
+        with tempfile.TemporaryDirectory() as raw:
+            evidence = edge.capture(
+                run_id="run-reviewed-policy",
+                evidence_root=Path(raw),
+                max_binding_age_ns=500,
+            )
+            self.assertTrue(evidence.secret_safe)
+            self.assertEqual(policy.policy_ref, evidence.secret_policy_ref)
+            import inspect
+            self.assertNotIn("secret_policy", inspect.signature(edge.capture).parameters)
+            pixels = _decode_rgb_png(evidence.full_frame.path.read_bytes())
+            self.assertEqual(bytes((0, 0, 0, 1, 2, 3)), pixels)
+
+    def test_reviewed_secret_policy_requires_nonempty_regions(self):
+        geometry = _capture_edge.WindowGeometry(x=0, y=0, width=1, height=1)
+        with self.assertRaisesRegex(ValueError, "reviewed secret regions invalid"):
+            _capture_edge.ReviewedSecretMaskPolicy(
+                policy_id="fixture-empty-mask-v1",
+                expected_width=geometry.width,
+                expected_height=geometry.height,
+                secret_regions=(),
+            )
+
+    def test_reviewed_policy_geometry_mismatch_fails_before_capture_or_persistence(self):
+        binding = _binding()
+        geometry = _capture_edge.WindowGeometry(x=0, y=0, width=2, height=1)
+        wrong_geometry_policy = _capture_edge.ReviewedSecretMaskPolicy(
+            policy_id="fixture-wrong-geometry-v1",
+            expected_width=1,
+            expected_height=1,
+            secret_regions=(_capture_edge.PixelRegion(0, 0, 1, 1),),
+        )
+        source = _FrameSource(geometry, bytes((9, 8, 7, 1, 2, 3)))
+        edge = _capture_edge.CaptureEdge(
+            binding_reader=lambda: binding,
+            frame_source=source,
+            monotonic_ns=iter((1_100, 1_200)).__next__,
+            secret_policy=wrong_geometry_policy,
         )
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
             with self.assertRaisesRegex(
-                _capture_edge.CaptureEdgeError, "CAPTURE_SECRET_POLICY_UNPROVEN"
+                _capture_edge.CaptureEdgeError, "CAPTURE_SECRET_POLICY_GEOMETRY_MISMATCH"
             ):
                 edge.capture(
-                    run_id="run-unproven-secret-policy",
+                    run_id="run-policy-geometry-mismatch",
                     evidence_root=root,
-                    secret_policy=_capture_edge.SecretSafetyPolicy.no_secret_fields(),
                     max_binding_age_ns=500,
                 )
             self.assertEqual([], list(root.iterdir()))
-        self.assertEqual([], source.geometry_calls)
+        self.assertEqual([binding], source.geometry_calls)
         self.assertEqual([], source.capture_calls)
 
     def test_stable_capture_is_content_addressed_and_feeds_vision_foundation(self):
@@ -79,13 +131,13 @@ class CaptureEdgeTests(unittest.TestCase):
             binding_reader=lambda: binding_reads.append(binding) or binding,
             frame_source=source,
             monotonic_ns=lambda: next(clock),
+            secret_policy=_reviewed_policy(geometry),
         )
 
         with tempfile.TemporaryDirectory() as raw:
             evidence = edge.capture(
                 run_id="run-1",
                 evidence_root=Path(raw),
-                secret_policy=_masked_policy(),
                 max_binding_age_ns=500,
             )
             artifact_bytes = evidence.full_frame.path.read_bytes()
@@ -115,19 +167,24 @@ class CaptureEdgeTests(unittest.TestCase):
         geometry = _capture_edge.WindowGeometry(x=10, y=20, width=3, height=2)
         pixels = bytes((255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255, 1, 2, 3, 255, 255, 0))
         source = _FrameSource(geometry, pixels)
+        secret = _capture_edge.PixelRegion(x=0, y=0, width=1, height=1)
         edge = _capture_edge.CaptureEdge(
             binding_reader=lambda: binding,
             frame_source=source,
             monotonic_ns=iter((1_100, 1_200)).__next__,
+            secret_policy=_capture_edge.ReviewedSecretMaskPolicy(
+                policy_id="fixture-secret-crop-v1",
+                expected_width=geometry.width,
+                expected_height=geometry.height,
+                secret_regions=(secret,),
+            ),
         )
-        secret = _capture_edge.PixelRegion(x=0, y=0, width=1, height=1)
         crop = _capture_edge.PixelRegion(x=0, y=0, width=2, height=1)
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
             evidence = edge.capture(
                 run_id="run-secret",
                 evidence_root=root,
-                secret_policy=_capture_edge.SecretSafetyPolicy.mask_regions((secret,)),
                 crop=crop,
                 max_binding_age_ns=500,
             )
@@ -154,6 +211,7 @@ class CaptureEdgeTests(unittest.TestCase):
             binding_reader=lambda: binding,
             frame_source=source,
             monotonic_ns=iter((1_600, 1_700)).__next__,
+            secret_policy=_reviewed_policy(geometry),
         )
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
@@ -161,7 +219,7 @@ class CaptureEdgeTests(unittest.TestCase):
                 edge.capture(
                     run_id="run-stale",
                     evidence_root=root,
-                    secret_policy=_masked_policy(),
+
                     max_binding_age_ns=500,
                 )
             self.assertEqual([], list(root.iterdir()))
@@ -176,6 +234,7 @@ class CaptureEdgeTests(unittest.TestCase):
             binding_reader=bindings.__next__,
             frame_source=source,
             monotonic_ns=iter((1_100, 1_200)).__next__,
+            secret_policy=_reviewed_policy(geometry),
         )
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
@@ -183,7 +242,7 @@ class CaptureEdgeTests(unittest.TestCase):
                 edge.capture(
                     run_id="run-drift",
                     evidence_root=root,
-                    secret_policy=_masked_policy(),
+
                     max_binding_age_ns=500,
                 )
             self.assertEqual([], list(root.iterdir()))
@@ -198,6 +257,7 @@ class CaptureEdgeTests(unittest.TestCase):
             binding_reader=lambda: next(reads),
             frame_source=source,
             monotonic_ns=iter((1_100, 1_200)).__next__,
+            secret_policy=_reviewed_policy(geometry),
         )
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
@@ -205,7 +265,7 @@ class CaptureEdgeTests(unittest.TestCase):
                 edge.capture(
                     run_id="run-final-binding-drift",
                     evidence_root=root,
-                    secret_policy=_masked_policy(),
+
                     max_binding_age_ns=500,
                 )
             self.assertEqual([], list(root.iterdir()))
@@ -222,6 +282,7 @@ class CaptureEdgeTests(unittest.TestCase):
             binding_reader=lambda: binding,
             frame_source=source,
             monotonic_ns=iter((1_100, 1_200)).__next__,
+            secret_policy=_reviewed_policy(before_geometry),
         )
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
@@ -229,7 +290,7 @@ class CaptureEdgeTests(unittest.TestCase):
                 edge.capture(
                     run_id="run-geometry-drift",
                     evidence_root=root,
-                    secret_policy=_masked_policy(),
+
                     max_binding_age_ns=500,
                 )
             self.assertEqual([], list(root.iterdir()))
@@ -243,12 +304,12 @@ class CaptureEdgeTests(unittest.TestCase):
             binding_reader=lambda: binding,
             frame_source=source,
             monotonic_ns=iter((1_100, 1_200)).__next__,
+            secret_policy=_reviewed_policy(geometry),
         )
         with tempfile.TemporaryDirectory() as raw:
             evidence = edge.capture(
                 run_id="run-integrity",
                 evidence_root=Path(raw),
-                secret_policy=_masked_policy(),
                 crop=_capture_edge.PixelRegion(0, 0, 1, 1),
                 max_binding_age_ns=500,
             )
@@ -269,12 +330,12 @@ class CaptureEdgeTests(unittest.TestCase):
             binding_reader=lambda: binding,
             frame_source=_FrameSource(geometry, bytes((1, 2, 3))),
             monotonic_ns=iter((1_100, 1_200)).__next__,
+            secret_policy=_reviewed_policy(geometry),
         )
         with tempfile.TemporaryDirectory() as raw:
             evidence = edge.capture(
                 run_id="run-currentness",
                 evidence_root=Path(raw),
-                secret_policy=_masked_policy(),
                 max_binding_age_ns=500,
             )
             cases = (
@@ -295,12 +356,12 @@ class CaptureAnalysisTests(unittest.TestCase):
             binding_reader=lambda: binding,
             frame_source=_FrameSource(geometry, b"\x00" * 6),
             monotonic_ns=iter((1_100, 1_200)).__next__,
+            secret_policy=_reviewed_policy(geometry),
         )
         with tempfile.TemporaryDirectory() as raw:
             evidence = edge.capture(
                 run_id="run-black",
                 evidence_root=Path(raw),
-                secret_policy=_masked_policy(),
                 max_binding_age_ns=500,
             )
         self.assertTrue(evidence.is_black)
@@ -379,11 +440,11 @@ def _capture_once(binding, geometry, pixels, root, run_id, *, previous_full_sha2
         binding_reader=lambda: binding,
         frame_source=_FrameSource(geometry, pixels),
         monotonic_ns=iter((1_100, 1_200)).__next__,
+        secret_policy=_reviewed_policy(geometry),
     )
     return edge.capture(
         run_id=run_id,
         evidence_root=root,
-        secret_policy=_masked_policy(),
         max_binding_age_ns=500,
         previous_full_sha256=previous_full_sha256,
     )

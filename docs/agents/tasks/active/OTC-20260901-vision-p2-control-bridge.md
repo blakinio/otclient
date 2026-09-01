@@ -1,4 +1,4 @@
-﻿---
+---
 task_id: OTC-20260901-vision-p2-control-bridge
 status: ready
 agent: chatgpt-gpt-5.6-sol
@@ -14,7 +14,7 @@ branch: feat/OTC-20260901-vision-p2-control-bridge
 base_branch: main
 base_main: ca1a71b5852f6e00ba144ed183af470555c51f56
 created: 2026-09-01T16:27:39+02:00
-updated_at: 2026-09-01T17:55:06+02:00
+updated_at: 2026-09-01T18:01:19+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: isolated_worker_branch
@@ -78,14 +78,14 @@ related_prs:
 current_blocker: none
 next_action: OTC-VISION-P2-COORDINATOR independently classify Draft PR #830 against live exact-head CI and sibling contracts before any integration promotion
 invocation_started_at: 2026-09-01T16:49:00+02:00
-last_progress_at: 2026-09-01T17:55:06+02:00
+last_progress_at: 2026-09-01T18:01:19+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: worker-implementation
+ci_check_generation: worker-ci-repair
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 0
+repair_cycles_for_current_gate: 1
 context_reconstruction_attempts: 0
 stall_warnings: 0
 runtime_nonclaims:
@@ -174,8 +174,8 @@ runtime_access: none
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T17:55:06+02:00
-head: aa2bfaa8fc47c4c7abdb1ddd28a80e5178ed903e
+updated_at: 2026-09-01T18:01:19+02:00
+head: 3036ee5bc3e05765c4eb6988602cc9b0187b7696
 branch: feat/OTC-20260901-vision-p2-control-bridge
 pr: 830
 status: ready
@@ -213,8 +213,8 @@ unknown:
 conflicts:
   - unchanged origin/main agent-foundation standalone E2E submits physical_action_budget 1 through an API guard that requires 0; this pre-existing baseline defect is outside this worker ownership.
 first_failure:
-  marker: RUNTIME_ACCESS_UNAVAILABLE
-  evidence: initial focused RED proved the foundation could not accept bounded read_only edge observation before implementation.
+  marker: TRACK_A_TASK_FRONTMATTER_NOT_DETECTED
+  evidence: exact-head governance run 33529055205 job 99927229354 failed because the task file began with UTF-8 BOM before the YAML marker.
 rejected_hypotheses:
   - replaying an earlier observation after disconnect is safely equivalent to fresh evidence: rejected by RED and fixed with monotonic run-timeline rejection.
   - a second edge instance may replace the connected instance without disconnect: rejected by RED and fixed fail-closed.
@@ -252,6 +252,9 @@ validation:
   - command: full unittest discovery under WSL /mnt/c
     result: BLOCKED
     evidence: local Windows-mount I/O stayed in D state and was terminated after 462 seconds without emitting a test failure; exact-head GitHub CI remains authoritative for the full suite.
+  - command: python .github/scripts/test_track_a_agent_runtime_governance.py --changed-from ca1a71b5852f6e00ba144ed183af470555c51f56 --expected-branch feat/OTC-20260901-vision-p2-control-bridge
+    result: PASS
+    evidence: after removing the pre-existing UTF-8 BOM, the exact deterministic governance command reports TRACK_A_AGENT_RUNTIME_GOVERNANCE_PASS=true.
 blockers: []
 next_action: OTC-VISION-P2-COORDINATOR independently classify Draft PR #830 against live exact-head CI and sibling contracts before any integration promotion.
 ```

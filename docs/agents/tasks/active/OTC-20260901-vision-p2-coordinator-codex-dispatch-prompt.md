@@ -113,8 +113,8 @@ derived:
 unknown: []
 conflicts: []
 first_failure:
-  marker: COORDINATOR_CODEX_DISPATCH_SEMANTICS_MISSING
-  evidence: canonical alias/program text still describes owner-operated worker windows and coordinator Codex use only for integration edits.
+  marker: resolved
+  evidence: prompt contract 1.1.0 now makes coordinator-managed Codex dispatch explicit and manual worker windows fallback-only.
 rejected_hypotheses:
   - owner should manually choose a Codex model/effort for each ordinary worker task.
   - a Codex worker DONE/green narrative is sufficient coordinator evidence.

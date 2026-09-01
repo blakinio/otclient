@@ -18,6 +18,7 @@ That wording conflicts with the current prompting v2.1 short-invocation contract
 The candidate keeps Chat/GitHub as the supervising coordination plane while making Codex a subordinate execution/audit plane. The coordinator performs live anti-duplication and ownership checks, chooses the smallest sufficient model/effort, supplies bounded verified context when supported, supervises worker execution, and independently verifies results before promotion.
 
 Manual worker windows remain a fallback only when the execution bridge is unavailable or the owner explicitly requests manual worker operation.
+
 ## Static regression result
 
 The candidate is prompt contract `1.1.0`. Deterministic readback confirmed:

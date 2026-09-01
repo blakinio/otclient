@@ -1,18 +1,18 @@
 ---
 task_id: OTC-20260901-vision-p2-coordinator-codex-dispatch-prompt
-status: validating
+status: ready
 agent: ChatGPT
 session_role: prompt_maintainer
 project_lane: otclient
 lane: AGENT-ORCHESTRATION
 track_id: repository-governance
 task_kind: documentation
-phase: exact_head_validation
+phase: exact_head_ready
 branch: docs/OTC-20260901-vision-p2-coordinator-codex-dispatch-prompt
 base_branch: main
 base_sha: d1cb8722c3116a0e0aeb72b9b360712f43151f17
 created: 2026-09-01T22:55:00+02:00
-updated_at: 2026-09-01T23:08:08+02:00
+updated_at: 2026-09-01T23:11:51+02:00
 risk: low
 execution_class: local_owner_pc
 execution_mode: remote_desktop_plus_github
@@ -62,9 +62,9 @@ blocks: []
 cross_repository_task_ids: []
 related_pr: 844
 invocation_started_at: 2026-09-01T22:55:00+02:00
-last_progress_at: 2026-09-01T23:08:08+02:00
-ci_checks_for_current_head: 0
-ci_check_generation: pr844-bound-pending
+last_progress_at: 2026-09-01T23:11:51+02:00
+ci_checks_for_current_head: 2
+ci_check_generation: green-9502e4023a6c
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -72,8 +72,12 @@ identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 0
 stall_warnings: 0
-current_blocker: exact-head GitHub CI/governance pending after PR #844 binding
-next_action: push this PR-bound checkpoint, then require exact-head CI/governance, static prompt regression, zero review findings and current-main freshness before readiness/merge
+audit_result: PASS
+audit_evidence: deterministic static prompt regression plus exact GitHub diff/readback; no material prompt-authority or safety regression found
+e2e_result: NOT_APPLICABLE
+e2e_reason: prompt/documentation-only coordinator routing change; no executable, UI, runtime, network or product behavior changed
+current_blocker: none
+next_action: publish this readiness checkpoint, require final task-only exact-head CI/governance and unchanged PR hygiene/main freshness, then mark Ready and squash-merge PR #844
 ---
 
 # Vision P2 coordinator-managed Codex dispatch prompt
@@ -86,12 +90,12 @@ Make a newly started `OTC-VISION-P2-COORDINATOR` understand that it is the super
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T23:08:08+02:00
-head: 637794abaa7f1a476d36bf5d42634618d2deedf2
-head_semantics: prompt_contract_content_commit_before_pr_binding
+updated_at: 2026-09-01T23:11:51+02:00
+head: 9502e4023a6c011fe9d539349ca409b588c609a4
+head_semantics: last_verified_full_prompt_head_before_readiness_checkpoint
 branch: docs/OTC-20260901-vision-p2-coordinator-codex-dispatch-prompt
 pr: 844
-status: validating
+status: ready
 context_routes:
   - agent-governance
   - prompting-v2.1
@@ -108,6 +112,7 @@ proven:
   - current coordinator mode text says Codex is used only for integration edits, which conflicts with the owner-approved supervising-coordinator workflow and empirical routing policy.
   - EXECUTION_PROTOCOL.md now contains empirical model/effort calibration from PR #841.
   - prompt contract 1.1.0 static regression passed with exactly eight aliases and manual worker windows fallback-only.
+  - exact prompt head 9502e4023a6c011fe9d539349ca409b588c609a4 passed CI run 33559601723 and Track A governance run 33559601426; PR #844 had zero review threads/reviews and was behind=0 from main.
 derived:
   - coordinator prompt surfaces must explicitly distinguish supervising Chat coordinator from subordinate Codex workers and make manual worker windows a fallback only.
 unknown: []
@@ -139,5 +144,5 @@ validation:
     result: PASS
     evidence: task recognized as policy-v2 documentation task; active_sessions=0.
 blockers: []
-next_action: push this PR-bound checkpoint, then require exact-head CI/governance, static prompt regression, zero review findings and current-main freshness before readiness/merge
+next_action: publish this readiness checkpoint, require final task-only exact-head CI/governance and unchanged PR hygiene/main freshness, then mark Ready and squash-merge PR #844
 ```

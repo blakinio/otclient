@@ -277,6 +277,15 @@ branch: feat/OTC-20260901-vision-p2-capture-edge
 pr: 827
 status: validating
 phase: trust_boundary_fail_closed_repair
+context_routes:
+  - phase-2-read-only-coordination
+  - track-a-governance
+  - capture-edge
+owned_paths:
+  - docs/agents/tasks/active/OTC-20260901-vision-p2-capture-edge.md
+  - docs/agents/reports/OTC-20260901-vision-p2-capture-edge.md
+  - tools/tibia_re_vision/capture_edge.py
+  - tests/tools/tibia_re_vision/test_capture_edge.py
 proven:
   - coordinator comment 5500483713 reproduced direct token issue, registry injection, subclass issue, reflective evidence mutation, caller-created resolver, policy mutation, same-object binding mutation and unsafe caller root concerns.
   - underscore names, module globals, registries, object identity and frozen dataclasses cannot provide unforgeability in this Python boundary.
@@ -288,6 +297,14 @@ derived:
 unknown:
   - coordinator-owned trusted composition/consumer design and its exact path ownership.
   - exact-head CI/governance and coordinator re-review after restack.
+conflicts: []
+first_failure:
+  marker: RED-TRUST-BOUNDARY-UNFORGEABILITY
+  evidence: coordinator comment 5500483713 mechanically reproduced token, registry, subclass and reflective-mutation bypasses of the prior producer-issued design.
+rejected_hypotheses:
+  - Python-private tokens, module globals, registry membership, object identity or frozen dataclasses establish evidence/policy authority.
+  - a caller-created reviewed-policy resolver proves review.
+  - a caller-selected evidence root is safe without external canonical-root composition.
 changed_paths:
   - docs/agents/tasks/active/OTC-20260901-vision-p2-capture-edge.md
   - docs/agents/reports/OTC-20260901-vision-p2-capture-edge.md
@@ -305,6 +322,7 @@ validation:
     evidence: 19 tests
   - command: py_compile, Ruff and git diff --check
     result: PASS
+    evidence: compilation succeeded, Ruff reported all checks passed, and diff check returned clean.
 blockers:
   - trusted reviewed mask-policy and canonical evidence-root consumer are outside the worker-owned paths and have not been proven.
 next_action: commit, restack on origin/main, rerun governance/checkpoint/path validation, push with a safe lease, then request coordinator classification; do not self-promote or merge.

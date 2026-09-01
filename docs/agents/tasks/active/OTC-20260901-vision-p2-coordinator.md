@@ -152,7 +152,7 @@ validation:
     result: PASS
     evidence: main 103fa3071; #827/#830 closed unmerged at exact frozen heads; #829 open Draft 6031cf586 with all hosted gates green/CLEAN; #846 open Draft dda2df589.
   - command: direct current-head #829 authentication-object probe
-    result: FAIL_EXPECTED
+    result: PASS
     evidence: real module proof globals mint peer_authenticated VerifiedEdgeFrame and EdgeOutboundChannel objects, preserving RETURN_FOR_REPAIR.
   - command: production composition/replay callsite search
     result: PASS

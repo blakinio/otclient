@@ -7,7 +7,7 @@ repository: blakinio/otclient
 project_lane: otclient
 track_id: official-client-re
 phase: phase_2_runtime_edge_read_only
-prompt_contract_version: 1.0.0
+prompt_contract_version: 1.2.0
 prompting_standard_version: 2.1
 policy_version: 2
 promotion_authority: coordinator_only
@@ -71,19 +71,25 @@ Effort is a quality recommendation, not an authority field. Model/provider use r
 
 ### Coordinator-managed Codex dispatch
 
-The coordinator normally owns worker dispatch as part of the same owner invocation. When an authorized Codex execution bridge/tool is available, it should select and invoke subordinate workers itself rather than asking the owner to open separate chats or choose a model/effort. Manual worker windows remain a fallback only.
+The coordinator owns worker dispatch as part of the same owner invocation. When an authorized bounded Codex bridge/tool is available for an alias, it MUST select and invoke the subordinate worker through that bridge rather than direct `codex exec` or asking the owner to choose a model/effort. Manual worker windows/direct fallback are allowed only after a real bridge unavailability/failure is persisted or when the owner explicitly requests manual operation.
 
 Before dispatch, reconcile live task/PR/head/worktree/process state and ownership; do not duplicate an active worker or concurrently reuse a dirty worktree. Choose the smallest sufficient Codex model/effort using `EXECUTION_PROTOCOL.md` and its empirical benchmark evidence, provide verified bounded PR/CI context when supported, and independently verify worker results before classification/promotion. Codex workers never inherit coordinator authority merely because the selected family is Sol.
 
 For safety/security/provenance/secret-boundary work similar to the recorded benchmark, Sol/medium is a preferred first high-quality audit route and an independent Luna/medium may be added for higher confidence before expensive single-worker `xhigh`. These are provisional benchmark tie-breakers, not a global ranking. Terra/high remains a justified harder implementation/debug route; Terra/xhigh and Luna/xhigh are not automatic escalation steps.
 
+### Cost-control invariants
+
+For a bridge-supported Wave 1 alias, the coordinator uses the bounded owner-PC dispatcher while it is available and records any genuine bridge failure before fallback. Direct Codex execution may not widen sandbox/context/budget or bypass the required verified GitHub snapshot.
+
+Codex is never a CI/status/restack/checkpoint poller. External waiting releases the worker immediately. Moving `main` is reconciled by the coordinator, with one necessary final promotion-boundary restack rather than worker-side restack loops. The same exact-head audit generation is not repeated; a different-model same-head second opinion is reserved for explicit final confidence. Bridge hard ceilings are auditor 300s/20 tool actions and implementer 900s/60 tool actions. Quota exhaustion is a stop/routing barrier, not permission to consume Spark or another provider.
+
 ## Dependency graph and waves
 
-### Wave 0 — coordinator setup
+### Wave 0 â€” coordinator setup
 
 The coordinator refreshes live `main`, #820 terminal state, open PRs, active tasks, ownership and current runtime governance. It creates or reconciles the concrete worker task records, unique branches/worktrees and Draft PRs before write-capable dispatch, then normally invokes the eligible subordinate Codex workers itself when execution tooling is available.
 
-### Wave 1 — up to five workers in parallel
+### Wave 1 â€” up to five workers in parallel
 
 The following lanes may execute repository/static work concurrently when `owned_paths` do not overlap:
 
@@ -97,11 +103,11 @@ Actual observation of the one official-client runtime is serialized: at most one
 
 The Capture and Runtime-Signals workers may prepare implementation against reviewed interfaces before live admission, but they may not claim real-runtime success from fake/hosted evidence.
 
-### Wave 2 — reconciliation integration
+### Wave 2 â€” reconciliation integration
 
 `OTC-VISION-P2-VISION-RECONCILIATION` starts only after the coordinator has accepted the exact capture, runtime-signal and Control Center integration contracts it consumes. Transport must be sufficiently integrated to exercise the actual edge path required by acceptance.
 
-### Wave 3 — fresh audit and E2E
+### Wave 3 â€” fresh audit and E2E
 
 `OTC-VISION-P2-E2E-AUDIT` runs with fresh context against the exact integration head. It does not trust worker summaries. Material findings return ownership to the relevant worker or a coordinator-assigned bounded repair task; the auditor does not silently become the main implementer.
 

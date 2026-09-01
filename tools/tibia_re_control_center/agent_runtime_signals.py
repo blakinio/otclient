@@ -29,6 +29,7 @@ class RuntimeSignalBinding:
     run_id: str
     runtime_id: str
     runtime_instance_id: str
+    runtime_binding_sha256: str
 
 
 @dataclass(frozen=True)
@@ -103,14 +104,20 @@ def _safe_token(value: Any) -> str | None:
 
 
 def _binding_is_valid(binding: Any) -> bool:
-    return type(binding) is RuntimeSignalBinding and all(
-        _safe_token(value) is not None
-        for value in (
-            binding.session_id,
-            binding.run_id,
-            binding.runtime_id,
-            binding.runtime_instance_id,
+    return (
+        type(binding) is RuntimeSignalBinding
+        and all(
+            _safe_token(value) is not None
+            for value in (
+                binding.session_id,
+                binding.run_id,
+                binding.runtime_id,
+                binding.runtime_instance_id,
+            )
         )
+        and type(binding.runtime_binding_sha256) is str
+        and len(binding.runtime_binding_sha256) == 64
+        and all(char in "0123456789abcdef" for char in binding.runtime_binding_sha256)
     )
 
 
@@ -283,6 +290,7 @@ class RuntimeSignalResolver:
                 "clock_domain_id": sample.clock_domain_id,
                 "runtime_id": sample.binding.runtime_id,
                 "runtime_instance_id": sample.binding.runtime_instance_id,
+                "runtime_binding_sha256": sample.binding.runtime_binding_sha256,
                 "producer_id": source.producer_id,
                 "contract_id": source.contract_id,
                 "observed_monotonic_ns": sample.observed_monotonic_ns,

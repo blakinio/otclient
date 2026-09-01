@@ -18,7 +18,7 @@ physical_action_count: 0
 
 `tools/tibia_re_control_center/agent_runtime_signals.py` adds a Control-Center-owned `RuntimeSignalResolver` that:
 
-- binds evidence to one exact `session_id` / `run_id` / `runtime_id` / `runtime_instance_id`;
+- binds evidence to one exact `session_id` / `run_id` / `runtime_id` / `runtime_instance_id` plus the sibling admission producer's deterministic `runtime_binding_sha256`;
 - accepts data only through resolver-owned reviewed producer/contract handles;
 - maps producer `source_state` to semantic state and evidence class only from a reviewed contract, never from sample/model fields;
 - requires one explicit trusted `clock_domain_id` plus a bounded monotonic freshness window;
@@ -39,6 +39,8 @@ Current trusted repository evidence does not justify hard-coding a production `R
 - current Surveyor typed auth/player-state contracts explicitly retain `in_game_claimed=false` / no semantic promotion;
 - the merged foundation intentionally left production runtime resolver composition unbound until this later Phase 2 work.
 
+The concurrently implemented runtime-admission worker PR #826 now produces a deterministic `runtime_binding_sha256` over runtime namespace/owner, locator, exact process identity and X11 window identity. This worker consumes that value only as an opaque exact binding token and does not import the unmerged sibling module.
+
 Therefore this PR provides the strict reviewed-source resolver/adapter and tests, but does **not** manufacture a causal producer from static QMeta/window/name evidence, Surveyor structural data, visual/model output or opaque refs. A later coordinator-accepted live read-only path must bind only a separately reviewed producer under fresh admission/provenance.
 
 ## TDD evidence
@@ -55,14 +57,14 @@ RED-to-GREEN was observed for the production behaviors added in this slice, incl
 - clock-domain binding;
 - prohibition on structural semantic world-state assertion.
 
-Focused final suite: `20` tests PASS.
+Focused final suite: `21` tests PASS.
 
 ## Regression and static validation
 
 Final local evidence before publication:
 
 - `python -m unittest tests.tools.tibia_re_control_center.test_agent_runtime_signals -q` -> 20 PASS;
-- filtered full Control Center suite -> 475 PASS, 2 skipped, excluding exactly three clean-head baseline-failing test methods documented below;
+- filtered full Control Center suite -> 476 PASS, 2 skipped, excluding exactly three clean-head baseline-failing test methods documented below;
 - frozen vision benchmark -> 34 PASS;
 - `python -m ruff check tools/tibia_re_control_center/agent_runtime_signals.py tests/tools/tibia_re_control_center/test_agent_runtime_signals.py` -> PASS;
 - `python -m py_compile ...` -> PASS on the implemented module/test;

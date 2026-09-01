@@ -33,6 +33,7 @@ def _binding(**overrides: str) -> RuntimeSignalBinding:
         "run_id": "run-current",
         "runtime_id": "runtime-current",
         "runtime_instance_id": "instance-current",
+        "runtime_binding_sha256": "b" * 64,
     }
     values.update(overrides)
     return RuntimeSignalBinding(**values)
@@ -105,6 +106,19 @@ def _visual(screen_class: str = "WORLD_VISUAL") -> VisionObservation:
 
 
 class RuntimeSignalTests(unittest.TestCase):
+    def test_binding_requires_exact_runtime_admission_hash(self):
+        try:
+            binding = RuntimeSignalBinding(
+                session_id="session-current",
+                run_id="run-current",
+                runtime_id="runtime-current",
+                runtime_instance_id="instance-current",
+                runtime_binding_sha256="b" * 64,
+            )
+        except TypeError as exc:
+            self.fail(f"runtime admission binding hash missing: {exc}")
+        self.assertEqual(binding.runtime_binding_sha256, "b" * 64)
+
     def test_current_reviewed_signal_is_bound_to_current_context(self):
         resolver = _resolver()
         source = resolver.bind_reviewed_source(
@@ -218,6 +232,7 @@ class RuntimeSignalTests(unittest.TestCase):
             _binding(run_id="run-other"),
             _binding(runtime_id="runtime-other"),
             _binding(runtime_instance_id="instance-other"),
+            _binding(runtime_binding_sha256="c" * 64),
         )
 
         for binding in foreign_bindings:
@@ -253,7 +268,13 @@ class RuntimeSignalTests(unittest.TestCase):
             )
 
     def test_invalid_trusted_binding_is_rejected_at_composition(self):
-        for field in ("session_id", "run_id", "runtime_id", "runtime_instance_id"):
+        for field in (
+            "session_id",
+            "run_id",
+            "runtime_id",
+            "runtime_instance_id",
+            "runtime_binding_sha256",
+        ):
             with self.subTest(field=field), self.assertRaises(ValueError):
                 _resolver(binding=_binding(**{field: ""}))
 

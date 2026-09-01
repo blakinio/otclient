@@ -14,7 +14,7 @@ branch: feat/OTC-20260901-vision-p2-runtime-signals
 base_branch: main
 base_main: 0fe1ecb3569f1d8372209c857ab57f3b626c29ae
 created: 2026-09-01T16:27:39+02:00
-updated_at: 2026-09-01T17:50:02+02:00
+updated_at: 2026-09-01T17:56:26+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: isolated_worker_branch
@@ -66,11 +66,11 @@ depends_on:
 related_prs:
   - PR #828 Wave 1 worker Draft
 current_blocker: none
-next_action: publish the coherent runtime-signals implementation checkpoint to Draft PR #828, then inspect exact-head GitHub CI and return the worker result to OTC-VISION-P2-COORDINATOR
+next_action: publish the admission-bound runtime-signals follow-up to Draft PR #828, inspect exact-head GitHub CI, then return the worker result to OTC-VISION-P2-COORDINATOR
 invocation_started_at: 2026-09-01T17:02:17+02:00
-last_progress_at: 2026-09-01T17:50:02+02:00
+last_progress_at: 2026-09-01T17:56:26+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: implementation-pending-publish
+ci_check_generation: admission-bound-followup-pending-publish
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -144,8 +144,8 @@ runtime_access: none
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T17:50:02+02:00
-head: 11fc18820cc22303d6857361eb3404f5f1844ffa
+updated_at: 2026-09-01T17:56:26+02:00
+head: 16f9af0123e4ead21d2f97c1919a92826427fe95
 branch: feat/OTC-20260901-vision-p2-runtime-signals
 pr: 828
 status: validating
@@ -161,11 +161,12 @@ owned_paths:
 proven:
   - Draft PR 828 remains open, Draft, mergeable and bound to feat/OTC-20260901-vision-p2-runtime-signals; PR 820 and PR 824 are merged prerequisites.
   - refreshed origin/main ca1a71b5852f6e00ba144ed183af470555c51f56 changes none of this worker's owned paths.
-  - repository/static RED-to-GREEN implementation provides reviewed-source, session/run/runtime/runtime-instance, clock-domain, freshness, content-addressing, supersession and causal-conflict fail-closed behavior.
+  - repository/static RED-to-GREEN implementation provides reviewed-source, session/run/runtime/runtime-instance, admission runtime_binding_sha256, clock-domain, freshness, content-addressing, supersession and causal-conflict fail-closed behavior.
   - semantic IN_GAME or WORLD_EXIT output is accepted only from REVIEWED_CAUSAL contract rules; STRUCTURAL_ONLY and UNKNOWN rules may emit only UNKNOWN.
   - RuntimeSignalSample cannot supply runtime_state, evidence_class, producer_id or contract_id, so sample/model payload cannot self-select semantic authority through this interface.
-  - focused runtime-signals suite passes 20 tests and Ruff passes on both owned Python files.
-  - filtered Control Center regression passes 475 tests with 2 skips after excluding exactly three pre-existing failing test methods; frozen vision benchmark passes 34 tests.
+  - RuntimeSignalBinding requires the exact lowercase 64-hex runtime_binding_sha256 from the sibling admission contract, preventing a signal from crossing to a different freshly admitted target.
+  - focused runtime-signals suite passes 21 tests and Ruff passes on both owned Python files.
+  - filtered Control Center regression passes 476 tests with 2 skips after excluding exactly three pre-existing failing test methods; frozen vision benchmark passes 34 tests.
   - the three excluded methods reproduce with identical failure classes on clean branch head 11fc18820 before local implementation is restored.
   - runtime_access remains none; no Official Tibia observation, process-memory read, packet/payload capture, model inference, GUI input, credentials, login, process control or physical action occurred.
 derived:
@@ -177,7 +178,7 @@ unknown:
 conflicts: []
 first_failure:
   marker: EXACT_HEAD_CI_NOT_RUN
-  evidence: implementation is locally validated but has not yet been committed/pushed from parent head 11fc18820cc22303d6857361eb3404f5f1844ffa.
+  evidence: admission-binding follow-up is locally validated but has not yet been committed/pushed from implementation head 16f9af0123e4ead21d2f97c1919a92826427fe95.
 rejected_hypotheses:
   - the five full-suite errors were introduced by runtime-signals changes: rejected because the exact three failing test methods reproduce on clean head 11fc18820 with the local implementation stashed.
   - structural/QMeta/window/model evidence may assert IN_GAME: rejected by the binding Phase 2 contract and enforced by contract validation.
@@ -190,10 +191,10 @@ changed_paths:
 validation:
   - command: python -m unittest tests.tools.tibia_re_control_center.test_agent_runtime_signals -q
     result: PASS
-    evidence: 20 tests passed.
+    evidence: 21 tests passed.
   - command: filtered Control Center discovery excluding the three clean-head baseline-failing methods
     result: PASS
-    evidence: 475 tests passed, 2 skipped; TOTAL_DISCOVERED=478, EXCLUDED=3.
+    evidence: 476 tests passed, 2 skipped; TOTAL_DISCOVERED=479, EXCLUDED=3.
   - command: python -m unittest discover -s tools/tibia-re-vision-benchmark/tests -p test_*.py -q
     result: PASS
     evidence: 34 tests passed.
@@ -207,5 +208,5 @@ validation:
     result: PASS
     evidence: no owned-path overlap on refreshed main ca1a71b5852f6e00ba144ed183af470555c51f56.
 blockers: []
-next_action: publish the coherent runtime-signals implementation checkpoint to Draft PR #828, then inspect exact-head GitHub CI and return the worker result to OTC-VISION-P2-COORDINATOR.
+next_action: publish the admission-bound runtime-signals follow-up to Draft PR #828, inspect exact-head GitHub CI, then return the worker result to OTC-VISION-P2-COORDINATOR.
 ```

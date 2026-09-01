@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260901-vision-p2-coordinator
-status: waiting
+status: implementing
 agent: ChatGPT
 session_role: programme_coordinator
 worker_alias: OTC-VISION-P2-COORDINATOR
@@ -9,12 +9,12 @@ project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: coordination
-phase: wave_1_workers_dispatch_ready
-branch: docs/OTC-20260901-vision-p2-coordinator-wave1
+phase: wave_1_ci_repair
+branch: ci/OTC-20260901-vision-p2-package-a-path-boundary
 base_branch: main
-base_main: 0fe1ecb3569f1d8372209c857ab57f3b626c29ae
+base_main: ca1a71b5852f6e00ba144ed183af470555c51f56
 created: 2026-09-01T15:45:26+02:00
-updated_at: 2026-09-01T16:36:46+02:00
+updated_at: 2026-09-01T17:55:03+02:00
 risk: high
 execution_mode: chat_github
 run_scope: autonomous_program
@@ -51,135 +51,131 @@ network_payload_capture_allowed: false
 process_memory_access_allowed: false
 physical_action_budget: 0
 physical_action_count: 0
-worktree: C:/Users/barte/otclient-vision-p2-coordinator
+worktree: NOT_APPLICABLE_GITHUB_ONLY
 owned_paths:
   - docs/agents/tasks/active/OTC-20260901-vision-p2-coordinator.md
+  - .github/workflows/tibia-re-control-center-core.yml
+modules_touched:
+  - github_actions_package_a_governance
+reuses:
+  - existing Package A falsification audit
+  - existing Phase 2 programme ownership contract
 depends_on:
   - PR #820 merged foundation
   - PR #823 merged Phase 2 prompt-package closeout
+  - PR #825 merged Wave 1 dispatch checkpoint
+blocks:
+  - PR #826 exact-head Package A audit classification
+  - equivalent Wave 1 worker documentation paths under Package A audit
 related_prs:
   - PR #820 merged foundation integration
   - PR #823 merged Phase 2 prompt-package closeout
   - PR #824 merged Wave 0 coordinator cleanup
-  - PR #825 Wave 1 coordinator ledger Draft
+  - PR #825 merged Wave 1 coordinator dispatch
   - PR #826 runtime-admission worker Draft
   - PR #827 capture-edge worker Draft
   - PR #828 runtime-signals worker Draft
   - PR #829 edge-transport worker Draft
   - PR #830 control-bridge worker Draft
-current_blocker: SEPARATE_WORKER_EXECUTION_CHANNEL_REQUIRED
-next_action: dispatch the five prepared Wave 1 aliases in separate Codex/agent worker sessions against Draft PRs #826-#830; each session first validates its pre-bound task/branch/worktree/PR and then begins repository/static RED-to-GREEN TDD with runtime_access none
-invocation_started_at: 2026-09-01T15:35:00+02:00
-last_progress_at: 2026-09-01T16:36:46+02:00
+current_blocker: PR_826_FRESH_PACKAGE_A_PATH_BOUNDARY
+next_action: repair the Package A changed-path audit so the exact Phase 2 programme task/report family is admitted without expanding runtime authority, then prove the repair on an exact-head coordinator PR
+invocation_started_at: 2026-09-01T17:47:00+02:00
+last_progress_at: 2026-09-01T17:55:03+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: wave1-dispatch-ready
+ci_check_generation: ci-repair-draft
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
-context_reconstruction_attempts: 0
+context_reconstruction_attempts: 1
 stall_warnings: 0
 ---
-
 
 # OTC Vision Phase 2 read-only programme coordinator
 
 ## Objective
 
-Reconcile Phase 2 live state, release stale foundation ownership, create exact non-overlapping Wave 1 task/branch/Draft-PR assignments, independently classify worker outputs, integrate accepted slices, serialize real read-only observation, and drive the programme through fresh exact-head audit/E2E closeout without entering Phase 3+.
+Coordinate Phase 2 read-only runtime-edge integration, classify worker output, repair shared coordination/governance blockers, serialize any real read-only observation and drive the programme through exact-head audit/E2E closeout without entering Phase 3+.
 
 ## Binding authority
 
 - `docs/agents/programs/OTC_VISION_P2_READONLY_COORDINATION_V1.md`
 - `docs/agents/prompts/OTC_20260901_VISION_P2_READONLY_MULTIAGENT.md`
 - `docs/superpowers/specs/2026-08-30-local-track-a-vision-agent-supervisor-design.md`
-- live Git/GitHub/runtime state overrides stale historical task prose.
+- current `main`, live PR/check state and stricter trusted-base governance override stale historical prose.
 
 ## Context checkpoint
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T16:36:46+02:00
-head: bd62ba81fd9ec29a24f12f5c42ca5d535a36250a
-branch: docs/OTC-20260901-vision-p2-coordinator-wave1
-pr: 825
-status: waiting
+updated_at: 2026-09-01T17:55:03+02:00
+head: ca1a71b5852f6e00ba144ed183af470555c51f56
+head_semantics: trusted_base_before_coordinator_repair_commits
+branch: ci/OTC-20260901-vision-p2-package-a-path-boundary
+pr: NOT_OPEN_YET
+status: implementing
 context_routes:
   - phase-2-read-only-coordination
-  - autonomous-program
-  - delivery-closeout
   - track-a-governance
+  - ci-repair
 owned_paths:
   - docs/agents/tasks/active/OTC-20260901-vision-p2-coordinator.md
+  - .github/workflows/tibia-re-control-center-core.yml
 proven:
-  - PR 824 merged and refreshed main is 0fe1ecb3569f1d8372209c857ab57f3b626c29ae.
-  - five isolated Wave 1 branches/worktrees/tasks and Draft PRs 826-830 were created from exact refreshed main with pairwise and refreshed-main ownership overlap equal to zero.
-  - each worker task is PR-bound, status ready, agent unclaimed, runtime_access none and all mutation/effect authorities false with physical action budget/count 0/0.
-  - OTC-VISION-P2-RUNTIME-ADMISSION: Draft PR 826 is Draft/CLEAN and live PR head equals published branch head 2d2bb627965e0155e8f52210d1c8c6cab5610b53; CI / Required plus both Track A governance jobs are SUCCESS.
-  - OTC-VISION-P2-CAPTURE-EDGE: Draft PR 827 is Draft/CLEAN and live PR head equals published branch head dd40d914fa5d05cdf5ff2957cc798ee7aa336d9b; CI / Required plus both Track A governance jobs are SUCCESS.
-  - OTC-VISION-P2-RUNTIME-SIGNALS: Draft PR 828 is Draft/CLEAN and live PR head equals published branch head 11fc18820cc22303d6857361eb3404f5f1844ffa; CI / Required plus both Track A governance jobs are SUCCESS.
-  - OTC-VISION-P2-EDGE-TRANSPORT: Draft PR 829 is Draft/CLEAN and live PR head equals published branch head 2ba5a90629c2b3cab3094948bfa3a1fda2b1fb0b; CI / Required plus both Track A governance jobs are SUCCESS.
-  - OTC-VISION-P2-CONTROL-BRIDGE: Draft PR 830 is Draft/CLEAN and live PR head equals published branch head 7d5ccdb80aa523c3128bef0b8e4faef4450146fe; CI / Required plus both Track A governance jobs are SUCCESS.
-  - the prior GitHub PR-head metadata lag is resolved for all five worker PRs.
-  - local codex executable is absent on Molehill-PC; GitHub tools expose no Codex code-worker dispatch; plugin discovery found no executable Codex worker connector (Codex Security is a scanner, not a worker launcher).
+  - main is ca1a71b5852f6e00ba144ed183af470555c51f56 from merged PR 825.
+  - PR 826 advanced to exact head 0dbd823f6c89895e919f9bc07f7e99ecac9f31a6 and contains a completed static runtime-admission implementation.
+  - PR 826 focused runtime-admission tests are 14/14 PASS; Ruff and compileall PASS; its wider agent suite reproduces only the previously established current-main baseline error family.
+  - PR 826 exact-head CI / Required is SUCCESS, but Fresh Package A falsification audit is FAILURE.
+  - the Package A audit computes the complete PR changed-path set and allows control-center/vision code prefixes but not Phase 2 worker task/report documentation.
+  - PR 826 changed documentation includes docs/agents/tasks/active/OTC-20260901-vision-p2-runtime-admission.md and docs/agents/reports/OTC-20260901-vision-p2-runtime-admission.md; these are mandatory worker-owned durable artifacts.
+  - the same missing programme-documentation boundary would affect later Wave 1 lanes when their task/report files accompany control-center/vision implementation.
+  - PRs 827-830 remain open Drafts with no newer durable GitHub implementation checkpoint than their dispatch bootstrap.
+  - no Phase 2 live runtime observation has been authorized or performed by this coordinator session.
 derived:
-  - repository/GitHub Wave 1 bootstrap is complete and all five workers are safe to start concurrently for repository/static work.
-  - actual official-runtime observation remains serialized and is not authorized for any worker at this checkpoint.
+  - the CI failure is a shared governance/path-boundary defect, not a runtime-admission implementation defect.
+  - the narrow repair belongs to the coordinator because the workflow is shared governance and is outside worker #826 owned_paths.
+  - admitting only the exact OTC-20260901-vision-p2 task/report namespace preserves the Package A audit purpose while avoiding repeated identical blockers for the active Phase 2 programme.
 unknown:
-  - worker implementation, focused test, review, integration and later runtime-evidence outcomes.
+  - exact-head result of the coordinator repair PR until GitHub Actions runs it.
+  - current Synology/Kasm target identity and availability for a future serialized read-only observation window.
 conflicts: []
 first_failure:
-  marker: WORKER-EXECUTION-CHANNEL-UNAVAILABLE
-  evidence: coordinator environment can prepare Git/GitHub/worktrees but cannot create the required separate Codex/agent execution sessions; codex CLI is not installed and available connectors/plugins do not expose a code-worker launcher.
+  marker: PACKAGE_A_CHANGED_PATHS_REJECT_PHASE2_DURABLE_DOCS
+  evidence: PR 826 check Fresh Package A falsification audit at exact head 0dbd823f6c89895e919f9bc07f7e99ecac9f31a6 concluded FAILURE while CI / Required and the remaining observed Package A/Package B checks passed.
 rejected_hypotheses:
-  - worker PR head metadata is still stale: rejected by live gh PR readback matching all five published remote branch refs.
-  - worker bootstrap CI/governance is pending or failed: rejected by exact-head SUCCESS on CI / Required and both Track A governance jobs for PRs 826-830.
-  - coordinator may silently implement all five worker lanes in one session: rejected by the binding multi-agent role/ownership/independent-review contract.
+  - runtime-admission implementation paths are outside the Package A boundary: rejected because tools/tibia_re_control_center/ and tests/tools/tibia_re_control_center/ are already allowed prefixes.
+  - rerunning the same failed check without repository change can fix the issue: rejected because the failure is deterministic path classification.
+  - worker 826 should edit the workflow itself: rejected because the workflow is outside its exact owned_paths and shared governance is coordinator-owned.
 changed_paths:
   - docs/agents/tasks/active/OTC-20260901-vision-p2-coordinator.md
 validation:
-  - command: pairwise worker plus refreshed-main exact ownership scan
-    result: PASS
-    evidence: WORKER_OVERLAPS={} and MAIN_ACTIVE_EXACT_CONFLICTS=[].
-  - command: five worker PR live head and statusCheckRollup readback
-    result: PASS
-    evidence: PRs 826-830 each match final binding branch head, remain Draft/CLEAN, and exact-head required CI/governance are SUCCESS.
-  - command: worker branch local governance/checkpoint/diff validation
-    result: PASS
-    evidence: all five workers passed branch-bound Track A governance, checkpoint schema and git diff --check after PR binding.
-  - command: worker execution-channel discovery
-    result: BLOCKED
-    evidence: local codex not installed; no available connector/plugin provides separate Codex code-worker execution.
+  - command: inspect PR 826 exact-head check-runs
+    result: RED
+    evidence: Fresh Package A falsification audit failed on 0dbd823f6c89895e919f9bc07f7e99ecac9f31a6 while CI / Required passed.
+  - command: inspect current .github/workflows/tibia-re-control-center-core.yml
+    result: PASS_ROOT_CAUSE_IDENTIFIED
+    evidence: internal allowed_exact/allowed_prefixes omit the Phase 2 worker task/report namespace.
 blockers:
-  - separate Codex/agent worker sessions must be launched outside this coordinator session.
-next_action: dispatch the five prepared Wave 1 aliases in separate Codex/agent worker sessions against Draft PRs #826-#830; each session first validates its pre-bound task/branch/worktree/PR and then begins repository/static RED-to-GREEN TDD with runtime_access none.
+  - deterministic Package A changed-path boundary must be repaired and validated before PR 826 can be reclassified green.
+next_action: repair the Package A changed-path audit so the exact Phase 2 programme task/report family is admitted without expanding runtime authority, then prove the repair on an exact-head coordinator PR.
 ```
-## Planned Wave 1 ownership
 
-This map is coordinator-owned dispatch intent and becomes write-capable only after PR #824 merges, refreshed-main overlap checks pass, and each worker has its own concrete task/branch/worktree/Draft PR. Shared indexes such as `docs/agents/MODULE_CATALOG.md` are excluded.
+## Wave 1 live ledger
 
-- `OTC-VISION-P2-RUNTIME-ADMISSION`: new `agent_runtime_admission.py`, its focused test, lane report/task.
-- `OTC-VISION-P2-CAPTURE-EDGE`: new `tools/tibia_re_vision/capture_edge.py`, its focused test, lane report/task.
-- `OTC-VISION-P2-RUNTIME-SIGNALS`: new `agent_runtime_signals.py`, its focused test, lane report/task.
-- `OTC-VISION-P2-EDGE-TRANSPORT`: new `agent_edge_transport.py`, its focused test, lane report/task.
-- `OTC-VISION-P2-CONTROL-BRIDGE`: exclusive integration ownership for a new edge bridge plus the existing session/domain/API/CLI/UI/MCP files and their focused tests; no other Wave 1 worker may edit those shared integration files.
+| Alias | Draft PR | Current durable state | Coordinator classification |
+|---|---:|---|---|
+| `OTC-VISION-P2-RUNTIME-ADMISSION` | #826 | static implementation complete; waiting for CI repair and later serialized read-only observation | `RETURN_FOR_EVIDENCE` pending shared CI repair/live observation |
+| `OTC-VISION-P2-CAPTURE-EDGE` | #827 | dispatch-ready on GitHub; no newer durable implementation checkpoint | pending |
+| `OTC-VISION-P2-RUNTIME-SIGNALS` | #828 | dispatch-ready on GitHub; no newer durable implementation checkpoint | pending |
+| `OTC-VISION-P2-EDGE-TRANSPORT` | #829 | dispatch-ready on GitHub; no newer durable implementation checkpoint | pending |
+| `OTC-VISION-P2-CONTROL-BRIDGE` | #830 | dispatch-ready on GitHub; no newer durable implementation checkpoint | pending |
 
-Repository/static execution defaults to `github_hosted` with `runtime_access: none`. Actual official-runtime observation is separately admitted, read-only, mutation-disabled and serialized to one observation owner.
+Actual official-runtime observation remains serialized to one worker and requires a fresh `read_only` admission before any live observation. All mutation, credentials, login/relogin, gameplay, GUI/anti-idle input, process control, process memory, network payload capture and physical actions remain forbidden with budget/count `0/0`.
 
-## Wave 0 audit findings
+## Historical coordinator milestones
 
-- `W0-AUDIT-001` — **material medium**, mandatory Track A admission fields absent from the coordinator task. Evidence: exact-head governance run `33517851944`, job `99889308745`, plus matching local RED. Impact: PR cannot satisfy Track A governance. Disposition: fixed with the canonical `runtime_access:none` admission record; local GREEN confirmed. Final verification: pending fresh exact-head CI.
-- `W0-AUDIT-002` — **material medium**, UTF-8 mojibake in the archived foundation task caused by an intermediate Windows text round-trip. Evidence: PR diff exposed changed Unicode punctuation. Impact: historical archive integrity and readability. Disposition: rebuilt both archive files from exact `main` UTF-8 bytes plus only intended lifecycle edits; `MOJIBAKE_MATCHES=[]`, both archive checkpoint validators PASS. Final verification: pending fresh exact-head CI/diff.
-- `W0-AUDIT-003` — **material medium**, duplicate `execution_class` keys in the coordinator frontmatter after admission remediation. Evidence: direct fresh task read showed both `github_coordination` and `github_hosted`. Impact: ambiguous machine-readable contract. Disposition: removed the duplicate and retained the routing-contract value `github_hosted`. Final verification: pending fresh exact-head CI/checkpoint validation.
-## Wave 1 dispatch ledger
-
-| Alias | Draft PR | Branch | Worktree | Final branch/PR head | Exact-head gates |
-|---|---:|---|---|---|---|
-| `OTC-VISION-P2-RUNTIME-ADMISSION` | #826 | `feat/OTC-20260901-vision-p2-runtime-admission` | `C:/Users/barte/otclient-vision-p2-runtime-admission` | `2d2bb627965e0155e8f52210d1c8c6cab5610b53` | CI Required + Track A governance: PASS |
-| `OTC-VISION-P2-CAPTURE-EDGE` | #827 | `feat/OTC-20260901-vision-p2-capture-edge` | `C:/Users/barte/otclient-vision-p2-capture-edge` | `dd40d914fa5d05cdf5ff2957cc798ee7aa336d9b` | CI Required + Track A governance: PASS |
-| `OTC-VISION-P2-RUNTIME-SIGNALS` | #828 | `feat/OTC-20260901-vision-p2-runtime-signals` | `C:/Users/barte/otclient-vision-p2-runtime-signals` | `11fc18820cc22303d6857361eb3404f5f1844ffa` | CI Required + Track A governance: PASS |
-| `OTC-VISION-P2-EDGE-TRANSPORT` | #829 | `feat/OTC-20260901-vision-p2-edge-transport` | `C:/Users/barte/otclient-vision-p2-edge-transport` | `2ba5a90629c2b3cab3094948bfa3a1fda2b1fb0b` | CI Required + Track A governance: PASS |
-| `OTC-VISION-P2-CONTROL-BRIDGE` | #830 | `feat/OTC-20260901-vision-p2-control-bridge` | `C:/Users/barte/otclient-vision-p2-control-bridge` | `7d5ccdb80aa523c3128bef0b8e4faef4450146fe` | CI Required + Track A governance: PASS |
-
-All five tasks are `status: ready`, `agent: unclaimed`, `runtime_access: none`, and overlap-free. They are repository/GitHub dispatch-ready; the only remaining Wave 1 start dependency is creation of separate worker execution sessions.
+- PR #824 merged Wave 0 lifecycle/ownership cleanup.
+- PR #825 merged Wave 1 dispatch bootstrap.
+- Wave 0 findings W0-AUDIT-001 through W0-AUDIT-003 were remediated before Wave 1 dispatch.
+- Five Wave 1 worker branches/tasks/Draft PRs were created with non-overlapping ownership.

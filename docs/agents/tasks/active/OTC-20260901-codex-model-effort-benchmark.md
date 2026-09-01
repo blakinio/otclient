@@ -13,7 +13,7 @@ branch: docs/OTC-20260901-codex-model-effort-benchmark
 base_branch: main
 base_sha: e883543403d5430d7b1d287f59043b23c98f37d6
 created: 2026-09-01T22:22:39+02:00
-updated_at: 2026-09-01T22:31:48+02:00
+updated_at: 2026-09-01T22:33:12+02:00
 risk: low
 execution_class: local_owner_pc
 execution_mode: remote_desktop_plus_github
@@ -58,8 +58,9 @@ depends_on:
   - merged Codex model/effort routing policy PR #831
 blocks: []
 cross_repository_task_ids: []
+related_pr: 841
 invocation_started_at: 2026-09-01T22:22:39+02:00
-last_progress_at: 2026-09-01T22:31:48+02:00
+last_progress_at: 2026-09-01T22:33:12+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: benchmark-evidence-initial
 terminal_ci_wait_started_at: null
@@ -70,7 +71,7 @@ repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 0
 stall_warnings: 0
 current_blocker: none
-next_action: push the benchmark branch, open its Draft PR, bind the PR number in this task, then obtain exact-head CI/governance before merge
+next_action: obtain exact-head CI/governance and review hygiene for Draft PR #841, then promote and squash-merge if every gate remains green
 ---
 
 # Codex model x reasoning-effort benchmark persistence
@@ -96,7 +97,7 @@ updated_at: 2026-09-01T22:31:48+02:00
 head: 3d27527f5c689e3d511c4d0fc5a7327e9f8b5413
 head_semantics: benchmark_content_commit_before_pr_binding
 branch: docs/OTC-20260901-codex-model-effort-benchmark
-pr: null
+pr: 841
 status: validating
 context_routes:
   - agent-governance
@@ -147,5 +148,5 @@ validation:
     result: PASS
     evidence: TRACK_A_AGENT_RUNTIME_GOVERNANCE_PASS=true.
 blockers: []
-next_action: push the benchmark branch, open its Draft PR, bind the PR number in this task, then obtain exact-head CI/governance before merge
+next_action: obtain exact-head CI/governance and review hygiene for Draft PR #841, then promote and squash-merge if every gate remains green
 ```

@@ -12,7 +12,7 @@ branch: docs/OTC-20260902-codex-coordinator-simplification
 base_branch: main
 base_sha: 154388feeb4057fed05ac3c5a1d5181a552e7f31
 created: 2026-09-02T00:17:00+02:00
-updated_at: 2026-09-02T00:26:50+02:00
+updated_at: 2026-09-02T00:28:26+02:00
 risk: low
 execution_class: local_owner_pc
 execution_mode: remote_desktop_plus_github
@@ -63,9 +63,9 @@ blocks: []
 cross_repository_task_ids: []
 related_pr: null
 invocation_started_at: 2026-09-02T00:17:00+02:00
-last_progress_at: 2026-09-02T00:26:50+02:00
+last_progress_at: 2026-09-02T00:28:26+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: prompt-1.3-initial
+ci_check_generation: prompt-1.3-content-4d014bc0b634
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -74,7 +74,7 @@ repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 0
 stall_warnings: 0
 current_blocker: none
-next_action: commit the validated prompt 1.3.0 simplification, publish a Draft PR, then require exact-head CI/governance and clean review state before merge
+next_action: publish the validated content head, open a Draft PR, bind its number in this task, then require exact-head CI/governance and clean review state before merge
 ---
 
 # Codex coordinator simplification
@@ -83,9 +83,9 @@ next_action: commit the validated prompt 1.3.0 simplification, publish a Draft P
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-02T00:26:50+02:00
-head: 154388feeb4057fed05ac3c5a1d5181a552e7f31
-head_semantics: trusted_main_before_prompt_simplification
+updated_at: 2026-09-02T00:28:26+02:00
+head: 4d014bc0b6345ebc3c0dbb89c5cf7fe1a26385c0
+head_semantics: validated_prompt_1_3_content_commit_before_pr_binding
 branch: docs/OTC-20260902-codex-coordinator-simplification
 pr: null
 status: validating
@@ -136,5 +136,5 @@ validation:
     result: PASS
     evidence: policy-v2 task, checkpoint valid, Track A governance green and no whitespace errors.
 blockers: []
-next_action: commit the validated prompt 1.3.0 simplification, publish a Draft PR, then require exact-head CI/governance and clean review state before merge
+next_action: publish the validated content head, open a Draft PR, bind its number in this task, then require exact-head CI/governance and clean review state before merge
 ```

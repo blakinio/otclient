@@ -246,15 +246,17 @@ class AgentApiTests(unittest.TestCase):
         self.assertEqual(0, session["physical_action_count"])
         self.assertEqual("NULL", session["executor"])
         self.assertEqual("NONE", session["mutation_authority"])
+        self.assertEqual("NONE", session["official_client_access"])
         self.assertEqual([], self.server.domain.adapter.physical_effects)
 
-    def test_agent_session_get_exposes_current_edge_state_without_physical_authority(self) -> None:
+    def test_agent_session_get_keeps_declared_read_only_pending_without_trusted_admission(self) -> None:
         status, _, submitted = self.post(
             "/v1/agent/tasks",
             task_envelope(runtime_access="read_only"),
             "agent-read-only-edge-task",
         )
         self.assertEqual(201, status, submitted)
+        self.assertEqual("NONE", submitted["session"]["official_client_access"])
         now = self.server.domain.agent._now_epoch_ms()
         self.server.domain.agent.ingest_edge_observation({
             "schema": "otclient.local-agent.edge-observation.v1",
@@ -270,19 +272,17 @@ class AgentApiTests(unittest.TestCase):
                 "observed_epoch_ms": now,
                 "secret_safe": True,
             },
-            "runtime": {
-                "status": "IN_GAME",
-                "evidence_refs": ["api-runtime-1"],
-                "observed_epoch_ms": now,
-            },
+            "runtime": None,
         })
 
         get_status, _, session = self.get("/v1/agent/session?session_id=agent-session-1")
         self.assertEqual(200, get_status, session)
-        self.assertEqual("READ_ONLY", session["official_client_access"])
-        self.assertTrue(session["edge"]["current"])
-        self.assertEqual("api-capture-1", session["edge"]["capture"]["artifact_ref"])
-        self.assertEqual("IN_GAME", session["edge"]["runtime"]["status"])
+        self.assertEqual("read_only", session["runtime_access"])
+        self.assertEqual("NONE", session["official_client_access"])
+        self.assertFalse(session["edge"]["current"])
+        self.assertEqual("RUNTIME_ADMISSION_REQUIRED", session["edge"]["reason"])
+        self.assertFalse(session["edge"]["capture"]["current"])
+        self.assertFalse(session["edge"]["runtime"]["current"])
         self.assertEqual("NULL", session["executor"])
         self.assertEqual("NONE", session["mutation_authority"])
         self.assertEqual(0, session["physical_action_count"])

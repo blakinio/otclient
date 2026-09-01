@@ -22,6 +22,12 @@ from .agent_protocol import (
     ResultStatus,
     TaskEnvelope,
 )
+from .agent_runtime_admission import ReadOnlyRuntimeAdmission
+from .agent_runtime_signals import (
+    RuntimeSignalBinding,
+    RuntimeSignalEvidence,
+    RuntimeSignalResolver,
+)
 from .agent_vision import ModelSlotUnavailable, model_slot_wait_reason_code
 from .canonical import jcs_dumps
 from .execution import CancellationToken, MutationCoordinator
@@ -831,6 +837,92 @@ class AgentSessionCoordinator:
                 "result": _jsonable(accepted["result"]),
             }
 
+    def bind_read_only_runtime(
+        self,
+        session_id: str,
+        admission: ReadOnlyRuntimeAdmission,
+        *,
+        runtime_signal_resolver: RuntimeSignalResolver,
+        runtime_signal_binding: RuntimeSignalBinding,
+    ) -> dict[str, object]:
+        """Bind one current typed admission and reviewed runtime-signal resolver."""
+        with self._lock:
+            session = self.ensure_session(session_id)
+            task = self._tasks.get(session_id)
+            if task is None or task.runtime_access != "read_only":
+                raise ValidationError("EDGE_RUNTIME_NOT_ADMITTED", "read-only runtime binding requires an accepted read-only task")
+            if session.current_run_id != task.run_id:
+                raise ValidationError("EDGE_BINDING_MISMATCH", "read-only runtime binding requires the active task run")
+            now = self._now_epoch_ms()
+            canonical, signal_binding = self.edge.bind_runtime_authority(
+                session_id=session_id,
+                run_id=task.run_id,
+                task_id=task.task_id,
+                expected_client_version=task.client_identity.version,
+                expected_client_size=task.client_identity.size,
+                expected_client_sha256=task.client_identity.sha256,
+                admission=admission,
+                runtime_signal_resolver=runtime_signal_resolver,
+                runtime_signal_binding=runtime_signal_binding,
+                now_epoch_ms=now,
+            )
+            events = self._events_for(session_id)
+            edge_status = self._edge_status(session, task, events)
+            target_state = session.operational_state
+            if (
+                target_state is AgentOperationalState.DEGRADED
+                and edge_status.get("availability") == "CONNECTED"
+                and self.edge.heartbeat_is_fresh(session.heartbeat_epoch_ms, now_epoch_ms=now)
+            ):
+                target_state = AgentOperationalState.RUNNING
+            payload = {
+                "admission": canonical.to_provenance(),
+                "signal_binding": _jsonable(asdict(signal_binding)),
+                "physical_effect": False,
+            }
+            ensure_no_secret_material(payload, key_path="agent_runtime_admission")
+            self._persist_event(
+                session_id,
+                provenance=AgentProvenance.RUNTIME,
+                kind="EDGE_RUNTIME_ADMITTED",
+                state_after=target_state,
+                payload=payload,
+                operation="agent_edge_runtime_admission",
+            )
+            return self.snapshot(session_id)
+
+    def ingest_runtime_signal(self, session_id: str, evidence: RuntimeSignalEvidence) -> dict[str, object]:
+        """Persist semantic runtime state only after resolver-owned reviewed validation."""
+        with self._lock:
+            session = self.ensure_session(session_id)
+            task = self._tasks.get(session_id)
+            if task is None or task.runtime_access != "read_only":
+                raise ValidationError("EDGE_RUNTIME_NOT_ADMITTED", "runtime signal requires an accepted read-only task")
+            if session.current_run_id != task.run_id:
+                raise ValidationError("EDGE_BINDING_MISMATCH", "runtime signal requires the active task run")
+            payload = self.edge.accept_runtime_signal(
+                session_id=session_id,
+                run_id=task.run_id,
+                task_id=task.task_id,
+                evidence=evidence,
+                now_epoch_ms=self._now_epoch_ms(),
+            )
+            refs_value = payload.get("evidence_refs")
+            refs = tuple(refs_value) if isinstance(refs_value, list) else ()
+            self._persist_event(
+                session_id,
+                provenance=AgentProvenance.RUNTIME,
+                kind="EDGE_RUNTIME_SIGNAL",
+                artifact_refs=refs,
+                payload=payload,
+                operation="agent_edge_runtime_signal",
+            )
+            retained = self._evidence_refs.setdefault(session_id, [])
+            for ref in refs:
+                if isinstance(ref, str) and ref not in retained:
+                    retained.append(ref)
+            return self.snapshot(session_id)
+
     def ingest_edge_observation(self, value: Mapping[str, Any]) -> dict[str, object]:
         """Persist one normalized read-only edge observation without creating effect authority."""
         with self._lock:
@@ -862,6 +954,13 @@ class AgentSessionCoordinator:
                 previous_observed_epoch_ms=previous_observed_epoch_ms,
             )
             fresh = self.edge.heartbeat_is_fresh(observation.heartbeat_epoch_ms, now_epoch_ms=now)
+            authority_current = self.edge.runtime_authority_is_current(
+                session_id=session_id,
+                task_id=task.task_id,
+                current_run_id=task.run_id,
+                runtime_access=task.runtime_access,
+                now_epoch_ms=now,
+            )
             target_state = session.operational_state
             if not fresh and target_state not in {
                 AgentOperationalState.PAUSED,
@@ -870,19 +969,17 @@ class AgentSessionCoordinator:
                 AgentOperationalState.TERMINAL,
             }:
                 target_state = AgentOperationalState.DEGRADED
-            elif fresh and target_state is AgentOperationalState.DEGRADED:
+            elif fresh and authority_current and target_state is AgentOperationalState.DEGRADED:
                 target_state = AgentOperationalState.RUNNING
             refs: list[str] = []
             if observation.capture is not None and observation.capture.artifact_ref is not None:
                 refs.append(observation.capture.artifact_ref)
-            if observation.runtime is not None:
-                refs.extend(observation.runtime.evidence_refs)
             payload = {
                 "edge_instance_id": observation.edge_instance_id,
                 "observed_epoch_ms": observation.observed_epoch_ms,
                 "heartbeat_epoch_ms": observation.heartbeat_epoch_ms,
                 "capture": None if observation.capture is None else _jsonable(asdict(observation.capture)),
-                "runtime": None if observation.runtime is None else _jsonable(asdict(observation.runtime)),
+                "runtime": None,
                 "physical_effect": False,
             }
             self._persist_event(
@@ -932,6 +1029,7 @@ class AgentSessionCoordinator:
     ) -> dict[str, object]:
         return self.edge.status(
             session_id=session.session_id,
+            task_id=None if task is None else task.task_id,
             current_run_id=session.current_run_id,
             runtime_access="none" if task is None else task.runtime_access,
             heartbeat_epoch_ms=session.heartbeat_epoch_ms,
@@ -948,7 +1046,7 @@ class AgentSessionCoordinator:
         if task is None or task.runtime_access != "read_only" or session.heartbeat_epoch_ms is None:
             return session
         status = self._edge_status(session, task, events)
-        if status.get("reason") not in {"HEARTBEAT_STALE", "EVIDENCE_STALE"}:
+        if status.get("reason") not in {"HEARTBEAT_STALE", "EVIDENCE_STALE", "EDGE_RUNTIME_ADMISSION_STALE"}:
             return session
         if session.operational_state in {
             AgentOperationalState.DEGRADED,
@@ -1829,9 +1927,7 @@ class AgentSessionCoordinator:
                 "events": events,
                 "executor": "NULL" if type(self.executor) is NullBoundedActionExecutor else "INJECTED_TEST",
                 "mutation_authority": "NONE",
-                "official_client_access": (
-                    "READ_ONLY" if task is not None and task.runtime_access == "read_only" else "NONE"
-                ),
+                "official_client_access": "READ_ONLY" if edge_status.get("current") is True else "NONE",
             }
 
     def foundation_status(self) -> dict[str, object]:

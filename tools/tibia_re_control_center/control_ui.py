@@ -106,8 +106,8 @@ function agentSessionId(){return document.getElementById('agentSessionId').value
 function agentRunId(){return document.getElementById('agentRunId').value.trim()}
 function applyAgentSession(session){
   const dashboard=session.dashboard||{};
-  const edge=session.edge||{availability:'DISCONNECTED',current:false,reason:'NO_EDGE_OBSERVATION',capture:null,runtime:null};
-  document.getElementById('agentHeartbeat').textContent=json({state:session.operational_state,heartbeat_epoch_ms:session.heartbeat_epoch_ms,edge:{availability:edge.availability,current:edge.current,reason:edge.reason,edge_instance_id:edge.edge_instance_id},pause_latched:session.pause_latched,stop_latched:session.stop_latched});
+  const edge=session.edge||{availability:'DISCONNECTED',current:false,reason:'NO_EDGE_OBSERVATION',admission:{bound:false,current:false,reason:'RUNTIME_ADMISSION_REQUIRED'},capture:null,runtime:null};
+  document.getElementById('agentHeartbeat').textContent=json({state:session.operational_state,heartbeat_epoch_ms:session.heartbeat_epoch_ms,edge:{availability:edge.availability,current:edge.current,reason:edge.reason,edge_instance_id:edge.edge_instance_id,admission:edge.admission||{bound:false,current:false,reason:'RUNTIME_ADMISSION_REQUIRED'}},pause_latched:session.pause_latched,stop_latched:session.stop_latched});
   document.getElementById('agentTaskRun').textContent=json({task_id:session.task_id,run_id:session.current_run_id,trusted_main_sha:session.trusted_main_sha,runtime_access:session.runtime_access,official_client_access:session.official_client_access});
   document.getElementById('agentCapture').textContent=json(edge.capture||dashboard.latest_secret_safe_capture||{status:'UNAVAILABLE',secret_safe:true,current:false});
   document.getElementById('agentVisual').textContent=json(dashboard.visual||{label:'UNKNOWN',ocr:[],visual_only:true,structural_authority:false});

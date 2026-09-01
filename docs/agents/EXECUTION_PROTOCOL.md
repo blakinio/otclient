@@ -283,6 +283,22 @@ Do not spend Codex capacity on waiting, status polling, repeated preflight, prom
 
 Record the choice in `execution_mode` and the short reason in `execution_reason`.
 
+### Codex model family and reasoning-effort routing
+
+When the available Codex worker families are Luna, Terra and Sol, choose the smallest model and lowest reasoning effort that are sufficient for the task's scope, uncertainty and risk. Token cost is a first-class execution resource; a larger model or higher effort is not a quality signal by itself.
+
+Use this default routing:
+
+- **Luna** - narrow, low-risk work such as repository search, status synthesis, straightforward extraction/classification, small documentation edits and other bounded tasks where fast low-cost execution is sufficient. Prefer `low`; use `medium` when the task needs more reasoning.
+- **Terra** - the default implementation and debugging worker for routine coding, RED-to-GREEN TDD, bounded multi-file changes and ordinary repair loops. Prefer `medium`; use `high` when debugging, integration complexity or evidence volume justifies it.
+- **Sol** - use when stronger reasoning materially improves correctness, for example hard debugging, reconciliation/integration, independent high-risk review or ambiguous multi-surface reasoning. Sol may run at `low`, `medium`, `high` or `xhigh`. Always choose the lowest sufficient effort. `xhigh` is the maximum permitted Sol effort and is exceptional because of its token cost; it is never the default merely because Sol was selected.
+
+A reasonable escalation path is `Luna low/medium -> Terra medium/high -> Sol medium/high -> Sol xhigh -> supervising Chat/owner`. This is a decision ladder, not a requirement to execute every step. Skip a lower tier when task risk or complexity clearly makes it unsuitable, and do not escalate solely because wall-clock time passed or one attempt failed. First inspect scope, evidence and the failure mode, then respect the anti-stall requirement for a materially new hypothesis or changed input.
+
+When supported by the task/executor schema, persist `worker_model_family`, `worker_reasoning_effort` and a short `worker_routing_reason`; after an escalation also record the prior route. A coordinator must not hide an expensive escalation in an opaque default.
+
+If a justified `Sol/xhigh` attempt still cannot resolve the task safely, or the remaining decision requires architecture, governance, safety or owner authority, stop the worker loop and escalate to the supervising Chat/owner. Do not invent an effort above `xhigh`, repeatedly retry Sol/xhigh with unchanged evidence, or let an implementation worker silently make the supervisory decision.
+
 ## Failure and takeover
 
 Before any operation that may run for a long time or fail silently, checkpoint first and use a bounded timeout when the tool supports it.

@@ -165,7 +165,7 @@ recovery:
   next_action: run Track A governance and checkpoint/path validation on the repaired exact head, push with a lease, then request coordinator re-review of Draft PR #827
 ```
 
-## Context checkpoint
+## Historical benchmark-reclassification checkpoint
 
 ```yaml
 checkpoint_version: 1
@@ -267,15 +267,15 @@ blockers: []
 next_action: run Track A governance and checkpoint/path validation on the repaired exact head, push with a lease, then request coordinator re-review of Draft PR #827; worker must not self-promote or merge.
 ```
 
-## Context checkpoint — trust-boundary fail-closed repair
+## Context checkpoint
 
 ```yaml
 checkpoint_version: 1
 updated_at: 2026-09-01T23:40:00+02:00
-head: uncommitted
+head: 4d476251a3404dca67dfa5a0d3195babbc6fc924
 branch: feat/OTC-20260901-vision-p2-capture-edge
 pr: 827
-status: implementing
+status: validating
 phase: trust_boundary_fail_closed_repair
 proven:
   - coordinator comment 5500483713 reproduced direct token issue, registry injection, subclass issue, reflective evidence mutation, caller-created resolver, policy mutation, same-object binding mutation and unsafe caller root concerns.

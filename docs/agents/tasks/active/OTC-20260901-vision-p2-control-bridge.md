@@ -14,7 +14,7 @@ branch: feat/OTC-20260901-vision-p2-control-bridge
 base_branch: main
 base_main: ca1a71b5852f6e00ba144ed183af470555c51f56
 created: 2026-09-01T16:27:39+02:00
-updated_at: 2026-09-01T16:52:55+02:00
+updated_at: 2026-09-01T17:01:25+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: isolated_worker_branch
@@ -78,7 +78,7 @@ related_prs:
 current_blocker: none
 next_action: run focused baseline Control Center agent tests on rebased main, then write the first RED edge-bridge test with runtime_access none
 invocation_started_at: 2026-09-01T16:49:00+02:00
-last_progress_at: 2026-09-01T16:31:41+02:00
+last_progress_at: 2026-09-01T17:01:25+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: pr-bound-bootstrap
 terminal_ci_wait_started_at: null
@@ -175,7 +175,7 @@ runtime_access: none
 ```yaml
 checkpoint_version: 1
 updated_at: 2026-09-01T16:52:55+02:00
-head: 46ad8c08fa6cfc7dba38a9a8f8b31d774e55dbba
+head: 12a92e636a291aab701248d902ca8a9a14857577
 branch: feat/OTC-20260901-vision-p2-control-bridge
 pr: 830
 status: implementing
@@ -207,16 +207,17 @@ proven:
 derived:
   - repository/static RED-to-GREEN implementation may proceed; official-client observation remains forbidden in this invocation.
 unknown:
-  - focused baseline outcome and implementation behavior.
+  - implementation GREEN behavior and exact-head CI outcome.
   - exact-head CI and coordinator classification.
 conflicts: []
 first_failure:
-  marker: none
-  evidence: no implementation test has run yet.
+  marker: RUNTIME_ACCESS_UNAVAILABLE
+  evidence: first focused RED test fails at the existing repository-foundation runtime_access guard before any edge observation can be accepted.
 rejected_hypotheses:
   - real runtime access is needed for this implementation slice: rejected; task is explicitly repository/static with runtime_access none.
 changed_paths:
   - docs/agents/tasks/active/OTC-20260901-vision-p2-control-bridge.md
+  - tests/tools/tibia_re_control_center/test_agent_edge_bridge.py
 validation:
   - command: git rebase origin/main
     result: PASS
@@ -224,6 +225,12 @@ validation:
   - command: active task ownership scan
     result: PASS
     evidence: no overlapping active task owns the declared Control Center paths.
+  - command: WSL focused baseline agent_session + agent_api + agent_mcp + agent_persistence
+    result: PASS
+    evidence: 109 tests passed under Linux-compatible WSL; Windows-only unauthenticated POST reset was isolated as a platform artifact.
+  - command: WSL focused RED test_agent_edge_bridge
+    result: EXPECTED_FAIL
+    evidence: RUNTIME_ACCESS_UNAVAILABLE proves the Phase 2 read-only bridge is absent before production changes.
 blockers: []
-next_action: run focused baseline Control Center agent tests, then write the first RED edge-bridge test.
+next_action: implement the minimal read-only edge observation bridge to make the first focused RED test GREEN while preserving the Null executor and zero physical budget.
 ```

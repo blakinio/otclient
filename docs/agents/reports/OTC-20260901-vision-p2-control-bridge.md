@@ -8,7 +8,7 @@ worker_alias: OTC-VISION-P2-CONTROL-BRIDGE
 task_id: OTC-20260901-vision-p2-control-bridge
 implementation_head: 7ec06d4d9bdec9f10f76cb7b8b49d5f696e28ecd
 pr: 830
-worker_result: VALIDATING_REPAIR
+worker_result: PRODUCER_COMPLETE
 promotion_authority: coordinator_only
 runtime_access_used: none
 physical_action_count: 0
@@ -92,3 +92,12 @@ Fresh local validation after merged #839:
 Windows-only baseline remains the previously isolated loopback reset family (`WinError 10054`) plus the existing broader vision `MODEL_INFERENCE_FAILED` case; the same final tree is green under WSL/Linux and no bridge-specific failure signature was introduced.
 
 No live Synology/Kasm/Official Tibia observation was performed or authorized. This worker invocation stayed `runtime_access:none` and physical action count remained `0`. Exact-head hosted CI and coordinator reclassification remain the next gates.
+## Exact-head hosted validation - 274955658f08
+
+The repaired implementation/checkpoint head `274955658f08c8631d24511be1646a9ec16fff6c` completed the required hosted validation successfully:
+- Track A agent runtime governance `33554082006`: SUCCESS;
+- TIBIA RE Control Center Package A `33554082232`: SUCCESS, including deterministic core and fresh falsification audit;
+- TIBIA RE Control Center Package B `33554082117`: SUCCESS, including fresh falsification, full regression, and real Chromium + CLI E2E;
+- repository CI `33554082565`: SUCCESS with `CI / Required` PASS, Lua syntax PASS, workflow/syntax checks PASS, and informational static analysis PASS.
+
+PR hygiene at the handoff point: exactly 8 expected changed paths, 0 submitted reviews, 0 review threads. The worker repair is therefore repository/static producer-complete and returns to `OTC-VISION-P2-COORDINATOR` for independent classification. No live runtime observation or physical action was performed.

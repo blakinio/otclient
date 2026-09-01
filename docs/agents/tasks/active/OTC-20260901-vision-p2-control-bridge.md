@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260901-vision-p2-control-bridge
-status: validating
+status: ready
 agent: chatgpt-gpt-5.6-sol
 session_role: phase2_worker
 worker_alias: OTC-VISION-P2-CONTROL-BRIDGE
@@ -14,7 +14,7 @@ branch: feat/OTC-20260901-vision-p2-control-bridge
 base_branch: main
 base_main: e883543403d5430d7b1d287f59043b23c98f37d6
 created: 2026-09-01T16:27:39+02:00
-updated_at: 2026-09-01T22:12:42+02:00
+updated_at: 2026-09-01T22:16:27+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: isolated_worker_branch
@@ -75,14 +75,14 @@ depends_on:
   - main e883543403d5430d7b1d287f59043b23c98f37d6
 related_prs:
   - PR #830 Wave 1 worker Draft
-current_blocker: exact-head GitHub CI pending after coordinator-requested authority-binding repair
-next_action: publish the trusted-main integration repair, obtain exact-head CI, then return Draft PR #830 to OTC-VISION-P2-COORDINATOR for independent reclassification
+current_blocker: none
+next_action: OTC-VISION-P2-COORDINATOR independently reclassify repaired Draft PR #830 against the exact-head green evidence and current live integration state
 invocation_started_at: 2026-09-01T16:49:00+02:00
-last_progress_at: 2026-09-01T22:12:42+02:00
-ci_checks_for_current_head: 0
-ci_check_generation: post-839-authority-binding-repair
+last_progress_at: 2026-09-01T22:16:27+02:00
+ci_checks_for_current_head: 4
+ci_check_generation: exact-head-green-274955658
 terminal_ci_wait_started_at: null
-terminal_ci_checks_for_current_generation: 0
+terminal_ci_checks_for_current_generation: 4
 unchanged_state_checks: 0
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 2
@@ -174,11 +174,11 @@ runtime_access: none
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T22:12:42+02:00
-head: 7ec06d4d9bdec9f10f76cb7b8b49d5f696e28ecd
+updated_at: 2026-09-01T22:16:27+02:00
+head: 274955658f08c8631d24511be1646a9ec16fff6c
 branch: feat/OTC-20260901-vision-p2-control-bridge
 pr: 830
-status: validating
+status: ready
 context_routes:
   - phase-2-read-only-coordination
   - track-a-governance
@@ -210,7 +210,6 @@ proven:
 derived:
   - the coordinator's material RETURN_FOR_REPAIR finding is addressed locally and the worker is ready for hosted exact-head validation.
 unknown:
-  - exact-head GitHub CI outcome after publishing this checkpoint generation.
   - independent coordinator reclassification of repaired Draft PR #830.
 conflicts: []
 first_failure:
@@ -259,7 +258,9 @@ validation:
   - command: git diff --check
     result: PASS
     evidence: no whitespace errors on the repair diff.
-blockers:
-  - exact-head GitHub CI pending after publication.
-next_action: publish repaired Draft PR #830 on this trusted-main generation, verify exact-head CI once, then return to OTC-VISION-P2-COORDINATOR for independent classification.
+  - command: exact-head GitHub Actions on 274955658f08c8631d24511be1646a9ec16fff6c
+    result: PASS
+    evidence: Track A governance 33554082006 SUCCESS; Package A 33554082232 SUCCESS; Package B 33554082117 SUCCESS including full regression and real-browser E2E; CI 33554082565 SUCCESS with CI / Required PASS.
+blockers: []
+next_action: OTC-VISION-P2-COORDINATOR independently reclassify repaired Draft PR #830 against exact-head green evidence and current live integration state.
 ```

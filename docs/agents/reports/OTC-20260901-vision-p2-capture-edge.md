@@ -42,4 +42,4 @@ No Linux/Synology/Kasm execution of the backend has been performed or claimed. R
 
 ## Exact-head GitHub verification
 
-Earlier generations passed their own CI/governance but were superseded by coordinator secret-safety findings. Exact-head GitHub CI/governance for this second repair checkpoint is pending publication.
+Earlier generations passed their own CI/governance but were superseded by coordinator secret-safety findings. Exact checkpoint head `1f550b658ca6f17c02f4aeec80fd01cc212122b5` passed GitHub CI run `33545702287` and Track A agent runtime governance run `33545701984`. The worker slice is returned to the coordinator for independent re-review; no live runtime claim or worker self-promotion is made.

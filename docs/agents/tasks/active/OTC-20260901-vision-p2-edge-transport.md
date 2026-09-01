@@ -14,7 +14,7 @@ branch: feat/OTC-20260901-vision-p2-edge-transport
 base_branch: main
 base_main: b4e13e16f6bbe8a77d9aad54d4cf697b0706dce1
 created: 2026-09-01T16:27:39+02:00
-updated_at: 2026-09-01T23:21:03+02:00
+updated_at: 2026-09-01T23:23:33+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: isolated_worker_branch
@@ -65,8 +65,8 @@ depends_on:
   - current main d1cb8722c3116a0e0aeb72b9b360712f43151f17 after the subsequent main advance
 related_prs:
   - PR #829 Wave 1 worker Draft
-current_blocker: prior exact-head Package A path-boundary audit compared a stale topology and failed before falsification; its deterministic core passed. The branch is now cleanly restacked on current main b4e13e16f6bbe8a77d9aad54d4cf697b0706dce1.
-next_action: force-with-lease publish the current-main-restacked repair head, obtain fresh exact-head CI, then return the evidence and request coordinator independent re-review; worker must not mark it ready, promote, or merge.
+current_blocker: none; current-main-restacked implementation head passed its fresh four-workflow aggregate, but this durable final-validation checkpoint must itself receive one exact-head aggregate before coordinator handoff.
+next_action: await the final checkpoint head's fresh aggregate, then return its evidence and request coordinator independent re-review; worker must not mark it ready, promote, or merge.
 invocation_started_at: 2026-09-01T17:03:28+02:00
 last_progress_at: 2026-09-01T22:52:27+02:00
 ci_checks_for_current_head: 1
@@ -100,6 +100,8 @@ The local RED→GREEN repair replaces open-ended metadata admission with per-kin
 Local validation at `2026-09-01T23:15:47+02:00`: focused edge transport `38/38`, protocol plus edge transport `55/55`, Ruff, `py_compile`, checkpoint validation, exact changed-task Track A governance validation, and `git diff --check` all passed. The attempted obsolete governance command path was corrected to `.github/scripts/test_track_a_agent_runtime_governance.py`; no source or authority change resulted.
 
 The prior publication generated Package B `33560269278`, Package A `33560269282`, CI `33560269528` and Track A governance `33560269190` on the pre-restack head. Package A deterministic core passed; its fresh falsification path audit failed only because the stale topology made four current-main Phase 2 prompt files appear unexpected. The clean rebase at `61010d8f6d5797829a00ec5dd1e05b1f9e57fe4a` makes `origin/main..HEAD` exactly the four declared worker-owned paths, so a final force-with-lease publication and fresh exact-head aggregate are required.
+
+The current-main-restacked implementation generation passed: Package A `33560626122`, Package B `33560626062`, CI `33560626315` and Track A governance `33560626049`, all `success`. Package A's deterministic core and fresh falsification audit both passed. This final evidence checkpoint is intentionally a new final head, so it awaits exactly one further aggregate before the worker returns to the coordinator.
 
 ## Dispatch boundary
 

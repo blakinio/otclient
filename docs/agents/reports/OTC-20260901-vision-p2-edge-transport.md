@@ -85,6 +85,8 @@ Local repair validation is `38/38` focused edge-transport tests and `55/55` prot
 
 The pre-restack repair publication produced Package B `33560269278`, CI `33560269528` and Track A governance `33560269190` successfully. Package A deterministic core passed, but its falsification path gate used stale topology and listed four Phase 2 prompt files that are now on trusted main. The worker rebased cleanly on `main@b4e13e16f6bbe8a77d9aad54d4cf697b0706dce1`; `origin/main..HEAD` now contains exactly the four declared worker-owned paths. A final force-with-lease publication and fresh exact-head CI are still required.
 
+The restacked implementation generation is green: Package A `33560626122`, Package B `33560626062`, CI `33560626315`, and Track A governance `33560626049`. The final durable checkpoint commit awaits its own exact-head aggregate before coordinator handoff.
+
 ## Fresh resumed-worker validation
 
 The previously dirty worker slice was independently revalidated before local commit. A stale test expected Python JSON recursion failure at depth 1100; on the current interpreter that depth parses successfully. Empirical tracing showed 1500+ triggers `RecursionError`; the test now uses depth 2000 and verifies the existing production catch maps it to `EDGE_FRAME_INVALID`. Production code did not require a fix.

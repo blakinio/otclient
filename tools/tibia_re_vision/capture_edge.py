@@ -90,18 +90,49 @@ class RuntimeBinding:
 
 
 @dataclass(frozen=True)
-class SecretSafetyPolicy:
-    secret_regions: tuple[PixelRegion, ...] = ()
+class ReviewedSecretMaskPolicy:
+    policy_id: str
+    expected_width: int
+    expected_height: int
+    secret_regions: tuple[PixelRegion, ...]
 
-    @classmethod
-    def no_secret_fields(cls) -> "SecretSafetyPolicy":
-        return cls()
+    def __post_init__(self) -> None:
+        if type(self.policy_id) is not str or re.fullmatch(r"[A-Za-z0-9_.:-]{1,80}", self.policy_id) is None:
+            raise ValueError("reviewed secret policy id invalid")
+        if (
+            type(self.expected_width) is not int
+            or type(self.expected_height) is not int
+            or self.expected_width <= 0
+            or self.expected_height <= 0
+        ):
+            raise ValueError("reviewed secret geometry invalid")
+        if (
+            type(self.secret_regions) is not tuple
+            or not self.secret_regions
+            or any(type(region) is not PixelRegion for region in self.secret_regions)
+        ):
+            raise ValueError("reviewed secret regions invalid")
+        geometry = WindowGeometry(0, 0, self.expected_width, self.expected_height)
+        for region in self.secret_regions:
+            if region.x + region.width > geometry.width or region.y + region.height > geometry.height:
+                raise ValueError("reviewed secret regions invalid")
 
-    @classmethod
-    def mask_regions(cls, regions: tuple[PixelRegion, ...]) -> "SecretSafetyPolicy":
-        if type(regions) is not tuple or any(type(region) is not PixelRegion for region in regions):
-            raise ValueError("secret regions invalid")
-        return cls(secret_regions=regions)
+    @property
+    def policy_ref(self) -> str:
+        regions = sorted(
+            (region.x, region.y, region.width, region.height)
+            for region in self.secret_regions
+        )
+        canonical = "|".join(
+            [
+                "reviewed-secret-mask-v1",
+                self.policy_id,
+                str(self.expected_width),
+                str(self.expected_height),
+                *(f"{x},{y},{width},{height}" for x, y, width, height in regions),
+            ]
+        ).encode("ascii")
+        return f"secret-mask:{hashlib.sha256(canonical).hexdigest()}"
 
 
 class FrameSource(Protocol):
@@ -212,6 +243,7 @@ class CaptureEvidence:
     source_monotonic_ns: int
     full_frame: CaptureArtifact
     secret_safe: bool
+    secret_policy_ref: str
     is_blank: bool
     is_black: bool
     changed_from_previous: bool | None
@@ -347,10 +379,14 @@ class CaptureEdge:
         binding_reader: Callable[[], RuntimeBinding],
         frame_source: FrameSource,
         monotonic_ns: Callable[[], int],
+        secret_policy: ReviewedSecretMaskPolicy,
     ) -> None:
+        if type(secret_policy) is not ReviewedSecretMaskPolicy:
+            raise ValueError("reviewed secret policy invalid")
         self._binding_reader = binding_reader
         self._frame_source = frame_source
         self._monotonic_ns = monotonic_ns
+        self._secret_policy = secret_policy
 
     @staticmethod
     def _require_current(binding: RuntimeBinding, now_ns: int, max_age_ns: int) -> None:
@@ -365,17 +401,12 @@ class CaptureEdge:
         *,
         run_id: str,
         evidence_root: Path,
-        secret_policy: SecretSafetyPolicy,
         max_binding_age_ns: int,
         crop: PixelRegion | None = None,
         previous_full_sha256: str | None = None,
     ) -> CaptureEvidence:
         if type(run_id) is not str or not run_id:
             raise ValueError("run_id invalid")
-        if type(secret_policy) is not SecretSafetyPolicy:
-            raise ValueError("secret policy invalid")
-        if not secret_policy.secret_regions:
-            raise CaptureEdgeError("CAPTURE_SECRET_POLICY_UNPROVEN")
         if crop is not None and type(crop) is not PixelRegion:
             raise ValueError("crop invalid")
         if previous_full_sha256 is not None:
@@ -389,14 +420,19 @@ class CaptureEdge:
         geometry = self._frame_source.geometry(before)
         if type(geometry) is not WindowGeometry:
             raise CaptureEdgeError("CAPTURE_GEOMETRY_INVALID")
-        for region in secret_policy.secret_regions:
+        if (
+            geometry.width != self._secret_policy.expected_width
+            or geometry.height != self._secret_policy.expected_height
+        ):
+            raise CaptureEdgeError("CAPTURE_SECRET_POLICY_GEOMETRY_MISMATCH")
+        for region in self._secret_policy.secret_regions:
             _require_region(region, geometry)
         if crop is not None:
             _require_region(crop, geometry)
 
         raw_pixels = self._frame_source.capture_rgb(before, geometry)
         _require_rgb(geometry, raw_pixels)
-        safe_pixels = _mask_rgb(raw_pixels, geometry, secret_policy.secret_regions)
+        safe_pixels = _mask_rgb(raw_pixels, geometry, self._secret_policy.secret_regions)
         first_pixel = safe_pixels[:3]
         is_blank = all(safe_pixels[offset : offset + 3] == first_pixel for offset in range(0, len(safe_pixels), 3))
         is_black = max(safe_pixels, default=0) <= 4
@@ -441,6 +477,7 @@ class CaptureEdge:
             source_monotonic_ns=observed_ns,
             full_frame=full_artifact,
             secret_safe=True,
+            secret_policy_ref=self._secret_policy.policy_ref,
             is_blank=is_blank,
             is_black=is_black,
             changed_from_previous=changed_from_previous,

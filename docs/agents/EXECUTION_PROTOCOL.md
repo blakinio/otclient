@@ -281,7 +281,21 @@ Prefer Chat plus the GitHub connector for repository state inspection, coordinat
 
 Do not spend Codex capacity on waiting, status polling, repeated preflight, prompt generation, or general coordination.
 
-Record the choice in `execution_mode` and the short reason in `execution_reason`.
+### Codex worker cost-control guard
+
+When a repository/owner environment provides a bounded dispatcher for the selected worker alias, that dispatcher is the normal mandatory execution path. Do not bypass a healthy dispatcher with direct `codex exec`. If the dispatcher is genuinely unavailable or fails before model execution, persist the exact failure/reason before any fallback; a fallback may not silently widen sandbox, context, model/provider, effort, runtime authority or ownership.
+
+Codex worker intent is execution-only: implementation, bounded repair, review or security review. CI/workflow waiting or polling, status synthesis, PR metadata inspection, restack-only, push-only, checkpoint-only and general coordination stay in Chat/GitHub/deterministic tooling. When external CI is the only next action, the worker persists its coherent handoff and exits; it does not sleep/watch/poll.
+
+A worker runs against a bounded base/head generation. It must not chase a moving `main` through repeated rebases or fresh workflow generations. The coordinator owns current-main reconciliation and performs only the necessary final restack at the promotion/integration boundary before exact-head validation.
+
+Independent audit is generation-scoped. Treat `(repository, PR, exact head, role, model, effort, prompt/context fingerprint)` as the audit generation key when tooling supports it. Do not rerun an unchanged generation. After a material repair creates a new exact head, a fresh audit is valid. A same-head second opinion is exceptional: use a different model, label it explicitly as a final-confidence check, and do not trigger it automatically on every repair cycle.
+
+Hard worker budgets are mandatory when the executor supports them. The current owner-PC Vision P2 bridge ceilings are 300 seconds / 20 tool actions for auditors and 900 seconds / 60 tool actions for implementers; lower budgets are allowed. A worker that attempts coordination waits/main chasing or exceeds its hard budget is terminated and returns control to the coordinator.
+
+Model/provider quota pressure is a stop/routing signal, not authority to spill work into another owner-funded provider. In particular, Spark or another provider must not be selected merely because a Codex family/window is exhausted; provider/model use still requires an independently valid authorization and task-routing reason.
+
+Record the choice in `execution_mode` and the short reason in `execution_reason`. When supported, also persist the bounded dispatcher/context profile, worker budget and audit-generation identity.
 
 ### Codex model family and reasoning-effort routing
 

@@ -1,6 +1,6 @@
 ﻿---
 task_id: OTC-20260901-vision-p2-control-bridge
-status: implementing
+status: ready
 agent: chatgpt-gpt-5.6-sol
 session_role: phase2_worker
 worker_alias: OTC-VISION-P2-CONTROL-BRIDGE
@@ -9,12 +9,12 @@ project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: implementation
-phase: implement
+phase: validate
 branch: feat/OTC-20260901-vision-p2-control-bridge
 base_branch: main
 base_main: ca1a71b5852f6e00ba144ed183af470555c51f56
 created: 2026-09-01T16:27:39+02:00
-updated_at: 2026-09-01T17:01:25+02:00
+updated_at: 2026-09-01T17:55:06+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: isolated_worker_branch
@@ -76,11 +76,11 @@ depends_on:
 related_prs:
   - PR #830 Wave 1 worker Draft
 current_blocker: none
-next_action: run focused baseline Control Center agent tests on rebased main, then write the first RED edge-bridge test with runtime_access none
+next_action: OTC-VISION-P2-COORDINATOR independently classify Draft PR #830 against live exact-head CI and sibling contracts before any integration promotion
 invocation_started_at: 2026-09-01T16:49:00+02:00
-last_progress_at: 2026-09-01T17:01:25+02:00
+last_progress_at: 2026-09-01T17:55:06+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: pr-bound-bootstrap
+ci_check_generation: worker-implementation
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -174,11 +174,11 @@ runtime_access: none
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T16:52:55+02:00
-head: 12a92e636a291aab701248d902ca8a9a14857577
+updated_at: 2026-09-01T17:55:06+02:00
+head: aa2bfaa8fc47c4c7abdb1ddd28a80e5178ed903e
 branch: feat/OTC-20260901-vision-p2-control-bridge
 pr: 830
-status: implementing
+status: ready
 context_routes:
   - phase-2-read-only-coordination
   - track-a-governance
@@ -199,38 +199,59 @@ owned_paths:
   - tests/tools/tibia_re_control_center/test_agent_mcp.py
   - tests/tools/tibia_re_control_center/test_agent_persistence.py
 proven:
-  - live Draft PR 830 still targets main from this exact worker branch; pre-rebase remote head was 7d5ccdb80aa523c3128bef0b8e4faef4450146fe.
-  - isolated worktree C:/Users/barte/otclient-vision-p2-control-bridge is on the unique worker branch and was clean before claim.
-  - current main is ca1a71b5852f6e00ba144ed183af470555c51f56; its only drift from the dispatch base is coordinator task state from merged PR 825.
-  - active-task ownership scan found no other owner of this worker's Control Center implementation/test paths.
-  - runtime_access is none; all mutation/runtime-effect authorities remain false and physical action budget/count are 0/0.
+  - implementation commit aa2bfaa8fc47c4c7abdb1ddd28a80e5178ed903e extends the existing Control Center session/event backend with a fail-closed read-only edge bridge; no second store/control plane was added.
+  - bounded read_only tasks require zero physical budget, no secret capability and SCREENSHOT-only action vocabulary; all other runtime classes remain refused here.
+  - edge heartbeat/capture/runtime evidence is durable through existing AgentEvent storage; disconnect, stale heartbeat, restart, replay and competing edge-instance cases fail closed.
+  - owner session/API/MCP/UI can observe edge status while production executor remains NULL, mutation authority NONE and physical action count/budget 0/0.
+  - this invocation performed no Official Tibia/Kasm/Synology observation or mutation; runtime_access remained none.
 derived:
-  - repository/static RED-to-GREEN implementation may proceed; official-client observation remains forbidden in this invocation.
+  - the worker slice is repository/static producer-complete and ready for independent coordinator classification, not Phase 2 programme completion.
 unknown:
-  - implementation GREEN behavior and exact-head CI outcome.
-  - exact-head CI and coordinator classification.
-conflicts: []
+  - exact-head GitHub CI outcome after publishing the final checkpoint commit.
+  - coordinator classification and compatibility with later sibling producer contracts from PRs 826-829.
+  - any real admitted read-only runtime evidence; none was authorized or claimed by this worker.
+conflicts:
+  - unchanged origin/main agent-foundation standalone E2E submits physical_action_budget 1 through an API guard that requires 0; this pre-existing baseline defect is outside this worker ownership.
 first_failure:
   marker: RUNTIME_ACCESS_UNAVAILABLE
-  evidence: first focused RED test fails at the existing repository-foundation runtime_access guard before any edge observation can be accepted.
+  evidence: initial focused RED proved the foundation could not accept bounded read_only edge observation before implementation.
 rejected_hypotheses:
-  - real runtime access is needed for this implementation slice: rejected; task is explicitly repository/static with runtime_access none.
+  - replaying an earlier observation after disconnect is safely equivalent to fresh evidence: rejected by RED and fixed with monotonic run-timeline rejection.
+  - a second edge instance may replace the connected instance without disconnect: rejected by RED and fixed fail-closed.
 changed_paths:
   - docs/agents/tasks/active/OTC-20260901-vision-p2-control-bridge.md
+  - docs/agents/reports/OTC-20260901-vision-p2-control-bridge.md
+  - tools/tibia_re_control_center/agent_edge_bridge.py
+  - tools/tibia_re_control_center/agent_session.py
+  - tools/tibia_re_control_center/control_ui.py
   - tests/tools/tibia_re_control_center/test_agent_edge_bridge.py
+  - tests/tools/tibia_re_control_center/test_agent_api.py
+  - tests/tools/tibia_re_control_center/test_agent_mcp.py
 validation:
-  - command: git rebase origin/main
+  - command: ruff 0.16.1 on all changed Python implementation/tests
     result: PASS
-    evidence: worker branch rebased cleanly onto ca1a71b5852f6e00ba144ed183af470555c51f56.
-  - command: active task ownership scan
+    evidence: All checks passed.
+  - command: python3 -m compileall -q tools/tibia_re_control_center tests/tools/tibia_re_control_center
     result: PASS
-    evidence: no overlapping active task owns the declared Control Center paths.
-  - command: WSL focused baseline agent_session + agent_api + agent_mcp + agent_persistence
+    evidence: compileall completed successfully after final implementation edits.
+  - command: focused unittest edge bridge + session + API + MCP + persistence
     result: PASS
-    evidence: 109 tests passed under Linux-compatible WSL; Windows-only unauthenticated POST reset was isolated as a platform artifact.
-  - command: WSL focused RED test_agent_edge_bridge
+    evidence: 121 tests passed under Linux-compatible WSL after replay/instance hardening.
+  - command: tests/tools/tibia_re_control_center/audit_agent_foundation.py
+    result: PASS
+    evidence: AGENT_FOUNDATION_AUDIT, runtime surfaces, authority boundaries and MCP allowlist all PASS.
+  - command: tests/tools/tibia_re_control_center/audit_package_b.py
+    result: PASS
+    evidence: Package B boundary/transport/idempotency/restart/privacy audit PASS on Windows with repository Git available.
+  - command: tests/tools/tibia_re_control_center/e2e_package_b.py
+    result: PASS
+    evidence: backend, CLI, real Chrome browser and restart/idempotency E2E PASS on Molehill Windows; Official client access remained NONE.
+  - command: tests/tools/tibia_re_control_center/e2e_agent_foundation.py
     result: FAIL
-    evidence: RUNTIME_ACCESS_UNAVAILABLE proves the Phase 2 read-only bridge is absent before production changes.
+    evidence: pre-existing origin/main fixture/API contradiction PHYSICAL_ACTION_BUDGET_UNAVAILABLE; both involved files are unchanged from origin/main.
+  - command: full unittest discovery under WSL /mnt/c
+    result: BLOCKED
+    evidence: local Windows-mount I/O stayed in D state and was terminated after 462 seconds without emitting a test failure; exact-head GitHub CI remains authoritative for the full suite.
 blockers: []
-next_action: implement the minimal read-only edge observation bridge to make the first focused RED test GREEN while preserving the Null executor and zero physical budget.
+next_action: OTC-VISION-P2-COORDINATOR independently classify Draft PR #830 against live exact-head CI and sibling contracts before any integration promotion.
 ```

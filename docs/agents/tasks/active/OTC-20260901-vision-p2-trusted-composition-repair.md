@@ -14,7 +14,7 @@ branch: feat/OTC-20260901-vision-p2-trusted-composition-repair
 base_branch: main
 base_main: 103fa3071ee4d82d7dff934034e2442c32bd3a81
 created: 2026-09-01T23:28:41+02:00
-updated_at: 2026-09-01T23:31:29+02:00
+updated_at: 2026-09-01T23:32:09+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: isolated_worker_branch
@@ -28,7 +28,8 @@ track_a_runtime_agent_admission_version: 1
 routing_contract: docs/agents/programs/OTCLIENT_TIBIA_RE_HYBRID_EXECUTION_ROUTING.md
 runtime_access: none
 persistent_session_role: none
-physical_e2e_required: falseruntime_owner_task: NOT_APPLICABLE
+physical_e2e_required: false
+runtime_owner_task: NOT_APPLICABLE
 runtime_namespace: NOT_APPLICABLE
 canonical_registration: NOT_APPLICABLE
 canonical_lease_generation: NOT_APPLICABLE
@@ -56,7 +57,8 @@ worktree: C:/Users/barte/otclient-vision-p2-trusted-composition
 owned_paths:
   - docs/agents/tasks/active/OTC-20260901-vision-p2-trusted-composition-repair.md
   - docs/agents/reports/OTC-20260901-vision-p2-trusted-composition-repair.md
-  - tools/tibia_re_vision/capture_edge.py  - tests/tools/tibia_re_vision/test_capture_edge.py
+  - tools/tibia_re_vision/capture_edge.py
+  - tests/tools/tibia_re_vision/test_capture_edge.py
   - tools/tibia_re_control_center/agent_edge_bridge.py
   - tools/tibia_re_control_center/agent_session.py
   - tools/tibia_re_control_center/control_domain.py
@@ -83,7 +85,8 @@ last_progress_at: 2026-09-01T23:28:41+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: scaffold-only
 terminal_ci_wait_started_at: null
-terminal_ci_checks_for_current_generation: 0unchanged_state_checks: 0
+terminal_ci_checks_for_current_generation: 0
+unchanged_state_checks: 0
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 0
@@ -110,13 +113,14 @@ This is a coordinator-assigned bounded repair task, not a new conceptual program
 - `docs/superpowers/specs/2026-08-30-local-track-a-vision-agent-supervisor-design.md`
 - `docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md`
 - `docs/agents/contracts/TRACK_A_KASMVNC_RUNTIME_ACCESS_V1.md`
+
 ## Context checkpoint
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T23:31:29+02:00
-head: c82392787
-head_semantics: scaffold_commit_before_pr_binding_checkpoint
+updated_at: 2026-09-01T23:32:09+02:00
+head: 123115eb81728a473cff85f7c2614913d31a95ea
+head_semantics: pr_binding_commit_before_metadata_repair_checkpoint
 branch: feat/OTC-20260901-vision-p2-trusted-composition-repair
 pr: 846
 status: blocked

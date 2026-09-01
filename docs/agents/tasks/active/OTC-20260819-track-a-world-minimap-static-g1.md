@@ -16,7 +16,7 @@ base_main: 54a20bbd8721e92d069974af14d6ebd2f4f5a55d
 latest_observed_main: 54a20bbd8721e92d069974af14d6ebd2f4f5a55d
 related_pr: 593
 created: 2026-08-19T13:45:00+02:00
-updated: 2026-09-01T19:04:34+02:00
+updated: 2026-09-01T19:09:45+02:00
 risk: low
 EXECUTION_CLASS: github_hosted
 RUNTIME_ACCESS: none
@@ -170,7 +170,7 @@ Both historical producer artifacts contained compact text only and reported `RAW
 - [x] final PR scope remains only the three declared docs/evidence/task paths;
 - [x] structured E2E result is `NOT_APPLICABLE` with a concrete documentation-only reason;
 - [x] first independent audit findings `WM-G1-AUD-001..003` are durably recorded and remediated in content;
-- [ ] fresh independent audit on the remediated exact head before completion/merge.
+- [x] fresh independent Luna/medium audit on remediated head `98def097c6adfbfa9ba489ee088b020a4a161481`: `AUDIT_PASS`, zero material findings.
 
 ## Evidence result
 
@@ -252,17 +252,13 @@ fresh public packed SHA observed = 439db64ead9b62aa0870094fa0ce30e8e0ccaf35844de
 raw client retained = false
 ```
 
-A second independent audit and fresh exact-head CI/governance are required after the remediation commit.
+That post-remediation requirement was satisfied on `98def097c6adfbfa9ba489ee088b020a4a161481`: independent Luna/medium `AUDIT_PASS`, CI PASS, and Track A governance PASS.
 
-## Independent-audit blocker
+## Independent audit closeout
 
-The first fresh independent audit is complete and its three material findings are now content-remediated. This task remains non-terminal until a **second fresh validator session** audits the remediated exact head.
+The first fresh independent audit returned `AUDIT_FAIL` with `WM-G1-AUD-001..003`; those findings were remediated. Fresh independent Luna/medium session `01a05deb-4381-7800-8a7b-4c18d0ca0d14` then audited `98def097c6adfbfa9ba489ee088b020a4a161481` and returned `AUDIT_PASS` with zero material findings.
 
-```text
-BLOCKER=FRESH_INDEPENDENT_AUDIT_AFTER_REMEDIATION
-```
-
-Do not mark Ready or merge on the first failed audit. The second auditor must verify the authority downgrade, current-main freshness, explicit E2E disposition, exact three-path scope and absence of unsupported current-build promotion claims.
+A later narrow Luna/low audit of task-only closeout head `786eba7ac5f3d6bc8a493f21f0bbb0321ca11210` found only lifecycle consistency findings `WM-G1-FINAL-001..003` (unchecked audit checklist, stale blocker section, ambiguous recovery exact-head). This successor task-only fix addresses those three items without changing evidence/report semantics. Final readiness remains gated by fresh exact-head CI, PR hygiene, current-main freshness, and one final narrow read-only audit of this lifecycle fix.
 
 ## Recovery checkpoint
 
@@ -272,10 +268,11 @@ recovery:
   generation: 5
   session_id: chatgpt-pr593-audit-remediation-20260901
   session_started_at: 2026-09-01T18:45:07+02:00
-  checkpointed_at: 2026-09-01T19:04:34+02:00
-  last_progress_at: 2026-09-01T19:04:34+02:00
+  checkpointed_at: 2026-09-01T19:09:45+02:00
+  last_progress_at: 2026-09-01T19:09:45+02:00
   phase: ready_for_merge
-  exact_head: ae07a3da386d3d9d021cee04d072065405b3008e
+  exact_head: 98def097c6adfbfa9ba489ee088b020a4a161481
+  remediation_content_head: ae07a3da386d3d9d021cee04d072065405b3008e
   pull_request: 593
   active_operation: none
   external_run_ids: [32249741341, 32250742374, 32251606403, 32251606609]
@@ -292,7 +289,7 @@ recovery:
 
 ```yaml
 invocation_started_at: 2026-08-19T13:45:00+02:00
-last_progress_at: 2026-09-01T19:04:34+02:00
+last_progress_at: 2026-09-01T19:09:45+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: blocker-checkpoint
 terminal_ci_wait_started_at: null
@@ -308,7 +305,7 @@ stall_warnings: 0
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T19:04:34+02:00
+updated_at: 2026-09-01T19:09:45+02:00
 head: ae07a3da386d3d9d021cee04d072065405b3008e
 branch: research/OTC-20260819-track-a-world-minimap-static-g1
 pr: 593
@@ -329,6 +326,7 @@ proven:
   - Current trusted Track A repository fence is 15.32.75d4a0 / 52105824 / d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a; historical G1 addresses and formulas are not promoted to it.
   - Fresh independent Luna/medium re-audit session 01a05deb-4381-7800-8a7b-4c18d0ca0d14 returned AUDIT_PASS with zero material findings on 98def097c6adfbfa9ba489ee088b020a4a161481.
   - Exact audited head CI run 33534579992 and Track A governance run 33534579411 both passed.
+  - Narrow Luna/low closeout audit session 01a05df1-1bfb-7e21-9446-97440e9d87b9 returned AUDIT_FAIL only for WM-G1-FINAL-001..003 lifecycle inconsistencies; this successor task-only fix addresses them.
 derived:
   - Safe closeout is an authority downgrade that preserves historical hypotheses, not a current-build semantic promotion.
 unknown:

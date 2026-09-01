@@ -14,7 +14,7 @@ branch: feat/OTC-20260901-vision-p2-trusted-composition-repair
 base_branch: main
 base_main: 103fa3071ee4d82d7dff934034e2442c32bd3a81
 created: 2026-09-01T23:28:41+02:00
-updated_at: 2026-09-01T23:32:09+02:00
+updated_at: 2026-09-01T23:35:34+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: isolated_worker_branch
@@ -73,15 +73,15 @@ depends_on:
   - PR #830 source head 971787f380d52d0e141c50b9201498b0c99e752d coordinator ACCEPT_WITH_EDITS
   - PR #829 must reach coordinator ACCEPT before transport replay persistence is enabled
 related_prs:
-  - PR #827 capture-edge source Draft
-  - PR #829 edge-transport source Draft
-  - PR #830 control-bridge source Draft
+  - PR #827 capture-edge source closed unmerged at 6991b98f3f970c6ffc9d1bec9bf032aed89f0f2d
+  - PR #829 edge-transport repair Draft at 6031cf5862f7dd019aafa9314aaee408c67b20fe
+  - PR #830 control-bridge source closed unmerged at 971787f380d52d0e141c50b9201498b0c99e752d
   - PR #843 coordinator reconciliation Draft
   - PR #846 trusted-composition repair Draft
 current_blocker: CODEX_SPARK_QUOTA_EXHAUSTED_UNTIL_2026-09-02T04:15+02:00_AND_PR_829_RETURN_FOR_REPAIR
 next_action: after Spark quota reset, integrate exact accepted source slices into this isolated branch, keep runtime access none, and implement the trusted composition root without reintroducing caller-mintable authority
 invocation_started_at: null
-last_progress_at: 2026-09-01T23:28:41+02:00
+last_progress_at: 2026-09-01T23:35:34+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: scaffold-only
 terminal_ci_wait_started_at: null
@@ -118,9 +118,9 @@ This is a coordinator-assigned bounded repair task, not a new conceptual program
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T23:32:09+02:00
-head: 123115eb81728a473cff85f7c2614913d31a95ea
-head_semantics: pr_binding_commit_before_metadata_repair_checkpoint
+updated_at: 2026-09-01T23:35:34+02:00
+head: dda2df589a448d0d9c9d0fe4871ab074a4433c6d
+head_semantics: metadata_repair_commit_before_source_freeze_checkpoint
 branch: feat/OTC-20260901-vision-p2-trusted-composition-repair
 pr: 846
 status: blocked
@@ -143,9 +143,10 @@ owned_paths:
   - tests/tools/tibia_re_control_center/test_agent_session.py
   - tests/tools/tibia_re_control_center/test_vision_p2_trusted_composition.py
 proven:
-  - PR 827 head 6991b98f3f970c6ffc9d1bec9bf032aed89f0f2d safely fails closed until a trusted reviewed capture-policy/evidence-root consumer exists.
-  - PR 830 head 971787f380d52d0e141c50b9201498b0c99e752d has green hosted gates and safely fails closed because production ControlDomain supplies no reviewed runtime authority configuration.
+  - PR 827 head 6991b98f3f970c6ffc9d1bec9bf032aed89f0f2d safely fails closed until a trusted reviewed capture-policy/evidence-root consumer exists; source PR is closed unmerged and frozen.
+  - PR 830 head 971787f380d52d0e141c50b9201498b0c99e752d has green hosted gates and safely fails closed because production ControlDomain supplies no reviewed runtime authority configuration; source PR is closed unmerged and frozen.
   - production ControlDomainService constructs AgentSessionCoordinator without ReviewedRuntimeAuthorityConfiguration.
+  - PR 829 exact current head 6031cf5862f7dd019aafa9314aaee408c67b20fe is hosted GREEN/CLEAN but coordinator RETURN_FOR_REPAIR persists because reachable module proof globals can mint peer_authenticated objects without cryptographic issuance.
   - EdgeReplayLedger currently has no production persistence/reuse callsite; a fresh ledger is created by EdgeOutboundClient.connect.
   - no Official Tibia/Synology/Kasm live observation or mutation occurred; runtime_access remains none and physical budget/count are 0/0.
 derived:

@@ -66,7 +66,7 @@ depends_on:
 related_prs:
   - PR #827 Wave 1 worker Draft
 current_blocker: no externally pinned reviewed secret-mask policy and canonical symlink-safe evidence-root consumer exists within the four owned worker paths; capture must remain fail closed
-next_action: restack the fail-closed repair on current main, run exact local governance/path validation, push with a lease, and request coordinator classification of the missing trusted consumer
+next_action: push the restacked exact head with a safe lease, verify PR #827 exact-head checks, then request coordinator classification of the missing trusted consumer
 invocation_started_at: 2026-09-01T16:58:39+02:00
 last_progress_at: 2026-09-01T23:40:00+02:00
 ci_checks_for_current_head: 0
@@ -272,7 +272,7 @@ next_action: run Track A governance and checkpoint/path validation on the repair
 ```yaml
 checkpoint_version: 1
 updated_at: 2026-09-01T23:40:00+02:00
-head: 4d476251a3404dca67dfa5a0d3195babbc6fc924
+head: 38415ca3cdd6693947b15c81e20e5af6c69680f9
 branch: feat/OTC-20260901-vision-p2-capture-edge
 pr: 827
 status: validating
@@ -325,5 +325,5 @@ validation:
     evidence: compilation succeeded, Ruff reported all checks passed, and diff check returned clean.
 blockers:
   - trusted reviewed mask-policy and canonical evidence-root consumer are outside the worker-owned paths and have not been proven.
-next_action: commit, restack on origin/main, rerun governance/checkpoint/path validation, push with a safe lease, then request coordinator classification; do not self-promote or merge.
+next_action: push the restacked exact head with a safe lease, verify exact-head checks, then request coordinator classification; do not self-promote or merge.
 ```

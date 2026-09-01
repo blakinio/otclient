@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260901-vision-p2-coordinator
-status: validating
+status: waiting
 agent: ChatGPT
 session_role: programme_coordinator
 worker_alias: OTC-VISION-P2-COORDINATOR
@@ -9,12 +9,12 @@ project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: coordination
-phase: wave_0_audit_remediation
-branch: docs/OTC-20260901-vision-p2-coordinator
+phase: wave_1_workers_dispatch_ready
+branch: docs/OTC-20260901-vision-p2-coordinator-wave1
 base_branch: main
-base_main: 21fedc04809f0f78a1ff673edb2804a83ab5fedb
+base_main: 0fe1ecb3569f1d8372209c857ab57f3b626c29ae
 created: 2026-09-01T15:45:26+02:00
-updated_at: 2026-09-01T16:15:20+02:00
+updated_at: 2026-09-01T16:36:46+02:00
 risk: high
 execution_mode: chat_github
 run_scope: autonomous_program
@@ -54,27 +54,30 @@ physical_action_count: 0
 worktree: C:/Users/barte/otclient-vision-p2-coordinator
 owned_paths:
   - docs/agents/tasks/active/OTC-20260901-vision-p2-coordinator.md
-  - docs/agents/tasks/archive/OTC-20260830-local-vision-agent-supervisor-discovery.md
-  - docs/agents/tasks/archive/OTC-20260830-local-vision-agent-supervisor-foundation.md
 depends_on:
   - PR #820 merged foundation
   - PR #823 merged Phase 2 prompt-package closeout
 related_prs:
-  - PR #808 closed historical discovery Draft; superseded after #820
-  - PR #810 closed historical foundation Draft; superseded after #820
   - PR #820 merged foundation integration
-  - PR #824 Wave 0 coordinator cleanup Draft
-current_blocker: none
-next_action: publish the Wave 0 audit remediation, run fresh exact-head governance/CI and PR-hygiene checks, then merge PR #824 only if every gate passes
+  - PR #823 merged Phase 2 prompt-package closeout
+  - PR #824 merged Wave 0 coordinator cleanup
+  - PR #825 Wave 1 coordinator ledger Draft
+  - PR #826 runtime-admission worker Draft
+  - PR #827 capture-edge worker Draft
+  - PR #828 runtime-signals worker Draft
+  - PR #829 edge-transport worker Draft
+  - PR #830 control-bridge worker Draft
+current_blocker: SEPARATE_WORKER_EXECUTION_CHANNEL_REQUIRED
+next_action: dispatch the five prepared Wave 1 aliases in separate Codex/agent worker sessions against Draft PRs #826-#830; each session first validates its pre-bound task/branch/worktree/PR and then begins repository/static RED-to-GREEN TDD with runtime_access none
 invocation_started_at: 2026-09-01T15:35:00+02:00
-last_progress_at: 2026-09-01T16:15:20+02:00
+last_progress_at: 2026-09-01T16:36:46+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: draft
+ci_check_generation: wave1-dispatch-ready
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 1
+repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 0
 stall_warnings: 0
 ---
@@ -97,11 +100,11 @@ Reconcile Phase 2 live state, release stale foundation ownership, create exact n
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T16:15:20+02:00
-head: 7145e17b6b8fdbf5b88a4ed9cbc9ec75326bbde3
-branch: docs/OTC-20260901-vision-p2-coordinator
-pr: 824
-status: validating
+updated_at: 2026-09-01T16:36:46+02:00
+head: bd62ba81fd9ec29a24f12f5c42ca5d535a36250a
+branch: docs/OTC-20260901-vision-p2-coordinator-wave1
+pr: 825
+status: waiting
 context_routes:
   - phase-2-read-only-coordination
   - autonomous-program
@@ -109,52 +112,48 @@ context_routes:
   - track-a-governance
 owned_paths:
   - docs/agents/tasks/active/OTC-20260901-vision-p2-coordinator.md
-  - docs/agents/tasks/archive/OTC-20260830-local-vision-agent-supervisor-discovery.md
-  - docs/agents/tasks/archive/OTC-20260830-local-vision-agent-supervisor-foundation.md
 proven:
-  - PR 820 is merged; historical Draft PRs 808 and 810 are closed and their stale active task records are archived with ownership released.
-  - coordinator Draft PR 824 remains limited to three task-lifecycle files and changes no product/runtime implementation.
-  - current Track A trusted-base contracts were refreshed; current exact-client fence is 15.32.75d4a0 / 52105824 / d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a.
-  - the older 52109920 / ed5469... parallel-research fence is superseded by the 2026-08-28 canonical advance recorded in CHANGELOG / PR 754 and is not Phase 2 identity authority.
-  - exact head 313415e124941cac4c07599d6d4c94acadb950a1 passed general CI but failed Track A governance run 33517851944 job 99889308745 solely because the coordinator task omitted ten mandatory runtime_access=none admission fields.
-  - the governance failure was reproduced locally, the ten fields were added using the repository working pattern, and the same validator now passes locally.
-  - proportional diff audit found UTF-8 mojibake in the foundation archive introduced by a Windows text round-trip; both archives were reconstructed from exact main bytes plus only intended lifecycle changes and now contain no mojibake markers.
-  - active coordinator plus both terminal archive checkpoints pass tools/agents/checkpoint.py --require-checkpoint after remediation.
-  - no active task claims tools/tibia_re_control_center/** or tools/tibia_re_vision/** after the archive cleanup; shared MODULE_CATALOG.md remains excluded.
+  - PR 824 merged and refreshed main is 0fe1ecb3569f1d8372209c857ab57f3b626c29ae.
+  - five isolated Wave 1 branches/worktrees/tasks and Draft PRs 826-830 were created from exact refreshed main with pairwise and refreshed-main ownership overlap equal to zero.
+  - each worker task is PR-bound, status ready, agent unclaimed, runtime_access none and all mutation/effect authorities false with physical action budget/count 0/0.
+  - OTC-VISION-P2-RUNTIME-ADMISSION: Draft PR 826 is Draft/CLEAN and live PR head equals published branch head 2d2bb627965e0155e8f52210d1c8c6cab5610b53; CI / Required plus both Track A governance jobs are SUCCESS.
+  - OTC-VISION-P2-CAPTURE-EDGE: Draft PR 827 is Draft/CLEAN and live PR head equals published branch head dd40d914fa5d05cdf5ff2957cc798ee7aa336d9b; CI / Required plus both Track A governance jobs are SUCCESS.
+  - OTC-VISION-P2-RUNTIME-SIGNALS: Draft PR 828 is Draft/CLEAN and live PR head equals published branch head 11fc18820cc22303d6857361eb3404f5f1844ffa; CI / Required plus both Track A governance jobs are SUCCESS.
+  - OTC-VISION-P2-EDGE-TRANSPORT: Draft PR 829 is Draft/CLEAN and live PR head equals published branch head 2ba5a90629c2b3cab3094948bfa3a1fda2b1fb0b; CI / Required plus both Track A governance jobs are SUCCESS.
+  - OTC-VISION-P2-CONTROL-BRIDGE: Draft PR 830 is Draft/CLEAN and live PR head equals published branch head 7d5ccdb80aa523c3128bef0b8e4faef4450146fe; CI / Required plus both Track A governance jobs are SUCCESS.
+  - the prior GitHub PR-head metadata lag is resolved for all five worker PRs.
+  - local codex executable is absent on Molehill-PC; GitHub tools expose no Codex code-worker dispatch; plugin discovery found no executable Codex worker connector (Codex Security is a scanner, not a worker launcher).
 derived:
-  - Wave 1 can use disjoint lane-local modules only after PR 824 merges and refreshed-main overlap checks repeat.
+  - repository/GitHub Wave 1 bootstrap is complete and all five workers are safe to start concurrently for repository/static work.
+  - actual official-runtime observation remains serialized and is not authorized for any worker at this checkpoint.
 unknown:
-  - fresh exact-head GitHub governance/CI outcome and final review-thread/PR-hygiene state after this audit-remediation commit is published.
+  - worker implementation, focused test, review, integration and later runtime-evidence outcomes.
 conflicts: []
 first_failure:
-  marker: FINAL-EXACT-HEAD-GATES-PENDING
-  evidence: local RED-to-GREEN and archive-integrity remediation pass, but the remediated exact head has not yet run required GitHub checks.
+  marker: WORKER-EXECUTION-CHANNEL-UNAVAILABLE
+  evidence: coordinator environment can prepare Git/GitHub/worktrees but cannot create the required separate Codex/agent execution sessions; codex CLI is not installed and available connectors/plugins do not expose a code-worker launcher.
 rejected_hypotheses:
-  - direct Codex CLI dispatch is available on Molehill-PC: codex executable is not installed on the connected host.
-  - the older 52109920 / ed5469... fence is current Phase 2 identity authority: superseded by current mandatory contracts and PR 754/CHANGELOG evidence.
-  - the exact-head governance failure was caused by runtime state: rejected; CI log and local reproduction isolate it to missing task admission fields.
+  - worker PR head metadata is still stale: rejected by live gh PR readback matching all five published remote branch refs.
+  - worker bootstrap CI/governance is pending or failed: rejected by exact-head SUCCESS on CI / Required and both Track A governance jobs for PRs 826-830.
+  - coordinator may silently implement all five worker lanes in one session: rejected by the binding multi-agent role/ownership/independent-review contract.
 changed_paths:
   - docs/agents/tasks/active/OTC-20260901-vision-p2-coordinator.md
-  - docs/agents/tasks/archive/OTC-20260830-local-vision-agent-supervisor-discovery.md
-  - docs/agents/tasks/archive/OTC-20260830-local-vision-agent-supervisor-foundation.md
 validation:
-  - command: GitHub Actions exact head 313415e124941cac4c07599d6d4c94acadb950a1
-    result: FAIL
-    evidence: CI success; Track A governance failure run 33517851944 job 99889308745 identified W0-AUDIT-001.
-  - command: python .github/scripts/test_track_a_agent_runtime_governance.py --changed-from 21fedc04809f0f78a1ff673edb2804a83ab5fedb --expected-branch docs/OTC-20260901-vision-p2-coordinator
+  - command: pairwise worker plus refreshed-main exact ownership scan
     result: PASS
-    evidence: TRACK_A_AGENT_RUNTIME_GOVERNANCE_PASS=true after W0-AUDIT-001 remediation.
-  - command: terminal archive byte reconstruction and mojibake scan
+    evidence: WORKER_OVERLAPS={} and MAIN_ACTIVE_EXACT_CONFLICTS=[].
+  - command: five worker PR live head and statusCheckRollup readback
     result: PASS
-    evidence: source bytes decoded strict UTF-8 from main; MOJIBAKE_MATCHES=[] after W0-AUDIT-002 remediation.
-  - command: tools/agents/checkpoint.py --require-checkpoint for coordinator and both archived tasks
+    evidence: PRs 826-830 each match final binding branch head, remain Draft/CLEAN, and exact-head required CI/governance are SUCCESS.
+  - command: worker branch local governance/checkpoint/diff validation
     result: PASS
-    evidence: all three current checkpoint records validate.
-  - command: git diff --check
-    result: PASS
-    evidence: no whitespace errors in the remediated Wave 0 lifecycle delta.
-blockers: []
-next_action: publish the Wave 0 audit remediation, run fresh exact-head governance/CI and PR-hygiene checks, then merge PR #824 only if every gate passes.
+    evidence: all five workers passed branch-bound Track A governance, checkpoint schema and git diff --check after PR binding.
+  - command: worker execution-channel discovery
+    result: BLOCKED
+    evidence: local codex not installed; no available connector/plugin provides separate Codex code-worker execution.
+blockers:
+  - separate Codex/agent worker sessions must be launched outside this coordinator session.
+next_action: dispatch the five prepared Wave 1 aliases in separate Codex/agent worker sessions against Draft PRs #826-#830; each session first validates its pre-bound task/branch/worktree/PR and then begins repository/static RED-to-GREEN TDD with runtime_access none.
 ```
 ## Planned Wave 1 ownership
 
@@ -173,3 +172,14 @@ Repository/static execution defaults to `github_hosted` with `runtime_access: no
 - `W0-AUDIT-001` — **material medium**, mandatory Track A admission fields absent from the coordinator task. Evidence: exact-head governance run `33517851944`, job `99889308745`, plus matching local RED. Impact: PR cannot satisfy Track A governance. Disposition: fixed with the canonical `runtime_access:none` admission record; local GREEN confirmed. Final verification: pending fresh exact-head CI.
 - `W0-AUDIT-002` — **material medium**, UTF-8 mojibake in the archived foundation task caused by an intermediate Windows text round-trip. Evidence: PR diff exposed changed Unicode punctuation. Impact: historical archive integrity and readability. Disposition: rebuilt both archive files from exact `main` UTF-8 bytes plus only intended lifecycle edits; `MOJIBAKE_MATCHES=[]`, both archive checkpoint validators PASS. Final verification: pending fresh exact-head CI/diff.
 - `W0-AUDIT-003` — **material medium**, duplicate `execution_class` keys in the coordinator frontmatter after admission remediation. Evidence: direct fresh task read showed both `github_coordination` and `github_hosted`. Impact: ambiguous machine-readable contract. Disposition: removed the duplicate and retained the routing-contract value `github_hosted`. Final verification: pending fresh exact-head CI/checkpoint validation.
+## Wave 1 dispatch ledger
+
+| Alias | Draft PR | Branch | Worktree | Final branch/PR head | Exact-head gates |
+|---|---:|---|---|---|---|
+| `OTC-VISION-P2-RUNTIME-ADMISSION` | #826 | `feat/OTC-20260901-vision-p2-runtime-admission` | `C:/Users/barte/otclient-vision-p2-runtime-admission` | `2d2bb627965e0155e8f52210d1c8c6cab5610b53` | CI Required + Track A governance: PASS |
+| `OTC-VISION-P2-CAPTURE-EDGE` | #827 | `feat/OTC-20260901-vision-p2-capture-edge` | `C:/Users/barte/otclient-vision-p2-capture-edge` | `dd40d914fa5d05cdf5ff2957cc798ee7aa336d9b` | CI Required + Track A governance: PASS |
+| `OTC-VISION-P2-RUNTIME-SIGNALS` | #828 | `feat/OTC-20260901-vision-p2-runtime-signals` | `C:/Users/barte/otclient-vision-p2-runtime-signals` | `11fc18820cc22303d6857361eb3404f5f1844ffa` | CI Required + Track A governance: PASS |
+| `OTC-VISION-P2-EDGE-TRANSPORT` | #829 | `feat/OTC-20260901-vision-p2-edge-transport` | `C:/Users/barte/otclient-vision-p2-edge-transport` | `2ba5a90629c2b3cab3094948bfa3a1fda2b1fb0b` | CI Required + Track A governance: PASS |
+| `OTC-VISION-P2-CONTROL-BRIDGE` | #830 | `feat/OTC-20260901-vision-p2-control-bridge` | `C:/Users/barte/otclient-vision-p2-control-bridge` | `7d5ccdb80aa523c3128bef0b8e4faef4450146fe` | CI Required + Track A governance: PASS |
+
+All five tasks are `status: ready`, `agent: unclaimed`, `runtime_access: none`, and overlap-free. They are repository/GitHub dispatch-ready; the only remaining Wave 1 start dependency is creation of separate worker execution sessions.

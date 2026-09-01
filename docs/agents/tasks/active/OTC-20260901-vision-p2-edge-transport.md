@@ -9,12 +9,12 @@ project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: implementation
-phase: worker_current_main_restack_ready
+phase: worker_current_main_restack_validated
 branch: feat/OTC-20260901-vision-p2-edge-transport
 base_branch: main
-base_main: f37d2241b32de40171c0afc17bb2443593ef8c7a
+base_main: d1cb8722c3116a0e0aeb72b9b360712f43151f17
 created: 2026-09-01T16:27:39+02:00
-updated_at: 2026-09-01T22:43:34+02:00
+updated_at: 2026-09-01T22:49:31+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: isolated_worker_branch
@@ -62,15 +62,15 @@ owned_paths:
 depends_on:
   - PR #820 merged foundation
   - PR #824 merged Wave 0 coordinator cleanup
-  - current main f37d2241b32de40171c0afc17bb2443593ef8c7a after PR #841
+  - current main d1cb8722c3116a0e0aeb72b9b360712f43151f17 after the subsequent main advance
 related_prs:
   - PR #829 Wave 1 worker Draft
 current_blocker: none; prior Package A failure combined stale-base path-boundary drift with a reproducible unowned test_agent_session concurrency flake
-next_action: commit the current-main restack checkpoint, rerun owned local gates and fresh audit, force-with-lease publish PR #829, then observe exact-head CI once
+next_action: verify the remote branch lease, force-with-lease publish this current-main validated checkpoint to Draft PR #829, then obtain one fresh exact-head CI snapshot
 invocation_started_at: 2026-09-01T17:03:28+02:00
-last_progress_at: 2026-09-01T22:43:34+02:00
+last_progress_at: 2026-09-01T22:49:31+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: restack-f37d2241-local
+ci_check_generation: restack-d1cb872-local
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -144,13 +144,13 @@ runtime_access: none
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T22:43:34+02:00
-head: 9cfcf1ca5d4ac248f61225cd03df362e2ad70228
-head_semantics: current_main_restack_head_before_final_checkpoint_commit
+updated_at: 2026-09-01T22:49:31+02:00
+head: c23f404143ad092687a1b365fc836c73893b86e7
+head_semantics: current_main_d1cb872_restak_head_before_validated_checkpoint_commit
 branch: feat/OTC-20260901-vision-p2-edge-transport
 pr: 829
 status: validating
-phase: worker_current_main_restack_ready
+phase: worker_current_main_restack_validated
 context_routes:
   - phase-2-read-only-coordination
   - track-a-governance
@@ -161,13 +161,13 @@ owned_paths:
   - tools/tibia_re_control_center/agent_edge_transport.py
   - tests/tools/tibia_re_control_center/test_agent_edge_transport.py
 proven:
-  - current main advanced after the prior PR event to f37d2241b32de40171c0afc17bb2443593ef8c7a via PR #841; this branch rebased cleanly onto that exact main.
+  - current main subsequently advanced to d1cb8722c3116a0e0aeb72b9b360712f43151f17; this branch rebased cleanly onto that exact main.
   - current diff against main remains exactly the four declared owned paths with no shared Control Center integration file.
   - prior head 15bcb86626edf9a21404459ec41d44d3ea516eae fixed the task-owned recursion-test portability failure: Package B then passed fully and Package A edge-transport tests all passed.
   - Package A run 33556598887 failed its path-boundary audit because the PR event base was e8835434 while main had advanced through #841; the reported unexpected paths are now part of current main and disappear from current main...HEAD diff after restack.
   - the same Package A run also hit test_agent_session.test_concurrent_duplicate_action_executes_once; that path is unowned by this worker and Package B on the same exact head passed.
   - a local 12-run probe reproduced the unowned concurrency test as flaky: five consecutive passes followed by the same REFUSED_BUDGET_EXHAUSTED versus PERFORMED mismatch.
-  - focused edge transport passes 30/30 and protocol+transport passes 47/47 after the latest restack.
+  - focused edge transport passes 30/30, protocol+transport passes 47/47, Ruff and py_compile pass after the d1cb872 restack.
   - fresh independent temp-validator audit of edge-transport authority, endpoint, control-surface and artifact invariants reports zero findings.
   - runtime_access remains none and physical action count/budget remain 0/0; no live runtime operation occurred.
 derived:
@@ -175,7 +175,7 @@ derived:
   - the remaining observed session concurrency failure is an unrelated flaky gate in a path owned by OTC-VISION-P2-CONTROL-BRIDGE; this worker must not edit it.
   - a new exact head should be published and validated before deciding whether that external flake is an actual current blocker.
 unknown:
-  - exact-head CI outcome after publishing the f37d2241 restack.
+  - exact-head CI outcome after publishing the d1cb872 restack checkpoint.
   - whether the unowned concurrency flake will recur in the next Package A run.
   - coordinator classification after a valid exact-head run.
 conflicts: []
@@ -195,12 +195,15 @@ validation:
   - command: exact-head workflows for 15bcb86626edf9a21404459ec41d44d3ea516eae
     result: FAIL
     evidence: Package B, CI and Track A governance SUCCESS; Package A failure isolated to stale-base path audit plus one unowned concurrency flake, while every edge-transport test passed.
-  - command: git rebase origin/main at f37d2241b32de40171c0afc17bb2443593ef8c7a; git diff --name-status origin/main...HEAD
+  - command: git rebase origin/main at d1cb8722c3116a0e0aeb72b9b360712f43151f17; git diff --name-status origin/main...HEAD
     result: PASS
     evidence: clean rebase and exactly four owned changed paths.
   - command: focused edge transport and protocol+transport suites after restack
     result: PASS
     evidence: 30/30 and 47/47.
+  - command: python -m unittest tests.tools.tibia_re_control_center.test_agent_edge_transport; python -m unittest tests.tools.tibia_re_control_center.test_agent_protocol tests.tools.tibia_re_control_center.test_agent_edge_transport; python -m ruff check tools/tibia_re_control_center/agent_edge_transport.py tests/tools/tibia_re_control_center/test_agent_edge_transport.py; python -m py_compile tools/tibia_re_control_center/agent_edge_transport.py tests/tools/tibia_re_control_center/test_agent_edge_transport.py; git diff --check origin/main...HEAD
+    result: PASS
+    evidence: 30/30 focused, 47/47 protocol+transport, Ruff, py_compile and diff whitespace checks passed after the d1cb872 restack.
   - command: repeated unowned test_agent_session concurrent-duplicate probe
     result: FAIL
     evidence: five passes then same CI failure signature, establishing external flakiness; no worker-owned edit made.
@@ -208,5 +211,5 @@ validation:
     result: PASS
     evidence: EDGE_TRANSPORT_FRESH_AUDIT_FINDINGS=0.
 blockers: []
-next_action: commit the current-main restack checkpoint, rerun owned local gates and fresh audit, force-with-lease publish PR #829, then observe exact-head CI once.
+next_action: verify the remote branch lease, force-with-lease publish this current-main validated checkpoint to Draft PR #829, then obtain one fresh exact-head CI snapshot.
 ```

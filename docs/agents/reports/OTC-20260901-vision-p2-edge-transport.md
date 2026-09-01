@@ -137,3 +137,9 @@ While the repaired exact-head workflows were running, `main` advanced from `e883
 The same Package A run showed one additional failure in the pre-existing unowned `test_agent_session.test_concurrent_duplicate_action_executes_once`; Package B on the same head passed. A local repeated probe reproduced that test as flaky (five passes followed by the same `REFUSED_BUDGET_EXHAUSTED` versus `PERFORMED` mismatch). `test_agent_session.py` is outside this worker's ownership and belongs to the Control Bridge lane, so no out-of-scope repair was attempted.
 
 After the latest restack, focused edge transport remains `30/30 PASS`, protocol+transport remains `47/47 PASS`, the diff is still limited to the four declared paths, and the fresh independent edge-transport validator reports zero findings. A new exact-head hosted run will determine whether the external concurrency flake remains a live gate.
+
+## Current-main revalidation after subsequent main advance
+
+`main` advanced again to `d1cb8722c3116a0e0aeb72b9b360712f43151f17`. The worker branch was cleanly restacked onto that exact trusted base; `origin/main...HEAD` still names exactly the four declared worker-owned paths. Fresh local validation on the restacked tree passed: focused edge transport `30/30`, protocol plus edge transport `47/47`, Ruff, `py_compile`, and `git diff --check`.
+
+No runtime access or physical action occurred. The required next evidence is a fresh exact-head hosted CI snapshot after the Draft PR branch is safely force-with-lease published.

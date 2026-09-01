@@ -15,7 +15,7 @@ branch: docs/OTC-20260901-codex-model-effort-benchmark-closeout
 base_branch: main
 base_sha: e883543403d5430d7b1d287f59043b23c98f37d6
 created: 2026-09-01T22:22:39+02:00
-updated_at: 2026-09-01T22:39:31+02:00
+updated_at: 2026-09-01T22:41:44+02:00
 risk: low
 execution_class: local_owner_pc
 execution_mode: remote_desktop_plus_github
@@ -58,7 +58,7 @@ blocks: []
 cross_repository_task_ids: []
 related_pr: 841
 implementation_pr: 841
-archive_pr: null
+archive_pr: 842
 implementation_final_head: d88f2af201d74c73312180452fe7a288f8214abb
 implementation_merge: f37d2241b32de40171c0afc17bb2443593ef8c7a
 merged_at: 2026-09-01T20:38:59Z
@@ -79,10 +79,10 @@ e2e:
   reason: documentation/evidence-only benchmark persistence; no executable, UI, runtime, network, or product behavior changed
 pull_requests:
   implementation: 841
-  archive: null
+  archive: 842
   unresolved_review_threads: 0
 invocation_started_at: 2026-09-01T22:22:39+02:00
-last_progress_at: 2026-09-01T22:39:31+02:00
+last_progress_at: 2026-09-01T22:41:44+02:00
 ci_checks_for_current_head: 2
 ci_check_generation: final-green-d88f2af201d7
 terminal_ci_wait_started_at: null
@@ -97,7 +97,7 @@ audit_evidence: deterministic raw-log-to-JSON and report-to-JSON crosschecks; 7/
 e2e_result: NOT_APPLICABLE
 e2e_reason: documentation/evidence-only benchmark persistence; no executable, UI, runtime, network, or product behavior changed
 current_blocker: none
-next_action: publish and merge the lifecycle-only archive PR, then no follow-up is required
+next_action: validate and squash-merge lifecycle-only archive PR #842; after merge no follow-up is required
 ---
 
 # Codex model x reasoning-effort benchmark persistence
@@ -119,11 +119,11 @@ Acceptance:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T22:39:31+02:00
-head: f37d2241b32de40171c0afc17bb2443593ef8c7a
-head_semantics: merged_implementation_main_before_archive_commit
+updated_at: 2026-09-01T22:41:44+02:00
+head: 32c75a5f3cd6893a3f8dc75a1f892a86b79b00ff
+head_semantics: archive_metadata_commit_before_pr_binding
 branch: docs/OTC-20260901-codex-model-effort-benchmark-closeout
-pr: 841
+pr: 842
 status: completed
 context_routes:
   - agent-governance
@@ -176,5 +176,5 @@ validation:
     result: PASS
     evidence: REPORT_JSON_CROSSCHECK=PASS.
 blockers: []
-next_action: publish and merge the lifecycle-only archive PR, then no follow-up is required
+next_action: validate and squash-merge lifecycle-only archive PR #842; after merge no follow-up is required
 ```

@@ -87,6 +87,8 @@ The pre-restack repair publication produced Package B `33560269278`, CI `3356026
 
 The restacked implementation generation is green: Package A `33560626122`, Package B `33560626062`, CI `33560626315`, and Track A governance `33560626049`. The final durable checkpoint commit awaits its own exact-head aggregate before coordinator handoff.
 
+`main` then advanced again. The worker cleanly restacked on `main@103fa3071ee4d82d7dff934034e2442c32bd3a81`; the current triple-dot diff is only the four declared worker paths, and the complete local validation set passes again. Fresh hosted validation is required on this final-main restack.
+
 ## Fresh resumed-worker validation
 
 The previously dirty worker slice was independently revalidated before local commit. A stale test expected Python JSON recursion failure at depth 1100; on the current interpreter that depth parses successfully. Empirical tracing showed 1500+ triggers `RecursionError`; the test now uses depth 2000 and verifies the existing production catch maps it to `EDGE_FRAME_INVALID`. Production code did not require a fix.

@@ -12,9 +12,9 @@ task_kind: integration_repair
 phase: prepared_waiting_for_codex
 branch: feat/OTC-20260901-vision-p2-trusted-composition-repair
 base_branch: main
-base_main: 103fa3071ee4d82d7dff934034e2442c32bd3a81
+base_main: 89fbc39753d48b1391d6f4a7e2a3e967c74a8c79
 created: 2026-09-01T23:28:41+02:00
-updated_at: 2026-09-01T23:35:34+02:00
+updated_at: 2026-09-01T23:37:23+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: isolated_worker_branch
@@ -81,7 +81,7 @@ related_prs:
 current_blocker: CODEX_SPARK_QUOTA_EXHAUSTED_UNTIL_2026-09-02T04:15+02:00_AND_PR_829_RETURN_FOR_REPAIR
 next_action: after Spark quota reset, integrate exact accepted source slices into this isolated branch, keep runtime access none, and implement the trusted composition root without reintroducing caller-mintable authority
 invocation_started_at: null
-last_progress_at: 2026-09-01T23:35:34+02:00
+last_progress_at: 2026-09-01T23:37:23+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: scaffold-only
 terminal_ci_wait_started_at: null
@@ -118,9 +118,9 @@ This is a coordinator-assigned bounded repair task, not a new conceptual program
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T23:35:34+02:00
-head: dda2df589a448d0d9c9d0fe4871ab074a4433c6d
-head_semantics: metadata_repair_commit_before_source_freeze_checkpoint
+updated_at: 2026-09-01T23:37:23+02:00
+head: 3fe68f094a0a343e6160604a7fd8c48891b22e6d
+head_semantics: source_freeze_scaffold_rebased_to_merged_coordinator_main_before_checkpoint_commit
 branch: feat/OTC-20260901-vision-p2-trusted-composition-repair
 pr: 846
 status: blocked

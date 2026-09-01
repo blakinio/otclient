@@ -370,6 +370,7 @@ class EdgeTransportVerifier:
             else validate_opaque_id(expected_connection_id, field_name="expected_connection_id")
         )
         self._last_sequence = checked_non_negative(last_accepted_sequence, maximum=MAX_SAFE_INTEGER, field_name="last_accepted_sequence")
+        self._state_lock = threading.RLock()
         self.max_age_ms = checked_non_negative(max_age_ms, maximum=MAX_SAFE_INTEGER, field_name="max_age_ms")
         self.max_future_skew_ms = checked_non_negative(max_future_skew_ms, maximum=MAX_SAFE_INTEGER, field_name="max_future_skew_ms")
 
@@ -386,13 +387,14 @@ class EdgeTransportVerifier:
 
     def bind_connection(self, connection_id: str) -> None:
         connection_id = validate_opaque_id(connection_id, field_name="connection_id")
-        if self._connection_id == connection_id:
-            raise ValidationError(
-                "EDGE_CONNECTION_REUSE_REJECTED",
-                "reusing a connection id cannot reset the replay window",
-            )
-        self._connection_id = connection_id
-        self._last_sequence = 0
+        with self._state_lock:
+            if self._connection_id == connection_id:
+                raise ValidationError(
+                    "EDGE_CONNECTION_REUSE_REJECTED",
+                    "reusing a connection id cannot reset the replay window",
+                )
+            self._connection_id = connection_id
+            self._last_sequence = 0
 
     def verify(self, packet: bytes, *, now_epoch_ms: int) -> VerifiedEdgeFrame:
         if not isinstance(packet, bytes):
@@ -437,8 +439,6 @@ class EdgeTransportVerifier:
         if not hmac.compare_digest(tag, expected):
             raise ValidationError("EDGE_AUTHENTICATION_FAILED", "edge transport authentication failed")
         sequence = checked_non_negative(decoded["sequence"], maximum=MAX_SAFE_INTEGER, field_name="sequence")
-        if sequence <= self._last_sequence:
-            raise ValidationError("EDGE_REPLAY_REJECTED", "edge frame sequence is not newer than accepted state")
         sent_epoch_ms = checked_non_negative(decoded["sent_epoch_ms"], maximum=MAX_SAFE_INTEGER, field_name="sent_epoch_ms")
         now_epoch_ms = checked_non_negative(now_epoch_ms, maximum=MAX_SAFE_INTEGER, field_name="now_epoch_ms")
         if sent_epoch_ms > now_epoch_ms + self.max_future_skew_ms or now_epoch_ms - sent_epoch_ms > self.max_age_ms:
@@ -454,11 +454,14 @@ class EdgeTransportVerifier:
         _reject_control_surface(payload)
         ensure_no_secret_material(payload, key_path="edge.payload")
         connection_id = validate_opaque_id(decoded["connection_id"], field_name="connection_id")
-        if self._connection_id is None:
-            self._connection_id = connection_id
-        elif connection_id != self._connection_id:
-            raise ValidationError("EDGE_CONNECTION_REJECTED", "edge frame belongs to a different connection")
-        self._last_sequence = sequence
+        with self._state_lock:
+            if sequence <= self._last_sequence:
+                raise ValidationError("EDGE_REPLAY_REJECTED", "edge frame sequence is not newer than accepted state")
+            if self._connection_id is None:
+                self._connection_id = connection_id
+            elif connection_id != self._connection_id:
+                raise ValidationError("EDGE_CONNECTION_REJECTED", "edge frame belongs to a different connection")
+            self._last_sequence = sequence
         return VerifiedEdgeFrame(
             kind=kind,
             sender_peer_id=self.expected_peer_id,

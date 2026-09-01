@@ -856,6 +856,59 @@ class AgentEdgeTransportTests(unittest.TestCase):
             EdgeTransportVerifier(expected_peer_id="synology-edge", expected_peer_auth_key=EDGE_KEY).verify(jcs_dumps(unsigned).encode("utf-8"), now_epoch_ms=1_001)
         self.assertEqual("EDGE_PAYLOAD_TOO_DEEP", raised.exception.code)
 
+    def test_concurrent_duplicate_receive_advances_replay_window_once(self):
+        import threading
+
+        import tools.tibia_re_control_center.agent_edge_transport as transport
+        from tools.tibia_re_control_center.agent_edge_transport import (
+            EdgeFrameKind,
+            EdgeTransportSigner,
+            EdgeTransportVerifier,
+        )
+        from tools.tibia_re_control_center.model import ValidationError
+
+        signer = EdgeTransportSigner(local_peer_id="synology-edge", local_auth_key=EDGE_KEY)
+        packet = signer.seal(
+            kind=EdgeFrameKind.OBSERVATION,
+            connection_id="concurrent-replay",
+            sequence=1,
+            sent_epoch_ms=1_000,
+            payload={"value": "ok"},
+        )
+        verifier = EdgeTransportVerifier(
+            expected_peer_id="synology-edge",
+            expected_peer_auth_key=EDGE_KEY,
+        )
+        original_snapshot = transport._snapshot_payload
+        barrier = threading.Barrier(2)
+
+        def gated_snapshot(value, *, depth=0, counter=None):
+            if depth == 0:
+                barrier.wait(timeout=2)
+            return original_snapshot(value, depth=depth, counter=counter)
+
+        transport._snapshot_payload = gated_snapshot
+        replies = []
+        try:
+            def receive_once():
+                try:
+                    replies.append(("ok", verifier.verify(packet, now_epoch_ms=1_001).sequence))
+                except ValidationError as exc:
+                    replies.append(("error", exc.code))
+
+            threads = [threading.Thread(target=receive_once) for _ in range(2)]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join(timeout=3)
+        finally:
+            transport._snapshot_payload = original_snapshot
+
+        self.assertEqual(2, len(replies))
+        self.assertEqual(1, sum(kind == "ok" for kind, _ in replies))
+        self.assertEqual(1, sum(value == "EDGE_REPLAY_REJECTED" for _, value in replies))
+        self.assertEqual(1, verifier.last_accepted_sequence)
+
     def test_receiver_converts_json_recursion_failure_to_validation_error(self):
         from tools.tibia_re_control_center.model import ValidationError
 

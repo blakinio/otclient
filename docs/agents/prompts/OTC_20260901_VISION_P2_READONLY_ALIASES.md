@@ -1,7 +1,7 @@
 # OTC Vision P2 Read-Only — Owner Alias Registry
 
 ```yaml
-alias_registry_version: 1.2.0
+alias_registry_version: 1.3.0
 programme_id: OTC-VISION-P2-READONLY
 repository: blakinio/otclient
 canonical_prompt_family: docs/agents/prompts/OTC_20260901_VISION_P2_READONLY_MULTIAGENT.md
@@ -16,9 +16,9 @@ Run the coordinator first:
 Uruchom OTC-VISION-P2-COORDINATOR autonomicznie.
 ```
 
-The coordinator must refresh live state, create/reconcile concrete worker tasks/branches/ownership and prepare Wave 1. When coordinator-managed Codex execution is available, it also selects and invokes the subordinate workers itself. Do not manually invent worker branches, select worker models/effort, or duplicate tasks when the coordinator can resolve and dispatch them.
+The coordinator refreshes live state, owns worker selection and invokes subordinate workers itself. The owner should normally provide only the coordinator/programme goal; routine worker model/effort choice is coordinator work.
 
-For the five Wave 1 aliases supported by the owner-PC bounded bridge, use that bridge as the mandatory normal execution path while it is available. Direct `codex exec` is not a convenience fallback. Real dispatch requires a fresh verified GitHub snapshot and bounded role profile. CI/status/restack/checkpoint-only work remains coordinator work, and worker quota exhaustion never authorizes automatic provider/Spark spillover.
+For supported Wave 1 aliases the coordinator uses the bounded bridge. Mechanical dispatch safeguards belong to the bridge; GitHub/CI/status/restack lifecycle remains coordinator work.
 
 ## Wave 1 — up to five workers
 
@@ -70,20 +70,11 @@ Kontynuuj OTC-VISION-P2-COORDINATOR autonomicznie.
 
 The canonical prompt requires the outgoing worker to persist a coherent task checkpoint, branch/head/Draft PR, validation evidence and exactly one `next_action` after every meaningful subtask and before unsafe context/effort/tool exhaustion. The replacement worker resumes the existing task; it must not recreate completed discovery or open a duplicate task/PR.
 
-## Recommended agent and effort
+## Worker routing
 
-| Alias | Primary agent/mode | Reasoning effort | Why |
-|---|---|---:|---|
-| `OTC-VISION-P2-COORDINATOR` | Chat/GitHub supervising coordinator; invokes subordinate Codex workers for execution/audit and uses its own checkout only when coordinator-owned edits require it | **xhigh coordinator reasoning; worker model/effort dynamic** | cross-lane dependencies, authority, dispatch, acceptance and final integration |
-| `OTC-VISION-P2-RUNTIME-ADMISSION` | Codex | **xhigh** | live target identity/governance mistakes have high downstream blast radius |
-| `OTC-VISION-P2-CAPTURE-EDGE` | Codex | **high** | bounded implementation with secret-safe capture/integrity constraints |
-| `OTC-VISION-P2-RUNTIME-SIGNALS` | Codex | **xhigh** | provenance/freshness/semantic-authority discrimination is subtle and safety-critical |
-| `OTC-VISION-P2-EDGE-TRANSPORT` | Codex | **high** | bounded transport/security implementation, no runtime semantics authority |
-| `OTC-VISION-P2-CONTROL-BRIDGE` | Codex | **high** | existing Control Center integration with durable failure/restart semantics |
-| `OTC-VISION-P2-VISION-RECONCILIATION` | Codex | **xhigh** | combines untrusted model evidence with authoritative runtime evidence |
-| `OTC-VISION-P2-E2E-AUDIT` | **fresh Codex validator** | **xhigh** | must actively falsify the exact integration result with independent context |
+The coordinator selects the smallest sufficient worker model/effort from `docs/agents/EXECUTION_PROTOCOL.md` using the live task's risk and evidence. Historical per-alias effort labels are not dispatch commands and are intentionally omitted here so the owner and coordinator do not micromanage routing from this registry.
 
-Worker effort values in this table are historical risk recommendations, not mandatory fixed dispatch settings. A coordinator-managed Codex dispatch follows `EXECUTION_PROTOCOL.md` and its empirical calibration, selecting the smallest sufficient model/effort for the live task. If a manually selected client exposes only `low/medium/high`, use **high** where a manual fallback explicitly requires `xhigh`.
+Manual worker commands remain fallback/resume entry points; they do not change the coordinator-first operating model.
 
 ## Spark note
 

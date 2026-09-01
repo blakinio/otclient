@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260901-vision-p2-capture-edge
-status: ready
+status: validating
 agent: ChatGPT
 session_role: phase2_worker
 worker_alias: OTC-VISION-P2-CAPTURE-EDGE
@@ -9,12 +9,12 @@ project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: implementation
-phase: worker_repair_ready_for_coordinator
+phase: worker_second_repair_validating
 branch: feat/OTC-20260901-vision-p2-capture-edge
 base_branch: main
-base_main: 54a20bbd8721e92d069974af14d6ebd2f4f5a55d
+base_main: fb0c489f2ed166e872c4f197c6a78375a8576685
 created: 2026-09-01T16:27:39+02:00
-updated_at: 2026-09-01T18:42:06+02:00
+updated_at: 2026-09-01T20:45:55+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: isolated_worker_branch
@@ -65,17 +65,17 @@ depends_on:
   - main 0fe1ecb3569f1d8372209c857ab57f3b626c29ae
 related_prs:
   - PR #827 Wave 1 worker Draft
-current_blocker: none
-next_action: return Draft PR #827 secret-safety repair to OTC-VISION-P2-COORDINATOR for independent re-review; worker must not mark Ready-for-review or merge
+current_blocker: exact-head GitHub CI/governance pending for reviewed composition-time mask-policy repair
+next_action: publish the second secret-safety repair checkpoint, wait for exact-head CI/governance, then return Draft PR #827 to OTC-VISION-P2-COORDINATOR for independent re-review
 invocation_started_at: 2026-09-01T16:58:39+02:00
-last_progress_at: 2026-09-01T18:42:06+02:00
-ci_checks_for_current_head: 2
-ci_check_generation: repair-verified-483c6eca24ae
-terminal_ci_wait_started_at: 2026-09-01T18:40:07+02:00
-terminal_ci_checks_for_current_generation: 4
+last_progress_at: 2026-09-01T20:45:55+02:00
+ci_checks_for_current_head: 0
+ci_check_generation: second-repair-f3b149e38bc1
+terminal_ci_wait_started_at: 2026-09-01T20:45:55+02:00
+terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 1
+repair_cycles_for_current_gate: 2
 context_reconstruction_attempts: 0
 stall_warnings: 0
 runtime_nonclaims:
@@ -144,11 +144,13 @@ runtime_access: none
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T18:42:06+02:00
-head: 87dd4b914f471fd70e5e632fad69edbfce86f888
+updated_at: 2026-09-01T20:45:55+02:00
+head: f3b149e38bc1f49808295d6762522ac78e95e859
+head_semantics: implementation_commit_before_checkpoint_docs
 branch: feat/OTC-20260901-vision-p2-capture-edge
 pr: 827
-status: ready
+status: validating
+phase: worker_second_repair_validating
 context_routes:
   - phase-2-read-only-coordination
   - track-a-governance
@@ -159,51 +161,52 @@ owned_paths:
   - tools/tibia_re_vision/capture_edge.py
   - tests/tools/tibia_re_vision/test_capture_edge.py
 proven:
-  - coordinator review comment 5496909848 returned the prior generation because an empty caller policy could self-certify secret_safe without machine-checkable proof.
-  - RED test test_unproven_empty_secret_policy_fails_before_frame_capture_or_persistence failed because CaptureEdgeError was not raised before the repair.
-  - repaired CaptureEdge.capture rejects empty secret_regions with CAPTURE_SECRET_POLICY_UNPROVEN before binding/frame-source use or artifact persistence.
-  - deterministic non-empty masking remains the only accepted secret-safe path in this worker slice; masked crop/full content-addressing and runtime/geometry fences are preserved.
-  - branch was restacked conflict-free onto trusted main 54a20bbd8721e92d069974af14d6ebd2f4f5a55d; exact changed paths remain the four declared worker-owned paths.
-  - post-restack focused capture-edge suite passes 12/12 and capture-edge plus existing vision-evidence suite passes 16/16.
-  - post-restack py_compile, Track A runtime governance, git diff --check, shell=True audit and production no_secret_fields-call audit pass.
-  - exact checkpoint head 483c6eca24aeee35675c5ea6e1c0310b363be711 passed GitHub CI run 33533157584 and Track A runtime governance run 33533157282.
+  - coordinator comment 5497472188 identified the broader remaining gap: arbitrary non-empty per-call masks could still self-certify secret_safe.
+  - focused RED required ReviewedSecretMaskPolicy at trusted composition time and failed because the published module lacked that contract.
+  - ReviewedSecretMaskPolicy is immutable, binds a reviewed policy id, exact expected frame dimensions, deterministic non-empty regions and content-addressed policy_ref.
+  - CaptureEdge constructor now requires ReviewedSecretMaskPolicy; CaptureEdge.capture exposes no secret_policy parameter.
+  - frame dimensions that do not match the reviewed policy fail with CAPTURE_SECRET_POLICY_GEOMETRY_MISMATCH before RGB capture or artifact persistence.
+  - CaptureEvidence records secret_policy_ref; masking still occurs in memory before PNG persistence/crop derivation.
+  - branch was restacked conflict-free onto trusted main fb0c489f2ed166e872c4f197c6a78375a8576685, which includes promoted runtime-admission producer PR #838.
+  - post-restack focused capture-edge suite passes 14/14; capture-edge plus existing vision-evidence suite passes 18/18.
+  - post-restack py_compile, Track A runtime governance, checkpoint validation and git diff --check pass; changed paths remain exactly four worker-owned paths.
+  - public-surface audit confirms capture parameters are self, run_id, evidence_root, max_binding_age_ns, crop and previous_full_sha256; legacy SecretSafetyPolicy is absent.
 derived:
-  - the coordinator secret-safety finding is repaired in repository/static behavior and exact-head hosted verification is green.
+  - the arbitrary per-call secret-mask authority found in coordinator re-review is removed from the capture request surface.
   - no repository/static result proves real Official Tibia runtime capture behavior.
 unknown:
-  - coordinator independent re-review disposition on the repaired exact head.
+  - exact-head GitHub CI/governance result after publication of this second repair checkpoint.
+  - independent coordinator re-review disposition on the second repaired generation.
   - real admitted Linux/Synology/Kasm read-only runtime verification; not authorized in this worker checkpoint.
 conflicts: []
 first_failure:
-  marker: RED-UNPROVEN-EMPTY-SECRET-POLICY
-  evidence: focused RED expected CAPTURE_SECRET_POLICY_UNPROVEN but prior CaptureEdge.capture persisted/returned evidence instead.
+  marker: RED-REVIEWED-MASK-NOT-COMPOSITION-BOUND
+  evidence: focused test test_reviewed_secret_policy_is_bound_to_edge_not_each_capture failed because ReviewedSecretMaskPolicy did not exist.
 rejected_hypotheses:
-  - a caller-authored empty secret policy can prove a frame is secret-free: rejected by coordinator review and the repaired fail-closed contract.
-  - a new caller-authored proof token is required: rejected; this repair admits only deterministic non-empty masking in this slice.
+  - any non-empty per-call mask is sufficient proof of secret safety: rejected by coordinator re-review and removed from the public capture API.
+  - GitHub-only production patching should bypass the local RED-to-GREEN loop while the host is offline: rejected; production remained untouched until Molehill-PC returned online.
 changed_paths:
   - docs/agents/tasks/active/OTC-20260901-vision-p2-capture-edge.md
   - docs/agents/reports/OTC-20260901-vision-p2-capture-edge.md
   - tools/tibia_re_vision/capture_edge.py
   - tests/tools/tibia_re_vision/test_capture_edge.py
 validation:
-  - command: python -m unittest tests/tools/tibia_re_vision/test_capture_edge.py -q
+  - command: python -m unittest tests.tools.tibia_re_vision.test_capture_edge -q
     result: PASS
-    evidence: 12 tests, zero failures/errors after restack.
-  - command: python -m unittest tests/tools/tibia_re_vision/test_evidence.py tests/tools/tibia_re_vision/test_capture_edge.py -q
+    evidence: 14 tests, zero failures/errors after restack.
+  - command: python -m unittest tests.tools.tibia_re_vision.test_evidence tests.tools.tibia_re_vision.test_capture_edge -q
     result: PASS
-    evidence: 16 tests, zero failures/errors after restack.
-  - command: Track A runtime governance validator changed-from current trusted main
+    evidence: 18 tests, zero failures/errors after restack.
+  - command: py_compile implementation and focused tests
+    result: PASS
+    evidence: both files compile.
+  - command: Track A runtime governance changed-from fb0c489f2ed166e872c4f197c6a78375a8576685
     result: PASS
     evidence: TRACK_A_AGENT_RUNTIME_GOVERNANCE_PASS=true.
-  - command: git diff --check origin/main...HEAD plus AST/public-surface audit
+  - command: checkpoint validator and git diff --check origin/main...HEAD
     result: PASS
-    evidence: four owned paths only; shell=True=0; production no_secret_fields calls=0; unproven guard present.
-  - command: GitHub CI run 33533157584 on 483c6eca24aeee35675c5ea6e1c0310b363be711
-    result: PASS
-    evidence: workflow completed with conclusion success.
-  - command: GitHub Track A runtime governance run 33533157282 on 483c6eca24aeee35675c5ea6e1c0310b363be711
-    result: PASS
-    evidence: workflow completed with conclusion success.
-blockers: []
-next_action: return Draft PR #827 secret-safety repair to OTC-VISION-P2-COORDINATOR for independent re-review; worker must not mark Ready-for-review or merge.
+    evidence: checkpoint schema valid and no whitespace/path-boundary finding.
+blockers:
+  - exact-head GitHub CI/governance is pending after publication.
+next_action: publish this checkpoint, wait for exact-head CI/governance, then return Draft PR #827 to OTC-VISION-P2-COORDINATOR for independent re-review.
 ```

@@ -1,14 +1,14 @@
 ---
 task_id: OTC-20260819-track-a-world-minimap-static-g1
-status: validating
+status: ready
 agent: ChatGPT
 session_id: chatgpt-pr593-audit-remediation-20260901
-session_role: audit_remediator
+session_role: closeout
 project_lane: otclient
 lane: P0-STATE
 track_id: official-client-re
 task_kind: discovery
-phase: independent_audit_remediation
+phase: ready_for_merge
 execution_mode: github_only
 branch: research/OTC-20260819-track-a-world-minimap-static-g1
 base_branch: main
@@ -16,7 +16,7 @@ base_main: 54a20bbd8721e92d069974af14d6ebd2f4f5a55d
 latest_observed_main: 54a20bbd8721e92d069974af14d6ebd2f4f5a55d
 related_pr: 593
 created: 2026-08-19T13:45:00+02:00
-updated: 2026-09-01T18:45:07+02:00
+updated: 2026-09-01T19:04:34+02:00
 risk: low
 EXECUTION_CLASS: github_hosted
 RUNTIME_ACCESS: none
@@ -42,8 +42,16 @@ implementation_authorized: true
 e2e_required: false
 e2e_result: NOT_APPLICABLE
 e2e_reason: documentation-only GitHub-hosted static evidence; no executable, UI, runtime, network, or product behavior changed
-current_blocker: FRESH_INDEPENDENT_AUDIT_AFTER_REMEDIATION
-next_action: run a fresh independent audit on the remediated exact head; if zero material findings, complete exact-head CI and close out under current-main protection
+audit_result: PASS
+audit_head: 98def097c6adfbfa9ba489ee088b020a4a161481
+audit_session: 01a05deb-4381-7800-8a7b-4c18d0ca0d14
+audit_material_findings_open: 0
+audited_head_ci: PASS
+audited_head_ci_run: 33534579992
+audited_head_track_a_governance: PASS
+audited_head_track_a_run: 33534579411
+current_blocker: none
+next_action: validate this task-only closeout head, update PR #593 metadata, mark it ready, and squash-merge only if final CI, review hygiene, and current-main freshness remain green
 policy_version: 2
 context_pressure: medium
 context_growth: stable
@@ -264,9 +272,9 @@ recovery:
   generation: 5
   session_id: chatgpt-pr593-audit-remediation-20260901
   session_started_at: 2026-09-01T18:45:07+02:00
-  checkpointed_at: 2026-09-01T18:45:07+02:00
-  last_progress_at: 2026-09-01T18:45:07+02:00
-  phase: independent_audit_remediation
+  checkpointed_at: 2026-09-01T19:04:34+02:00
+  last_progress_at: 2026-09-01T19:04:34+02:00
+  phase: ready_for_merge
   exact_head: ae07a3da386d3d9d021cee04d072065405b3008e
   pull_request: 593
   active_operation: none
@@ -274,17 +282,17 @@ recovery:
   rerun_job_ids: [99940034906, 99940062914]
   check_generation: post-audit-remediation
   checks_used: 0
-  status: validating
+  status: ready
   safe_to_resume: true
-  resume_condition: remediated exact head remains three-path only and a fresh independent auditor is available
-  next_action: run a fresh independent audit on the remediated exact head; if zero material findings, run exact-head CI/governance, refresh protected main, then close out under repository policy
+  resume_condition: final task-only closeout head remains three-path only and final CI/review hygiene/current-main freshness are green
+  next_action: validate the task-only closeout head, refresh protected main and PR hygiene, then squash-merge PR #593 if every gate remains green
 ```
 
 ## Invocation counters
 
 ```yaml
 invocation_started_at: 2026-08-19T13:45:00+02:00
-last_progress_at: 2026-09-01T18:45:07+02:00
+last_progress_at: 2026-09-01T19:04:34+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: blocker-checkpoint
 terminal_ci_wait_started_at: null
@@ -300,11 +308,11 @@ stall_warnings: 0
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T18:51:48+02:00
+updated_at: 2026-09-01T19:04:34+02:00
 head: ae07a3da386d3d9d021cee04d072065405b3008e
 branch: research/OTC-20260819-track-a-world-minimap-static-g1
 pr: 593
-status: validating
+status: ready
 context_routes:
   - official-client-re
   - world-minimap-static-g1
@@ -319,6 +327,8 @@ proven:
   - Exact historical producer reruns 99940034906 and 99940062914 failed closed at the historical package fence before analysis; v1 observed packed SHA 439db64ead9b62aa0870094fa0ce30e8e0ccaf35844de1a515692770a7019036.
   - Both remediation reruns removed temporary client bytes and reported RAW_CLIENT_RETAINED=false.
   - Current trusted Track A repository fence is 15.32.75d4a0 / 52105824 / d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a; historical G1 addresses and formulas are not promoted to it.
+  - Fresh independent Luna/medium re-audit session 01a05deb-4381-7800-8a7b-4c18d0ca0d14 returned AUDIT_PASS with zero material findings on 98def097c6adfbfa9ba489ee088b020a4a161481.
+  - Exact audited head CI run 33534579992 and Track A governance run 33534579411 both passed.
 derived:
   - Safe closeout is an authority downgrade that preserves historical hypotheses, not a current-build semantic promotion.
 unknown:
@@ -341,7 +351,6 @@ validation:
   - command: python tools/agents/checkpoint.py docs/agents/tasks/active/OTC-20260819-track-a-world-minimap-static-g1.md --require-checkpoint
     result: PASS
     evidence: Fresh checkpoint validation passed after the mandatory Context checkpoint was added.
-blockers:
-  - FRESH_INDEPENDENT_AUDIT_AFTER_REMEDIATION
-next_action: run a fresh independent audit on the remediated exact head; if zero material findings, run exact-head CI/governance, refresh protected main, then close out under repository policy
+blockers: []
+next_action: validate the task-only closeout head, refresh protected main and PR hygiene, then squash-merge PR #593 if every gate remains green
 ```

@@ -43,3 +43,8 @@ No Linux/Synology/Kasm execution of the backend has been performed or claimed. R
 ## Exact-head GitHub verification
 
 Earlier generations passed their own CI/governance but were superseded by coordinator secret-safety findings. Exact checkpoint head `1f550b658ca6f17c02f4aeec80fd01cc212122b5` passed GitHub CI run `33545702287` and Track A agent runtime governance run `33545701984`. The worker slice is returned to the coordinator for independent re-review; no live runtime claim or worker self-promotion is made.
+## Current-main revalidation after runtime-signals promotion
+
+After PR #839 merged, the accepted capture-edge branch was restacked conflict-free onto main@e883543403d5430d7b1d287f59043b23c98f37d6. The promoted runtime-signals change touched none of this worker's four owned paths. Fresh post-restack validation on implementation/history head e1a5f2c5bedc3e89fc252d439eb2355a22bb362 passed: focused capture-edge **14/14**, capture-edge plus existing vision evidence **18/18**, targeted py_compile, Track A runtime governance, checkpoint validation and git diff --check. Public API audit still shows no per-call secret_policy, no legacy SecretSafetyPolicy, ReviewedSecretMaskPolicy present, and shell=True count zero.
+
+This is repository/static evidence only. No Official Tibia/Synology/Kasm live capture or observation is claimed. The current-main checkpoint will be published once; exact-head hosted CI/governance must pass before coordinator promotion.

@@ -213,3 +213,28 @@ validation:
 blockers: []
 next_action: verify the remote branch lease, force-with-lease publish this current-main validated checkpoint to Draft PR #829, then obtain one fresh exact-head CI snapshot.
 ```
+
+## Recovery checkpoint
+
+```yaml
+recovery:
+  policy_version: 1
+  generation: 1
+  session_id: 2026-09-01T22:49:31+02:00
+  session_started_at: 2026-09-01T22:43:34+02:00
+  checkpointed_at: 2026-09-01T22:49:31+02:00
+  last_progress_at: 2026-09-01T22:49:31+02:00
+  phase: publish-current-main-restack
+  exact_head: c23f404143ad092687a1b365fc836c73893b86e7
+  pull_request: 829
+  active_operation: scoped force-with-lease publication
+  external_run_ids: []
+  operation_started_at: null
+  wait_deadline_at: null
+  check_generation: restack-d1cb872
+  checks_used: 0
+  status: active
+  safe_to_resume: true
+  resume_condition: origin branch remains fd84ad1d0b2dec127b4bcf00f43361e6fa72681f
+  next_action: commit this checkpoint, force-with-lease publish the rebased branch, then inspect the aggregate PR check snapshot once.
+```

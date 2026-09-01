@@ -9,12 +9,12 @@ project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: implementation
-phase: worker_second_repair_ready_for_coordinator
+phase: worker_current_main_revalidation_ready_for_coordinator
 branch: feat/OTC-20260901-vision-p2-capture-edge
 base_branch: main
-base_main: fb0c489f2ed166e872c4f197c6a78375a8576685
+base_main: e883543403d5430d7b1d287f59043b23c98f37d6
 created: 2026-09-01T16:27:39+02:00
-updated_at: 2026-09-01T20:51:35+02:00
+updated_at: 2026-09-01T22:29:51+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: isolated_worker_branch
@@ -66,11 +66,11 @@ depends_on:
 related_prs:
   - PR #827 Wave 1 worker Draft
 current_blocker: none
-next_action: return exact-head-green Draft PR #827 to OTC-VISION-P2-COORDINATOR for independent re-review; worker must not self-promote or merge
+next_action: publish current-main-restacked Draft PR #827, require exact-head hosted CI/governance, then return to OTC-VISION-P2-COORDINATOR for promotion; worker must not self-promote or merge
 invocation_started_at: 2026-09-01T16:58:39+02:00
-last_progress_at: 2026-09-01T20:51:35+02:00
-ci_checks_for_current_head: 2
-ci_check_generation: second-repair-green-1f550b658ca6
+last_progress_at: 2026-09-01T22:29:51+02:00
+ci_checks_for_current_head: 0
+ci_check_generation: current-main-revalidation-pending
 terminal_ci_wait_started_at: 2026-09-01T20:47:34+02:00
 terminal_ci_checks_for_current_generation: 2
 unchanged_state_checks: 0
@@ -144,13 +144,13 @@ runtime_access: none
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T20:51:35+02:00
-head: f3b149e38bc1f49808295d6762522ac78e95e859
+updated_at: 2026-09-01T22:29:51+02:00
+head: be1a5f2c5bedc3e89fc252d439eb2355a22bb362
 head_semantics: implementation_commit_before_checkpoint_docs
 branch: feat/OTC-20260901-vision-p2-capture-edge
 pr: 827
 status: ready
-phase: worker_second_repair_ready_for_coordinator
+phase: worker_current_main_revalidation_ready_for_coordinator
 context_routes:
   - phase-2-read-only-coordination
   - track-a-governance
@@ -167,7 +167,7 @@ proven:
   - CaptureEdge constructor now requires ReviewedSecretMaskPolicy; CaptureEdge.capture exposes no secret_policy parameter.
   - frame dimensions that do not match the reviewed policy fail with CAPTURE_SECRET_POLICY_GEOMETRY_MISMATCH before RGB capture or artifact persistence.
   - CaptureEvidence records secret_policy_ref; masking still occurs in memory before PNG persistence/crop derivation.
-  - branch was restacked conflict-free onto trusted main fb0c489f2ed166e872c4f197c6a78375a8576685, which includes promoted runtime-admission producer PR #838.
+  - branch was restacked conflict-free onto trusted main e883543403d5430d7b1d287f59043b23c98f37d6, which includes promoted runtime-admission producer PR #838.
   - post-restack focused capture-edge suite passes 14/14; capture-edge plus existing vision-evidence suite passes 18/18.
   - post-restack py_compile, Track A runtime governance, checkpoint validation and git diff --check pass; changed paths remain exactly four worker-owned paths.
   - public-surface audit confirms capture parameters are self, run_id, evidence_root, max_binding_age_ns, crop and previous_full_sha256; legacy SecretSafetyPolicy is absent.
@@ -207,5 +207,5 @@ validation:
     result: PASS
     evidence: checkpoint schema valid and no whitespace/path-boundary finding.
 blockers: []
-next_action: return exact-head-green Draft PR #827 to OTC-VISION-P2-COORDINATOR for independent re-review; worker must not self-promote or merge.
+next_action: publish current-main-restacked Draft PR #827, require exact-head hosted CI/governance, then return to OTC-VISION-P2-COORDINATOR for promotion; worker must not self-promote or merge.
 ```

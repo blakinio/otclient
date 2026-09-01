@@ -14,6 +14,8 @@ from .agent_runtime_admission import (
     admit_read_only_runtime,
 )
 from .agent_runtime_signals import (
+    ReviewedRuntimeSignalContract,
+    ReviewedRuntimeSignalRule,
     RuntimeSignalBinding,
     RuntimeSignalEvidence,
     RuntimeSignalResolver,
@@ -152,6 +154,139 @@ class _RuntimeAuthority:
     resolver: RuntimeSignalResolver
 
 
+@dataclass(frozen=True)
+class ReviewedRuntimeAuthorityConfiguration:
+    """Composition-root allowlist for one reviewed runtime-signal configuration.
+
+    This is deliberately supplied when the coordinator is composed, rather than
+    by a task or edge request.  A task may request read-only access, but it may
+    not nominate the causal rules that make runtime evidence authoritative.
+    """
+
+    reviewed_contracts: tuple[ReviewedRuntimeSignalContract, ...]
+    clock_domain_id: str
+    max_age_ns: int
+
+
+@dataclass(frozen=True)
+class _IssuedRuntimeAuthority:
+    """Registry-owned opaque receipt for one authority bind."""
+
+    admission: ReadOnlyRuntimeAdmission
+    resolver: RuntimeSignalResolver
+    signal_binding: RuntimeSignalBinding
+    session_id: str
+    run_id: str
+    task_id: str
+    expected_client_version: str
+    expected_client_size: int | str
+    expected_client_sha256: str
+
+
+def _contract_signature(
+    contracts: tuple[ReviewedRuntimeSignalContract, ...],
+) -> tuple[tuple[str, str, tuple[tuple[str, str, str], ...]], ...] | None:
+    if type(contracts) is not tuple or not contracts:
+        return None
+    signature: list[tuple[str, str, tuple[tuple[str, str, str], ...]]] = []
+    for contract in contracts:
+        if type(contract) is not ReviewedRuntimeSignalContract or type(contract.rules) is not tuple:
+            return None
+        rules: list[tuple[str, str, str]] = []
+        for rule in contract.rules:
+            if type(rule) is not ReviewedRuntimeSignalRule:
+                return None
+            rules.append((rule.source_state, rule.runtime_state, rule.evidence_class.value))
+        signature.append((contract.producer_id, contract.contract_id, tuple(rules)))
+    return tuple(sorted(signature))
+
+
+class _RuntimeAuthorityRegistry:
+    """Issue one-shot authority receipts from the trusted composition root."""
+
+    def __init__(self, configuration: ReviewedRuntimeAuthorityConfiguration | None) -> None:
+        self._configuration = configuration
+        self._issued: dict[int, _IssuedRuntimeAuthority] = {}
+        self._configuration_signature = (
+            None
+            if configuration is None
+            else _contract_signature(configuration.reviewed_contracts)
+        )
+
+    def issue(
+        self,
+        *,
+        admission: ReadOnlyRuntimeAdmission,
+        resolver: RuntimeSignalResolver,
+        binding: RuntimeSignalBinding,
+        session_id: str,
+        run_id: str,
+        task_id: str,
+        expected_client_version: str,
+        expected_client_size: int | str,
+        expected_client_sha256: str,
+        now_epoch_ms: int,
+        max_age_ms: int,
+    ) -> _IssuedRuntimeAuthority:
+        configuration = self._configuration
+        if (
+            configuration is None
+            or self._configuration_signature is None
+            or type(resolver) is not RuntimeSignalResolver
+            or resolver._clock_domain_id != configuration.clock_domain_id
+            or resolver._max_age_ns != configuration.max_age_ns
+            or _contract_signature(tuple(resolver._contracts.values()))
+            != self._configuration_signature
+            or resolver._current_binding != binding
+        ):
+            raise ValidationError(
+                "EDGE_RUNTIME_COMPOSITION_MISMATCH",
+                "runtime authority does not use the composition-owned reviewed resolver configuration",
+            )
+        canonical = _validated_admission(
+            admission,
+            now_epoch_ms=_epoch(now_epoch_ms, "now_epoch_ms"),
+            max_age_ms=_epoch(max_age_ms, "max_age_ms"),
+        )
+        if (
+            binding.session_id != session_id
+            or binding.run_id != run_id
+            or canonical.task_id != task_id
+            or canonical.runtime_owner_task != task_id
+            or binding.runtime_id != canonical.runtime_namespace
+            or binding.runtime_binding_sha256 != canonical.runtime_binding_sha256
+            or canonical.process.get("client_version") != expected_client_version
+            or canonical.process.get("client_size") != expected_client_size
+            or canonical.process.get("client_sha256") != expected_client_sha256
+        ):
+            raise ValidationError(
+                "EDGE_RUNTIME_COMPOSITION_MISMATCH",
+                "runtime authority receipt does not bind the trusted task/run/runtime/client identity",
+            )
+        receipt = _IssuedRuntimeAuthority(
+            canonical,
+            resolver,
+            binding,
+            session_id,
+            run_id,
+            task_id,
+            expected_client_version,
+            expected_client_size,
+            expected_client_sha256,
+        )
+        self._issued[id(receipt)] = receipt
+        return receipt
+
+    def consume(self, receipt: Any) -> _IssuedRuntimeAuthority:
+        issued = self._issued.pop(id(receipt), None)
+        if type(receipt) is not _IssuedRuntimeAuthority or issued is not receipt:
+            raise ValidationError(
+                "EDGE_RUNTIME_AUTHORITY_REQUIRED",
+                "only a one-shot authority receipt issued by the trusted composition is accepted",
+            )
+        return issued
+
+
 def _require_signal_binding(value: Any) -> RuntimeSignalBinding:
     if type(value) is not RuntimeSignalBinding:
         raise ValidationError(
@@ -226,12 +361,47 @@ def _validated_admission(
 class AgentEdgeBridge:
     """Track live edge identity and trusted read-only runtime authority."""
 
-    def __init__(self, *, heartbeat_timeout_ms: int = 15_000) -> None:
+    def __init__(
+        self,
+        *,
+        heartbeat_timeout_ms: int = 15_000,
+        runtime_authority_configuration: ReviewedRuntimeAuthorityConfiguration | None = None,
+    ) -> None:
         if type(heartbeat_timeout_ms) is not int or heartbeat_timeout_ms < 1 or heartbeat_timeout_ms > 300_000:
             raise ValueError("heartbeat_timeout_ms must be between 1 and 300000")
         self.heartbeat_timeout_ms = heartbeat_timeout_ms
         self._live_instances: dict[str, str] = {}
         self._runtime_authorities: dict[str, _RuntimeAuthority] = {}
+        self._authority_registry = _RuntimeAuthorityRegistry(runtime_authority_configuration)
+
+    def _issue_trusted_runtime_authority(
+        self,
+        *,
+        admission: ReadOnlyRuntimeAdmission,
+        runtime_signal_resolver: RuntimeSignalResolver,
+        runtime_signal_binding: RuntimeSignalBinding,
+        session_id: str,
+        run_id: str,
+        task_id: str,
+        expected_client_version: str,
+        expected_client_size: int | str,
+        expected_client_sha256: str,
+        now_epoch_ms: int,
+    ) -> _IssuedRuntimeAuthority:
+        """Private composition-root capability; never an edge/task request API."""
+        return self._authority_registry.issue(
+            admission=admission,
+            resolver=runtime_signal_resolver,
+            binding=_require_signal_binding(runtime_signal_binding),
+            session_id=session_id,
+            run_id=run_id,
+            task_id=task_id,
+            expected_client_version=expected_client_version,
+            expected_client_size=expected_client_size,
+            expected_client_sha256=expected_client_sha256,
+            now_epoch_ms=now_epoch_ms,
+            max_age_ms=self.heartbeat_timeout_ms,
+        )
 
     def bind_runtime_authority(
         self,
@@ -242,11 +412,25 @@ class AgentEdgeBridge:
         expected_client_version: str,
         expected_client_size: int | str,
         expected_client_sha256: str,
-        admission: ReadOnlyRuntimeAdmission,
-        runtime_signal_resolver: RuntimeSignalResolver,
-        runtime_signal_binding: RuntimeSignalBinding,
+        authority: Any,
         now_epoch_ms: int,
     ) -> tuple[ReadOnlyRuntimeAdmission, RuntimeSignalBinding]:
+        issued = self._authority_registry.consume(authority)
+        admission = issued.admission
+        runtime_signal_resolver = issued.resolver
+        runtime_signal_binding = issued.signal_binding
+        if (
+            issued.session_id != session_id
+            or issued.run_id != run_id
+            or issued.task_id != task_id
+            or issued.expected_client_version != expected_client_version
+            or issued.expected_client_size != expected_client_size
+            or issued.expected_client_sha256 != expected_client_sha256
+        ):
+            raise ValidationError(
+                "EDGE_RUNTIME_ADMISSION_BINDING_MISMATCH",
+                "runtime authority receipt cannot be substituted for another task/run/runtime/client identity",
+            )
         canonical = _validated_admission(
             admission,
             now_epoch_ms=_epoch(now_epoch_ms, "now_epoch_ms"),
@@ -300,6 +484,7 @@ class AgentEdgeBridge:
         task_id: str | None,
         current_run_id: str | None,
         runtime_access: str,
+        task_deadline_epoch_ms: int | None,
         now_epoch_ms: int,
     ) -> dict[str, object]:
         authority = self._runtime_authorities.get(session_id)
@@ -307,6 +492,12 @@ class AgentEdgeBridge:
             return {"bound": authority is not None, "current": False, "reason": "RUNTIME_NOT_ADMITTED"}
         if authority is None:
             return {"bound": False, "current": False, "reason": "RUNTIME_ADMISSION_REQUIRED"}
+        if (
+            type(task_deadline_epoch_ms) is not int
+            or task_deadline_epoch_ms < 0
+            or _epoch(now_epoch_ms, "now_epoch_ms") >= task_deadline_epoch_ms
+        ):
+            return {"bound": True, "current": False, "reason": "EDGE_TASK_DEADLINE_EXPIRED"}
         if task_id is None or authority.admission.task_id != task_id or authority.admission.runtime_owner_task != task_id:
             return {"bound": True, "current": False, "reason": "RUNTIME_ADMISSION_BINDING_STALE"}
         if current_run_id is None or authority.signal_binding.run_id != current_run_id:
@@ -345,6 +536,7 @@ class AgentEdgeBridge:
         task_id: str | None,
         current_run_id: str | None,
         runtime_access: str,
+        task_deadline_epoch_ms: int | None,
         now_epoch_ms: int,
     ) -> bool:
         return self._authority_status(
@@ -352,6 +544,7 @@ class AgentEdgeBridge:
             task_id=task_id,
             current_run_id=current_run_id,
             runtime_access=runtime_access,
+            task_deadline_epoch_ms=task_deadline_epoch_ms,
             now_epoch_ms=now_epoch_ms,
         ).get("current") is True
 
@@ -386,6 +579,7 @@ class AgentEdgeBridge:
         session_id: str,
         run_id: str,
         task_id: str,
+        task_deadline_epoch_ms: int,
         evidence: RuntimeSignalEvidence,
         now_epoch_ms: int,
     ) -> dict[str, object]:
@@ -394,6 +588,7 @@ class AgentEdgeBridge:
             task_id=task_id,
             current_run_id=run_id,
             runtime_access="read_only",
+            task_deadline_epoch_ms=task_deadline_epoch_ms,
             now_epoch_ms=now_epoch_ms,
         )
         if authority_status.get("current") is not True:
@@ -586,6 +781,7 @@ class AgentEdgeBridge:
         task_id: str | None,
         current_run_id: str | None,
         runtime_access: str,
+        task_deadline_epoch_ms: int | None,
         heartbeat_epoch_ms: int | None,
         events: Sequence[Mapping[str, Any]],
         now_epoch_ms: int,
@@ -595,6 +791,7 @@ class AgentEdgeBridge:
             task_id=task_id,
             current_run_id=current_run_id,
             runtime_access=runtime_access,
+            task_deadline_epoch_ms=task_deadline_epoch_ms,
             now_epoch_ms=now_epoch_ms,
         )
         latest = self._latest_event(events, "EDGE_OBSERVATION")
@@ -678,4 +875,5 @@ __all__ = [
     "AgentEdgeBridge",
     "EdgeCaptureObservation",
     "EdgeObservation",
+    "ReviewedRuntimeAuthorityConfiguration",
 ]

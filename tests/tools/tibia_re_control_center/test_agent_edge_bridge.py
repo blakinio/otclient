@@ -5,6 +5,9 @@ from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
+from tools.tibia_re_control_center.agent_edge_bridge import (
+    ReviewedRuntimeAuthorityConfiguration,
+)
 from tools.tibia_re_control_center.agent_protocol import (
     ClientIdentity,
     NamedAgentAction,
@@ -35,8 +38,8 @@ from tools.tibia_re_control_center.model import ValidationError
 from tools.tibia_re_control_center.persistent_store import SQLitePersistentStore
 
 
-def _signal_resolver(binding: RuntimeSignalBinding) -> RuntimeSignalResolver:
-    contract = ReviewedRuntimeSignalContract(
+def _reviewed_contract() -> ReviewedRuntimeSignalContract:
+    return ReviewedRuntimeSignalContract(
         producer_id="fixture-causal-producer",
         contract_id="fixture-causal-v1",
         rules=(
@@ -47,13 +50,25 @@ def _signal_resolver(binding: RuntimeSignalBinding) -> RuntimeSignalResolver:
             ),
         ),
     )
+
+
+def _signal_resolver(binding: RuntimeSignalBinding) -> RuntimeSignalResolver:
     return RuntimeSignalResolver(
         current_binding=binding,
-        reviewed_contracts=(contract,),
+        reviewed_contracts=(_reviewed_contract(),),
         monotonic_ns=lambda: 1_000,
         max_age_ns=100,
         clock_domain_id="clock:control-center",
     )
+
+
+def _authority_configuration() -> ReviewedRuntimeAuthorityConfiguration:
+    return ReviewedRuntimeAuthorityConfiguration(
+        reviewed_contracts=(_reviewed_contract(),),
+        clock_domain_id="clock:control-center",
+        max_age_ns=100,
+    )
+
 
 def _admission_observation(now_ms: int) -> dict[str, object]:
     return {
@@ -136,7 +151,11 @@ class AgentEdgeBridgeTests(unittest.TestCase):
             self.clock,
             backend_epoch="edge-test",
         )
-        self.agent = AgentSessionCoordinator(self.store, self.control)
+        self.agent = AgentSessionCoordinator(
+            self.store,
+            self.control,
+            runtime_authority_configuration=_authority_configuration(),
+        )
         self.now_ms = 1_000_000
         self.agent._now_epoch_ms = lambda: self.now_ms
 
@@ -159,13 +178,30 @@ class AgentEdgeBridgeTests(unittest.TestCase):
             runtime_binding_sha256=admission.runtime_binding_sha256,
         )
         resolver = _signal_resolver(binding)
-        self.agent.bind_read_only_runtime(
+        authority = self.agent._issue_read_only_runtime_authority(
             "session-edge-1",
             admission,
             runtime_signal_resolver=resolver,
             runtime_signal_binding=binding,
         )
+        self.agent.bind_read_only_runtime(
+            "session-edge-1",
+            authority,
+        )
         return admission, resolver, binding
+
+    def _issue_authority(
+        self,
+        admission: ReadOnlyRuntimeAdmission,
+        resolver: RuntimeSignalResolver,
+        binding: RuntimeSignalBinding,
+    ) -> object:
+        return self.agent._issue_read_only_runtime_authority(
+            "session-edge-1",
+            admission,
+            runtime_signal_resolver=resolver,
+            runtime_signal_binding=binding,
+        )
 
     def _reviewed_signal(
         self,
@@ -202,6 +238,94 @@ class AgentEdgeBridgeTests(unittest.TestCase):
         self.assertEqual("NONE", snapshot["official_client_access"] )
         self.assertFalse(snapshot["edge"]["runtime"]["current"] )
         self.assertEqual(0, snapshot["physical_action_count"] )
+
+    def test_preconnect_caller_minted_authority_is_rejected_before_any_live_edge_exists(self) -> None:
+        self.agent.submit_task(read_only_task())
+        admission = admit_read_only_runtime(
+            _admission_observation(self.now_ms), now_epoch_ms=self.now_ms, max_age_ms=15_000
+        )
+        binding = RuntimeSignalBinding(
+            session_id="session-edge-1",
+            run_id="run-edge-1",
+            runtime_id=admission.runtime_namespace,
+            runtime_instance_id="runtime-instance-caller-minted",
+            runtime_binding_sha256=admission.runtime_binding_sha256,
+        )
+        with self.assertRaises(ValidationError) as caller_minted:
+            self.agent.bind_read_only_runtime(
+                "session-edge-1",
+                admission,
+                runtime_signal_resolver=_signal_resolver(binding),
+                runtime_signal_binding=binding,
+            )
+        self.assertEqual("EDGE_RUNTIME_AUTHORITY_REQUIRED", caller_minted.exception.code)
+        self.assertEqual("NONE", self.agent.snapshot("session-edge-1")["official_client_access"])
+
+    def test_composition_rejects_exact_resolver_with_unapproved_causal_contract(self) -> None:
+        self.agent.submit_task(read_only_task())
+        admission = admit_read_only_runtime(
+            _admission_observation(self.now_ms), now_epoch_ms=self.now_ms, max_age_ms=15_000
+        )
+        binding = RuntimeSignalBinding(
+            session_id="session-edge-1",
+            run_id="run-edge-1",
+            runtime_id=admission.runtime_namespace,
+            runtime_instance_id="runtime-instance-unapproved",
+            runtime_binding_sha256=admission.runtime_binding_sha256,
+        )
+        unapproved = RuntimeSignalResolver(
+            current_binding=binding,
+            reviewed_contracts=(
+                ReviewedRuntimeSignalContract(
+                    producer_id="caller-causal-producer",
+                    contract_id="caller-causal-v1",
+                    rules=(ReviewedRuntimeSignalRule(
+                        source_state="CALLER_ASSERTED_IN_GAME",
+                        runtime_state="IN_GAME",
+                        evidence_class=RuntimeEvidenceClass.REVIEWED_CAUSAL,
+                    ),),
+                ),
+            ),
+            monotonic_ns=lambda: 1_000,
+            max_age_ns=100,
+            clock_domain_id="clock:control-center",
+        )
+        with self.assertRaises(ValidationError) as rejected:
+            self._issue_authority(admission, unapproved, binding)
+        self.assertEqual("EDGE_RUNTIME_COMPOSITION_MISMATCH", rejected.exception.code)
+        self.assertEqual("NONE", self.agent.snapshot("session-edge-1")["official_client_access"])
+
+    def test_expired_task_cannot_bind_ingest_or_remain_runtime_current(self) -> None:
+        expiring_task = replace(read_only_task(), deadline_epoch_ms=self.now_ms + 1)
+        self.agent.submit_task(expiring_task)
+        _admission, resolver, binding = self._admit_and_bind()
+        self.agent.ingest_edge_observation(self._edge_update())
+        evidence = self._reviewed_signal(resolver, binding)
+
+        self.now_ms += 1
+        expired_snapshot = self.agent.snapshot("session-edge-1")
+        self.assertEqual("NONE", expired_snapshot["official_client_access"])
+        self.assertFalse(expired_snapshot["edge"]["current"])
+        self.assertEqual("EDGE_TASK_DEADLINE_EXPIRED", expired_snapshot["edge"]["reason"])
+
+        with self.assertRaises(ValidationError) as signal_rejected:
+            self.agent.ingest_runtime_signal("session-edge-1", evidence)
+        self.assertEqual("EDGE_TASK_DEADLINE_EXPIRED", signal_rejected.exception.code)
+        with self.assertRaises(ValidationError) as edge_rejected:
+            self.agent.ingest_edge_observation(self._edge_update(observed_epoch_ms=self.now_ms))
+        self.assertEqual("EDGE_TASK_DEADLINE_EXPIRED", edge_rejected.exception.code)
+
+        fresh_admission = admit_read_only_runtime(
+            _admission_observation(self.now_ms), now_epoch_ms=self.now_ms, max_age_ms=15_000
+        )
+        fresh_binding = replace(
+            binding,
+            runtime_instance_id="runtime-instance-expired-bind",
+            runtime_binding_sha256=fresh_admission.runtime_binding_sha256,
+        )
+        with self.assertRaises(ValidationError) as bind_rejected:
+            self._issue_authority(fresh_admission, _signal_resolver(fresh_binding), fresh_binding)
+        self.assertEqual("EDGE_TASK_DEADLINE_EXPIRED", bind_rejected.exception.code)
 
     def test_valid_admission_and_reviewed_signal_are_required_for_semantic_runtime(self) -> None:
         self.agent.submit_task(read_only_task())
@@ -295,7 +419,11 @@ class AgentEdgeBridgeTests(unittest.TestCase):
             self.clock,
             backend_epoch="edge-restart",
         )
-        self.agent = AgentSessionCoordinator(self.store, self.control)
+        self.agent = AgentSessionCoordinator(
+            self.store,
+            self.control,
+            runtime_authority_configuration=_authority_configuration(),
+        )
         self.agent._now_epoch_ms = lambda: self.now_ms
 
     def test_heartbeat_loss_degrades_operational_state_and_stales_edge_evidence(self) -> None:
@@ -497,11 +625,9 @@ class AgentEdgeBridgeTests(unittest.TestCase):
         with self.assertRaises(ValidationError) as mismatch:
             self.agent.bind_read_only_runtime(
                 "session-edge-1",
-                admission,
-                runtime_signal_resolver=_signal_resolver(binding),
-                runtime_signal_binding=binding,
+                self._issue_authority(admission, _signal_resolver(binding), binding),
             )
-        self.assertEqual("EDGE_RUNTIME_CLIENT_IDENTITY_MISMATCH", mismatch.exception.code)
+        self.assertEqual("EDGE_RUNTIME_COMPOSITION_MISMATCH", mismatch.exception.code)
         self.assertEqual("NONE", self.agent.snapshot("session-edge-1")["official_client_access"])
 
     def test_stale_or_forged_admission_fails_closed_without_current_access(self) -> None:
@@ -522,9 +648,7 @@ class AgentEdgeBridgeTests(unittest.TestCase):
         with self.assertRaises(ValidationError) as forged_error:
             self.agent.bind_read_only_runtime(
                 "session-edge-1",
-                forged,
-                runtime_signal_resolver=_signal_resolver(forged_binding),
-                runtime_signal_binding=forged_binding,
+                self._issue_authority(forged, _signal_resolver(forged_binding), forged_binding),
             )
         self.assertEqual("EDGE_RUNTIME_ADMISSION_INVALID", forged_error.exception.code)
 
@@ -537,9 +661,7 @@ class AgentEdgeBridgeTests(unittest.TestCase):
         with self.assertRaises(ValidationError) as stale_error:
             self.agent.bind_read_only_runtime(
                 "session-edge-1",
-                admission,
-                runtime_signal_resolver=_signal_resolver(stale_binding),
-                runtime_signal_binding=stale_binding,
+                self._issue_authority(admission, _signal_resolver(stale_binding), stale_binding),
             )
         self.assertEqual("EDGE_RUNTIME_ADMISSION_STALE", stale_error.exception.code)
         snapshot = self.agent.snapshot("session-edge-1")
@@ -631,19 +753,16 @@ class AgentEdgeBridgeTests(unittest.TestCase):
             runtime_binding_sha256=binding.runtime_binding_sha256,
         )
         with self.assertRaises(ValidationError) as untyped_binding:
-            self.agent.bind_read_only_runtime(
-                "session-edge-1",
+            self._issue_authority(
                 admission,
-                runtime_signal_resolver=resolver,
-                runtime_signal_binding=duck_binding,
+                resolver,
+                duck_binding,
             )
         self.assertEqual("EDGE_RUNTIME_SIGNAL_BINDING_INVALID", untyped_binding.exception.code)
 
         self.agent.bind_read_only_runtime(
             "session-edge-1",
-            admission,
-            runtime_signal_resolver=resolver,
-            runtime_signal_binding=binding,
+            self._issue_authority(admission, resolver, binding),
         )
         self.agent.ingest_edge_observation(self._edge_update())
         evidence = self._reviewed_signal(resolver, binding)
@@ -674,7 +793,7 @@ class AgentEdgeBridgeTests(unittest.TestCase):
                 runtime_signal_resolver=_signal_resolver(binding),
                 runtime_signal_binding=binding,
             )
-        self.assertEqual("EDGE_RUNTIME_ADMISSION_BINDING_MISMATCH", swapped.exception.code)
+        self.assertEqual("EDGE_RUNTIME_AUTHORITY_REQUIRED", swapped.exception.code)
 
         missing_provenance = replace(
             self._reviewed_signal(resolver, binding),

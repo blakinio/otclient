@@ -10,7 +10,7 @@ from dataclasses import asdict, dataclass, replace
 from enum import Enum
 from typing import Any, Protocol
 
-from .agent_edge_bridge import AgentEdgeBridge
+from .agent_edge_bridge import AgentEdgeBridge, ReviewedRuntimeAuthorityConfiguration
 from .agent_protocol import (
     AgentEvent,
     AgentOperationalState,
@@ -353,6 +353,7 @@ class AgentSessionCoordinator:
         executor: BoundedActionExecutor | None = None,
         *,
         guarded_executor: GuardedMutationActionExecutor | None = None,
+        runtime_authority_configuration: ReviewedRuntimeAuthorityConfiguration | None = None,
     ) -> None:
         self.store = store
         self.control = control
@@ -366,7 +367,7 @@ class AgentSessionCoordinator:
                 "guarded executor must be the exact MutationCoordinator-backed facade for this control domain",
             )
         self.guarded_executor = guarded_executor
-        self.edge = AgentEdgeBridge()
+        self.edge = AgentEdgeBridge(runtime_authority_configuration=runtime_authority_configuration)
         self._lock = threading.RLock()
         self._sessions: dict[str, AgentSessionRecord] = {}
         self._tasks: dict[str, TaskEnvelope] = {}
@@ -837,15 +838,49 @@ class AgentSessionCoordinator:
                 "result": _jsonable(accepted["result"]),
             }
 
-    def bind_read_only_runtime(
+    def _issue_read_only_runtime_authority(
         self,
         session_id: str,
         admission: ReadOnlyRuntimeAdmission,
         *,
         runtime_signal_resolver: RuntimeSignalResolver,
         runtime_signal_binding: RuntimeSignalBinding,
+    ) -> object:
+        """Compose a one-shot authority receipt from the trusted application root.
+
+        This private method is intentionally not exposed through task, edge,
+        API, MCP, or transport input.  Those callers can consume a receipt but
+        cannot select an admission validator or runtime-signal contract.
+        """
+        session = self.ensure_session(session_id)
+        task = self._tasks.get(session_id)
+        if task is None or task.runtime_access != "read_only":
+            raise ValidationError("EDGE_RUNTIME_NOT_ADMITTED", "read-only authority requires an accepted read-only task")
+        if session.current_run_id != task.run_id:
+            raise ValidationError("EDGE_BINDING_MISMATCH", "read-only authority requires the active task run")
+        now = self._now_epoch_ms()
+        if now >= task.deadline_epoch_ms:
+            raise ValidationError("EDGE_TASK_DEADLINE_EXPIRED", "expired task cannot issue read-only runtime authority")
+        return self.edge._issue_trusted_runtime_authority(
+            admission=admission,
+            runtime_signal_resolver=runtime_signal_resolver,
+            runtime_signal_binding=runtime_signal_binding,
+            session_id=session_id,
+            run_id=task.run_id,
+            task_id=task.task_id,
+            expected_client_version=task.client_identity.version,
+            expected_client_size=task.client_identity.size,
+            expected_client_sha256=task.client_identity.sha256,
+            now_epoch_ms=now,
+        )
+
+    def bind_read_only_runtime(
+        self,
+        session_id: str,
+        authority: object,
+        **legacy_components: object,
     ) -> dict[str, object]:
-        """Bind one current typed admission and reviewed runtime-signal resolver."""
+        """Consume one composition-issued read-only runtime authority receipt."""
         with self._lock:
             session = self.ensure_session(session_id)
             task = self._tasks.get(session_id)
@@ -853,7 +888,15 @@ class AgentSessionCoordinator:
                 raise ValidationError("EDGE_RUNTIME_NOT_ADMITTED", "read-only runtime binding requires an accepted read-only task")
             if session.current_run_id != task.run_id:
                 raise ValidationError("EDGE_BINDING_MISMATCH", "read-only runtime binding requires the active task run")
+            if legacy_components:
+                raise ValidationError(
+                    "EDGE_RUNTIME_AUTHORITY_REQUIRED",
+                    "caller-supplied admission and resolver components are not a trusted authority receipt",
+                )
             now = self._now_epoch_ms()
+            if now >= task.deadline_epoch_ms:
+                self.edge.disconnect(session_id)
+                raise ValidationError("EDGE_TASK_DEADLINE_EXPIRED", "expired task cannot bind read-only runtime authority")
             canonical, signal_binding = self.edge.bind_runtime_authority(
                 session_id=session_id,
                 run_id=task.run_id,
@@ -861,9 +904,7 @@ class AgentSessionCoordinator:
                 expected_client_version=task.client_identity.version,
                 expected_client_size=task.client_identity.size,
                 expected_client_sha256=task.client_identity.sha256,
-                admission=admission,
-                runtime_signal_resolver=runtime_signal_resolver,
-                runtime_signal_binding=runtime_signal_binding,
+                authority=authority,
                 now_epoch_ms=now,
             )
             events = self._events_for(session_id)
@@ -900,12 +941,17 @@ class AgentSessionCoordinator:
                 raise ValidationError("EDGE_RUNTIME_NOT_ADMITTED", "runtime signal requires an accepted read-only task")
             if session.current_run_id != task.run_id:
                 raise ValidationError("EDGE_BINDING_MISMATCH", "runtime signal requires the active task run")
+            now = self._now_epoch_ms()
+            if now >= task.deadline_epoch_ms:
+                self.edge.disconnect(session_id)
+                raise ValidationError("EDGE_TASK_DEADLINE_EXPIRED", "expired task cannot ingest runtime signals")
             payload = self.edge.accept_runtime_signal(
                 session_id=session_id,
                 run_id=task.run_id,
                 task_id=task.task_id,
+                task_deadline_epoch_ms=task.deadline_epoch_ms,
                 evidence=evidence,
-                now_epoch_ms=self._now_epoch_ms(),
+                now_epoch_ms=now,
             )
             refs_value = payload.get("evidence_refs")
             refs = tuple(refs_value) if isinstance(refs_value, list) else ()
@@ -946,6 +992,9 @@ class AgentSessionCoordinator:
                 and type(payload.get("observed_epoch_ms")) is int
             ), None)
             now = self._now_epoch_ms()
+            if now >= task.deadline_epoch_ms:
+                self.edge.disconnect(session_id)
+                raise ValidationError("EDGE_TASK_DEADLINE_EXPIRED", "expired task cannot ingest edge observations")
             observation = self.edge.accept(
                 value,
                 now_epoch_ms=now,
@@ -959,6 +1008,7 @@ class AgentSessionCoordinator:
                 task_id=task.task_id,
                 current_run_id=task.run_id,
                 runtime_access=task.runtime_access,
+                task_deadline_epoch_ms=task.deadline_epoch_ms,
                 now_epoch_ms=now,
             )
             target_state = session.operational_state
@@ -1032,6 +1082,7 @@ class AgentSessionCoordinator:
             task_id=None if task is None else task.task_id,
             current_run_id=session.current_run_id,
             runtime_access="none" if task is None else task.runtime_access,
+            task_deadline_epoch_ms=None if task is None else task.deadline_epoch_ms,
             heartbeat_epoch_ms=session.heartbeat_epoch_ms,
             events=events,
             now_epoch_ms=self._now_epoch_ms(),
@@ -1046,7 +1097,12 @@ class AgentSessionCoordinator:
         if task is None or task.runtime_access != "read_only" or session.heartbeat_epoch_ms is None:
             return session
         status = self._edge_status(session, task, events)
-        if status.get("reason") not in {"HEARTBEAT_STALE", "EVIDENCE_STALE", "EDGE_RUNTIME_ADMISSION_STALE"}:
+        if status.get("reason") not in {
+            "HEARTBEAT_STALE",
+            "EVIDENCE_STALE",
+            "EDGE_RUNTIME_ADMISSION_STALE",
+            "EDGE_TASK_DEADLINE_EXPIRED",
+        }:
             return session
         if session.operational_state in {
             AgentOperationalState.DEGRADED,

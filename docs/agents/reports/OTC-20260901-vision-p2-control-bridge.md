@@ -101,3 +101,33 @@ The repaired implementation/checkpoint head `274955658f08c8631d24511be1646a9ec16
 - repository CI `33554082565`: SUCCESS with `CI / Required` PASS, Lua syntax PASS, workflow/syntax checks PASS, and informational static analysis PASS.
 
 PR hygiene at the handoff point: exactly 8 expected changed paths, 0 submitted reviews, 0 review threads. The worker repair is therefore repository/static producer-complete and returns to `OTC-VISION-P2-COORDINATOR` for independent classification. No live runtime observation or physical action was performed.
+
+## Coordinator review 5500323278 remediation — pending exact-head validation
+
+The prior completion classification is superseded by the coordinator's exact-head
+`RETURN_FOR_REPAIR`. The bridge now consumes only a one-shot receipt issued by
+its composition-owned runtime-authority registry. The receipt seals the current
+admission, reviewed resolver contract/configuration, session/run/runtime binding,
+and task client identity. Task/edge callers cannot bind caller-supplied admission
+or resolver components, including before an edge is connected.
+
+The runtime paths now also fail closed at `TaskEnvelope.deadline_epoch_ms`:
+binding, runtime-signal ingestion, edge-observation ingestion and status/currentness
+all refuse or report no read-only authority after expiry. The repair keeps the
+production executor `NULL`, mutation `NONE`, and physical action budget/count
+`0/0`; no runtime was accessed.
+
+Focused RED-to-GREEN evidence on the working repair tree:
+
+- `test_agent_edge_bridge`: 20 PASS, including caller-minted admission,
+  unapproved exact-class causal resolver, pre-connect substitution and task-expiry
+  negatives;
+- Windows full relevant `test_agent*.py`: 263 executed with the established five
+  unrelated baseline errors (four loopback `WinError 10054`, one vision
+  `MODEL_INFERENCE_FAILED`);
+- WSL/Linux-compatible full relevant `test_agent*.py`: 263 PASS, 1 skipped;
+- `compileall`, focused Ruff and `git diff --check`: PASS.
+
+Fresh exact-head audit, Package A/Package B/Track A and CI remain pending after
+the repair commit is published. The Draft PR remains coordinator-owned for
+classification; this worker will not merge or promote it.

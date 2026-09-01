@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260901-vision-p2-control-bridge
-status: ready
+status: validating
 agent: chatgpt-gpt-5.6-sol
 session_role: phase2_worker
 worker_alias: OTC-VISION-P2-CONTROL-BRIDGE
@@ -12,9 +12,9 @@ task_kind: implementation
 phase: validate
 branch: feat/OTC-20260901-vision-p2-control-bridge
 base_branch: main
-base_main: e883543403d5430d7b1d287f59043b23c98f37d6
+base_main: d1cb8722c3116a0e0aeb72b9b360712f43151f17
 created: 2026-09-01T16:27:39+02:00
-updated_at: 2026-09-01T22:16:27+02:00
+updated_at: 2026-09-01T23:04:01+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: isolated_worker_branch
@@ -75,10 +75,10 @@ depends_on:
   - main e883543403d5430d7b1d287f59043b23c98f37d6
 related_prs:
   - PR #830 Wave 1 worker Draft
-current_blocker: none
-next_action: OTC-VISION-P2-COORDINATOR independently reclassify repaired Draft PR #830 against the exact-head green evidence and current live integration state
+current_blocker: exact-head coordinator review 5500323278 returned two material authority/lifetime findings for repair
+next_action: run the full relevant hosted-equivalent suite after focused RED-to-GREEN authority and lifetime repair
 invocation_started_at: 2026-09-01T16:49:00+02:00
-last_progress_at: 2026-09-01T22:16:27+02:00
+last_progress_at: 2026-09-01T23:04:01+02:00
 ci_checks_for_current_head: 4
 ci_check_generation: exact-head-green-274955658
 terminal_ci_wait_started_at: null
@@ -263,4 +263,29 @@ validation:
     evidence: Track A governance 33554082006 SUCCESS; Package A 33554082232 SUCCESS; Package B 33554082117 SUCCESS including full regression and real-browser E2E; CI 33554082565 SUCCESS with CI / Required PASS.
 blockers: []
 next_action: OTC-VISION-P2-COORDINATOR independently reclassify repaired Draft PR #830 against exact-head green evidence and current live integration state.
+```
+
+## Recovery checkpoint
+
+```yaml
+recovery:
+  policy_version: 1
+  generation: 1
+  session_id: control-bridge-repair-20260901T230401+0200
+  session_started_at: 2026-09-01T22:16:27+02:00
+  checkpointed_at: 2026-09-01T23:04:01+02:00
+  last_progress_at: 2026-09-01T23:04:01+02:00
+  phase: validating
+  exact_head: working-tree-on-5e615ee27c50edb827bc2bdd4a718f6dbc052706
+  pull_request: 830
+  active_operation: repair commit and deterministic safety audit
+  external_run_ids: []
+  operation_started_at: null
+  wait_deadline_at: null
+  check_generation: repair-pending-local-audit
+  checks_used: 0
+  status: active
+  safe_to_resume: true
+  resume_condition: repair commit is published and deterministic safety audits have completed
+  next_action: commit and push the bounded authority/lifetime repair, then run Package A, Package B and Track A validation
 ```

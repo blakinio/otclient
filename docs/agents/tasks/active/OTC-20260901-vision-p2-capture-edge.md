@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260901-vision-p2-capture-edge
-status: validating
+status: ready
 agent: ChatGPT
 session_role: phase2_worker
 worker_alias: OTC-VISION-P2-CAPTURE-EDGE
@@ -9,12 +9,12 @@ project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: implementation
-phase: worker_second_repair_validating
+phase: worker_second_repair_ready_for_coordinator
 branch: feat/OTC-20260901-vision-p2-capture-edge
 base_branch: main
 base_main: fb0c489f2ed166e872c4f197c6a78375a8576685
 created: 2026-09-01T16:27:39+02:00
-updated_at: 2026-09-01T20:45:55+02:00
+updated_at: 2026-09-01T20:51:35+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: isolated_worker_branch
@@ -65,14 +65,14 @@ depends_on:
   - main 0fe1ecb3569f1d8372209c857ab57f3b626c29ae
 related_prs:
   - PR #827 Wave 1 worker Draft
-current_blocker: exact-head GitHub CI/governance pending for reviewed composition-time mask-policy repair
-next_action: publish the second secret-safety repair checkpoint, wait for exact-head CI/governance, then return Draft PR #827 to OTC-VISION-P2-COORDINATOR for independent re-review
+current_blocker: none
+next_action: return exact-head-green Draft PR #827 to OTC-VISION-P2-COORDINATOR for independent re-review; worker must not self-promote or merge
 invocation_started_at: 2026-09-01T16:58:39+02:00
-last_progress_at: 2026-09-01T20:45:55+02:00
-ci_checks_for_current_head: 0
-ci_check_generation: second-repair-f3b149e38bc1
-terminal_ci_wait_started_at: 2026-09-01T20:45:55+02:00
-terminal_ci_checks_for_current_generation: 0
+last_progress_at: 2026-09-01T20:51:35+02:00
+ci_checks_for_current_head: 2
+ci_check_generation: second-repair-green-1f550b658ca6
+terminal_ci_wait_started_at: 2026-09-01T20:47:34+02:00
+terminal_ci_checks_for_current_generation: 2
 unchanged_state_checks: 0
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 2
@@ -144,13 +144,13 @@ runtime_access: none
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T20:45:55+02:00
+updated_at: 2026-09-01T20:51:35+02:00
 head: f3b149e38bc1f49808295d6762522ac78e95e859
 head_semantics: implementation_commit_before_checkpoint_docs
 branch: feat/OTC-20260901-vision-p2-capture-edge
 pr: 827
-status: validating
-phase: worker_second_repair_validating
+status: ready
+phase: worker_second_repair_ready_for_coordinator
 context_routes:
   - phase-2-read-only-coordination
   - track-a-governance
@@ -171,11 +171,11 @@ proven:
   - post-restack focused capture-edge suite passes 14/14; capture-edge plus existing vision-evidence suite passes 18/18.
   - post-restack py_compile, Track A runtime governance, checkpoint validation and git diff --check pass; changed paths remain exactly four worker-owned paths.
   - public-surface audit confirms capture parameters are self, run_id, evidence_root, max_binding_age_ns, crop and previous_full_sha256; legacy SecretSafetyPolicy is absent.
+  - exact checkpoint head 1f550b658ca6f17c02f4aeec80fd01cc212122b5 passed GitHub CI run 33545702287 and Track A governance run 33545701984.
 derived:
   - the arbitrary per-call secret-mask authority found in coordinator re-review is removed from the capture request surface.
   - no repository/static result proves real Official Tibia runtime capture behavior.
 unknown:
-  - exact-head GitHub CI/governance result after publication of this second repair checkpoint.
   - independent coordinator re-review disposition on the second repaired generation.
   - real admitted Linux/Synology/Kasm read-only runtime verification; not authorized in this worker checkpoint.
 conflicts: []
@@ -206,7 +206,6 @@ validation:
   - command: checkpoint validator and git diff --check origin/main...HEAD
     result: PASS
     evidence: checkpoint schema valid and no whitespace/path-boundary finding.
-blockers:
-  - exact-head GitHub CI/governance is pending after publication.
-next_action: publish this checkpoint, wait for exact-head CI/governance, then return Draft PR #827 to OTC-VISION-P2-COORDINATOR for independent re-review.
+blockers: []
+next_action: return exact-head-green Draft PR #827 to OTC-VISION-P2-COORDINATOR for independent re-review; worker must not self-promote or merge.
 ```

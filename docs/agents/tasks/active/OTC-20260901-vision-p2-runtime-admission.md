@@ -1,7 +1,7 @@
 ---
 task_id: OTC-20260901-vision-p2-runtime-admission
-status: ready
-agent: unclaimed
+status: waiting
+agent: ChatGPT
 session_role: phase2_worker
 worker_alias: OTC-VISION-P2-RUNTIME-ADMISSION
 programme_id: OTC-VISION-P2-READONLY
@@ -9,12 +9,12 @@ project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: implementation
-phase: dispatch_ready
+phase: waiting_runtime_observation
 branch: feat/OTC-20260901-vision-p2-runtime-admission
 base_branch: main
-base_main: 0fe1ecb3569f1d8372209c857ab57f3b626c29ae
+base_main: ca1a71b5852f6e00ba144ed183af470555c51f56
 created: 2026-09-01T16:27:39+02:00
-updated_at: 2026-09-01T16:31:41+02:00
+updated_at: 2026-09-01T17:35:16+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: isolated_worker_branch
@@ -62,13 +62,13 @@ owned_paths:
 depends_on:
   - PR #820 merged foundation
   - PR #824 merged Wave 0 coordinator cleanup
-  - main 0fe1ecb3569f1d8372209c857ab57f3b626c29ae
+  - main ca1a71b5852f6e00ba144ed183af470555c51f56
 related_prs:
   - PR #826 Wave 1 worker Draft
-current_blocker: none
-next_action: launch OTC-VISION-P2-RUNTIME-ADMISSION in its isolated worker session, verify Draft PR #826 still matches this branch/worktree/ownership, read binding contracts, then write the first RED focused test at tests/tools/tibia_re_control_center/test_agent_runtime_admission.py with runtime_access none
-invocation_started_at: null
-last_progress_at: 2026-09-01T16:31:41+02:00
+current_blocker: coordinator-assigned serialized read-only observation window not granted; live runtime remains unauthorized
+next_action: coordinator assigns one serialized read-only observation window; then freshly prove locator, inventory, exact process fence and X11 ownership through admit_read_only_runtime without mutation
+invocation_started_at: 2026-09-01T16:47:00+02:00
+last_progress_at: 2026-09-01T17:35:16+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: pr-bound-bootstrap
 terminal_ci_wait_started_at: null
@@ -142,13 +142,20 @@ runtime_access: none
 
 ## Context checkpoint
 
+
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T16:31:41+02:00
-head: 751eda3b7bc0d790e35971f99f7c37b2d2520627
+updated_at: 2026-09-01T17:35:16+02:00
+head: 9d8233528bcf2dd1c4e214d2aee3a8677d3a07ad
+head_semantics: implementation_commit_before_checkpoint_docs
 branch: feat/OTC-20260901-vision-p2-runtime-admission
 pr: 826
-status: ready
+status: waiting
+phase: waiting_runtime_observation
+runtime_access: none
+mutation_authorized: false
+physical_action_budget: 0
+physical_action_count: 0
 context_routes:
   - phase-2-read-only-coordination
   - track-a-governance
@@ -159,35 +166,53 @@ owned_paths:
   - tools/tibia_re_control_center/agent_runtime_admission.py
   - tests/tools/tibia_re_control_center/test_agent_runtime_admission.py
 proven:
-  - branch and isolated worktree were created by the coordinator from exact main 0fe1ecb3569f1d8372209c857ab57f3b626c29ae.
-  - Draft PR 826 exists for this exact worker branch and was opened from bootstrap head 751eda3b7bc0d790e35971f99f7c37b2d2520627.
-  - PR 820 and PR 824 are merged prerequisites.
-  - coordinator pairwise and refreshed-main ownership scans found no overlap for this worker ownership set.
-  - bootstrap checkpoint, Track A runtime governance and git diff --check passed before PR binding.
-  - runtime_access is none; all mutation/runtime-effect authorities remain false and physical action budget/count are 0/0.
+  - live repository state was reconciled and the worker branch was rebased without conflict onto main ca1a71b5852f6e00ba144ed183af470555c51f56.
+  - Draft PR 826 remains the exact worker delivery vehicle and no additional implementation PR was created.
+  - static read-only admission/provenance producer is implemented at 9d8233528bcf2dd1c4e214d2aee3a8677d3a07ad.
+  - exact current client fence is enforced as 15.32.75d4a0 / 52105824 / d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a.
+  - admission fails closed on stale/future evidence, ownership, namespace, uniqueness, locator, process/window identity, forbidden effects, unknown fields and unsafe observer endpoints.
+  - Track A read-only canonical fields and gates remain NOT_APPLICABLE and mutation_authorized remains false.
+  - focused final tests are 14/14 PASS; ruff and compileall PASS.
+  - final test_agent_*.py run executed 219 tests with 215 PASS and 4 known baseline errors outside owned paths.
+  - no credentials, GUI input, process control, process memory access, network payload capture or physical action occurred.
 derived:
-  - the isolated worker may begin repository/static RED-to-GREEN work only after its own session revalidates this task, Draft PR, branch, worktree and ownership.
+  - the static producer is ready to consume fresh facts only inside a coordinator-assigned read-only observation window.
+  - the worker remains waiting until a valid live read_only admission/provenance record is freshly produced and persisted.
 unknown:
-  - implementation, focused test, review and exact-head CI outcomes.
-  - any future real-runtime evidence; none is authorized or claimed at bootstrap.
+  - current exact live Synology/Kasm client process identity.
+  - current runtime locator reachability and endpoint mapping.
+  - current all-container target uniqueness and X11 ownership.
+  - any live read_only admission/provenance record; none has been legally produced yet.
 conflicts: []
 first_failure:
-  marker: none
-  evidence: no current failure; worker session has not yet claimed execution.
+  marker: live_admission_not_authorized
+  evidence: runtime_access remains none because no serialized read-only observation window has been assigned.
 rejected_hypotheses:
-  - fake or hosted evidence can satisfy real-runtime acceptance: rejected by the Phase 2 contract.
+  - historical Package C Surveyor fence can establish current Phase 2 identity: rejected because its client tuple is stale and differs from the trusted-base fence.
+  - hosted/static tests can satisfy real-runtime acceptance: rejected by the Phase 2 coordination contract.
 changed_paths:
   - docs/agents/tasks/active/OTC-20260901-vision-p2-runtime-admission.md
+  - docs/agents/reports/OTC-20260901-vision-p2-runtime-admission.md
+  - tools/tibia_re_control_center/agent_runtime_admission.py
+  - tests/tools/tibia_re_control_center/test_agent_runtime_admission.py
 validation:
-  - command: coordinator refreshed-main and pairwise ownership scans
+  - command: focused runtime-admission unittest suite
     result: PASS
-    evidence: no worker-worker or active-main exact ownership conflicts.
-  - command: bootstrap Track A governance and checkpoint validation
+    evidence: 14 tests passed on exact-final implementation.
+  - command: ruff check implementation and focused test
     result: PASS
-    evidence: task was branch-bound and runtime_access none admission was valid before Draft PR binding.
-  - command: live Draft PR creation readback
+    evidence: exact-final implementation and focused test passed Ruff with no findings.
+  - command: compileall implementation and focused test
     result: PASS
-    evidence: PR 826 opened Draft against main from feat/OTC-20260901-vision-p2-runtime-admission at 751eda3b7bc0d790e35971f99f7c37b2d2520627.
-blockers: []
-next_action: launch OTC-VISION-P2-RUNTIME-ADMISSION in its isolated worker session, verify Draft PR #826 still matches this branch/worktree/ownership, read binding contracts, then write the first RED focused test at tests/tools/tibia_re_control_center/test_agent_runtime_admission.py with runtime_access none.
+    evidence: exact-final implementation and focused test compiled successfully.
+  - command: test_agent_*.py component suite
+    result: FAIL
+    evidence: 219 total, 215 PASS, 4 errors within the previously reproduced current-main baseline error set.
+  - command: detached origin/main baseline reproduction
+    result: PASS
+    evidence: current main independently reproduced the same agent_api socket-reset and agent_vision model-slot error family.
+blockers:
+  - coordinator-assigned serialized read-only observation window is not granted.
+  - Synology remote targets were offline during this worker session; this is secondary to the authority blocker.
+next_action: coordinator assigns one serialized read-only observation window; then freshly prove locator, inventory, exact process fence and X11 ownership through admit_read_only_runtime without mutation.
 ```

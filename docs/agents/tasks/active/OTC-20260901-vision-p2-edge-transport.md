@@ -9,12 +9,12 @@ project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: implementation
-phase: worker_local_commit_ready_waiting_main
+phase: worker_restack_validation_complete
 branch: feat/OTC-20260901-vision-p2-edge-transport
 base_branch: main
-base_main: 0fe1ecb3569f1d8372209c857ab57f3b626c29ae
+base_main: e883543403d5430d7b1d287f59043b23c98f37d6
 created: 2026-09-01T16:27:39+02:00
-updated_at: 2026-09-01T21:07:53+02:00
+updated_at: 2026-09-01T22:27:55+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: isolated_worker_branch
@@ -62,15 +62,15 @@ owned_paths:
 depends_on:
   - PR #820 merged foundation
   - PR #824 merged Wave 0 coordinator cleanup
-  - main 0fe1ecb3569f1d8372209c857ab57f3b626c29ae
+  - current main e883543403d5430d7b1d287f59043b23c98f37d6 after PR #839
 related_prs:
   - PR #829 Wave 1 worker Draft
-current_blocker: coordinator runtime-signals promotion PR #839 must merge before final current-main restack/push to avoid a known-stale base
-next_action: after PR #839 merges, refresh main, restack this committed edge-transport slice once, rerun exact local gates, then push Draft PR #829 and observe exact-head CI
+current_blocker: none
+next_action: commit this post-restack checkpoint, rerun exact local gates, force-with-lease push Draft PR #829, then observe the first exact-head CI snapshot
 invocation_started_at: 2026-09-01T17:03:28+02:00
-last_progress_at: 2026-09-01T21:07:53+02:00
+last_progress_at: 2026-09-01T22:27:55+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: local-replay-race-repaired-30-pass
+ci_check_generation: post-pr839-restack-local-pass
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -126,7 +126,7 @@ worker_alias: OTC-VISION-P2-EDGE-TRANSPORT
 TASK_ID: OTC-20260901-vision-p2-edge-transport
 TASK_RECORD: docs/agents/tasks/active/OTC-20260901-vision-p2-edge-transport.md
 PROJECT_LANE: otclient
-BASE_MAIN: 0fe1ecb3569f1d8372209c857ab57f3b626c29ae
+BASE_MAIN: e883543403d5430d7b1d287f59043b23c98f37d6
 BRANCH: feat/OTC-20260901-vision-p2-edge-transport
 WORKTREE: C:/Users/barte/otclient-vision-p2-edge-transport
 OWNED_PATHS:
@@ -144,13 +144,13 @@ runtime_access: none
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T21:07:53+02:00
-head: 9fce716178820920cac1f605fc5402910c1bed6e
-head_semantics: local_replay_race_repair_commit_before_docs_checkpoint
+updated_at: 2026-09-01T22:27:55+02:00
+head: 9d525694dcef97b7197a6b15e8d5dbed61c8bcfe
+head_semantics: post_pr839_restack_head_before_final_checkpoint_commit
 branch: feat/OTC-20260901-vision-p2-edge-transport
 pr: 829
 status: validating
-phase: worker_local_commit_ready_waiting_main
+phase: worker_restack_validation_complete
 context_routes:
   - phase-2-read-only-coordination
   - track-a-governance
@@ -161,31 +161,30 @@ owned_paths:
   - tools/tibia_re_control_center/agent_edge_transport.py
   - tests/tools/tibia_re_control_center/test_agent_edge_transport.py
 proven:
-  - local implementation plus replay-race repair is committed through 9fce716178820920cac1f605fc5402910c1bed6e; branch remains unpushed while coordinator runtime-signals promotion PR #839 is pending.
+  - PR #839 merged as e883543403d5430d7b1d287f59043b23c98f37d6 and this worker branch rebased cleanly onto that current main.
+  - current diff against main contains only the four declared owned paths and no shared Control Center integration path.
   - runtime_access remains none; all mutation/runtime-effect authority remains false and physical action count/budget remain 0/0.
   - outbound-only transport mutually authenticates peers with distinct directional HMAC-SHA256 keys and grants no runtime/action authority.
-  - signed metadata is bounded, versioned, freshness/connection/replay fenced and recursively rejects generic shell/process/GUI/secret-getter surfaces.
+  - metadata is bounded, versioned, freshness/connection/replay fenced, deep-snapshotted before privacy checks and rejects generic shell/process/GUI/secret-getter surfaces.
+  - endpoint resolution is restricted to explicit loopback/private/link-local CIDRs and rejects public/reserved destinations.
   - artifact descriptors bind SHA-256, exact size and media type; bytes travel separately with exact receiver integrity checks.
-  - empirical parser debugging corrected a stale test-only recursion depth assumption without changing production behavior.
-  - independent concurrency falsification proved two simultaneous verify calls could both accept the same sequence before atomic replay state commit.
-  - RED test test_concurrent_duplicate_receive_advances_replay_window_once reproduced two successful accepts for sequence 1.
-  - verifier now validates packet contents first and atomically commits connection/replay state under one RLock; bind_connection uses the same state lock.
-  - after repair exactly one concurrent duplicate is accepted and one fails EDGE_REPLAY_REJECTED.
-  - fresh focused suite passes 30/30; protocol+transport component suite passes 47/47; Ruff, py_compile, checkpoint validation, Track A governance and git diff --check pass.
+  - verifier replay/connection state commits atomically under one RLock so concurrent duplicate sequence acceptance is prevented.
+  - post-restack focused suite passes 30/30 and protocol+transport component suite passes 47/47; Ruff, py_compile, Track A governance and git diff --check pass.
 derived:
-  - repository/static transport producer is locally coherent and replay-safe under concurrent verifier use.
-  - transport peer authentication remains authority-neutral and cannot establish Track A admission, semantic state, evidence freshness or action authority.
+  - repository/static transport producer is locally coherent on current main and ready for Draft PR publication and coordinator classification.
+  - peer authentication remains authority-neutral and cannot establish Track A admission, semantic state, evidence freshness or action authority.
 unknown:
-  - exact-head hosted CI/governance after current-main restack and future publication.
+  - exact-head GitHub CI/review outcome after publication.
   - coordinator independent classification after publication.
   - real Synology/Kasm/Official Tibia transport evidence; none authorized or attempted.
 conflicts: []
 first_failure:
-  marker: CONCURRENT-REPLAY-WINDOW-RACE
-  evidence: deterministic barrier test forced two verifier threads past validation before state commit and both accepted sequence 1; atomic replay-state commit repair reduces acceptance to exactly one.
+  marker: none
+  evidence: all currently required local owned-slice and governance checks pass after current-main restack.
 rejected_hypotheses:
-  - production JSON recursion handling was broken: rejected; current decoder simply accepts depth 1100 and production correctly catches RecursionError at deeper nesting.
-  - GIL alone makes verifier replay updates atomic: rejected by deterministic two-thread falsification.
+  - GIL alone makes verifier replay updates atomic: rejected by deterministic two-thread falsification and repaired with explicit locking.
+  - nested payloads are safe with a shallow copy before privacy admission: rejected by mutation regression and repaired with a deep snapshot.
+  - ipaddress.is_private alone defines the intended LAN trust boundary: rejected; explicit admitted CIDRs are enforced.
   - transport authentication grants runtime/action authority: rejected by fixed authority-neutral envelope and tests.
 changed_paths:
   - docs/agents/tasks/active/OTC-20260901-vision-p2-edge-transport.md
@@ -195,17 +194,16 @@ changed_paths:
 validation:
   - command: python -m unittest tests.tools.tibia_re_control_center.test_agent_edge_transport -q
     result: PASS
-    evidence: 30 tests, zero failures/errors after replay-race repair.
+    evidence: 30 tests, zero failures/errors after restack.
   - command: python -m unittest tests.tools.tibia_re_control_center.test_agent_protocol tests.tools.tibia_re_control_center.test_agent_edge_transport -q
     result: PASS
-    evidence: 47 tests, zero failures/errors.
-  - command: Ruff and py_compile on edge-transport implementation/test
+    evidence: 47 tests, zero failures/errors after restack.
+  - command: python -m ruff check <owned implementation/test>; python -m py_compile <owned implementation/test>; git diff --check origin/main...HEAD
     result: PASS
-    evidence: static validation clean.
-  - command: checkpoint validator, Track A governance, git diff --check
+    evidence: static and diff hygiene clean.
+  - command: python .github/scripts/test_track_a_agent_runtime_governance.py --changed-from origin/main --expected-branch feat/OTC-20260901-vision-p2-edge-transport
     result: PASS
-    evidence: all local governance/hygiene gates pass.
-blockers:
-  - wait for coordinator promotion PR #839 to merge before final current-main restack/push.
-next_action: after PR #839 merges, restack once onto current main, rerun local gates, push Draft PR #829 and observe exact-head CI.
+    evidence: TRACK_A_AGENT_RUNTIME_GOVERNANCE_PASS=true.
+blockers: []
+next_action: commit this post-restack checkpoint, rerun exact local gates, force-with-lease push Draft PR #829, then observe the first exact-head CI snapshot.
 ```

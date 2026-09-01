@@ -100,3 +100,22 @@ Fresh results after repair:
 - Ruff / py_compile / checkpoint validator / Track A governance / `git diff --check`: PASS.
 
 The branch remains local-only until PR #839 merges, after which it will be restacked once on trusted current main and revalidated before Draft PR #829 publication.
+
+## Current-main restack and final worker-local gate
+
+After coordinator promotion PR #839 merged, the worker branch was rebased cleanly onto current `main@e883543403d5430d7b1d287f59043b23c98f37d6`. The resulting diff still contains only the four declared owned paths.
+
+Additional falsification/hardening retained on the restacked branch includes:
+- deep snapshot of nested metadata before privacy admission/signing;
+- explicit admitted local-network CIDRs rather than relying on broad `ipaddress.is_private` classification;
+- normalized control-surface key rejection across separator variants;
+- bounded/JSON-only metadata structure on sender and authenticated receiver;
+- strict boolean rejection for protocol/budget integer fields and finite connection timeouts;
+- atomic replay/connection state commit under concurrent verification.
+
+Fresh post-restack results:
+- focused edge transport: `30/30 PASS`;
+- protocol + edge transport: `47/47 PASS`;
+- Ruff / py_compile / checkpoint validator / Track A governance / `git diff --check`: PASS.
+
+No live runtime observation or physical action was performed. The next gate is publication to Draft PR #829 and exact-head hosted CI; coordinator classification remains mandatory before any promotion.

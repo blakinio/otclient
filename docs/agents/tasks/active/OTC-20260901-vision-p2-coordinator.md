@@ -101,9 +101,9 @@ Reconcile Phase 2 live state, release stale foundation ownership, create exact n
 ```yaml
 checkpoint_version: 1
 updated_at: 2026-09-01T18:07:00+02:00
-head: 2df0aa64c4578832f41acbf66339310c07724fb4
+head: 995ba7353db8df5fe0804a652771f1c50ee78d9d
 branch: docs/OTC-20260901-vision-p2-wave1-classification
-pr: NOT_CREATED
+pr: 835
 status: implementing
 context_routes:
   - phase-2-read-only-coordination

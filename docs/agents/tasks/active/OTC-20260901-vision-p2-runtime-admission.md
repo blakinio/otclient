@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260901-vision-p2-runtime-admission
-status: waiting
+status: validating
 agent: ChatGPT
 session_role: phase2_worker
 worker_alias: OTC-VISION-P2-RUNTIME-ADMISSION
@@ -9,12 +9,12 @@ project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: implementation
-phase: waiting_runtime_observation
+phase: current_main_revalidation_complete
 branch: feat/OTC-20260901-vision-p2-runtime-admission
 base_branch: main
-base_main: ca1a71b5852f6e00ba144ed183af470555c51f56
+base_main: 54a20bbd8721e92d069974af14d6ebd2f4f5a55d
 created: 2026-09-01T16:27:39+02:00
-updated_at: 2026-09-01T17:35:16+02:00
+updated_at: 2026-09-01T18:46:29+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: isolated_worker_branch
@@ -65,12 +65,12 @@ depends_on:
   - main ca1a71b5852f6e00ba144ed183af470555c51f56
 related_prs:
   - PR #826 Wave 1 worker Draft
-current_blocker: coordinator-assigned serialized read-only observation window not granted; live runtime remains unauthorized
-next_action: coordinator assigns one serialized read-only observation window; then freshly prove locator, inventory, exact process fence and X11 ownership through admit_read_only_runtime without mutation
+current_blocker: exact-head CI Package A and Track A governance pending on current-main restack; live observation remains unauthorized
+next_action: publish current-main restack and obtain fresh exact-head CI Package A and Track A governance; after green coordinator may assign one serialized read-only observation window
 invocation_started_at: 2026-09-01T16:47:00+02:00
-last_progress_at: 2026-09-01T17:35:16+02:00
+last_progress_at: 2026-09-01T18:46:29+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: pr-bound-bootstrap
+ci_check_generation: current-main-restack-79fa5fbca652
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -142,20 +142,13 @@ runtime_access: none
 
 ## Context checkpoint
 
-
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T17:35:16+02:00
-head: 9d8233528bcf2dd1c4e214d2aee3a8677d3a07ad
-head_semantics: implementation_commit_before_checkpoint_docs
+updated_at: 2026-09-01T18:46:29+02:00
+head: 79fa5fbca652048e6fb9408d03140d5d707d075d
 branch: feat/OTC-20260901-vision-p2-runtime-admission
 pr: 826
-status: waiting
-phase: waiting_runtime_observation
-runtime_access: none
-mutation_authorized: false
-physical_action_budget: 0
-physical_action_count: 0
+status: validating
 context_routes:
   - phase-2-read-only-coordination
   - track-a-governance
@@ -166,53 +159,46 @@ owned_paths:
   - tools/tibia_re_control_center/agent_runtime_admission.py
   - tests/tools/tibia_re_control_center/test_agent_runtime_admission.py
 proven:
-  - live repository state was reconciled and the worker branch was rebased without conflict onto main ca1a71b5852f6e00ba144ed183af470555c51f56.
-  - Draft PR 826 remains the exact worker delivery vehicle and no additional implementation PR was created.
-  - static read-only admission/provenance producer is implemented at 9d8233528bcf2dd1c4e214d2aee3a8677d3a07ad.
-  - exact current client fence is enforced as 15.32.75d4a0 / 52105824 / d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a.
-  - admission fails closed on stale/future evidence, ownership, namespace, uniqueness, locator, process/window identity, forbidden effects, unknown fields and unsafe observer endpoints.
-  - Track A read-only canonical fields and gates remain NOT_APPLICABLE and mutation_authorized remains false.
-  - focused final tests are 14/14 PASS; ruff and compileall PASS.
-  - final test_agent_*.py run executed 219 tests with 215 PASS and 4 known baseline errors outside owned paths.
-  - no credentials, GUI input, process control, process memory access, network payload capture or physical action occurred.
+  - coordinator independent review comment 5496990233 accepts the bounded static ReadOnlyRuntimeAdmission/provenance producer and keeps real-runtime acceptance at RETURN_FOR_EVIDENCE.
+  - shared Package A durable-doc repair #833 and coordinator checkpoint #836 are merged into trusted current main 54a20bbd8721e92d069974af14d6ebd2f4f5a55d.
+  - worker branch restacked conflict-free onto trusted current main; main changes none of the four worker-owned paths.
+  - accepted static admission contract is unchanged by the restack and remains fail-closed on freshness, uniqueness, locator, process/X11 identity, ownership, namespace and forbidden effects.
+  - fresh post-restack focused runtime-admission suite passes 14/14; Ruff and py_compile pass.
+  - fresh post-restack Track A runtime governance, checkpoint validator and git diff --check pass; changed paths remain exactly the four worker-owned paths.
+  - no credentials, GUI input, process control, process memory access, network payload capture, runtime observation or physical action occurred.
 derived:
-  - the static producer is ready to consume fresh facts only inside a coordinator-assigned read-only observation window.
-  - the worker remains waiting until a valid live read_only admission/provenance record is freshly produced and persisted.
+  - current-main repository/static revalidation is locally green and ready for hosted exact-head checks.
+  - live read-only observation remains illegal until hosted revalidation is green and the coordinator separately assigns one serialized observation window.
 unknown:
-  - current exact live Synology/Kasm client process identity.
-  - current runtime locator reachability and endpoint mapping.
-  - current all-container target uniqueness and X11 ownership.
-  - any live read_only admission/provenance record; none has been legally produced yet.
+  - exact-head CI Package A and Track A governance outcome after publishing the restack.
+  - current exact live Synology/Kasm client process identity, locator reachability, inventory uniqueness and X11 ownership.
 conflicts: []
 first_failure:
-  marker: live_admission_not_authorized
-  evidence: runtime_access remains none because no serialized read-only observation window has been assigned.
+  marker: historical-package-a-path-boundary
+  evidence: prior exact head failed only the old durable-doc allowlist; coordinator repair #833 is now merged and this restack must obtain a fresh result.
 rejected_hypotheses:
-  - historical Package C Surveyor fence can establish current Phase 2 identity: rejected because its client tuple is stale and differs from the trusted-base fence.
-  - hosted/static tests can satisfy real-runtime acceptance: rejected by the Phase 2 coordination contract.
+  - old Package A failure can be treated as current after #833: rejected; fresh exact-head validation is required.
+  - static acceptance authorizes live observation: rejected; coordinator still owns serialized read-only admission.
 changed_paths:
   - docs/agents/tasks/active/OTC-20260901-vision-p2-runtime-admission.md
   - docs/agents/reports/OTC-20260901-vision-p2-runtime-admission.md
   - tools/tibia_re_control_center/agent_runtime_admission.py
   - tests/tools/tibia_re_control_center/test_agent_runtime_admission.py
 validation:
-  - command: focused runtime-admission unittest suite
+  - command: python -m unittest tests.tools.tibia_re_control_center.test_agent_runtime_admission -q
     result: PASS
-    evidence: 14 tests passed on exact-final implementation.
-  - command: ruff check implementation and focused test
+    evidence: 14 tests, zero failures/errors after current-main restack.
+  - command: Ruff and py_compile on implementation and focused test
     result: PASS
-    evidence: exact-final implementation and focused test passed Ruff with no findings.
-  - command: compileall implementation and focused test
+    evidence: static checks pass after restack.
+  - command: Track A runtime governance validator changed-from trusted current main
     result: PASS
-    evidence: exact-final implementation and focused test compiled successfully.
-  - command: test_agent_*.py component suite
-    result: FAIL
-    evidence: 219 total, 215 PASS, 4 errors within the previously reproduced current-main baseline error set.
-  - command: detached origin/main baseline reproduction
+    evidence: TRACK_A_AGENT_RUNTIME_GOVERNANCE_PASS=true.
+  - command: checkpoint validator and git diff --check origin/main...HEAD
     result: PASS
-    evidence: current main independently reproduced the same agent_api socket-reset and agent_vision model-slot error family.
+    evidence: checkpoint valid and exact changed paths remain four worker-owned files.
 blockers:
-  - coordinator-assigned serialized read-only observation window is not granted.
-  - Synology remote targets were offline during this worker session; this is secondary to the authority blocker.
-next_action: coordinator assigns one serialized read-only observation window; then freshly prove locator, inventory, exact process fence and X11 ownership through admit_read_only_runtime without mutation.
+  - exact-head hosted CI Package A and Track A governance pending after publication.
+  - real runtime observation remains separately coordinator-gated.
+next_action: publish current-main restack and obtain fresh exact-head CI Package A and Track A governance; after green coordinator may assign one serialized read-only observation window.
 ```

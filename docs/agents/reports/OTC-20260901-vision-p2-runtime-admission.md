@@ -68,6 +68,22 @@ Ran 219 tests
 
 All four errors are outside the owned implementation and belong to the already established current-main baseline set: Windows `ConnectionResetError [WinError 10054]` in `test_agent_api` and `ModelSlotUnavailable: MODEL_INFERENCE_FAILED` in `test_agent_vision`. Before finalization, the worker reproduced the same baseline error family on a detached clean `origin/main@ca1a71b5852f6e00ba144ed183af470555c51f56`; no new error signature was introduced by this worker.
 
+## Current-main revalidation
+
+After coordinator repair #833 and checkpoint #836 merged, the existing worker branch was restacked conflict-free onto trusted `main@54a20bbd8721e92d069974af14d6ebd2f4f5a55d` without changing any worker-owned implementation path from main. Fresh local verification on the restacked generation:
+
+```text
+focused runtime-admission: 14/14 PASS
+ruff: PASS
+py_compile: PASS
+Track A runtime governance: PASS
+checkpoint validator: PASS
+git diff --check: PASS
+changed paths: exact four worker-owned paths
+```
+
+This revalidation does not authorize live observation. Exact-head GitHub CI / Package A / Track A governance must be fresh on the published restack before the coordinator may assign the serialized read-only observation window.
+
 ## Runtime / physical E2E
 
 ```yaml
@@ -89,9 +105,9 @@ No current display, PID, session, endpoint mapping or target uniqueness is claim
 
 ## Blocker and next action
 
-Primary blocker: the coordinator has not yet assigned the required single serialized read-only observation window and therefore no valid `read_only` task admission has been persisted for a live target.
+Primary blocker at this checkpoint: the current-main restack must first obtain fresh exact-head hosted CI / Package A / Track A governance. The coordinator-assigned serialized read-only observation window remains a subsequent gate; no valid `read_only` live admission has been persisted yet.
 
-The next legal action is exactly one coordinator-controlled observation window. In that window, a non-invasive observer must freshly obtain locator reachability, complete candidate inventory, exact process/build identity and X11 window ownership, then pass those facts through `admit_read_only_runtime(...)` and persist the resulting admission/provenance before any runtime observation continues.
+The next legal action is publication and hosted revalidation of this current-main restack. Only after those repository gates are green may the coordinator assign exactly one observation window. In that later window, a non-invasive observer must freshly obtain locator reachability, complete candidate inventory, exact process/build identity and X11 window ownership, then pass those facts through `admit_read_only_runtime(...)` and persist the resulting admission/provenance before any runtime observation continues.
 
 This transition must preserve:
 

@@ -13,7 +13,7 @@ branch: docs/OTC-20260901-codex-model-effort-benchmark
 base_branch: main
 base_sha: e883543403d5430d7b1d287f59043b23c98f37d6
 created: 2026-09-01T22:22:39+02:00
-updated_at: 2026-09-01T22:22:39+02:00
+updated_at: 2026-09-01T22:31:48+02:00
 risk: low
 execution_class: local_owner_pc
 execution_mode: remote_desktop_plus_github
@@ -59,7 +59,7 @@ depends_on:
 blocks: []
 cross_repository_task_ids: []
 invocation_started_at: 2026-09-01T22:22:39+02:00
-last_progress_at: 2026-09-01T22:22:39+02:00
+last_progress_at: 2026-09-01T22:31:48+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: benchmark-evidence-initial
 terminal_ci_wait_started_at: null
@@ -70,7 +70,7 @@ repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 0
 stall_warnings: 0
 current_blocker: none
-next_action: validate benchmark evidence and protocol calibration, commit/push the isolated branch, open a Draft PR, and obtain exact-head CI/governance before merge
+next_action: push the benchmark branch, open its Draft PR, bind the PR number in this task, then obtain exact-head CI/governance before merge
 ---
 
 # Codex model x reasoning-effort benchmark persistence
@@ -92,9 +92,9 @@ Acceptance:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T22:22:39+02:00
-head: e883543403d5430d7b1d287f59043b23c98f37d6
-head_semantics: trusted_main_before_benchmark_evidence_commit
+updated_at: 2026-09-01T22:31:48+02:00
+head: 3d27527f5c689e3d511c4d0fc5a7327e9f8b5413
+head_semantics: benchmark_content_commit_before_pr_binding
 branch: docs/OTC-20260901-codex-model-effort-benchmark
 pr: null
 status: validating
@@ -130,7 +130,22 @@ changed_paths:
   - docs/agents/reports/OTC-20260901-codex-model-effort-benchmark.md
   - docs/agents/evidence/OTC-20260901-codex-model-effort-benchmark/results.json
   - docs/agents/EXECUTION_PROTOCOL.md
-validation: []
+validation:
+  - command: python -m json.tool docs/agents/evidence/OTC-20260901-codex-model-effort-benchmark/results.json
+    result: PASS
+    evidence: machine-readable benchmark evidence parses successfully.
+  - command: python tools/agents/checkpoint.py docs/agents/tasks/active/OTC-20260901-codex-model-effort-benchmark.md --require-checkpoint
+    result: PASS
+    evidence: required Context checkpoint validates.
+  - command: git diff --cached --check
+    result: PASS
+    evidence: committed documentation/evidence delta has no whitespace errors.
+  - command: python tools/agents/control_room.py --format markdown
+    result: PASS
+    evidence: task is recognized as policy-v2 RUNNING with active_sessions=1.
+  - command: python .github/scripts/test_track_a_agent_runtime_governance.py --changed-from e883543403d5430d7b1d287f59043b23c98f37d6 --expected-branch docs/OTC-20260901-codex-model-effort-benchmark
+    result: PASS
+    evidence: TRACK_A_AGENT_RUNTIME_GOVERNANCE_PASS=true.
 blockers: []
-next_action: validate benchmark evidence and protocol calibration, commit/push the isolated branch, open a Draft PR, and obtain exact-head CI/governance before merge
+next_action: push the benchmark branch, open its Draft PR, bind the PR number in this task, then obtain exact-head CI/governance before merge
 ```

@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260901-vision-p2-capture-edge
-status: validating
+status: ready
 agent: ChatGPT
 session_role: phase2_worker
 worker_alias: OTC-VISION-P2-CAPTURE-EDGE
@@ -9,12 +9,12 @@ project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: implementation
-phase: worker_repair_local_validation_complete
+phase: worker_repair_ready_for_coordinator
 branch: feat/OTC-20260901-vision-p2-capture-edge
 base_branch: main
 base_main: 54a20bbd8721e92d069974af14d6ebd2f4f5a55d
 created: 2026-09-01T16:27:39+02:00
-updated_at: 2026-09-01T18:38:34+02:00
+updated_at: 2026-09-01T18:42:06+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: isolated_worker_branch
@@ -65,14 +65,14 @@ depends_on:
   - main 0fe1ecb3569f1d8372209c857ab57f3b626c29ae
 related_prs:
   - PR #827 Wave 1 worker Draft
-current_blocker: exact-head GitHub CI/governance pending on restacked secret-safety repair generation
-next_action: commit and publish the restacked secret-safety repair generation, verify exact-head CI/governance, then return Draft PR #827 to OTC-VISION-P2-COORDINATOR for re-review
+current_blocker: none
+next_action: return Draft PR #827 secret-safety repair to OTC-VISION-P2-COORDINATOR for independent re-review; worker must not mark Ready-for-review or merge
 invocation_started_at: 2026-09-01T16:58:39+02:00
-last_progress_at: 2026-09-01T18:38:34+02:00
-ci_checks_for_current_head: 0
-ci_check_generation: repair-unpublished-87dd4b914f47
-terminal_ci_wait_started_at: null
-terminal_ci_checks_for_current_generation: 0
+last_progress_at: 2026-09-01T18:42:06+02:00
+ci_checks_for_current_head: 2
+ci_check_generation: repair-verified-483c6eca24ae
+terminal_ci_wait_started_at: 2026-09-01T18:40:07+02:00
+terminal_ci_checks_for_current_generation: 4
 unchanged_state_checks: 0
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 1
@@ -144,11 +144,11 @@ runtime_access: none
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T18:38:34+02:00
+updated_at: 2026-09-01T18:42:06+02:00
 head: 87dd4b914f471fd70e5e632fad69edbfce86f888
 branch: feat/OTC-20260901-vision-p2-capture-edge
 pr: 827
-status: validating
+status: ready
 context_routes:
   - phase-2-read-only-coordination
   - track-a-governance
@@ -166,12 +166,12 @@ proven:
   - branch was restacked conflict-free onto trusted main 54a20bbd8721e92d069974af14d6ebd2f4f5a55d; exact changed paths remain the four declared worker-owned paths.
   - post-restack focused capture-edge suite passes 12/12 and capture-edge plus existing vision-evidence suite passes 16/16.
   - post-restack py_compile, Track A runtime governance, git diff --check, shell=True audit and production no_secret_fields-call audit pass.
+  - exact checkpoint head 483c6eca24aeee35675c5ea6e1c0310b363be711 passed GitHub CI run 33533157584 and Track A runtime governance run 33533157282.
 derived:
-  - the coordinator secret-safety finding is repaired in repository/static behavior and is ready for exact-head hosted verification.
+  - the coordinator secret-safety finding is repaired in repository/static behavior and exact-head hosted verification is green.
   - no repository/static result proves real Official Tibia runtime capture behavior.
 unknown:
-  - exact-head GitHub CI/governance outcome for the restacked repair generation.
-  - coordinator re-review disposition after hosted verification.
+  - coordinator independent re-review disposition on the repaired exact head.
   - real admitted Linux/Synology/Kasm read-only runtime verification; not authorized in this worker checkpoint.
 conflicts: []
 first_failure:
@@ -198,7 +198,12 @@ validation:
   - command: git diff --check origin/main...HEAD plus AST/public-surface audit
     result: PASS
     evidence: four owned paths only; shell=True=0; production no_secret_fields calls=0; unproven guard present.
-blockers:
-  - exact-head GitHub CI/governance is pending after publication.
-next_action: commit and publish the restacked secret-safety repair generation, verify exact-head CI/governance, then return Draft PR #827 to OTC-VISION-P2-COORDINATOR for re-review.
+  - command: GitHub CI run 33533157584 on 483c6eca24aeee35675c5ea6e1c0310b363be711
+    result: PASS
+    evidence: workflow completed with conclusion success.
+  - command: GitHub Track A runtime governance run 33533157282 on 483c6eca24aeee35675c5ea6e1c0310b363be711
+    result: PASS
+    evidence: workflow completed with conclusion success.
+blockers: []
+next_action: return Draft PR #827 secret-safety repair to OTC-VISION-P2-COORDINATOR for independent re-review; worker must not mark Ready-for-review or merge.
 ```

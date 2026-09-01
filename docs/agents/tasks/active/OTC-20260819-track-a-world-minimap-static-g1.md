@@ -267,7 +267,7 @@ recovery:
   checkpointed_at: 2026-09-01T18:45:07+02:00
   last_progress_at: 2026-09-01T18:45:07+02:00
   phase: independent_audit_remediation
-  exact_head: PENDING_REMEDIATION_COMMIT
+  exact_head: ae07a3da386d3d9d021cee04d072065405b3008e
   pull_request: 593
   active_operation: none
   external_run_ids: [32249741341, 32250742374, 32251606403, 32251606609]
@@ -301,7 +301,7 @@ stall_warnings: 0
 ```yaml
 checkpoint_version: 1
 updated_at: 2026-09-01T18:51:48+02:00
-head: PENDING_REMEDIATION_COMMIT
+head: ae07a3da386d3d9d021cee04d072065405b3008e
 branch: research/OTC-20260819-track-a-world-minimap-static-g1
 pr: 593
 status: validating
@@ -339,8 +339,8 @@ validation:
     result: PASS
     evidence: Remediation diff is whitespace-clean before commit.
   - command: python tools/agents/checkpoint.py docs/agents/tasks/active/OTC-20260819-track-a-world-minimap-static-g1.md --require-checkpoint
-    result: NOT_RUN
-    evidence: Run immediately after this checkpoint is written.
+    result: PASS
+    evidence: Fresh checkpoint validation passed after the mandatory Context checkpoint was added.
 blockers:
   - FRESH_INDEPENDENT_AUDIT_AFTER_REMEDIATION
 next_action: run a fresh independent audit on the remediated exact head; if zero material findings, run exact-head CI/governance, refresh protected main, then close out under repository policy

@@ -1,7 +1,7 @@
 ---
 task_id: OTC-20260901-vision-p2-edge-transport
-status: ready
-agent: unclaimed
+status: validating
+agent: ChatGPT
 session_role: phase2_worker
 worker_alias: OTC-VISION-P2-EDGE-TRANSPORT
 programme_id: OTC-VISION-P2-READONLY
@@ -9,12 +9,12 @@ project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: implementation
-phase: dispatch_ready
+phase: worker_local_commit_ready_waiting_main
 branch: feat/OTC-20260901-vision-p2-edge-transport
 base_branch: main
 base_main: 0fe1ecb3569f1d8372209c857ab57f3b626c29ae
 created: 2026-09-01T16:27:39+02:00
-updated_at: 2026-09-01T16:31:41+02:00
+updated_at: 2026-09-01T21:01:13+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: isolated_worker_branch
@@ -65,12 +65,12 @@ depends_on:
   - main 0fe1ecb3569f1d8372209c857ab57f3b626c29ae
 related_prs:
   - PR #829 Wave 1 worker Draft
-current_blocker: none
-next_action: launch OTC-VISION-P2-EDGE-TRANSPORT in its isolated worker session, verify Draft PR #829 still matches this branch/worktree/ownership, read binding contracts, then write the first RED focused test at tests/tools/tibia_re_control_center/test_agent_edge_transport.py with runtime_access none
-invocation_started_at: null
-last_progress_at: 2026-09-01T16:31:41+02:00
+current_blocker: coordinator runtime-signals promotion PR #839 must merge before final current-main restack/push to avoid a known-stale base
+next_action: after PR #839 merges, refresh main, restack this committed edge-transport slice once, rerun exact local gates, then push Draft PR #829 and observe exact-head CI
+invocation_started_at: 2026-09-01T17:03:28+02:00
+last_progress_at: 2026-09-01T21:01:13+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: pr-bound-bootstrap
+ci_check_generation: local-implementation-29-pass
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -144,11 +144,13 @@ runtime_access: none
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T16:31:41+02:00
-head: 2f79d907f3372f7c8215fb6f4e2034547038ecb8
+updated_at: 2026-09-01T21:01:13+02:00
+head: c0015b470fd6792cbb03cd00bf0597c79bd54e11
+head_semantics: local_implementation_commit_before_docs_checkpoint
 branch: feat/OTC-20260901-vision-p2-edge-transport
 pr: 829
-status: ready
+status: validating
+phase: worker_local_commit_ready_waiting_main
 context_routes:
   - phase-2-read-only-coordination
   - track-a-governance
@@ -159,35 +161,48 @@ owned_paths:
   - tools/tibia_re_control_center/agent_edge_transport.py
   - tests/tools/tibia_re_control_center/test_agent_edge_transport.py
 proven:
-  - branch and isolated worktree were created by the coordinator from exact main 0fe1ecb3569f1d8372209c857ab57f3b626c29ae.
-  - Draft PR 829 exists for this exact worker branch and was opened from bootstrap head 2f79d907f3372f7c8215fb6f4e2034547038ecb8.
-  - PR 820 and PR 824 are merged prerequisites.
-  - coordinator pairwise and refreshed-main ownership scans found no overlap for this worker ownership set.
-  - bootstrap checkpoint, Track A runtime governance and git diff --check passed before PR binding.
-  - runtime_access is none; all mutation/runtime-effect authorities remain false and physical action budget/count are 0/0.
+  - implementation is committed locally at c0015b470fd6792cbb03cd00bf0597c79bd54e11 and still unpushed while coordinator promotion PR #839 is pending.
+  - runtime_access remains none; all mutation/runtime-effect authority remains false and physical action count/budget remain 0/0.
+  - outbound-only transport uses distinct directional HMAC-SHA256 pairing keys and returns a channel only after mutual authentication.
+  - signed JSON metadata is versioned, bounded, replay/freshness/connection fenced and recursively rejects generic shell/process/GUI/secret-getter control surfaces.
+  - content-addressed artifact descriptors bind SHA-256, exact size and plain media type; artifact bytes travel over a separate bounded path with receiver-side length/hash verification.
+  - send failure latches the channel closed; reconnect requires a new connection identity; concurrent sends serialize unique monotonic sequence numbers.
+  - fresh focused suite passes 29/29; protocol+transport component suite passes 46/46; Ruff, py_compile, checkpoint validation, Track A governance and git diff --check pass.
+  - a stale recursion test assumption was debugged: depth 1100 parses on the current Python JSON decoder; depth 2000 triggers the intended RecursionError and verifies EDGE_FRAME_INVALID mapping without production changes.
 derived:
-  - the isolated worker may begin repository/static RED-to-GREEN work only after its own session revalidates this task, Draft PR, branch, worktree and ownership.
+  - the repository/static edge-transport producer is locally coherent and ready for one current-main restack after #839 promotion merges.
+  - transport peer authentication remains authority-neutral and cannot establish Track A admission, semantic state, evidence freshness or action authority.
 unknown:
-  - implementation, focused test, review and exact-head CI outcomes.
-  - any future real-runtime evidence; none is authorized or claimed at bootstrap.
-conflicts: []
+  - exact-head GitHub CI/governance result after future publication of the current-main-restacked branch.
+  - coordinator independent classification after publication.
+  - real Synology/Kasm/Official Tibia transport evidence; none is authorized or attempted.
+conflicts:
+  - broader pre-existing Control Center failures remain outside worker ownership; no new import edge from those files into agent_edge_transport was introduced.
 first_failure:
-  marker: none
-  evidence: no current failure; worker session has not yet claimed execution.
+  marker: STALE-JSON-RECURSION-TEST-DEPTH
+  evidence: test expected EDGE_FRAME_INVALID at nesting 1100 but current Python parsed it and reached MISSING_FIELD; empirical threshold showed 1500+ raises RecursionError, and 2000 now exercises the intended production catch.
 rejected_hypotheses:
-  - fake or hosted evidence can satisfy real-runtime acceptance: rejected by the Phase 2 contract.
+  - production failed to catch RecursionError: rejected by source inspection and the corrected 2000-depth focused test.
+  - transport authentication grants runtime/action authority: rejected by fixed authority-neutral envelope fields and focused tests.
 changed_paths:
   - docs/agents/tasks/active/OTC-20260901-vision-p2-edge-transport.md
+  - docs/agents/reports/OTC-20260901-vision-p2-edge-transport.md
+  - tools/tibia_re_control_center/agent_edge_transport.py
+  - tests/tools/tibia_re_control_center/test_agent_edge_transport.py
 validation:
-  - command: coordinator refreshed-main and pairwise ownership scans
+  - command: python -m unittest tests.tools.tibia_re_control_center.test_agent_edge_transport -q
     result: PASS
-    evidence: no worker-worker or active-main exact ownership conflicts.
-  - command: bootstrap Track A governance and checkpoint validation
+    evidence: 29 tests, zero failures/errors.
+  - command: python -m unittest tests.tools.tibia_re_control_center.test_agent_protocol tests.tools.tibia_re_control_center.test_agent_edge_transport -q
     result: PASS
-    evidence: task was branch-bound and runtime_access none admission was valid before Draft PR binding.
-  - command: live Draft PR creation readback
+    evidence: 46 tests, zero failures/errors.
+  - command: Ruff and py_compile on edge-transport implementation/test
     result: PASS
-    evidence: PR 829 opened Draft against main from feat/OTC-20260901-vision-p2-edge-transport at 2f79d907f3372f7c8215fb6f4e2034547038ecb8.
-blockers: []
-next_action: launch OTC-VISION-P2-EDGE-TRANSPORT in its isolated worker session, verify Draft PR #829 still matches this branch/worktree/ownership, read binding contracts, then write the first RED focused test at tests/tools/tibia_re_control_center/test_agent_edge_transport.py with runtime_access none.
+    evidence: static validation clean.
+  - command: checkpoint validator, Track A governance, git diff --check
+    result: PASS
+    evidence: all local governance/hygiene gates pass.
+blockers:
+  - wait for coordinator promotion PR #839 to merge before final current-main restack/push.
+next_action: after PR #839 merges, restack once onto current main, rerun local gates, push Draft PR #829 and observe exact-head CI.
 ```

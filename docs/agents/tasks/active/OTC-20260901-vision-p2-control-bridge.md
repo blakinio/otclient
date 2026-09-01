@@ -1,4 +1,4 @@
----
+﻿---
 task_id: OTC-20260901-vision-p2-control-bridge
 status: implementing
 agent: chatgpt-gpt-5.6-sol
@@ -229,7 +229,7 @@ validation:
     result: PASS
     evidence: 109 tests passed under Linux-compatible WSL; Windows-only unauthenticated POST reset was isolated as a platform artifact.
   - command: WSL focused RED test_agent_edge_bridge
-    result: EXPECTED_FAIL
+    result: FAIL
     evidence: RUNTIME_ACCESS_UNAVAILABLE proves the Phase 2 read-only bridge is absent before production changes.
 blockers: []
 next_action: implement the minimal read-only edge observation bridge to make the first focused RED test GREEN while preserving the Null executor and zero physical budget.

@@ -1,26 +1,48 @@
 ---
 task_id: OTC-20260901-codex-model-effort-routing-policy
-status: validating
+status: completed
 agent: ChatGPT
 session_id: chatgpt-codex-routing-policy-20260901
-session_role: implementer
+session_role: closeout
 project_lane: otclient
 lane: AGENT-ORCHESTRATION
 track_id: repository-governance
 task_kind: documentation
-phase: validate
-branch: docs/OTC-20260901-codex-model-effort-routing-policy
+phase: close
+source_branch: docs/OTC-20260901-codex-model-effort-routing-policy
+archive_branch: docs/OTC-20260901-codex-model-effort-routing-policy-closeout
 base_branch: main
 base_sha: ca1a71b5852f6e00ba144ed183af470555c51f56
 created: 2026-09-01T17:49:12+02:00
-updated: 2026-09-01T17:56:35+02:00
+updated: 2026-09-01T18:07:10+02:00
 risk: low
 related_pr: "831"
-owned_paths:
-  - docs/agents/EXECUTION_PROTOCOL.md
-  - docs/agents/tasks/active/OTC-20260901-codex-model-effort-routing-policy.md
-modules_touched:
-  - agent-governance
+archive_pr: 834
+implementation_pr: 831
+implementation_final_head: 4d270faf28be907eee4ffee68f848b6451a2d009
+implementation_merge: 11bb95ebf34ce4fb7d46529393862d493250a202
+merged_at: 2026-09-01T16:02:51Z
+ownership_released: true
+final_ci:
+  head: 4d270faf28be907eee4ffee68f848b6451a2d009
+  ci_run: 33528955322
+  result: PASS
+track_a_governance:
+  run: 33528955128
+  result: PASS
+audit:
+  result: PASS
+  validator: Codex gpt-5.6-luna medium, session 01a05db2-fbb4-79f2-84f4-de27a5d03863
+  material_findings_open: 0
+e2e:
+  result: NOT_APPLICABLE
+  reason: documentation-only governance policy; no executable, UI, runtime, network, or product behavior changed
+pull_requests:
+  implementation: 831
+  archive: 834
+  unresolved_review_threads: 0
+owned_paths: []
+modules_touched: []
 depends_on: []
 blocks: []
 cross_repository_task_ids: []
@@ -66,9 +88,9 @@ gameplay_allowed: false
 transaction_authorized: false
 owner_funded_ai_api_authorized: false
 invocation_started_at: 2026-09-01T17:49:12+02:00
-last_progress_at: 2026-09-01T17:56:35+02:00
+last_progress_at: 2026-09-01T18:07:10+02:00
 current_blocker: none
-next_action: run independent review and exact-head required checks for PR #831; if clean, mark it ready and merge under repository protection
+next_action: no follow-up is required after this lifecycle-only closeout PR merges
 ---
 
 # Codex model and reasoning-effort routing policy
@@ -92,43 +114,44 @@ No product code, runtime observation, credentials, login, GUI input, gameplay ac
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T17:56:35+02:00
-head: ca1a71b5852f6e00ba144ed183af470555c51f56
-branch: docs/OTC-20260901-codex-model-effort-routing-policy
-pr: 831
-status: validating
+updated_at: 2026-09-01T18:07:10+02:00
+head: 1d1ffc9bad5b6eec937aeda323f70e802cc2a051
+branch: docs/OTC-20260901-codex-model-effort-routing-policy-closeout
+pr: 834
+status: completed
 context_routes:
   - agent-governance
   - codex-model-routing
-owned_paths:
-  - docs/agents/EXECUTION_PROTOCOL.md
-  - docs/agents/tasks/active/OTC-20260901-codex-model-effort-routing-policy.md
+owned_paths: []
 proven:
-  - The owner approved persisting a cost-aware Luna/Terra/Sol routing policy.
-  - Sol may use lower efforts; xhigh is its maximum permitted effort and is not the default.
-  - EXECUTION_PROTOCOL.md is mandatory task governance and already contains the Codex execution-mode decision section.
+  - PR #831 merged exact head 4d270faf28be907eee4ffee68f848b6451a2d009 as squash 11bb95ebf34ce4fb7d46529393862d493250a202.
+  - Exact implementation head passed CI run 33528955322 and Track A governance run 33528955128.
+  - Independent Codex gpt-5.6-luna medium review returned REVIEW_PASS with no findings on EXECUTION_PROTOCOL.md lines 286-300.
+  - The merged policy makes Sol/xhigh a maximum exceptional effort rather than a default and escalates unresolved Sol/xhigh work to the supervising Chat/owner.
 derived:
-  - The model-family rule belongs beside the existing Codex execution-mode policy so future workers consume it automatically.
+  - Future workers consume the merged model-family rule through the mandatory EXECUTION_PROTOCOL.md startup path.
 unknown: []
 conflicts: []
 first_failure:
-  marker: CHECKPOINT_REQUIRED
-  evidence: Initial checkpoint validator rejected the new task because the mandatory Context checkpoint section was absent.
+  marker: resolved
+  evidence: The initial missing Context checkpoint was repaired before implementation merge; no material closeout failure remains.
 rejected_hypotheses:
   - Sol should always run at xhigh; the owner clarified that Sol may use lower efforts and xhigh is only the ceiling.
 changed_paths:
-  - docs/agents/EXECUTION_PROTOCOL.md
-  - docs/agents/tasks/active/OTC-20260901-codex-model-effort-routing-policy.md
+  - docs/agents/tasks/archive/OTC-20260901-codex-model-effort-routing-policy.md
 validation:
-  - command: python tools/agents/checkpoint.py docs/agents/tasks/active/OTC-20260901-codex-model-effort-routing-policy.md --require-checkpoint
+  - command: python tools/agents/checkpoint.py docs/agents/tasks/archive/OTC-20260901-codex-model-effort-routing-policy.md --require-checkpoint
     result: PASS
-    evidence: Fresh targeted checkpoint validation passed after adding the mandatory Context checkpoint.
+    evidence: Fresh closeout checkpoint validation passed after archival edits.
   - command: git diff --check
     result: PASS
-    evidence: Fresh working-tree diff check passed after the checkpoint repair with no whitespace errors.
+    evidence: Fresh lifecycle-only closeout diff has no whitespace errors.
+  - command: git show origin/main:docs/agents/EXECUTION_PROTOCOL.md
+    result: PASS
+    evidence: Fresh readback confirms the Codex model family and reasoning-effort routing section is merged on main.
   - command: python tools/agents/control_room.py --format markdown
     result: PASS
-    evidence: Fresh repository-root Control Room run exited 0; unrelated pre-existing stale tasks remain visible but this docs task introduces no ownership conflict.
+    evidence: Fresh closeout Control Room exited 0 with this task removed from active work; metrics showed active_tasks=11 and active_sessions=0.
 blockers: []
-next_action: run independent review and exact-head required checks for PR #831; if clean, mark it ready and merge under repository protection
+next_action: no follow-up is required after this lifecycle-only closeout PR merges
 ```

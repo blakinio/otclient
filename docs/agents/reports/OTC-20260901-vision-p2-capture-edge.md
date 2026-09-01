@@ -1,4 +1,4 @@
-# OTC-VISION-P2-CAPTURE-EDGE — worker report
+# OTC-VISION-P2-CAPTURE-EDGE ? worker report
 
 ## Result classification
 
@@ -6,47 +6,40 @@ Repository/static implementation slice only. `runtime_access: none`; no Official
 
 ## Implemented contract
 
-- `RuntimeBinding` requires an explicit read-only admitted/unique runtime identity and binds provenance, container/display, PID/start identity, XID, exact-client fields, and monotonic observation time.
-- `KasmX11FfmpegFrameSource` exposes only `geometry()` and `capture_rgb()`. It uses a fixed read-only command vocabulary: exact-bound `xdotool getwindowgeometry --shell` plus `ffmpeg -f x11grab` raw RGB capture through `docker exec`; stdin is disabled and command timeout is bounded.
-- `CaptureEdge.capture()` rechecks runtime binding freshness before capture and equality/freshness after capture. Stale or changed binding fails before artifact persistence.
-- Secret regions are masked in memory before PNG encoding or persistence. An empty caller policy is rejected with `CAPTURE_SECRET_POLICY_UNPROVEN` before frame-source use or persistence; optional crop bytes are derived only from the already-masked full frame and retain the parent full-frame SHA-256 binding.
-- Full frame and crop are content-addressed by SHA-256. Deterministic metadata records blank/black classification and optional change-vs-previous-full-frame digest.
-- `CaptureEvidence.validated_vision_capture()` is the only public conversion to the existing `SecretSafeCapture`; it rechecks current runtime binding, capture freshness, full/crop byte integrity, and crop-to-full parent binding before vision handoff.
+- `RuntimeBinding` binds admitted read-only runtime provenance, container/display, PID/start identity, XID, exact-client fields and monotonic observation time.
+- `KasmX11FfmpegFrameSource` exposes only dynamic `geometry()` and read-only `capture_rgb()` through fixed `xdotool getwindowgeometry --shell` and `ffmpeg -f x11grab`; stdin is disabled and command timeout is bounded.
+- `ReviewedSecretMaskPolicy` is immutable and is supplied at trusted `CaptureEdge` composition time. It binds a reviewed policy id, exact expected frame dimensions, deterministic non-empty secret regions and content-addressed `policy_ref`.
+- `CaptureEdge.capture()` has no per-call secret-policy parameter. Geometry/policy mismatch fails before RGB capture or persistence; configured regions are masked in memory before PNG encoding or crop derivation.
+- Full frame and crop remain content-addressed by SHA-256; evidence binds runtime, geometry, monotonic time, full/crop hashes and `secret_policy_ref`.
+- `CaptureEvidence.validated_vision_capture()` remains the only public conversion to existing `SecretSafeCapture` and rechecks current runtime binding, freshness and artifact integrity before vision handoff.
 
-## TDD evidence
+## Coordinator repair history
 
-Focused RED→GREEN cycles proved missing behavior before implementation for: module creation; secret masking/crop; stale binding; runtime binding drift; downstream integrity/currentness; blank/black classification; previous-frame change binding; fixed Kasm/X11/ffmpeg backend; geometry-drift refusal; final binding-race refusal; removal of an unchecked public vision-conversion bypass; and the coordinator-returned unproven empty secret-policy path.
+First review comment `5496909848` found that an empty caller policy could persist an unmasked frame and self-certify `secret_safe=True`. The first repair rejected empty masks.
 
-## Local validation
+Fresh re-review comment `5497472188` found the broader remaining gap: a caller could still provide a non-empty but incomplete mask on each capture request. The second repair removes secret-mask choice from the capture request surface entirely and binds the reviewed deterministic mask when the edge is constructed. No caller-authored proof token was added.
 
-Post-repair, post-restack validation on implementation head `87dd4b914f471fd70e5e632fad69edbfce86f888`:
+## Second repair TDD evidence
 
-- `python -m unittest tests/tools/tibia_re_vision/test_capture_edge.py -q` — PASS, 12/12.
-- `python -m unittest tests/tools/tibia_re_vision/test_evidence.py tests/tools/tibia_re_vision/test_capture_edge.py -q` — PASS, 16/16.
-- targeted `py_compile` — PASS.
-- Track A runtime governance against trusted main `54a20bbd8721e92d069974af14d6ebd2f4f5a55d` — PASS.
-- `git diff --check origin/main...HEAD` — PASS; exact changed paths remain the four worker-owned paths.
-- AST/surface audit — PASS: `shell=True=0`, production `no_secret_fields()` calls = 0, fail-closed unproven-policy guard present.
+A focused RED required `ReviewedSecretMaskPolicy` at composition time and failed because the class did not exist. Additional tests require non-empty reviewed regions, exact policy/frame geometry, absence of `secret_policy` from `CaptureEdge.capture()`, successful in-memory masking and persisted `secret_policy_ref`. The minimal production change then made those tests GREEN.
 
-## Coordinator repair cycle
+## Fresh post-restack validation
 
-Coordinator comment `5496909848` correctly found that the previous generation allowed `SecretSafetyPolicy.no_secret_fields()` to persist an unmasked frame and self-certify `secret_safe=True`. A focused RED reproduced that exact behavior. The minimal repair rejects any empty `secret_regions` policy before runtime binding/frame-source use or persistence. Existing success fixtures now use explicit deterministic masking; no caller-authored proof token or new authority surface was introduced.
+Trusted base: `main@fb0c489f2ed166e872c4f197c6a78375a8576685` (includes promoted runtime-admission producer #838). Implementation head before this docs checkpoint: `f3b149e38bc1f49808295d6762522ac78e95e859`.
 
-The branch was restacked conflict-free onto trusted `main@54a20bbd8721e92d069974af14d6ebd2f4f5a55d` before final local verification. No live capture was performed. Exact-head GitHub verification is pending publication of this repair generation.
+- focused capture-edge: **14/14 PASS**;
+- capture-edge + existing vision evidence: **18/18 PASS**;
+- targeted `py_compile`: PASS;
+- Track A runtime governance against `fb0c489f2ed166e872c4f197c6a78375a8576685`: PASS;
+- checkpoint validator: PASS;
+- `git diff --check origin/main...HEAD`: PASS;
+- changed paths: exactly the four worker-owned paths;
+- public API audit: `CaptureEdge.capture()` has no secret-policy argument, `SecretSafetyPolicy` is absent, `ReviewedSecretMaskPolicy` is frozen.
 
-## Broader baseline findings
+## Nonclaims and handoff
 
-`tests/tools/tibia_re_control_center/test_agent_vision.py` produced 55 passing tests and one error in `test_capture_and_snapshot_os_errors_do_not_leak_paths_or_causes`. The identical error (`ModelSlotUnavailable: MODEL_INFERENCE_FAILED`) reproduces from a clean archive of committed head `dd40d914fa5d05cdf5ff2957cc798ee7aa336d9b`, with no capture-edge files present; it is therefore a pre-existing baseline failure outside this worker ownership.
+No Linux/Synology/Kasm execution of the backend has been performed or claimed. Real read-only verification remains a later coordinator-assigned serialized observation window with fresh admitted runtime evidence. `docs/agents/MODULE_CATALOG.md` and `docs/agents/CHANGELOG.md` remain coordinator-owned and untouched. PR #827 remains Draft; the worker must not self-promote or merge.
 
-`tests/tools/tibia_re_control_center/e2e_agent_foundation.py` stops in scenario A with `the repository foundation has no physical action budget` followed by Windows sqlite temporary-directory cleanup errors. The same failure reproduces from the clean committed baseline. This worker does not repair or reinterpret that existing E2E.
-
-## Nonclaims and coordinator handoff
-
-No Linux/Synology/Kasm runtime execution of the new backend has been performed or claimed. Real read-only verification requires a future coordinator-assigned observation window with fresh `runtime_access: read_only` admission and exact-target proof.
-
-`docs/agents/MODULE_CATALOG.md` and `docs/agents/CHANGELOG.md` are shared coordinator-owned paths and are deliberately untouched despite the new reusable module. The coordinator must classify the worker slice and perform any required shared catalogue/changelog/integration update after acceptance. PR #827 must remain Draft and must not be self-merged by this worker.
 ## Exact-head GitHub verification
 
-Historical implementation head `8685f7c6a8dae9e41d71f0acbe70a89a35a0ef38` and checkpoint head `cc957a25ddb4c40e1416bec60eff03c38fda3ad9` passed their earlier CI/governance, but that generation is superseded by coordinator secret-safety finding `5496909848`.
-
-Current repaired checkpoint head `483c6eca24aeee35675c5ea6e1c0310b363be711` passed GitHub `CI` run `33533157584` and `Track A agent runtime governance` run `33533157282`. The PR remains Draft and is returned to the coordinator for independent re-review; no worker self-promotion or merge is authorized.
+Earlier generations passed their own CI/governance but were superseded by coordinator secret-safety findings. Exact-head GitHub CI/governance for this second repair checkpoint is pending publication.

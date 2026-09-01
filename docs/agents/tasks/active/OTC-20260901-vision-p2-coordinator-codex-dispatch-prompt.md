@@ -1,18 +1,18 @@
 ---
 task_id: OTC-20260901-vision-p2-coordinator-codex-dispatch-prompt
-status: implementing
+status: validating
 agent: ChatGPT
 session_role: prompt_maintainer
 project_lane: otclient
 lane: AGENT-ORCHESTRATION
 track_id: repository-governance
 task_kind: documentation
-phase: prompt_contract_update
+phase: exact_head_validation
 branch: docs/OTC-20260901-vision-p2-coordinator-codex-dispatch-prompt
 base_branch: main
 base_sha: d1cb8722c3116a0e0aeb72b9b360712f43151f17
 created: 2026-09-01T22:55:00+02:00
-updated_at: 2026-09-01T22:55:00+02:00
+updated_at: 2026-09-01T23:06:06+02:00
 risk: low
 execution_class: local_owner_pc
 execution_mode: remote_desktop_plus_github
@@ -58,11 +58,12 @@ modules_touched: []
 depends_on:
   - merged Codex model/effort benchmark PR #841
   - merged benchmark closeout PR #842
-blocks: []cross_repository_task_ids: []
+blocks: []
+cross_repository_task_ids: []
 invocation_started_at: 2026-09-01T22:55:00+02:00
-last_progress_at: 2026-09-01T22:55:00+02:00
+last_progress_at: 2026-09-01T23:06:06+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: prompt-contract-1.1-initial
+ci_check_generation: prompt-contract-content-637794abaa7f
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -71,7 +72,7 @@ repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 0
 stall_warnings: 0
 current_blocker: none
-next_action: update coordinator prompt/alias/coordination/eval surfaces, run static regression validation, then publish a Draft PR
+next_action: commit the validated checkpoint, push the isolated branch, open a Draft PR, then require exact-head CI/governance and PR hygiene before merge
 ---
 
 # Vision P2 coordinator-managed Codex dispatch prompt
@@ -84,12 +85,12 @@ Make a newly started `OTC-VISION-P2-COORDINATOR` understand that it is the super
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T22:55:00+02:00
-head: d1cb8722c3116a0e0aeb72b9b360712f43151f17
-head_semantics: trusted_main_before_prompt_contract_update
+updated_at: 2026-09-01T23:06:06+02:00
+head: 637794abaa7f1a476d36bf5d42634618d2deedf2
+head_semantics: prompt_contract_content_commit_before_pr_binding
 branch: docs/OTC-20260901-vision-p2-coordinator-codex-dispatch-prompt
 pr: null
-status: implementing
+status: validating
 context_routes:
   - agent-governance
   - prompting-v2.1
@@ -105,6 +106,7 @@ proven:
   - current alias registry tells the owner to open separate worker windows after coordinator dispatch.
   - current coordinator mode text says Codex is used only for integration edits, which conflicts with the owner-approved supervising-coordinator workflow and empirical routing policy.
   - EXECUTION_PROTOCOL.md now contains empirical model/effort calibration from PR #841.
+  - prompt contract 1.1.0 static regression passed with exactly eight aliases and manual worker windows fallback-only.
 derived:
   - coordinator prompt surfaces must explicitly distinguish supervising Chat coordinator from subordinate Codex workers and make manual worker windows a fallback only.
 unknown: []
@@ -136,5 +138,5 @@ validation:
     result: PASS
     evidence: task recognized as policy-v2 documentation task; active_sessions=0.
 blockers: []
-next_action: update coordinator prompt/alias/coordination/eval surfaces, run static regression validation, then publish a Draft PR
+next_action: commit the validated checkpoint, push the isolated branch, open a Draft PR, then require exact-head CI/governance and PR hygiene before merge
 ```

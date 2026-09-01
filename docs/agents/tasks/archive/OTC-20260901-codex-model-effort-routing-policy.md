@@ -14,9 +14,10 @@ archive_branch: docs/OTC-20260901-codex-model-effort-routing-policy-closeout
 base_branch: main
 base_sha: ca1a71b5852f6e00ba144ed183af470555c51f56
 created: 2026-09-01T17:49:12+02:00
-updated: 2026-09-01T18:04:03+02:00
+updated: 2026-09-01T18:07:10+02:00
 risk: low
 related_pr: "831"
+archive_pr: 834
 implementation_pr: 831
 implementation_final_head: 4d270faf28be907eee4ffee68f848b6451a2d009
 implementation_merge: 11bb95ebf34ce4fb7d46529393862d493250a202
@@ -38,6 +39,7 @@ e2e:
   reason: documentation-only governance policy; no executable, UI, runtime, network, or product behavior changed
 pull_requests:
   implementation: 831
+  archive: 834
   unresolved_review_threads: 0
 owned_paths: []
 modules_touched: []
@@ -86,7 +88,7 @@ gameplay_allowed: false
 transaction_authorized: false
 owner_funded_ai_api_authorized: false
 invocation_started_at: 2026-09-01T17:49:12+02:00
-last_progress_at: 2026-09-01T18:04:03+02:00
+last_progress_at: 2026-09-01T18:07:10+02:00
 current_blocker: none
 next_action: no follow-up is required after this lifecycle-only closeout PR merges
 ---
@@ -112,10 +114,10 @@ No product code, runtime observation, credentials, login, GUI input, gameplay ac
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T18:04:03+02:00
-head: 11bb95ebf34ce4fb7d46529393862d493250a202
+updated_at: 2026-09-01T18:07:10+02:00
+head: 1d1ffc9bad5b6eec937aeda323f70e802cc2a051
 branch: docs/OTC-20260901-codex-model-effort-routing-policy-closeout
-pr: NOT_ASSIGNED
+pr: 834
 status: completed
 context_routes:
   - agent-governance

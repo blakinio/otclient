@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260901-vision-p2-runtime-signals
-status: validating
+status: ready
 agent: ChatGPT
 session_role: phase2_worker
 worker_alias: OTC-VISION-P2-RUNTIME-SIGNALS
@@ -9,12 +9,12 @@ project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: implementation
-phase: current_main_revalidation_complete
+phase: worker_revalidation_ready_for_coordinator
 branch: feat/OTC-20260901-vision-p2-runtime-signals
 base_branch: main
 base_main: 54a20bbd8721e92d069974af14d6ebd2f4f5a55d
 created: 2026-09-01T16:27:39+02:00
-updated_at: 2026-09-01T18:51:01+02:00
+updated_at: 2026-09-01T18:54:35+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: isolated_worker_branch
@@ -65,14 +65,14 @@ depends_on:
   - main 0fe1ecb3569f1d8372209c857ab57f3b626c29ae
 related_prs:
   - PR #828 Wave 1 worker Draft
-current_blocker: exact-head CI Package A Package B and Track A governance pending on current-main restack
-next_action: publish current-main restack, obtain fresh exact-head CI Package A Package B and Track A governance, then return Draft PR #828 to OTC-VISION-P2-COORDINATOR
+current_blocker: none
+next_action: return current-main-green Draft PR #828 to OTC-VISION-P2-COORDINATOR for integration classification; worker must not self-promote or merge
 invocation_started_at: 2026-09-01T17:02:17+02:00
-last_progress_at: 2026-09-01T18:51:01+02:00
-ci_checks_for_current_head: 0
-ci_check_generation: current-main-restack-d240e63c51d6
-terminal_ci_wait_started_at: null
-terminal_ci_checks_for_current_generation: 0
+last_progress_at: 2026-09-01T18:54:35+02:00
+ci_checks_for_current_head: 4
+ci_check_generation: current-main-green-9d751f340e0a
+terminal_ci_wait_started_at: 2026-09-01T18:52:09+02:00
+terminal_ci_checks_for_current_generation: 4
 unchanged_state_checks: 0
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
@@ -144,11 +144,11 @@ runtime_access: none
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T18:51:01+02:00
+updated_at: 2026-09-01T18:54:35+02:00
 head: d240e63c51d672356e1f9b396f14cfda10b0dc45
 branch: feat/OTC-20260901-vision-p2-runtime-signals
 pr: 828
-status: validating
+status: ready
 context_routes:
   - phase-2-read-only-coordination
   - track-a-governance
@@ -166,12 +166,12 @@ proven:
   - fresh post-restack focused runtime-signals suite passes 21/21; Ruff and py_compile pass.
   - fresh frozen vision benchmark passes 34/34.
   - fresh Track A runtime governance, checkpoint validation and git diff --check pass; changed paths remain exactly four worker-owned files.
+  - exact head 9d751f340e0a9d1331d7f854795a7aa9d4b93425 passed CI 33534363910, Package A 33534363711, Package B 33534363817 and Track A governance 33534363709.
   - no Official Tibia observation, model inference, credentials, GUI input, process control, process memory, payload capture or physical action occurred.
 derived:
-  - current-main repository/static revalidation is locally green and ready for fresh hosted exact-head checks.
+  - current-main repository/static revalidation is green locally and on exact-head hosted checks.
   - consumer/integration must still construct runtime-signal binding only from an accepted current #826 admission; this worker does not self-grant that authority.
 unknown:
-  - exact-head CI Package A Package B and Track A governance outcome after publication.
   - coordinator promotion/integration disposition after fresh hosted validation.
 conflicts: []
 first_failure:
@@ -198,7 +198,9 @@ validation:
   - command: Track A governance checkpoint validator and git diff --check
     result: PASS
     evidence: governance and checkpoint pass; exact changed paths remain four worker-owned files.
-blockers:
-  - exact-head hosted CI Package A Package B and Track A governance pending after publication.
-next_action: publish current-main restack, obtain fresh exact-head CI Package A Package B and Track A governance, then return Draft PR #828 to OTC-VISION-P2-COORDINATOR.
+  - command: GitHub exact-head hosted gates on 9d751f340e0a9d1331d7f854795a7aa9d4b93425
+    result: PASS
+    evidence: CI 33534363910, Package A 33534363711, Package B 33534363817 and Track A governance 33534363709 all conclude success.
+blockers: []
+next_action: return current-main-green Draft PR #828 to OTC-VISION-P2-COORDINATOR for integration classification; worker must not self-promote or merge.
 ```

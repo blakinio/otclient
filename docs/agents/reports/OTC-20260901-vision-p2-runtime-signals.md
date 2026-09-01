@@ -91,7 +91,7 @@ After shared Package A repair #833 and coordinator checkpoint #836 merged, this 
 - `git diff --check`: PASS;
 - exact changed paths remain the four worker-owned files.
 
-No live runtime evidence is claimed or authorized. Fresh exact-head GitHub CI / Package A / Package B / Track A governance is required after publication before coordinator promotion.
+No live runtime evidence is claimed or authorized. Exact head `9d751f340e0a9d1331d7f854795a7aa9d4b93425` passed CI `33534363910`, Package A `33534363711`, Package B `33534363817` and Track A governance `33534363709`. The Draft PR is returned to the coordinator for integration classification; the worker does not self-promote or merge.
 
 ## Remaining proof boundary
 

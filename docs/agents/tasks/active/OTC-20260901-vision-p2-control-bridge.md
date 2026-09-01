@@ -1,7 +1,7 @@
 ---
 task_id: OTC-20260901-vision-p2-control-bridge
-status: ready
-agent: unclaimed
+status: implementing
+agent: chatgpt-gpt-5.6-sol
 session_role: phase2_worker
 worker_alias: OTC-VISION-P2-CONTROL-BRIDGE
 programme_id: OTC-VISION-P2-READONLY
@@ -9,12 +9,12 @@ project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: implementation
-phase: dispatch_ready
+phase: implement
 branch: feat/OTC-20260901-vision-p2-control-bridge
 base_branch: main
-base_main: 0fe1ecb3569f1d8372209c857ab57f3b626c29ae
+base_main: ca1a71b5852f6e00ba144ed183af470555c51f56
 created: 2026-09-01T16:27:39+02:00
-updated_at: 2026-09-01T16:31:41+02:00
+updated_at: 2026-09-01T16:52:55+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: isolated_worker_branch
@@ -72,12 +72,12 @@ owned_paths:
 depends_on:
   - PR #820 merged foundation
   - PR #824 merged Wave 0 coordinator cleanup
-  - main 0fe1ecb3569f1d8372209c857ab57f3b626c29ae
+  - main ca1a71b5852f6e00ba144ed183af470555c51f56
 related_prs:
   - PR #830 Wave 1 worker Draft
 current_blocker: none
-next_action: launch OTC-VISION-P2-CONTROL-BRIDGE in its isolated worker session, verify Draft PR #830 still matches this branch/worktree/ownership, read binding contracts, then write the first RED focused test at tests/tools/tibia_re_control_center/test_agent_edge_bridge.py with runtime_access none
-invocation_started_at: null
+next_action: run focused baseline Control Center agent tests on rebased main, then write the first RED edge-bridge test with runtime_access none
+invocation_started_at: 2026-09-01T16:49:00+02:00
 last_progress_at: 2026-09-01T16:31:41+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: pr-bound-bootstrap
@@ -146,7 +146,7 @@ worker_alias: OTC-VISION-P2-CONTROL-BRIDGE
 TASK_ID: OTC-20260901-vision-p2-control-bridge
 TASK_RECORD: docs/agents/tasks/active/OTC-20260901-vision-p2-control-bridge.md
 PROJECT_LANE: otclient
-BASE_MAIN: 0fe1ecb3569f1d8372209c857ab57f3b626c29ae
+BASE_MAIN: ca1a71b5852f6e00ba144ed183af470555c51f56
 BRANCH: feat/OTC-20260901-vision-p2-control-bridge
 WORKTREE: C:/Users/barte/otclient-vision-p2-control-bridge
 OWNED_PATHS:
@@ -174,11 +174,11 @@ runtime_access: none
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T16:31:41+02:00
-head: 4cfc3a94fd4bff9a6548f9fce6cd185d8bccbaae
+updated_at: 2026-09-01T16:52:55+02:00
+head: 46ad8c08fa6cfc7dba38a9a8f8b31d774e55dbba
 branch: feat/OTC-20260901-vision-p2-control-bridge
 pr: 830
-status: ready
+status: implementing
 context_routes:
   - phase-2-read-only-coordination
   - track-a-governance
@@ -199,35 +199,31 @@ owned_paths:
   - tests/tools/tibia_re_control_center/test_agent_mcp.py
   - tests/tools/tibia_re_control_center/test_agent_persistence.py
 proven:
-  - branch and isolated worktree were created by the coordinator from exact main 0fe1ecb3569f1d8372209c857ab57f3b626c29ae.
-  - Draft PR 830 exists for this exact worker branch and was opened from bootstrap head 4cfc3a94fd4bff9a6548f9fce6cd185d8bccbaae.
-  - PR 820 and PR 824 are merged prerequisites.
-  - coordinator pairwise and refreshed-main ownership scans found no overlap for this worker ownership set.
-  - bootstrap checkpoint, Track A runtime governance and git diff --check passed before PR binding.
+  - live Draft PR 830 still targets main from this exact worker branch; pre-rebase remote head was 7d5ccdb80aa523c3128bef0b8e4faef4450146fe.
+  - isolated worktree C:/Users/barte/otclient-vision-p2-control-bridge is on the unique worker branch and was clean before claim.
+  - current main is ca1a71b5852f6e00ba144ed183af470555c51f56; its only drift from the dispatch base is coordinator task state from merged PR 825.
+  - active-task ownership scan found no other owner of this worker's Control Center implementation/test paths.
   - runtime_access is none; all mutation/runtime-effect authorities remain false and physical action budget/count are 0/0.
 derived:
-  - the isolated worker may begin repository/static RED-to-GREEN work only after its own session revalidates this task, Draft PR, branch, worktree and ownership.
+  - repository/static RED-to-GREEN implementation may proceed; official-client observation remains forbidden in this invocation.
 unknown:
-  - implementation, focused test, review and exact-head CI outcomes.
-  - any future real-runtime evidence; none is authorized or claimed at bootstrap.
+  - focused baseline outcome and implementation behavior.
+  - exact-head CI and coordinator classification.
 conflicts: []
 first_failure:
   marker: none
-  evidence: no current failure; worker session has not yet claimed execution.
+  evidence: no implementation test has run yet.
 rejected_hypotheses:
-  - fake or hosted evidence can satisfy real-runtime acceptance: rejected by the Phase 2 contract.
+  - real runtime access is needed for this implementation slice: rejected; task is explicitly repository/static with runtime_access none.
 changed_paths:
   - docs/agents/tasks/active/OTC-20260901-vision-p2-control-bridge.md
 validation:
-  - command: coordinator refreshed-main and pairwise ownership scans
+  - command: git rebase origin/main
     result: PASS
-    evidence: no worker-worker or active-main exact ownership conflicts.
-  - command: bootstrap Track A governance and checkpoint validation
+    evidence: worker branch rebased cleanly onto ca1a71b5852f6e00ba144ed183af470555c51f56.
+  - command: active task ownership scan
     result: PASS
-    evidence: task was branch-bound and runtime_access none admission was valid before Draft PR binding.
-  - command: live Draft PR creation readback
-    result: PASS
-    evidence: PR 830 opened Draft against main from feat/OTC-20260901-vision-p2-control-bridge at 4cfc3a94fd4bff9a6548f9fce6cd185d8bccbaae.
+    evidence: no overlapping active task owns the declared Control Center paths.
 blockers: []
-next_action: launch OTC-VISION-P2-CONTROL-BRIDGE in its isolated worker session, verify Draft PR #830 still matches this branch/worktree/ownership, read binding contracts, then write the first RED focused test at tests/tools/tibia_re_control_center/test_agent_edge_bridge.py with runtime_access none.
+next_action: run focused baseline Control Center agent tests, then write the first RED edge-bridge test.
 ```

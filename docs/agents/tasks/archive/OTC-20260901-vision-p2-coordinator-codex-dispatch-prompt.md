@@ -14,7 +14,7 @@ branch: docs/OTC-20260901-vision-p2-coordinator-codex-dispatch-prompt-closeout
 base_branch: main
 base_sha: d1cb8722c3116a0e0aeb72b9b360712f43151f17
 created: 2026-09-01T22:55:00+02:00
-updated_at: 2026-09-01T23:16:11+02:00
+updated_at: 2026-09-01T23:19:53+02:00
 risk: low
 execution_class: local_owner_pc
 execution_mode: remote_desktop_plus_github
@@ -58,7 +58,7 @@ blocks: []
 cross_repository_task_ids: []
 related_pr: 844
 implementation_pr: 844
-archive_pr: null
+archive_pr: 845
 implementation_final_head: de72822c199684911557c513772e90b88f120bf9
 implementation_merge: b4e13e16f6bbe8a77d9aad54d4cf697b0706dce1
 merged_at: 2026-09-01T21:15:29Z
@@ -78,7 +78,7 @@ e2e:
   result: NOT_APPLICABLE
   reason: prompt/documentation-only coordinator routing change; no executable, UI, runtime, network or product behavior changed
 invocation_started_at: 2026-09-01T22:55:00+02:00
-last_progress_at: 2026-09-01T23:16:11+02:00
+last_progress_at: 2026-09-01T23:19:53+02:00
 ci_checks_for_current_head: 2
 ci_check_generation: final-green-de72822c1996
 terminal_ci_wait_started_at: null
@@ -106,11 +106,11 @@ Make a newly started `OTC-VISION-P2-COORDINATOR` understand that it is the super
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T23:16:11+02:00
+updated_at: 2026-09-01T23:19:53+02:00
 head: b4e13e16f6bbe8a77d9aad54d4cf697b0706dce1
 head_semantics: merged_implementation_main_before_archive_commit
 branch: docs/OTC-20260901-vision-p2-coordinator-codex-dispatch-prompt-closeout
-pr: 844
+pr: 845
 status: completed
 context_routes:
   - agent-governance

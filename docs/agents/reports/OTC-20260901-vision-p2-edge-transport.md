@@ -83,7 +83,7 @@ No runtime, credential, GUI, process, payload-capture or physical action occurre
 
 Local repair validation is `38/38` focused edge-transport tests and `55/55` protocol-plus-transport tests, with Ruff, `py_compile`, checkpoint validation, exact changed-task Track A governance validation and `git diff --check` passing. Hosted CI remains required on the next exact repair head.
 
-The local repair head is pending remote force-with-lease publication and fresh hosted exact-head validation.
+The repair was force-with-lease published to Draft PR #829. Its first generated runs were Package B `33560202250`, Package A `33560202292`, CI `33560202851` and Track A governance `33560202267`; a final checkpoint-head run is now required before handoff.
 
 ## Fresh resumed-worker validation
 

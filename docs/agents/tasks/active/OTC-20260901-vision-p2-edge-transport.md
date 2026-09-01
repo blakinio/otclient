@@ -14,7 +14,7 @@ branch: feat/OTC-20260901-vision-p2-edge-transport
 base_branch: main
 base_main: d1cb8722c3116a0e0aeb72b9b360712f43151f17
 created: 2026-09-01T16:27:39+02:00
-updated_at: 2026-09-01T23:16:21+02:00
+updated_at: 2026-09-01T23:17:22+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: isolated_worker_branch
@@ -66,7 +66,7 @@ depends_on:
 related_prs:
   - PR #829 Wave 1 worker Draft
 current_blocker: independent review comment 5500413800 returned exact green head fe258ecdb65cbc6802b54d2adff57ecb4357865a for bounded repair of schema admission, epoch replay binding, constructor proof and numeric canonicalization.
-next_action: publish the current local repair head with a force-with-lease update to Draft PR #829, then obtain fresh exact-head CI; worker must not mark it ready, promote, or merge.
+next_action: await one fresh aggregate exact-head CI observation for Draft PR #829, then return the evidence and request coordinator independent re-review; worker must not mark it ready, promote, or merge.
 invocation_started_at: 2026-09-01T17:03:28+02:00
 last_progress_at: 2026-09-01T22:52:27+02:00
 ci_checks_for_current_head: 1
@@ -99,7 +99,7 @@ The local RED→GREEN repair replaces open-ended metadata admission with per-kin
 
 Local validation at `2026-09-01T23:15:47+02:00`: focused edge transport `38/38`, protocol plus edge transport `55/55`, Ruff, `py_compile`, checkpoint validation, exact changed-task Track A governance validation, and `git diff --check` all passed. The attempted obsolete governance command path was corrected to `.github/scripts/test_track_a_agent_runtime_governance.py`; no source or authority change resulted.
 
-The current local repair head contains exactly the four declared owned paths. It is not published yet; the recorded remote lease head is still `fe258ecdb65cbc6802b54d2adff57ecb4357865a`.
+The repair was safely force-with-lease published to Draft PR #829 at `c2997a5ddb95fa8ad6ecaac352c2618c357994d5`, replacing only prior worker head `fe258ecdb65cbc6802b54d2adff57ecb4357865a`. Fresh runs were created: Package B `33560202250`, Package A `33560202292`, CI `33560202851` and Track A governance `33560202267`. This checkpoint commit itself now becomes the final exact head and therefore requires its own fresh aggregate observation.
 
 ## Dispatch boundary
 

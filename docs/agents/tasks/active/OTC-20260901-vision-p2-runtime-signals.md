@@ -14,7 +14,7 @@ branch: feat/OTC-20260901-vision-p2-runtime-signals
 base_branch: main
 base_main: 0fe1ecb3569f1d8372209c857ab57f3b626c29ae
 created: 2026-09-01T16:27:39+02:00
-updated_at: 2026-09-01T17:56:26+02:00
+updated_at: 2026-09-01T17:59:16+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: isolated_worker_branch
@@ -66,11 +66,11 @@ depends_on:
 related_prs:
   - PR #828 Wave 1 worker Draft
 current_blocker: none
-next_action: publish the admission-bound runtime-signals follow-up to Draft PR #828, inspect exact-head GitHub CI, then return the worker result to OTC-VISION-P2-COORDINATOR
+next_action: publish this coherent checkpoint, inspect exact-head GitHub CI for Draft PR #828, then return the worker result to OTC-VISION-P2-COORDINATOR
 invocation_started_at: 2026-09-01T17:02:17+02:00
-last_progress_at: 2026-09-01T17:56:26+02:00
+last_progress_at: 2026-09-01T17:59:16+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: admission-bound-followup-pending-publish
+ci_check_generation: admission-bound-exact-head-pending-publish
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -144,8 +144,8 @@ runtime_access: none
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T17:56:26+02:00
-head: 16f9af0123e4ead21d2f97c1919a92826427fe95
+updated_at: 2026-09-01T17:59:16+02:00
+head: f360f29c5de53cafaa09952eb98138ae3b2c6c5a
 branch: feat/OTC-20260901-vision-p2-runtime-signals
 pr: 828
 status: validating
@@ -178,7 +178,7 @@ unknown:
 conflicts: []
 first_failure:
   marker: EXACT_HEAD_CI_NOT_RUN
-  evidence: admission-binding follow-up is locally validated but has not yet been committed/pushed from implementation head 16f9af0123e4ead21d2f97c1919a92826427fe95.
+  evidence: admission-bound implementation is published through f360f29c5de53cafaa09952eb98138ae3b2c6c5a; this checkpoint correction has not yet been published or checked by exact-head GitHub CI.
 rejected_hypotheses:
   - the five full-suite errors were introduced by runtime-signals changes: rejected because the exact three failing test methods reproduce on clean head 11fc18820 with the local implementation stashed.
   - structural/QMeta/window/model evidence may assert IN_GAME: rejected by the binding Phase 2 contract and enforced by contract validation.
@@ -208,5 +208,5 @@ validation:
     result: PASS
     evidence: no owned-path overlap on refreshed main ca1a71b5852f6e00ba144ed183af470555c51f56.
 blockers: []
-next_action: publish the admission-bound runtime-signals follow-up to Draft PR #828, inspect exact-head GitHub CI, then return the worker result to OTC-VISION-P2-COORDINATOR.
+next_action: publish this coherent checkpoint, inspect exact-head GitHub CI for Draft PR #828, then return the worker result to OTC-VISION-P2-COORDINATOR.
 ```

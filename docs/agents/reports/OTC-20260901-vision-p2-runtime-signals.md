@@ -63,7 +63,7 @@ Focused final suite: `21` tests PASS.
 
 Final local evidence before publication:
 
-- `python -m unittest tests.tools.tibia_re_control_center.test_agent_runtime_signals -q` -> 20 PASS;
+- `python -m unittest tests.tools.tibia_re_control_center.test_agent_runtime_signals -q` -> 21 PASS;
 - filtered full Control Center suite -> 476 PASS, 2 skipped, excluding exactly three clean-head baseline-failing test methods documented below;
 - frozen vision benchmark -> 34 PASS;
 - `python -m ruff check tools/tibia_re_control_center/agent_runtime_signals.py tests/tools/tibia_re_control_center/test_agent_runtime_signals.py` -> PASS;

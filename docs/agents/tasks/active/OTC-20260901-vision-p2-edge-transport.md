@@ -12,9 +12,9 @@ task_kind: implementation
 phase: security_repair_local_validation_passed
 branch: feat/OTC-20260901-vision-p2-edge-transport
 base_branch: main
-base_main: d1cb8722c3116a0e0aeb72b9b360712f43151f17
+base_main: b4e13e16f6bbe8a77d9aad54d4cf697b0706dce1
 created: 2026-09-01T16:27:39+02:00
-updated_at: 2026-09-01T23:17:22+02:00
+updated_at: 2026-09-01T23:21:03+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: isolated_worker_branch
@@ -65,8 +65,8 @@ depends_on:
   - current main d1cb8722c3116a0e0aeb72b9b360712f43151f17 after the subsequent main advance
 related_prs:
   - PR #829 Wave 1 worker Draft
-current_blocker: independent review comment 5500413800 returned exact green head fe258ecdb65cbc6802b54d2adff57ecb4357865a for bounded repair of schema admission, epoch replay binding, constructor proof and numeric canonicalization.
-next_action: await one fresh aggregate exact-head CI observation for Draft PR #829, then return the evidence and request coordinator independent re-review; worker must not mark it ready, promote, or merge.
+current_blocker: prior exact-head Package A path-boundary audit compared a stale topology and failed before falsification; its deterministic core passed. The branch is now cleanly restacked on current main b4e13e16f6bbe8a77d9aad54d4cf697b0706dce1.
+next_action: force-with-lease publish the current-main-restacked repair head, obtain fresh exact-head CI, then return the evidence and request coordinator independent re-review; worker must not mark it ready, promote, or merge.
 invocation_started_at: 2026-09-01T17:03:28+02:00
 last_progress_at: 2026-09-01T22:52:27+02:00
 ci_checks_for_current_head: 1
@@ -99,7 +99,7 @@ The local RED→GREEN repair replaces open-ended metadata admission with per-kin
 
 Local validation at `2026-09-01T23:15:47+02:00`: focused edge transport `38/38`, protocol plus edge transport `55/55`, Ruff, `py_compile`, checkpoint validation, exact changed-task Track A governance validation, and `git diff --check` all passed. The attempted obsolete governance command path was corrected to `.github/scripts/test_track_a_agent_runtime_governance.py`; no source or authority change resulted.
 
-The repair was safely force-with-lease published to Draft PR #829 at `c2997a5ddb95fa8ad6ecaac352c2618c357994d5`, replacing only prior worker head `fe258ecdb65cbc6802b54d2adff57ecb4357865a`. Fresh runs were created: Package B `33560202250`, Package A `33560202292`, CI `33560202851` and Track A governance `33560202267`. This checkpoint commit itself now becomes the final exact head and therefore requires its own fresh aggregate observation.
+The prior publication generated Package B `33560269278`, Package A `33560269282`, CI `33560269528` and Track A governance `33560269190` on the pre-restack head. Package A deterministic core passed; its fresh falsification path audit failed only because the stale topology made four current-main Phase 2 prompt files appear unexpected. The clean rebase at `61010d8f6d5797829a00ec5dd1e05b1f9e57fe4a` makes `origin/main..HEAD` exactly the four declared worker-owned paths, so a final force-with-lease publication and fresh exact-head aggregate are required.
 
 ## Dispatch boundary
 

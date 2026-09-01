@@ -14,7 +14,7 @@ branch: feat/OTC-20260901-vision-p2-runtime-signals
 base_branch: main
 base_main: 0fe1ecb3569f1d8372209c857ab57f3b626c29ae
 created: 2026-09-01T16:27:39+02:00
-updated_at: 2026-09-01T16:27:39+02:00
+updated_at: 2026-09-01T16:31:41+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: isolated_worker_branch
@@ -63,13 +63,14 @@ depends_on:
   - PR #820 merged foundation
   - PR #824 merged Wave 0 coordinator cleanup
   - main 0fe1ecb3569f1d8372209c857ab57f3b626c29ae
-related_prs: []
+related_prs:
+  - PR #828 Wave 1 worker Draft
 current_blocker: none
-next_action: coordinator opens and binds the worker Draft PR, then the isolated worker session validates this task/branch/worktree/ownership and begins the first RED focused test without runtime access
+next_action: launch OTC-VISION-P2-RUNTIME-SIGNALS in its isolated worker session, verify Draft PR #828 still matches this branch/worktree/ownership, read binding contracts, then write the first RED focused test at tests/tools/tibia_re_control_center/test_agent_runtime_signals.py with runtime_access none
 invocation_started_at: null
-last_progress_at: 2026-09-01T16:27:39+02:00
+last_progress_at: 2026-09-01T16:31:41+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: bootstrap
+ci_check_generation: pr-bound-bootstrap
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -143,10 +144,10 @@ runtime_access: none
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T16:27:39+02:00
-head: 0fe1ecb3569f1d8372209c857ab57f3b626c29ae
+updated_at: 2026-09-01T16:31:41+02:00
+head: 160f8d1d93e8f09a05c58cd2f3d0f388ac322035
 branch: feat/OTC-20260901-vision-p2-runtime-signals
-pr: none
+pr: 828
 status: ready
 context_routes:
   - phase-2-read-only-coordination
@@ -159,29 +160,34 @@ owned_paths:
   - tests/tools/tibia_re_control_center/test_agent_runtime_signals.py
 proven:
   - branch and isolated worktree were created by the coordinator from exact main 0fe1ecb3569f1d8372209c857ab57f3b626c29ae.
+  - Draft PR 828 exists for this exact worker branch and was opened from bootstrap head 160f8d1d93e8f09a05c58cd2f3d0f388ac322035.
   - PR 820 and PR 824 are merged prerequisites.
-  - refreshed coordinator ownership scan found no active writer claim on this worker ownership set before bootstrap.
+  - coordinator pairwise and refreshed-main ownership scans found no overlap for this worker ownership set.
+  - bootstrap checkpoint, Track A runtime governance and git diff --check passed before PR binding.
   - runtime_access is none; all mutation/runtime-effect authorities remain false and physical action budget/count are 0/0.
 derived:
-  - after Draft PR binding and isolated-session validation, repository/static TDD may begin only inside owned_paths.
+  - the isolated worker may begin repository/static RED-to-GREEN work only after its own session revalidates this task, Draft PR, branch, worktree and ownership.
 unknown:
-  - implementation, focused test, review and CI outcomes.
+  - implementation, focused test, review and exact-head CI outcomes.
   - any future real-runtime evidence; none is authorized or claimed at bootstrap.
 conflicts: []
 first_failure:
   marker: none
-  evidence: no current failure; worker dispatch is not yet claimed.
+  evidence: no current failure; worker session has not yet claimed execution.
 rejected_hypotheses:
   - fake or hosted evidence can satisfy real-runtime acceptance: rejected by the Phase 2 contract.
 changed_paths:
   - docs/agents/tasks/active/OTC-20260901-vision-p2-runtime-signals.md
 validation:
-  - command: coordinator refreshed-main ownership scan
+  - command: coordinator refreshed-main and pairwise ownership scans
     result: PASS
-    evidence: ownership set was non-overlapping at bootstrap.
-  - command: worktree HEAD readback
+    evidence: no worker-worker or active-main exact ownership conflicts.
+  - command: bootstrap Track A governance and checkpoint validation
     result: PASS
-    evidence: exact base 0fe1ecb3569f1d8372209c857ab57f3b626c29ae.
+    evidence: task was branch-bound and runtime_access none admission was valid before Draft PR binding.
+  - command: live Draft PR creation readback
+    result: PASS
+    evidence: PR 828 opened Draft against main from feat/OTC-20260901-vision-p2-runtime-signals at 160f8d1d93e8f09a05c58cd2f3d0f388ac322035.
 blockers: []
-next_action: coordinator opens and binds the worker Draft PR, then the isolated worker session validates this task/branch/worktree/ownership and begins the first RED focused test without runtime access.
+next_action: launch OTC-VISION-P2-RUNTIME-SIGNALS in its isolated worker session, verify Draft PR #828 still matches this branch/worktree/ownership, read binding contracts, then write the first RED focused test at tests/tools/tibia_re_control_center/test_agent_runtime_signals.py with runtime_access none.
 ```

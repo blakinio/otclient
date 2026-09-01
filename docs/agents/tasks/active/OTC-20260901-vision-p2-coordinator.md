@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260901-vision-p2-coordinator
-status: implementing
+status: validating
 agent: ChatGPT
 session_role: programme_coordinator
 worker_alias: OTC-VISION-P2-COORDINATOR
@@ -9,12 +9,12 @@ project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: coordination
-phase: wave_0_reconciliation
+phase: wave_0_cleanup_validation
 branch: docs/OTC-20260901-vision-p2-coordinator
 base_branch: main
 base_main: 21fedc04809f0f78a1ff673edb2804a83ab5fedb
 created: 2026-09-01T15:45:26+02:00
-updated_at: 2026-09-01T15:45:26+02:00
+updated_at: 2026-09-01T15:55:30+02:00
 risk: high
 execution_class: github_coordination
 execution_mode: chat_github
@@ -37,24 +37,23 @@ network_payload_capture_allowed: false
 process_memory_access_allowed: false
 physical_action_budget: 0
 physical_action_count: 0
-worktree: NOT_APPLICABLE
+worktree: C:/Users/barte/otclient-vision-p2-coordinator
 owned_paths:
   - docs/agents/tasks/active/OTC-20260901-vision-p2-coordinator.md
-  - docs/agents/tasks/active/OTC-20260830-local-vision-agent-supervisor-discovery.md
-  - docs/agents/tasks/active/OTC-20260830-local-vision-agent-supervisor-foundation.md
   - docs/agents/tasks/archive/OTC-20260830-local-vision-agent-supervisor-discovery.md
   - docs/agents/tasks/archive/OTC-20260830-local-vision-agent-supervisor-foundation.md
 depends_on:
   - PR #820 merged foundation
   - PR #823 merged Phase 2 prompt-package closeout
 related_prs:
-  - PR #808 historical discovery Draft, expected superseded after #820
-  - PR #810 historical foundation Draft, expected superseded after #820
+  - PR #808 closed historical discovery Draft; superseded after #820
+  - PR #810 closed historical foundation Draft; superseded after #820
   - PR #820 merged foundation integration
+  - PR #824 Wave 0 coordinator cleanup Draft
 current_blocker: none
-next_action: terminally close superseded PRs #808/#810 and archive stale foundation/discovery active task ownership before Wave 1 dispatch
+next_action: validate coordinator checkpoint/control-room and PR #824 exact-head checks; merge bounded cleanup only if all required gates pass
 invocation_started_at: 2026-09-01T15:35:00+02:00
-last_progress_at: 2026-09-01T15:45:26+02:00
+last_progress_at: 2026-09-01T15:55:30+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: draft
 terminal_ci_wait_started_at: null
@@ -65,6 +64,7 @@ repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 0
 stall_warnings: 0
 ---
+
 
 # OTC Vision Phase 2 read-only programme coordinator
 
@@ -83,11 +83,11 @@ Reconcile Phase 2 live state, release stale foundation ownership, create exact n
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T15:45:26+02:00
-head: 21fedc04809f0f78a1ff673edb2804a83ab5fedb
+updated_at: 2026-09-01T15:55:30+02:00
+head: 55f642f5ee0b4d8d2a9bff982af948ceb44b1871
 branch: docs/OTC-20260901-vision-p2-coordinator
-pr: none
-status: implementing
+pr: 824
+status: validating
 context_routes:
   - phase-2-read-only-coordination
   - autonomous-program
@@ -95,37 +95,37 @@ context_routes:
   - track-a-governance
 owned_paths:
   - docs/agents/tasks/active/OTC-20260901-vision-p2-coordinator.md
-  - docs/agents/tasks/active/OTC-20260830-local-vision-agent-supervisor-discovery.md
-  - docs/agents/tasks/active/OTC-20260830-local-vision-agent-supervisor-foundation.md
   - docs/agents/tasks/archive/OTC-20260830-local-vision-agent-supervisor-discovery.md
   - docs/agents/tasks/archive/OTC-20260830-local-vision-agent-supervisor-foundation.md
 proven:
-  - main is 21fedc04809f0f78a1ff673edb2804a83ab5fedb.
-  - PR 820 is merged and the Phase 2 prompt family is merged on main.
-  - no active task on main currently has programme_id OTC-VISION-P2-READONLY.
-  - historical foundation/discovery task records remain active and claim paths needed by Wave 1.
-  - PR 808 and PR 810 remain open Drafts although PR 820 explicitly superseded them after successful merge.
+  - main base for Wave 0 is 21fedc04809f0f78a1ff673edb2804a83ab5fedb.
+  - PR 820 is merged; PRs 808 and 810 are now closed historical Drafts.
+  - stale discovery/foundation active task records were moved to archive and top-level owned_paths were released in 55f642f5ee0b4d8d2a9bff982af948ceb44b1871.
+  - coordinator Draft PR 824 exists against main.
 derived:
-  - Wave 1 write-capable dispatch is unsafe until stale foundation/discovery ownership is released.
+  - the original stale ownership conflict is resolved on the coordinator branch but not yet on main until PR 824 merges.
 unknown:
-  - exact Wave 1 branch heads and PR numbers until bootstrap completes.
-conflicts:
-  - stale foundation ownership claims tools/tibia_re_control_center/** and tools/tibia_re_vision/** after merged replacement #820.
+  - exact required-check result for PR 824 after the cleanup commit publishes.
+conflicts: []
 first_failure:
   marker: WAVE0-STALE-FOUNDATION-OWNERSHIP
-  evidence: active foundation/discovery task records plus open Draft PRs #808/#810 on live main/GitHub.
+  evidence: resolved by PR closures 808/810 and archive commit 55f642f5ee0b4d8d2a9bff982af948ceb44b1871; main awaits PR 824 merge.
 rejected_hypotheses:
-  - Phase 2 already has concrete worker tasks: rejected by live main active-task search.
   - direct Codex CLI dispatch is available on Molehill-PC: rejected; codex executable not found.
 changed_paths:
   - docs/agents/tasks/active/OTC-20260901-vision-p2-coordinator.md
+  - docs/agents/tasks/archive/OTC-20260830-local-vision-agent-supervisor-discovery.md
+  - docs/agents/tasks/archive/OTC-20260830-local-vision-agent-supervisor-foundation.md
 validation:
-  - command: live main branch readback
+  - command: live GitHub lifecycle readback
     result: PASS
-    evidence: GitHub main 21fedc04809f0f78a1ff673edb2804a83ab5fedb
-  - command: PR #820 live readback
+    evidence: PR 820 merged; PRs 808 and 810 closed
+  - command: git diff --check
     result: PASS
-    evidence: merged at 2026-08-31T21:27:08Z
+    evidence: no whitespace errors after archive transformation
+  - command: isolated coordinator worktree readback
+    result: PASS
+    evidence: unique worktree C:/Users/barte/otclient-vision-p2-coordinator on coordinator branch
 blockers: []
-next_action: close superseded PRs #808/#810 and archive stale foundation/discovery ownership, then validate and merge the coordination cleanup before Wave 1 task creation.
+next_action: validate coordinator checkpoint/control-room and PR #824 exact-head checks; merge bounded cleanup only if all required gates pass.
 ```

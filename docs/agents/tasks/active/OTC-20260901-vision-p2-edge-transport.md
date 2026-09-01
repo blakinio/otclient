@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260901-vision-p2-edge-transport
-status: waiting
+status: validating
 agent: ChatGPT
 session_role: phase2_worker
 worker_alias: OTC-VISION-P2-EDGE-TRANSPORT
@@ -9,12 +9,12 @@ project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: implementation
-phase: worker_exact_head_ci_passed_return_to_coordinator
+phase: security_repair_local_validation_passed
 branch: feat/OTC-20260901-vision-p2-edge-transport
 base_branch: main
 base_main: d1cb8722c3116a0e0aeb72b9b360712f43151f17
 created: 2026-09-01T16:27:39+02:00
-updated_at: 2026-09-01T22:52:27+02:00
+updated_at: 2026-09-01T23:16:21+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: isolated_worker_branch
@@ -65,8 +65,8 @@ depends_on:
   - current main d1cb8722c3116a0e0aeb72b9b360712f43151f17 after the subsequent main advance
 related_prs:
   - PR #829 Wave 1 worker Draft
-current_blocker: none; prior Package A failure combined stale-base path-boundary drift with a reproducible unowned test_agent_session concurrency flake
-next_action: coordinator must classify Draft PR #829; worker must not mark it ready, promote, or merge.
+current_blocker: independent review comment 5500413800 returned exact green head fe258ecdb65cbc6802b54d2adff57ecb4357865a for bounded repair of schema admission, epoch replay binding, constructor proof and numeric canonicalization.
+next_action: publish the current local repair head with a force-with-lease update to Draft PR #829, then obtain fresh exact-head CI; worker must not mark it ready, promote, or merge.
 invocation_started_at: 2026-09-01T17:03:28+02:00
 last_progress_at: 2026-09-01T22:52:27+02:00
 ci_checks_for_current_head: 1
@@ -90,6 +90,16 @@ runtime_nonclaims:
 ## Mission
 
 Implement a narrow authenticated bounded Synology-to-Molehill edge transport with versioned metadata and content-addressed artifacts, without generic shell, raw GUI control or authority expansion.
+
+## Independent-review repair checkpoint — 2026-09-01T23:14:54+02:00
+
+The coordinator's exact-head independent review comment `5500413800` is the current repair authority. RED probes mechanically reproduced all four findings on `fe258ecdb65cbc6802b54d2adff57ecb4357865a`: arbitrary signed observation fields; A→B→A replay reopening; direct authenticated-object construction; and JCS-compatible `1`→`1.0` payload substitution.
+
+The local RED→GREEN repair replaces open-ended metadata admission with per-kind exact schemas, signs explicit session/run/connection-generation identity, requires a caller-persisted bounded replay ledger (including a snapshot/restore boundary), removes public constructor self-certification, and requires exact observation application types before MAC verification. New focused probes cover all four review findings plus verifier reconstruction and cross-session/run substitution. The normal no-runtime/no-authority restrictions remain unchanged; physical action budget/count remains `0/0`.
+
+Local validation at `2026-09-01T23:15:47+02:00`: focused edge transport `38/38`, protocol plus edge transport `55/55`, Ruff, `py_compile`, checkpoint validation, exact changed-task Track A governance validation, and `git diff --check` all passed. The attempted obsolete governance command path was corrected to `.github/scripts/test_track_a_agent_runtime_governance.py`; no source or authority change resulted.
+
+The current local repair head contains exactly the four declared owned paths. It is not published yet; the recorded remote lease head is still `fe258ecdb65cbc6802b54d2adff57ecb4357865a`.
 
 ## Dispatch boundary
 

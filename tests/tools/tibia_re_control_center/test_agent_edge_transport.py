@@ -4,6 +4,7 @@ import unittest
 
 from tools.tibia_re_control_center.agent_edge_transport import (
     EdgeFrameKind,
+    EdgeReplayLedger,
     EdgeTransportSigner,
     EdgeTransportVerifier,
 )
@@ -21,6 +22,7 @@ class AgentEdgeTransportTests(unittest.TestCase):
         verifier = EdgeTransportVerifier(
             expected_peer_id="synology-edge",
             expected_peer_auth_key=EDGE_KEY,
+            replay_ledger=EdgeReplayLedger(),
         )
 
         packet = signer.seal(
@@ -44,6 +46,7 @@ class AgentEdgeTransportTests(unittest.TestCase):
         verifier = EdgeTransportVerifier(
             expected_peer_id="synology-edge",
             expected_peer_auth_key=EDGE_KEY,
+            replay_ledger=EdgeReplayLedger(),
         )
         packet = (
             b'{"schema":"otclient.local-agent.edge-transport.v1",'
@@ -74,6 +77,7 @@ class AgentEdgeTransportTests(unittest.TestCase):
         verifier = EdgeTransportVerifier(
             expected_peer_id="synology-edge",
             expected_peer_auth_key=EDGE_KEY,
+            replay_ledger=EdgeReplayLedger(),
             expected_connection_id="connection-1",
         )
         first = signer.seal(
@@ -113,6 +117,7 @@ class AgentEdgeTransportTests(unittest.TestCase):
         verifier = EdgeTransportVerifier(
             expected_peer_id="synology-edge",
             expected_peer_auth_key=EDGE_KEY,
+            replay_ledger=EdgeReplayLedger(),
         )
         with self.assertRaisesRegex(Exception, "size|large|bound"):
             signer.seal(
@@ -120,7 +125,7 @@ class AgentEdgeTransportTests(unittest.TestCase):
                 connection_id="connection-large",
                 sequence=1,
                 sent_epoch_ms=1_000_000,
-                payload={"blob": "x" * 300_000},
+                payload={"runtime_signal": "x" * 300_000, "artifact_refs": []},
             )
         with self.assertRaisesRegex(Exception, "size|large|bound"):
             verifier.verify(b"{" + b" " * 300_000 + b"}", now_epoch_ms=1_000_000)
@@ -184,6 +189,7 @@ class AgentEdgeTransportTests(unittest.TestCase):
                     verifier = EdgeTransportVerifier(
                         expected_peer_id="synology-edge",
                         expected_peer_auth_key=EDGE_KEY,
+                        replay_ledger=EdgeReplayLedger(),
                     )
                     hello = verifier.verify(hello_packet, now_epoch_ms=1_000_001)
                     self.assertEqual(EdgeFrameKind.HELLO, hello.kind)
@@ -191,6 +197,8 @@ class AgentEdgeTransportTests(unittest.TestCase):
                     signer = EdgeTransportSigner(
                         local_peer_id="molehill-control",
                         local_auth_key=MOLEHILL_KEY,
+                        session_id=hello.session_id,
+                        run_id=hello.run_id,
                     )
                     ack = signer.seal(
                         kind=EdgeFrameKind.HELLO_ACK,
@@ -201,6 +209,7 @@ class AgentEdgeTransportTests(unittest.TestCase):
                             "acknowledged_peer_id": "synology-edge",
                             "transport_mode": "OUTBOUND_ONLY",
                         },
+                        connection_generation=hello.connection_generation,
                     )
                     send_packet(conn, ack)
                     observation = verifier.verify(recv_packet(conn), now_epoch_ms=1_000_004)
@@ -272,6 +281,7 @@ class AgentEdgeTransportTests(unittest.TestCase):
             EdgeTransportVerifier(
                 expected_peer_id="different-edge",
                 expected_peer_auth_key=EDGE_KEY,
+                replay_ledger=EdgeReplayLedger(),
             ).verify(packet, now_epoch_ms=1_000_001)
         self.assertEqual("EDGE_PEER_REJECTED", wrong_peer.exception.code)
 
@@ -279,6 +289,7 @@ class AgentEdgeTransportTests(unittest.TestCase):
             EdgeTransportVerifier(
                 expected_peer_id="synology-edge",
                 expected_peer_auth_key=b"x" * 32,
+                replay_ledger=EdgeReplayLedger(),
             ).verify(packet, now_epoch_ms=1_000_001)
         self.assertEqual("EDGE_AUTHENTICATION_FAILED", wrong_key.exception.code)
 
@@ -289,6 +300,7 @@ class AgentEdgeTransportTests(unittest.TestCase):
         verifier = EdgeTransportVerifier(
             expected_peer_id="synology-edge",
             expected_peer_auth_key=EDGE_KEY,
+            replay_ledger=EdgeReplayLedger(),
             expected_connection_id="connection-replay",
             max_age_ms=100,
             max_future_skew_ms=10,
@@ -345,7 +357,7 @@ class AgentEdgeTransportTests(unittest.TestCase):
             connection_id="connection-authority",
             sequence=1,
             sent_epoch_ms=1_000_000,
-            payload={"runtime_signal": "LOGIN_SCREEN"},
+            payload={"runtime_signal": "LOGIN_SCREEN", "artifact_refs": []},
         )
         decoded = json.loads(packet.decode("utf-8"))
         decoded["mutation_authorized"] = True
@@ -359,6 +371,7 @@ class AgentEdgeTransportTests(unittest.TestCase):
             EdgeTransportVerifier(
                 expected_peer_id="synology-edge",
                 expected_peer_auth_key=EDGE_KEY,
+                replay_ledger=EdgeReplayLedger(),
             ).verify(forged, now_epoch_ms=1_000_001)
         self.assertEqual("EDGE_AUTHORITY_EXPANSION_REJECTED", authority.exception.code)
 
@@ -374,6 +387,7 @@ class AgentEdgeTransportTests(unittest.TestCase):
             EdgeTransportVerifier(
                 expected_peer_id="synology-edge",
                 expected_peer_auth_key=EDGE_KEY,
+                replay_ledger=EdgeReplayLedger(),
             ).verify(wrong_version, now_epoch_ms=1_000_001)
         self.assertEqual("EDGE_VERSION_REJECTED", version.exception.code)
 
@@ -385,6 +399,7 @@ class AgentEdgeTransportTests(unittest.TestCase):
         verifier = EdgeTransportVerifier(
             expected_peer_id="synology-edge",
             expected_peer_auth_key=EDGE_KEY,
+            replay_ledger=EdgeReplayLedger(),
             expected_connection_id="connection-fixed",
         )
         packet = signer.seal(
@@ -405,6 +420,7 @@ class AgentEdgeTransportTests(unittest.TestCase):
 
 
     def test_send_failure_latches_channel_closed_and_never_retries_same_stream(self):
+        import tools.tibia_re_control_center.agent_edge_transport as transport
         from tools.tibia_re_control_center.agent_edge_transport import (
             EdgeOutboundChannel,
         )
@@ -430,6 +446,8 @@ class AgentEdgeTransportTests(unittest.TestCase):
             connection=connection,
             signer=EdgeTransportSigner(local_peer_id="synology-edge", local_auth_key=EDGE_KEY),
             connection_id="connection-failed",
+            connection_generation="test-generation-failed",
+            _proof=transport._OUTBOUND_CHANNEL_PROOF,
         )
         with self.assertRaises(ValidationError) as first:
             channel.send(
@@ -453,6 +471,7 @@ class AgentEdgeTransportTests(unittest.TestCase):
         import threading
         import time
 
+        import tools.tibia_re_control_center.agent_edge_transport as transport
         from tools.tibia_re_control_center.agent_edge_transport import (
             EdgeOutboundChannel,
         )
@@ -482,13 +501,15 @@ class AgentEdgeTransportTests(unittest.TestCase):
             connection=connection,
             signer=EdgeTransportSigner(local_peer_id="synology-edge", local_auth_key=EDGE_KEY),
             connection_id="connection-concurrent",
+            connection_generation="test-generation-concurrent",
+            _proof=transport._OUTBOUND_CHANNEL_PROOF,
         )
         sequences = []
 
         def worker(index):
             sequences.append(channel.send(
                 EdgeFrameKind.HEARTBEAT,
-                {"edge_state": "ONLINE", "index": index},
+                {"edge_state": "ONLINE"},
                 sent_epoch_ms=1_000 + index,
             ))
 
@@ -563,11 +584,14 @@ class AgentEdgeTransportTests(unittest.TestCase):
                     verifier = EdgeTransportVerifier(
                         expected_peer_id="synology-edge",
                         expected_peer_auth_key=EDGE_KEY,
+                        replay_ledger=EdgeReplayLedger(),
                     )
                     hello = verifier.verify(recv_packet(conn), now_epoch_ms=2_000_001)
                     ack = EdgeTransportSigner(
                         local_peer_id="molehill-control",
                         local_auth_key=MOLEHILL_KEY,
+                        session_id=hello.session_id,
+                        run_id=hello.run_id,
                     ).seal(
                         kind=EdgeFrameKind.HELLO_ACK,
                         connection_id=hello.connection_id,
@@ -577,6 +601,7 @@ class AgentEdgeTransportTests(unittest.TestCase):
                             "acknowledged_peer_id": "synology-edge",
                             "transport_mode": "OUTBOUND_ONLY",
                         },
+                        connection_generation=hello.connection_generation,
                     )
                     send_packet(conn, ack)
                     metadata = verifier.verify(recv_packet(conn), now_epoch_ms=2_000_004)
@@ -664,6 +689,7 @@ class AgentEdgeTransportTests(unittest.TestCase):
 
 
     def test_generic_metadata_send_cannot_bypass_separate_artifact_path(self):
+        import tools.tibia_re_control_center.agent_edge_transport as transport
         from tools.tibia_re_control_center.agent_edge_transport import (
             EdgeOutboundChannel,
         )
@@ -687,6 +713,8 @@ class AgentEdgeTransportTests(unittest.TestCase):
             connection=connection,
             signer=EdgeTransportSigner(local_peer_id="synology-edge", local_auth_key=EDGE_KEY),
             connection_id="connection-artifact-bypass",
+            connection_generation="test-generation-artifact",
+            _proof=transport._OUTBOUND_CHANNEL_PROOF,
         )
         with self.assertRaises(ValidationError) as raised:
             channel.send(
@@ -724,12 +752,12 @@ class AgentEdgeTransportTests(unittest.TestCase):
 
         import tools.tibia_re_control_center.agent_edge_transport as transport_module
 
-        payload = {"nested": {"state": "LOGIN_SCREEN"}}
+        payload = {"runtime_signal": "LOGIN_SCREEN", "artifact_refs": []}
         original_guard = transport_module.ensure_no_secret_material
 
         def guard_then_mutate(value, *, key_path):
             original_guard(value, key_path=key_path)
-            payload["nested"]["token"] = "secret-after-scan"
+            payload["artifact_refs"].append("secret-after-scan")
 
         transport_module.ensure_no_secret_material = guard_then_mutate
         try:
@@ -746,8 +774,8 @@ class AgentEdgeTransportTests(unittest.TestCase):
             transport_module.ensure_no_secret_material = original_guard
 
         decoded = json.loads(packet.decode("utf-8"))
-        self.assertEqual({"state": "LOGIN_SCREEN"}, decoded["payload"]["nested"])
-        self.assertIn("token", payload["nested"])
+        self.assertEqual([], decoded["payload"]["artifact_refs"])
+        self.assertIn("secret-after-scan", payload["artifact_refs"])
 
 
 
@@ -814,7 +842,7 @@ class AgentEdgeTransportTests(unittest.TestCase):
             unsigned.pop("auth_tag")
             decoded["auth_tag"] = hmac.new(EDGE_KEY, jcs_dumps(unsigned).encode("utf-8"), hashlib.sha256).hexdigest()
             with self.subTest(field=field), self.assertRaises(ValidationError):
-                EdgeTransportVerifier(expected_peer_id="synology-edge", expected_peer_auth_key=EDGE_KEY).verify(jcs_dumps(decoded).encode("utf-8"), now_epoch_ms=1_001)
+                EdgeTransportVerifier(expected_peer_id="synology-edge", expected_peer_auth_key=EDGE_KEY, replay_ledger=EdgeReplayLedger()).verify(jcs_dumps(decoded).encode("utf-8"), now_epoch_ms=1_001)
 
     def test_timeout_must_be_finite(self):
         from tools.tibia_re_control_center.agent_edge_transport import (
@@ -840,10 +868,15 @@ class AgentEdgeTransportTests(unittest.TestCase):
             "schema": "otclient.local-agent.edge-transport.v1",
             "protocol_major": 1,
             "sender_peer_id": "synology-edge",
+            "session_id": "receiver-bounds-session",
+            "run_id": "receiver-bounds-run",
             "connection_id": "receiver-bounds",
+            "connection_generation": "receiver-bounds-generation",
             "sequence": 1,
             "sent_epoch_ms": 1_000,
             "kind": "OBSERVATION",
+            "direction": "EDGE_TO_CONTROL",
+            "handshake_phase": "ESTABLISHED",
             "authority_scope": "PEER_IDENTITY_ONLY",
             "mutation_authorized": False,
             "physical_action_budget": 0,
@@ -853,7 +886,7 @@ class AgentEdgeTransportTests(unittest.TestCase):
         }
         unsigned["auth_tag"] = hmac.new(EDGE_KEY, jcs_dumps(unsigned).encode("utf-8"), hashlib.sha256).hexdigest()
         with self.assertRaises(ValidationError) as raised:
-            EdgeTransportVerifier(expected_peer_id="synology-edge", expected_peer_auth_key=EDGE_KEY).verify(jcs_dumps(unsigned).encode("utf-8"), now_epoch_ms=1_001)
+            EdgeTransportVerifier(expected_peer_id="synology-edge", expected_peer_auth_key=EDGE_KEY, replay_ledger=EdgeReplayLedger()).verify(jcs_dumps(unsigned).encode("utf-8"), now_epoch_ms=1_001)
         self.assertEqual("EDGE_PAYLOAD_TOO_DEEP", raised.exception.code)
 
     def test_concurrent_duplicate_receive_advances_replay_window_once(self):
@@ -873,11 +906,12 @@ class AgentEdgeTransportTests(unittest.TestCase):
             connection_id="concurrent-replay",
             sequence=1,
             sent_epoch_ms=1_000,
-            payload={"value": "ok"},
+            payload={"runtime_signal": "LOGIN_SCREEN", "artifact_refs": []},
         )
         verifier = EdgeTransportVerifier(
             expected_peer_id="synology-edge",
             expected_peer_auth_key=EDGE_KEY,
+            replay_ledger=EdgeReplayLedger(),
         )
         original_snapshot = transport._snapshot_payload
         barrier = threading.Barrier(2)
@@ -924,10 +958,230 @@ class AgentEdgeTransportTests(unittest.TestCase):
                 EdgeTransportVerifier(
                     expected_peer_id="synology-edge",
                     expected_peer_auth_key=EDGE_KEY,
+                    replay_ledger=EdgeReplayLedger(),
                 ).verify(b"{}", now_epoch_ms=1_000)
         finally:
             transport.json.loads = original_loads
         self.assertEqual("EDGE_FRAME_INVALID", raised.exception.code)
+
+    def test_authenticated_observation_rejects_non_schema_control_fields(self):
+        from tools.tibia_re_control_center.model import ValidationError
+
+        signer = EdgeTransportSigner(local_peer_id="synology-edge", local_auth_key=EDGE_KEY)
+        with self.assertRaises(ValidationError) as raised:
+            signer.seal(
+                kind=EdgeFrameKind.OBSERVATION,
+                connection_id="schema-control-fields",
+                sequence=1,
+                sent_epoch_ms=1_000,
+                payload={
+                    "runtime_signal": "LOGIN_SCREEN",
+                    "method": "invoke",
+                    "script": "do-something",
+                    "tool": "desktop",
+                },
+            )
+        self.assertEqual("EDGE_PAYLOAD_SCHEMA_REJECTED", raised.exception.code)
+
+    def test_kind_and_handshake_payload_combinations_are_fail_closed(self):
+        import hashlib
+        import hmac
+        import json
+
+        from tools.tibia_re_control_center.canonical import jcs_dumps
+        from tools.tibia_re_control_center.model import ValidationError
+
+        packet = EdgeTransportSigner(local_peer_id="synology-edge", local_auth_key=EDGE_KEY).seal(
+            kind=EdgeFrameKind.OBSERVATION,
+            connection_id="wrong-kind-combination",
+            sequence=1,
+            sent_epoch_ms=1_000,
+            payload={"runtime_signal": "LOGIN_SCREEN", "artifact_refs": []},
+        )
+        forged = json.loads(packet.decode("utf-8"))
+        forged["kind"] = "HELLO"
+        unsigned = dict(forged)
+        unsigned.pop("auth_tag")
+        forged["auth_tag"] = hmac.new(
+            EDGE_KEY, jcs_dumps(unsigned).encode("utf-8"), hashlib.sha256
+        ).hexdigest()
+        with self.assertRaises(ValidationError) as raised:
+            EdgeTransportVerifier(
+                expected_peer_id="synology-edge", expected_peer_auth_key=EDGE_KEY,
+                replay_ledger=EdgeReplayLedger(),
+            ).verify(jcs_dumps(forged).encode("utf-8"), now_epoch_ms=1_001)
+        self.assertEqual("EDGE_HANDSHAKE_REJECTED", raised.exception.code)
+
+    def test_replay_epoch_cannot_reopen_after_a_b_a_rebinding(self):
+        from tools.tibia_re_control_center.model import ValidationError
+
+        signer = EdgeTransportSigner(local_peer_id="synology-edge", local_auth_key=EDGE_KEY)
+        verifier = EdgeTransportVerifier(
+            expected_peer_id="synology-edge", expected_peer_auth_key=EDGE_KEY,
+            replay_ledger=EdgeReplayLedger(),
+        )
+        original_a = signer.seal(
+            kind=EdgeFrameKind.HEARTBEAT,
+            connection_id="connection-a",
+            sequence=1,
+            sent_epoch_ms=1_000,
+            payload={"edge_state": "ONLINE"},
+        )
+        verifier.verify(original_a, now_epoch_ms=1_001)
+        verifier.bind_connection("connection-b")
+        verifier.verify(
+            signer.seal(
+                kind=EdgeFrameKind.HEARTBEAT,
+                connection_id="connection-b",
+                sequence=1,
+                sent_epoch_ms=1_002,
+                payload={"edge_state": "ONLINE"},
+            ),
+            now_epoch_ms=1_003,
+        )
+        verifier.bind_connection("connection-a")
+        with self.assertRaises(ValidationError) as raised:
+            verifier.verify(original_a, now_epoch_ms=1_004)
+        self.assertEqual("EDGE_EPOCH_REUSE_REJECTED", raised.exception.code)
+
+    def test_authenticated_objects_cannot_be_minted_by_direct_construction(self):
+        from tools.tibia_re_control_center.agent_edge_transport import (
+            EdgeOutboundChannel,
+            VerifiedEdgeFrame,
+        )
+
+        class SinkSocket:
+            def sendall(self, _data):
+                return None
+
+            def shutdown(self, _how):
+                return None
+
+            def close(self):
+                return None
+
+        with self.assertRaises(TypeError):
+            VerifiedEdgeFrame(
+                kind=EdgeFrameKind.HEARTBEAT,
+                sender_peer_id="synology-edge",
+                connection_id="direct-frame",
+                sequence=1,
+                sent_epoch_ms=1_000,
+                payload={},
+            )
+        with self.assertRaises(TypeError):
+            EdgeOutboundChannel(
+                connection=SinkSocket(),
+                signer=EdgeTransportSigner(local_peer_id="synology-edge", local_auth_key=EDGE_KEY),
+                connection_id="direct-channel",
+            )
+
+    def test_signed_integer_cannot_be_substituted_with_float(self):
+        from tools.tibia_re_control_center.model import ValidationError
+
+        packet = EdgeTransportSigner(local_peer_id="synology-edge", local_auth_key=EDGE_KEY).seal(
+            kind=EdgeFrameKind.OBSERVATION,
+            connection_id="numeric-type-substitution",
+            sequence=1,
+            sent_epoch_ms=1_000,
+            payload={"runtime_signal": "LOGIN_SCREEN", "artifact_refs": [], "observation_count": 1},
+        )
+        substituted = packet.replace(b'"observation_count":1', b'"observation_count":1.0')
+        self.assertNotEqual(packet, substituted)
+        with self.assertRaises(ValidationError) as raised:
+            EdgeTransportVerifier(
+                expected_peer_id="synology-edge", expected_peer_auth_key=EDGE_KEY,
+                replay_ledger=EdgeReplayLedger(),
+            ).verify(substituted, now_epoch_ms=1_001)
+        self.assertEqual("EDGE_PAYLOAD_SCHEMA_REJECTED", raised.exception.code)
+
+    def test_reconstructed_verifier_reuses_persisted_replay_ledger(self):
+        from tools.tibia_re_control_center.agent_edge_transport import EdgeReplayLedger
+        from tools.tibia_re_control_center.model import ValidationError
+
+        packet = EdgeTransportSigner(local_peer_id="synology-edge", local_auth_key=EDGE_KEY).seal(
+            kind=EdgeFrameKind.HEARTBEAT,
+            connection_id="reconstructed-verifier",
+            sequence=1,
+            sent_epoch_ms=1_000,
+            payload={"edge_state": "ONLINE"},
+        )
+        ledger = EdgeReplayLedger()
+        EdgeTransportVerifier(
+            expected_peer_id="synology-edge",
+            expected_peer_auth_key=EDGE_KEY,
+            replay_ledger=ledger,
+        ).verify(packet, now_epoch_ms=1_001)
+        with self.assertRaises(ValidationError) as raised:
+            EdgeTransportVerifier(
+                expected_peer_id="synology-edge",
+                expected_peer_auth_key=EDGE_KEY,
+                replay_ledger=ledger,
+            ).verify(packet, now_epoch_ms=1_002)
+        self.assertEqual("EDGE_REPLAY_REJECTED", raised.exception.code)
+
+    def test_persisted_replay_ledger_snapshot_survives_process_reconstruction(self):
+        from tools.tibia_re_control_center.agent_edge_transport import EdgeReplayLedger
+        from tools.tibia_re_control_center.model import ValidationError
+
+        packet = EdgeTransportSigner(local_peer_id="synology-edge", local_auth_key=EDGE_KEY).seal(
+            kind=EdgeFrameKind.HEARTBEAT,
+            connection_id="persisted-ledger",
+            sequence=1,
+            sent_epoch_ms=1_000,
+            payload={"edge_state": "ONLINE"},
+        )
+        first = EdgeReplayLedger()
+        EdgeTransportVerifier(
+            expected_peer_id="synology-edge",
+            expected_peer_auth_key=EDGE_KEY,
+            replay_ledger=first,
+        ).verify(packet, now_epoch_ms=1_001)
+        reconstructed = EdgeReplayLedger.from_snapshot(first.snapshot())
+        with self.assertRaises(ValidationError) as raised:
+            EdgeTransportVerifier(
+                expected_peer_id="synology-edge",
+                expected_peer_auth_key=EDGE_KEY,
+                replay_ledger=reconstructed,
+            ).verify(packet, now_epoch_ms=1_002)
+        self.assertEqual("EDGE_REPLAY_REJECTED", raised.exception.code)
+
+    def test_cross_session_or_run_substitution_cannot_replace_bound_epoch(self):
+        from tools.tibia_re_control_center.model import ValidationError
+
+        verifier = EdgeTransportVerifier(
+            expected_peer_id="synology-edge", expected_peer_auth_key=EDGE_KEY,
+            replay_ledger=EdgeReplayLedger(),
+        )
+        accepted = EdgeTransportSigner(
+            local_peer_id="synology-edge",
+            local_auth_key=EDGE_KEY,
+            session_id="session-a",
+            run_id="run-a",
+        )
+        first = accepted.seal(
+            kind=EdgeFrameKind.HEARTBEAT,
+            connection_id="cross-session",
+            sequence=1,
+            sent_epoch_ms=1_000,
+            payload={"edge_state": "ONLINE"},
+        )
+        verifier.verify(first, now_epoch_ms=1_001)
+        substituted = EdgeTransportSigner(
+            local_peer_id="synology-edge",
+            local_auth_key=EDGE_KEY,
+            session_id="session-b",
+            run_id="run-b",
+        ).seal(
+            kind=EdgeFrameKind.HEARTBEAT,
+            connection_id="cross-session",
+            sequence=2,
+            sent_epoch_ms=1_002,
+            payload={"edge_state": "ONLINE"},
+        )
+        with self.assertRaises(ValidationError) as raised:
+            verifier.verify(substituted, now_epoch_ms=1_003)
+        self.assertEqual("EDGE_SESSION_RUN_REJECTED", raised.exception.code)
 
 if __name__ == "__main__":
     unittest.main()

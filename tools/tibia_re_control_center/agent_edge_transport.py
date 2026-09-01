@@ -39,6 +39,7 @@ MAX_METADATA_FRAME_BYTES = 262_144
 MAX_ARTIFACT_BYTES = 32 * 1024 * 1024
 MAX_PAYLOAD_DEPTH = 16
 MAX_PAYLOAD_ITEMS = 4096
+MAX_RETIRED_EDGE_EPOCHS = 128
 _MEDIA_TYPE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]{0,63}/[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]{0,63}$")
 _FORBIDDEN_CONTROL_KEYS = frozenset({
     "command", "commands", "shell", "shell_command", "argv", "exec", "executable",
@@ -197,6 +198,17 @@ class EdgeFrameKind(str, Enum):
     ARTIFACT = "ARTIFACT"
 
 
+class EdgeFrameDirection(str, Enum):
+    EDGE_TO_CONTROL = "EDGE_TO_CONTROL"
+    CONTROL_TO_EDGE = "CONTROL_TO_EDGE"
+
+
+class EdgeHandshakePhase(str, Enum):
+    HELLO = "HELLO"
+    HELLO_ACK = "HELLO_ACK"
+    ESTABLISHED = "ESTABLISHED"
+
+
 def _auth_key(value: bytes, field: str) -> bytes:
     if not isinstance(value, bytes) or len(value) < MIN_AUTH_KEY_BYTES:
         raise ValidationError("EDGE_AUTH_KEY_INVALID", f"{field} must contain at least 32 bytes")
@@ -213,6 +225,194 @@ def _freeze(value: Any) -> Any:
 
 def _canonical_unsigned(value: Mapping[str, Any]) -> bytes:
     return jcs_dumps(value).encode("utf-8")
+
+
+_VERIFIED_FRAME_PROOF = object()
+_OUTBOUND_CHANNEL_PROOF = object()
+
+
+def _opaque(value: Any, field_name: str) -> str:
+    if not isinstance(value, str):
+        raise ValidationError("EDGE_FRAME_INVALID", f"{field_name} must be an opaque identifier")
+    return validate_opaque_id(value, field_name=field_name)
+
+
+def _exact_payload(value: Any, keys: tuple[str, ...], *, code: str = "EDGE_PAYLOAD_SCHEMA_REJECTED") -> dict[str, Any]:
+    if not isinstance(value, Mapping):
+        raise ValidationError(code, "edge payload must be an object")
+    try:
+        require_exact_keys(value, keys)
+    except ValidationError as exc:
+        raise ValidationError(code, "edge payload fields are not admitted") from exc
+    return dict(value)
+
+
+def _validate_payload_schema(kind: EdgeFrameKind, value: Any) -> dict[str, Any]:
+    value = _snapshot_payload(value)
+    _reject_control_surface(value)
+    ensure_no_secret_material(value, key_path="edge.payload")
+    if kind is EdgeFrameKind.HELLO:
+        payload = _exact_payload(value, ("transport_mode", "role"), code="EDGE_HANDSHAKE_REJECTED")
+        if payload["transport_mode"] != "OUTBOUND_ONLY" or payload["role"] != "RUNTIME_EDGE":
+            raise ValidationError("EDGE_HANDSHAKE_REJECTED", "HELLO payload is not admitted")
+    elif kind is EdgeFrameKind.HELLO_ACK:
+        payload = _exact_payload(value, ("acknowledged_peer_id", "transport_mode"), code="EDGE_HANDSHAKE_REJECTED")
+        if not isinstance(payload["acknowledged_peer_id"], str) or payload["transport_mode"] != "OUTBOUND_ONLY":
+            raise ValidationError("EDGE_HANDSHAKE_REJECTED", "HELLO_ACK payload is not admitted")
+    elif kind is EdgeFrameKind.HEARTBEAT:
+        payload = _exact_payload(value, ("edge_state",))
+        if payload["edge_state"] not in {"ONLINE", "OFFLINE"}:
+            raise ValidationError("EDGE_PAYLOAD_SCHEMA_REJECTED", "heartbeat state is not admitted")
+    elif kind is EdgeFrameKind.OBSERVATION:
+        if not isinstance(value, Mapping):
+            raise ValidationError("EDGE_PAYLOAD_SCHEMA_REJECTED", "observation payload must be an object")
+        payload = _exact_payload(value, ("runtime_signal", "artifact_refs", "observation_count")) if "observation_count" in value else _exact_payload(value, ("runtime_signal", "artifact_refs"))
+        if (
+            not isinstance(payload["runtime_signal"], str)
+            or not isinstance(payload["artifact_refs"], list)
+            or any(not isinstance(ref, str) for ref in payload["artifact_refs"])
+            or ("observation_count" in payload and type(payload["observation_count"]) is not int)
+        ):
+            raise ValidationError("EDGE_PAYLOAD_SCHEMA_REJECTED", "observation payload types are not admitted")
+    else:
+        payload = _exact_payload(value, ("artifact",))
+        EdgeArtifactDescriptor.from_mapping(payload["artifact"])
+    return _snapshot_payload(payload)
+
+
+def _expected_direction_and_phase(kind: EdgeFrameKind) -> tuple[EdgeFrameDirection, EdgeHandshakePhase]:
+    if kind is EdgeFrameKind.HELLO:
+        return EdgeFrameDirection.EDGE_TO_CONTROL, EdgeHandshakePhase.HELLO
+    if kind is EdgeFrameKind.HELLO_ACK:
+        return EdgeFrameDirection.CONTROL_TO_EDGE, EdgeHandshakePhase.HELLO_ACK
+    return EdgeFrameDirection.EDGE_TO_CONTROL, EdgeHandshakePhase.ESTABLISHED
+
+
+@dataclass(frozen=True)
+class EdgeReplayEpoch:
+    session_id: str
+    run_id: str
+    connection_id: str
+    connection_generation: str
+
+
+class EdgeReplayLedger:
+    """Bounded caller-persisted replay state; reconstruction must reuse this ledger."""
+
+    def __init__(self) -> None:
+        self._active_epoch: EdgeReplayEpoch | None = None
+        self._last_sequence = 0
+        self._retired_epochs: set[EdgeReplayEpoch] = set()
+        self._lock = threading.RLock()
+
+    def accept(self, epoch: EdgeReplayEpoch, sequence: int) -> None:
+        with self._lock:
+            if epoch in self._retired_epochs:
+                raise ValidationError("EDGE_EPOCH_REUSE_REJECTED", "retired edge epoch cannot become current again")
+            if self._active_epoch is None:
+                self._active_epoch = epoch
+                self._last_sequence = 0
+            elif epoch != self._active_epoch:
+                if (epoch.session_id, epoch.run_id) != (
+                    self._active_epoch.session_id,
+                    self._active_epoch.run_id,
+                ):
+                    raise ValidationError(
+                        "EDGE_SESSION_RUN_REJECTED",
+                        "edge frame session or run does not match the bound replay session",
+                    )
+                if len(self._retired_epochs) >= MAX_RETIRED_EDGE_EPOCHS:
+                    raise ValidationError("EDGE_EPOCH_CAPACITY_EXHAUSTED", "edge replay epoch history is full")
+                self._retired_epochs.add(self._active_epoch)
+                self._active_epoch = epoch
+                self._last_sequence = 0
+            if sequence <= self._last_sequence:
+                raise ValidationError("EDGE_REPLAY_REJECTED", "edge frame sequence is not newer than accepted state")
+            self._last_sequence = sequence
+
+    @property
+    def last_accepted_sequence(self) -> int:
+        with self._lock:
+            return self._last_sequence
+
+    @property
+    def active_epoch(self) -> EdgeReplayEpoch | None:
+        with self._lock:
+            return self._active_epoch
+
+    @staticmethod
+    def _epoch_mapping(epoch: EdgeReplayEpoch) -> dict[str, str]:
+        return {
+            "session_id": epoch.session_id,
+            "run_id": epoch.run_id,
+            "connection_id": epoch.connection_id,
+            "connection_generation": epoch.connection_generation,
+        }
+
+    @staticmethod
+    def _epoch_from_mapping(value: Any) -> EdgeReplayEpoch:
+        try:
+            mapping = _exact_payload(
+                value,
+                ("session_id", "run_id", "connection_id", "connection_generation"),
+                code="EDGE_REPLAY_STATE_INVALID",
+            )
+            return EdgeReplayEpoch(
+                _opaque(mapping["session_id"], "session_id"),
+                _opaque(mapping["run_id"], "run_id"),
+                _opaque(mapping["connection_id"], "connection_id"),
+                _opaque(mapping["connection_generation"], "connection_generation"),
+            )
+        except ValidationError as exc:
+            raise ValidationError("EDGE_REPLAY_STATE_INVALID", "edge replay epoch is invalid") from exc
+
+    def snapshot(self) -> dict[str, Any]:
+        with self._lock:
+            return {
+                "schema": "otclient.local-agent.edge-replay-ledger.v1",
+                "active_epoch": None if self._active_epoch is None else self._epoch_mapping(self._active_epoch),
+                "last_sequence": self._last_sequence,
+                "retired_epochs": [
+                    self._epoch_mapping(epoch)
+                    for epoch in sorted(
+                        self._retired_epochs,
+                        key=lambda value: (
+                            value.session_id,
+                            value.run_id,
+                            value.connection_id,
+                            value.connection_generation,
+                        ),
+                    )
+                ],
+            }
+
+    @classmethod
+    def from_snapshot(cls, value: Any) -> EdgeReplayLedger:
+        snapshot = _exact_payload(
+            value,
+            ("schema", "active_epoch", "last_sequence", "retired_epochs"),
+            code="EDGE_REPLAY_STATE_INVALID",
+        )
+        if snapshot["schema"] != "otclient.local-agent.edge-replay-ledger.v1":
+            raise ValidationError("EDGE_REPLAY_STATE_INVALID", "edge replay ledger schema is not supported")
+        active = snapshot["active_epoch"]
+        if active is not None:
+            active = cls._epoch_from_mapping(active)
+        if type(snapshot["last_sequence"]) is not int:
+            raise ValidationError("EDGE_REPLAY_STATE_INVALID", "edge replay sequence is invalid")
+        last_sequence = checked_non_negative(
+            snapshot["last_sequence"], maximum=MAX_SAFE_INTEGER, field_name="last_sequence"
+        )
+        if not isinstance(snapshot["retired_epochs"], list) or len(snapshot["retired_epochs"]) > MAX_RETIRED_EDGE_EPOCHS:
+            raise ValidationError("EDGE_REPLAY_STATE_INVALID", "edge replay retired epoch history is invalid")
+        retired = {cls._epoch_from_mapping(item) for item in snapshot["retired_epochs"]}
+        if len(retired) != len(snapshot["retired_epochs"]) or active in retired:
+            raise ValidationError("EDGE_REPLAY_STATE_INVALID", "edge replay epoch history is inconsistent")
+        ledger = cls()
+        ledger._active_epoch = active
+        ledger._last_sequence = last_sequence
+        ledger._retired_epochs = retired
+        return ledger
 
 
 @dataclass(frozen=True)
@@ -283,25 +483,47 @@ def verify_artifact_bytes(descriptor: EdgeArtifactDescriptor, data: bytes) -> by
     return bytes(data)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, init=False)
 class VerifiedEdgeFrame:
     kind: EdgeFrameKind
     sender_peer_id: str
+    session_id: str
+    run_id: str
     connection_id: str
+    connection_generation: str
     sequence: int
     sent_epoch_ms: int
     payload: Mapping[str, Any]
-    peer_authenticated: bool = True
     mutation_authorized: bool = False
     physical_action_budget: int = 0
     evidence_fresh: bool = False
     action_resume_allowed: bool = False
 
+    def __init__(self, *, _proof: object, **values: Any) -> None:
+        if _proof is not _VERIFIED_FRAME_PROOF:
+            raise TypeError("VerifiedEdgeFrame instances are issued only by EdgeTransportVerifier")
+        for name, value in values.items():
+            object.__setattr__(self, name, value)
+
+    @property
+    def peer_authenticated(self) -> bool:
+        return True
+
 
 class EdgeTransportSigner:
-    def __init__(self, *, local_peer_id: str, local_auth_key: bytes) -> None:
+    def __init__(
+        self,
+        *,
+        local_peer_id: str,
+        local_auth_key: bytes,
+        session_id: str | None = None,
+        run_id: str | None = None,
+    ) -> None:
         self.local_peer_id = validate_opaque_id(local_peer_id, field_name="local_peer_id")
         self._auth_key = _auth_key(local_auth_key, "local_auth_key")
+        self.session_id = _opaque(session_id or f"edge-session-{secrets.token_hex(16)}", "session_id")
+        self.run_id = _opaque(run_id or f"edge-run-{secrets.token_hex(16)}", "run_id")
+        self._connection_generations: dict[str, str] = {}
 
     def __repr__(self) -> str:
         return f"EdgeTransportSigner(local_peer_id={self.local_peer_id!r}, auth_key=<redacted>)"
@@ -314,6 +536,7 @@ class EdgeTransportSigner:
         sequence: int,
         sent_epoch_ms: int,
         payload: Mapping[str, Any],
+        connection_generation: str | None = None,
     ) -> bytes:
         try:
             admitted_kind = EdgeFrameKind(kind)
@@ -324,19 +547,26 @@ class EdgeTransportSigner:
         if sequence < 1:
             raise ValidationError("EDGE_SEQUENCE_INVALID", "sequence must be at least one")
         sent_epoch_ms = checked_non_negative(sent_epoch_ms, maximum=MAX_SAFE_INTEGER, field_name="sent_epoch_ms")
-        if not isinstance(payload, Mapping):
-            raise ValidationError("EDGE_PAYLOAD_INVALID", "payload must be an object")
-        payload_copy = _snapshot_payload(payload)
-        _reject_control_surface(payload_copy)
-        ensure_no_secret_material(payload_copy, key_path="edge.payload")
+        payload_copy = _validate_payload_schema(admitted_kind, payload)
+        if connection_generation is None:
+            connection_generation = self._connection_generations.setdefault(
+                connection_id, f"edge-generation-{secrets.token_hex(16)}"
+            )
+        connection_generation = _opaque(connection_generation, "connection_generation")
+        direction, phase = _expected_direction_and_phase(admitted_kind)
         unsigned = {
             "schema": EDGE_TRANSPORT_SCHEMA,
             "protocol_major": EDGE_TRANSPORT_PROTOCOL_MAJOR,
             "sender_peer_id": self.local_peer_id,
+            "session_id": self.session_id,
+            "run_id": self.run_id,
             "connection_id": connection_id,
+            "connection_generation": connection_generation,
             "sequence": sequence,
             "sent_epoch_ms": sent_epoch_ms,
             "kind": admitted_kind.value,
+            "direction": direction.value,
+            "handshake_phase": phase.value,
             "authority_scope": "PEER_IDENTITY_ONLY",
             "mutation_authorized": False,
             "physical_action_budget": 0,
@@ -357,6 +587,7 @@ class EdgeTransportVerifier:
         *,
         expected_peer_id: str,
         expected_peer_auth_key: bytes,
+        replay_ledger: EdgeReplayLedger,
         expected_connection_id: str | None = None,
         last_accepted_sequence: int = 0,
         max_age_ms: int = DEFAULT_MAX_AGE_MS,
@@ -369,7 +600,11 @@ class EdgeTransportVerifier:
             if expected_connection_id is None
             else validate_opaque_id(expected_connection_id, field_name="expected_connection_id")
         )
-        self._last_sequence = checked_non_negative(last_accepted_sequence, maximum=MAX_SAFE_INTEGER, field_name="last_accepted_sequence")
+        self._ledger = replay_ledger
+        if not isinstance(self._ledger, EdgeReplayLedger):
+            raise ValidationError("EDGE_REPLAY_STATE_INVALID", "edge verifier requires a replay ledger")
+        if last_accepted_sequence:
+            raise ValidationError("EDGE_REPLAY_STATE_INVALID", "replay sequence must be retained by the replay ledger")
         self._state_lock = threading.RLock()
         self.max_age_ms = checked_non_negative(max_age_ms, maximum=MAX_SAFE_INTEGER, field_name="max_age_ms")
         self.max_future_skew_ms = checked_non_negative(max_future_skew_ms, maximum=MAX_SAFE_INTEGER, field_name="max_future_skew_ms")
@@ -379,7 +614,11 @@ class EdgeTransportVerifier:
 
     @property
     def last_accepted_sequence(self) -> int:
-        return self._last_sequence
+        return self._ledger.last_accepted_sequence
+
+    @property
+    def replay_ledger(self) -> EdgeReplayLedger:
+        return self._ledger
 
     @property
     def connection_id(self) -> str | None:
@@ -394,7 +633,6 @@ class EdgeTransportVerifier:
                     "reusing a connection id cannot reset the replay window",
                 )
             self._connection_id = connection_id
-            self._last_sequence = 0
 
     def verify(self, packet: bytes, *, now_epoch_ms: int) -> VerifiedEdgeFrame:
         if not isinstance(packet, bytes):
@@ -408,8 +646,8 @@ class EdgeTransportVerifier:
         if not isinstance(decoded, dict):
             raise ValidationError("EDGE_FRAME_INVALID", "edge frame must be a JSON object")
         keys = (
-            "schema", "protocol_major", "sender_peer_id", "connection_id", "sequence",
-            "sent_epoch_ms", "kind", "authority_scope", "mutation_authorized",
+            "schema", "protocol_major", "sender_peer_id", "session_id", "run_id", "connection_id", "connection_generation", "sequence",
+            "sent_epoch_ms", "kind", "direction", "handshake_phase", "authority_scope", "mutation_authorized",
             "physical_action_budget", "evidence_fresh", "action_resume_allowed", "payload", "auth_tag",
         )
         require_exact_keys(decoded, keys)
@@ -430,6 +668,14 @@ class EdgeTransportVerifier:
             or decoded["action_resume_allowed"] is not False
         ):
             raise ValidationError("EDGE_AUTHORITY_EXPANSION_REJECTED", "transport frame attempted to expand authority")
+        try:
+            kind = EdgeFrameKind(decoded["kind"])
+        except (TypeError, ValueError) as exc:
+            raise ValidationError("EDGE_KIND_INVALID", "edge frame kind is not admitted") from exc
+        expected_direction, expected_phase = _expected_direction_and_phase(kind)
+        if decoded["direction"] != expected_direction.value or decoded["handshake_phase"] != expected_phase.value:
+            raise ValidationError("EDGE_HANDSHAKE_REJECTED", "edge frame direction or handshake phase is not admitted")
+        payload = _validate_payload_schema(kind, decoded["payload"])
         tag = decoded["auth_tag"]
         if not isinstance(tag, str) or len(tag) != 64:
             raise ValidationError("EDGE_AUTHENTICATION_FAILED", "edge transport authentication failed")
@@ -443,29 +689,27 @@ class EdgeTransportVerifier:
         now_epoch_ms = checked_non_negative(now_epoch_ms, maximum=MAX_SAFE_INTEGER, field_name="now_epoch_ms")
         if sent_epoch_ms > now_epoch_ms + self.max_future_skew_ms or now_epoch_ms - sent_epoch_ms > self.max_age_ms:
             raise ValidationError("EDGE_STALE_REJECTED", "edge frame timestamp is outside the admitted freshness window")
-        try:
-            kind = EdgeFrameKind(decoded["kind"])
-        except (TypeError, ValueError) as exc:
-            raise ValidationError("EDGE_KIND_INVALID", "edge frame kind is not admitted") from exc
-        payload = decoded["payload"]
-        if not isinstance(payload, dict):
-            raise ValidationError("EDGE_PAYLOAD_INVALID", "payload must be an object")
-        payload = _snapshot_payload(payload)
-        _reject_control_surface(payload)
-        ensure_no_secret_material(payload, key_path="edge.payload")
+        session_id = _opaque(decoded["session_id"], "session_id")
+        run_id = _opaque(decoded["run_id"], "run_id")
         connection_id = validate_opaque_id(decoded["connection_id"], field_name="connection_id")
+        connection_generation = _opaque(decoded["connection_generation"], "connection_generation")
         with self._state_lock:
-            if sequence <= self._last_sequence:
-                raise ValidationError("EDGE_REPLAY_REJECTED", "edge frame sequence is not newer than accepted state")
             if self._connection_id is None:
                 self._connection_id = connection_id
             elif connection_id != self._connection_id:
                 raise ValidationError("EDGE_CONNECTION_REJECTED", "edge frame belongs to a different connection")
-            self._last_sequence = sequence
+            self._ledger.accept(
+                EdgeReplayEpoch(session_id, run_id, connection_id, connection_generation),
+                sequence,
+            )
         return VerifiedEdgeFrame(
+            _proof=_VERIFIED_FRAME_PROOF,
             kind=kind,
             sender_peer_id=self.expected_peer_id,
+            session_id=session_id,
+            run_id=run_id,
             connection_id=connection_id,
+            connection_generation=connection_generation,
             sequence=sequence,
             sent_epoch_ms=sent_epoch_ms,
             payload=_freeze(payload),
@@ -532,10 +776,15 @@ class EdgeOutboundChannel:
         connection: socket.socket,
         signer: EdgeTransportSigner,
         connection_id: str,
+        connection_generation: str,
+        _proof: object,
     ) -> None:
+        if _proof is not _OUTBOUND_CHANNEL_PROOF:
+            raise TypeError("EdgeOutboundChannel instances are issued only by EdgeOutboundClient.connect")
         self._connection = connection
         self._signer = signer
         self.connection_id = validate_opaque_id(connection_id, field_name="connection_id")
+        self.connection_generation = _opaque(connection_generation, "connection_generation")
         self._next_sequence = 2
         self._closed = False
         self._send_lock = threading.RLock()
@@ -561,6 +810,7 @@ class EdgeOutboundChannel:
                 sequence=sequence,
                 sent_epoch_ms=sent_epoch_ms,
                 payload=payload,
+                connection_generation=self.connection_generation,
             )
             try:
                 _send_framed(self._connection, packet)
@@ -588,6 +838,7 @@ class EdgeOutboundChannel:
                 sequence=sequence,
                 sent_epoch_ms=sent_epoch_ms,
                 payload={"artifact": descriptor.as_mapping()},
+                connection_generation=self.connection_generation,
             )
             try:
                 _send_framed(self._connection, packet)
@@ -618,6 +869,8 @@ class EdgeOutboundClient:
         local_auth_key: bytes,
         expected_remote_peer_id: str,
         expected_remote_auth_key: bytes,
+        session_id: str | None = None,
+        run_id: str | None = None,
         timeout_seconds: float = 5.0,
     ) -> None:
         local_key = _auth_key(local_auth_key, "local_auth_key")
@@ -630,6 +883,8 @@ class EdgeOutboundClient:
         self._signer = EdgeTransportSigner(
             local_peer_id=local_peer_id,
             local_auth_key=local_key,
+            session_id=session_id,
+            run_id=run_id,
         )
         self.expected_remote_peer_id = validate_opaque_id(
             expected_remote_peer_id,
@@ -657,6 +912,7 @@ class EdgeOutboundClient:
         resolved_host = resolve_edge_endpoint(host, port)
         now_epoch_ms = checked_non_negative(now_epoch_ms, maximum=MAX_SAFE_INTEGER, field_name="now_epoch_ms")
         connection_id = f"edge-{secrets.token_hex(16)}"
+        connection_generation = f"edge-generation-{secrets.token_hex(16)}"
         try:
             connection = socket.create_connection((resolved_host, port), timeout=self.timeout_seconds)
             connection.settimeout(self.timeout_seconds)
@@ -669,16 +925,24 @@ class EdgeOutboundClient:
                 sequence=1,
                 sent_epoch_ms=now_epoch_ms,
                 payload={"transport_mode": "OUTBOUND_ONLY", "role": "RUNTIME_EDGE"},
+                connection_generation=connection_generation,
             )
             _send_framed(connection, hello)
             verifier = EdgeTransportVerifier(
                 expected_peer_id=self.expected_remote_peer_id,
                 expected_peer_auth_key=self._remote_key,
+                replay_ledger=EdgeReplayLedger(),
                 expected_connection_id=connection_id,
             )
             acknowledged = verifier.verify(_recv_framed(connection), now_epoch_ms=now_epoch_ms)
             if acknowledged.kind != EdgeFrameKind.HELLO_ACK:
                 raise ValidationError("EDGE_HANDSHAKE_REJECTED", "edge transport peer did not return HELLO_ACK")
+            if (
+                acknowledged.session_id != self._signer.session_id
+                or acknowledged.run_id != self._signer.run_id
+                or acknowledged.connection_generation != connection_generation
+            ):
+                raise ValidationError("EDGE_HANDSHAKE_REJECTED", "edge transport acknowledgement is not bound to this connection epoch")
             payload = acknowledged.payload
             require_exact_keys(payload, ("acknowledged_peer_id", "transport_mode"))
             if payload["acknowledged_peer_id"] != self._signer.local_peer_id or payload["transport_mode"] != "OUTBOUND_ONLY":
@@ -687,6 +951,8 @@ class EdgeOutboundClient:
                 connection=connection,
                 signer=self._signer,
                 connection_id=connection_id,
+                connection_generation=connection_generation,
+                _proof=_OUTBOUND_CHANNEL_PROOF,
             )
         except (OSError, ValidationError):
             try:

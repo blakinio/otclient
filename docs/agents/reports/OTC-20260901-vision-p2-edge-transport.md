@@ -75,6 +75,16 @@ The implementation authenticates transport peers only. It intentionally cannot e
 
 The worker slice is ready for coordinator classification, not self-merge. The next consumer is `OTC-VISION-P2-CONTROL-BRIDGE`, which should consume the signed/verified metadata and content-addressed artifact interface rather than introducing a second edge protocol.
 
+## Independent-review repair in progress
+
+Comment `5500413800` returned the former exact green head `fe258ecdb65cbc6802b54d2adff57ecb4357865a` for repair. RED probes confirmed all reported bypasses before code changes. The in-progress repair makes metadata kind schemas exact and fail-closed; binds frames to explicit session, run and non-reusable connection-generation identifiers; persists replay state only through a bounded caller-owned ledger snapshot; and makes verified frames and outbound channels verifier/client-issued rather than caller-self-certified. It also rejects non-canonical observation numeric types before HMAC comparison, closing the `1` to `1.0` substitution.
+
+No runtime, credential, GUI, process, payload-capture or physical action occurred while repairing this repository-only transport. The worker will remain Draft-only and return the resulting exact head to the coordinator for a fresh independent review.
+
+Local repair validation is `38/38` focused edge-transport tests and `55/55` protocol-plus-transport tests, with Ruff, `py_compile`, checkpoint validation, exact changed-task Track A governance validation and `git diff --check` passing. Hosted CI remains required on the next exact repair head.
+
+The local repair head is pending remote force-with-lease publication and fresh hosted exact-head validation.
+
 ## Fresh resumed-worker validation
 
 The previously dirty worker slice was independently revalidated before local commit. A stale test expected Python JSON recursion failure at depth 1100; on the current interpreter that depth parses successfully. Empirical tracing showed 1500+ triggers `RecursionError`; the test now uses depth 2000 and verifies the existing production catch maps it to `EDGE_FRAME_INVALID`. Production code did not require a fix.

@@ -12,7 +12,7 @@ branch: docs/OTC-20260901-codex-cost-control
 base_branch: main
 base_sha: 427a9e3ddca0f2c184b75741fb9b067a8a6520e5
 created: 2026-09-01T23:48:30+02:00
-updated_at: 2026-09-01T23:59:11+02:00
+updated_at: 2026-09-02T00:02:29+02:00
 risk: low
 execution_class: local_owner_pc
 execution_mode: remote_desktop_plus_github
@@ -62,10 +62,11 @@ depends_on:
   - merged coordinator-managed dispatch prompt PR #844
 blocks: []
 cross_repository_task_ids: []
+related_pr: 849
 invocation_started_at: 2026-09-01T23:48:30+02:00
-last_progress_at: 2026-09-01T23:59:11+02:00
+last_progress_at: 2026-09-02T00:02:29+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: current-main-restacked-d1d30ca45aad
+ci_check_generation: pr849-bound-pending
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -73,8 +74,8 @@ identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 0
 stall_warnings: 0
-current_blocker: none
-next_action: commit and publish the validated prompt-contract 1.2.0 content, open a Draft PR, then require exact-head CI/governance and PR hygiene before merge
+current_blocker: exact-head GitHub CI/governance pending after PR #849 binding
+next_action: publish this PR-bound checkpoint, then require exact-head CI/governance, zero review findings, prompt-contract 1.2.0 readback and current-main freshness before readiness/merge
 ---
 
 # Codex worker cost-control guard
@@ -87,11 +88,11 @@ Persist the measured root causes of the 2026-09-01 coordinator token burn and ma
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T23:59:11+02:00
+updated_at: 2026-09-02T00:02:29+02:00
 head: d1d30ca45aad70c918eee7db759428dd50da59b2
 head_semantics: cost_control_content_commit_after_current_main_restack
 branch: docs/OTC-20260901-codex-cost-control
-pr: null
+pr: 849
 status: validating
 context_routes:
   - agent-governance
@@ -153,5 +154,5 @@ validation:
     result: PASS
     evidence: TRACK_A_AGENT_RUNTIME_GOVERNANCE_PASS=true.
 blockers: []
-next_action: commit and publish the validated prompt-contract 1.2.0 content, open a Draft PR, then require exact-head CI/governance and PR hygiene before merge
+next_action: publish this PR-bound checkpoint, then require exact-head CI/governance, zero review findings, prompt-contract 1.2.0 readback and current-main freshness before readiness/merge
 ```

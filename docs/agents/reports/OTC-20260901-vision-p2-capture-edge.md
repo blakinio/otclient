@@ -62,3 +62,13 @@ This repair adds focused RED-to-GREEN coverage and makes three bounded changes:
 Fresh local validation on implementation head `14cb64db3ef13c753ba196529ee1f6672d215879`: focused capture-edge **17/17 PASS**; capture-edge plus existing vision evidence **21/21 PASS**; complete vision suite **24/24 PASS**; targeted `py_compile`, `ruff check tools/tibia_re_vision tests/tools/tibia_re_vision`, and `git diff --check` PASS. Track A governance, checkpoint/path validation and exact-head GitHub CI remain required before coordinator re-review.
 
 This remains a repository/static producer repair only. `runtime_access:none`; no Official Tibia/Synology/Kasm observation, credential/login, GUI/process/memory/payload action or physical effect occurred. Physical action budget/count remain `0/0`.
+
+## Trust-boundary repair after coordinator comment 5500483713
+
+The prior token/registry/resolver design is superseded. Python underscores, module-global tokens, object identity, weak registries, frozen dataclasses and resolver self-ownership do not establish a security boundary: the coordinator reproduced direct issue, registry/subclass and reflective-mutation bypasses.
+
+No externally pinned reviewed secret-mask policy or canonical symlink-safe evidence-root consumer exists within this worker's four owned paths. The capture edge therefore now fails closed with `CAPTURE_TRUSTED_POLICY_CONSUMER_REQUIRED` before frame acquisition, artifact persistence, or `SecretSafeCapture` conversion. It removes the module-global issuance tokens/registry and refuses caller-created policy resolvers, direct/subclass issuance, allocated/mutated evidence, and direct persistence helpers. This is intentionally a missing-consumer result, not a claim of unforgeability or real capture capability.
+
+The retained pure primitives keep bounded geometry/RGB/masking/crop/PNG and fixed read-only X11/ffmpeg vocabulary available for a later externally reviewed composition consumer. Binding snapshots and exact positive monotonic validation are also retained; however, acquisition-end/final-currentness enforcement belongs in that future enabled consumer and is not claimed as active capture behavior while capture is disabled.
+
+Focused adversarial tests cover token/registry absence, direct and subclass issuance, incomplete caller policy, reflective evidence mutation, same-object binding mutation, invalid/future clock samples, and attacker-selected evidence-root non-write. Local results after the fail-closed repair: capture-edge **12/12 PASS**; capture-edge plus evidence **16/16 PASS**; full vision suite **19/19 PASS**; `py_compile`, Ruff and diff check PASS. Exact-head governance/CI and coordinator re-review remain pending.

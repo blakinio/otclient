@@ -9,12 +9,12 @@ project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: implementation
-phase: benchmark_reclassification_repaired_local_validation
+phase: trust_boundary_fail_closed_repair
 branch: feat/OTC-20260901-vision-p2-capture-edge
 base_branch: main
 base_main: d1cb8722c3116a0e0aeb72b9b360712f43151f17
 created: 2026-09-01T16:27:39+02:00
-updated_at: 2026-09-01T23:05:00+02:00
+updated_at: 2026-09-01T23:40:00+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: isolated_worker_branch
@@ -65,10 +65,10 @@ depends_on:
   - main 0fe1ecb3569f1d8372209c857ab57f3b626c29ae
 related_prs:
   - PR #827 Wave 1 worker Draft
-current_blocker: coordinator reclassification 5500210008: forged CaptureEvidence, post-capture freshness, and policy-issuance trust boundaries require repair
-next_action: run Track A governance and checkpoint/path validation on the repaired exact head, push with a lease, then request coordinator re-review of Draft PR #827
+current_blocker: no externally pinned reviewed secret-mask policy and canonical symlink-safe evidence-root consumer exists within the four owned worker paths; capture must remain fail closed
+next_action: restack the fail-closed repair on current main, run exact local governance/path validation, push with a lease, and request coordinator classification of the missing trusted consumer
 invocation_started_at: 2026-09-01T16:58:39+02:00
-last_progress_at: 2026-09-01T22:29:51+02:00
+last_progress_at: 2026-09-01T23:40:00+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: current-main-revalidation-pending
 terminal_ci_wait_started_at: 2026-09-01T20:47:34+02:00
@@ -265,4 +265,47 @@ validation:
     evidence: checkpoint schema valid and no whitespace/path-boundary finding.
 blockers: []
 next_action: run Track A governance and checkpoint/path validation on the repaired exact head, push with a lease, then request coordinator re-review of Draft PR #827; worker must not self-promote or merge.
+```
+
+## Context checkpoint — trust-boundary fail-closed repair
+
+```yaml
+checkpoint_version: 1
+updated_at: 2026-09-01T23:40:00+02:00
+head: uncommitted
+branch: feat/OTC-20260901-vision-p2-capture-edge
+pr: 827
+status: implementing
+phase: trust_boundary_fail_closed_repair
+proven:
+  - coordinator comment 5500483713 reproduced direct token issue, registry injection, subclass issue, reflective evidence mutation, caller-created resolver, policy mutation, same-object binding mutation and unsafe caller root concerns.
+  - underscore names, module globals, registries, object identity and frozen dataclasses cannot provide unforgeability in this Python boundary.
+  - no trusted externally pinned reviewed mask-policy source or canonical symlink-safe evidence-root composition consumer is present in the worker-owned paths.
+  - capture, direct persistence and SecretSafeCapture conversion now fail closed before an effect; module issuance tokens and registry are removed.
+  - focused adversarial tests are GREEN: direct/subclass issuance, public incomplete policy, allocated/mutated evidence, attacker root, mutable binding snapshot and invalid/future monotonic samples.
+derived:
+  - this worker must not claim active secret-safe evidence production until a separately owned trusted composition consumer pins the reviewed expected policy and canonical evidence root.
+unknown:
+  - coordinator-owned trusted composition/consumer design and its exact path ownership.
+  - exact-head CI/governance and coordinator re-review after restack.
+changed_paths:
+  - docs/agents/tasks/active/OTC-20260901-vision-p2-capture-edge.md
+  - docs/agents/reports/OTC-20260901-vision-p2-capture-edge.md
+  - tools/tibia_re_vision/capture_edge.py
+  - tests/tools/tibia_re_vision/test_capture_edge.py
+validation:
+  - command: python -m unittest tests.tools.tibia_re_vision.test_capture_edge -q
+    result: PASS
+    evidence: 12 tests
+  - command: python -m unittest tests.tools.tibia_re_vision.test_evidence tests.tools.tibia_re_vision.test_capture_edge -q
+    result: PASS
+    evidence: 16 tests
+  - command: python -m unittest discover -s tests/tools/tibia_re_vision -p 'test_*.py' -q
+    result: PASS
+    evidence: 19 tests
+  - command: py_compile, Ruff and git diff --check
+    result: PASS
+blockers:
+  - trusted reviewed mask-policy and canonical evidence-root consumer are outside the worker-owned paths and have not been proven.
+next_action: commit, restack on origin/main, rerun governance/checkpoint/path validation, push with a safe lease, then request coordinator classification; do not self-promote or merge.
 ```

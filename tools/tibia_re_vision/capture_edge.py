@@ -10,7 +10,6 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
-from weakref import WeakValueDictionary
 
 from tools.tibia_re_control_center.agent_vision import SecretSafeCapture
 
@@ -91,8 +90,32 @@ class RuntimeBinding:
             raise ValueError("client sha256 invalid")
 
 
+def _snapshot_binding(binding: RuntimeBinding) -> RuntimeBinding:
+    """Copy canonical scalar fields; never use object identity as a fence."""
+    if type(binding) is not RuntimeBinding:
+        raise CaptureEdgeError("CAPTURE_RUNTIME_BINDING_INVALID")
+    try:
+        return RuntimeBinding(
+            provenance_ref=binding.provenance_ref,
+            runtime_id=binding.runtime_id,
+            target_container=binding.target_container,
+            display=binding.display,
+            pid=binding.pid,
+            process_start_ticks=binding.process_start_ticks,
+            xid=binding.xid,
+            client_version=binding.client_version,
+            client_size=binding.client_size,
+            client_sha256=binding.client_sha256,
+            observed_monotonic_ns=binding.observed_monotonic_ns,
+            runtime_access=binding.runtime_access,
+            target_uniqueness=binding.target_uniqueness,
+        )
+    except (AttributeError, ValueError):
+        raise CaptureEdgeError("CAPTURE_RUNTIME_BINDING_INVALID") from None
+
+
 class ReviewedSecretMaskPolicy:
-    """A policy can only be created by its trusted composition-time resolver."""
+    """Legacy candidate shape; it cannot establish reviewed-policy authority."""
 
     __slots__ = ("_issuer", "_sealed", "expected_height", "expected_width", "policy_id", "secret_regions")
 
@@ -115,8 +138,10 @@ class ReviewedSecretMaskPolicy:
         expected_height: int,
         secret_regions: tuple[PixelRegion, ...],
     ) -> ReviewedSecretMaskPolicy:
-        if issuance_token is not _SECRET_POLICY_ISSUANCE_TOKEN:
-            raise TypeError("ReviewedSecretMaskPolicy is resolver-issued")
+        # Python-private tokens and factories are inspectable/mutable by the
+        # caller.  This module has no externally pinned reviewed policy source,
+        # so it must not manufacture an authority claim from either one.
+        raise CaptureEdgeError("CAPTURE_TRUSTED_POLICY_CONSUMER_REQUIRED")
         if type(policy_id) is not str or re.fullmatch(r"[A-Za-z0-9_.:-]{1,80}", policy_id) is None:
             raise ValueError("reviewed secret policy id invalid")
         if (
@@ -164,7 +189,7 @@ class ReviewedSecretMaskPolicy:
 
 
 class ReviewedSecretMaskPolicyResolver:
-    """Trusted composition root that issues exactly one reviewed deterministic policy."""
+    """Rejected legacy API: a caller-created resolver is not a review boundary."""
 
     def __init__(
         self,
@@ -174,14 +199,7 @@ class ReviewedSecretMaskPolicyResolver:
         expected_height: int,
         secret_regions: tuple[PixelRegion, ...],
     ) -> None:
-        self._policy = ReviewedSecretMaskPolicy._issue(
-            self,
-            _SECRET_POLICY_ISSUANCE_TOKEN,
-            policy_id=policy_id,
-            expected_width=expected_width,
-            expected_height=expected_height,
-            secret_regions=secret_regions,
-        )
+        raise CaptureEdgeError("CAPTURE_TRUSTED_POLICY_CONSUMER_REQUIRED")
 
     @property
     def policy(self) -> ReviewedSecretMaskPolicy:
@@ -291,7 +309,7 @@ class CaptureArtifact:
 
 
 class CaptureEvidence:
-    """Opaque producer-issued evidence; caller-created instances never reach vision."""
+    """Evidence is not a secret-safety authority without a trusted consumer."""
 
     __slots__ = (
         "__weakref__",
@@ -333,23 +351,11 @@ class CaptureEvidence:
         changed_from_previous: bool | None,
         crop: CaptureArtifact | None,
     ) -> CaptureEvidence:
-        if issuance_token is not _CAPTURE_EVIDENCE_ISSUANCE_TOKEN:
-            raise TypeError("CaptureEvidence is producer-issued")
-        evidence = object.__new__(cls)
-        evidence.run_id = run_id
-        evidence.runtime_binding = runtime_binding
-        evidence.geometry = geometry
-        evidence.source_monotonic_ns = source_monotonic_ns
-        evidence.full_frame = full_frame
-        evidence.secret_safe = True
-        evidence.secret_policy_ref = secret_policy_ref
-        evidence.is_blank = is_blank
-        evidence.is_black = is_black
-        evidence.changed_from_previous = changed_from_previous
-        evidence.crop = crop
-        evidence._sealed = True
-        _ISSUED_EVIDENCE[id(evidence)] = evidence
-        return evidence
+        # There is deliberately no hidden token, registry, subclass check or
+        # object identity check here.  Those are not a security boundary in
+        # Python.  The Phase-2 trusted policy consumer is not owned by this
+        # worker, therefore this producer cannot issue secret-safe evidence.
+        raise CaptureEdgeError("CAPTURE_TRUSTED_POLICY_CONSUMER_REQUIRED")
 
     def validated_vision_capture(
         self,
@@ -358,43 +364,7 @@ class CaptureEvidence:
         now_ns: int,
         max_age_ns: int,
     ) -> SecretSafeCapture:
-        if _ISSUED_EVIDENCE.get(id(self)) is not self:
-            raise CaptureEdgeError("CAPTURE_EVIDENCE_UNISSUED")
-        if type(current_binding) is not RuntimeBinding:
-            raise ValueError("current binding invalid")
-        if type(now_ns) is not int or type(max_age_ns) is not int or max_age_ns < 0:
-            raise ValueError("capture time bound invalid")
-        if current_binding != self.runtime_binding:
-            raise CaptureEdgeError("CAPTURE_RUNTIME_BINDING_MISMATCH")
-        age = now_ns - self.source_monotonic_ns
-        if age < 0 or age > max_age_ns:
-            raise CaptureEdgeError("CAPTURE_EVIDENCE_STALE")
-        if self.secret_safe is not True:
-            raise CaptureEdgeError("CAPTURE_NOT_SECRET_SAFE")
-        artifacts = (self.full_frame,) if self.crop is None else (self.full_frame, self.crop)
-        for artifact in artifacts:
-            try:
-                actual = hashlib.sha256(artifact.path.read_bytes()).hexdigest()
-            except OSError:
-                raise CaptureEdgeError("CAPTURE_ARTIFACT_INTEGRITY_INVALID") from None
-            if actual != artifact.sha256:
-                raise CaptureEdgeError("CAPTURE_ARTIFACT_INTEGRITY_INVALID")
-        if self.crop is not None and self.crop.parent_full_sha256 != self.full_frame.sha256:
-            raise CaptureEdgeError("CAPTURE_PARENT_BINDING_INVALID")
-        artifact = self.crop or self.full_frame
-        return SecretSafeCapture(
-            run_id=self.run_id,
-            evidence_ref=f"capture:{artifact.sha256}",
-            path=artifact.path,
-            sha256=artifact.sha256,
-            secret_safe=self.secret_safe,
-            source_monotonic_ns=self.source_monotonic_ns,
-        )
-
-
-_ISSUED_EVIDENCE: WeakValueDictionary[int, CaptureEvidence] = WeakValueDictionary()
-_SECRET_POLICY_ISSUANCE_TOKEN = object()
-_CAPTURE_EVIDENCE_ISSUANCE_TOKEN = object()
+        raise CaptureEdgeError("CAPTURE_TRUSTED_POLICY_CONSUMER_REQUIRED")
 
 
 def _png_chunk(kind: bytes, payload: bytes) -> bytes:
@@ -466,19 +436,10 @@ def _persist_png(
     region: PixelRegion | None = None,
     parent_full_sha256: str | None = None,
 ) -> CaptureArtifact:
-    digest = hashlib.sha256(png).hexdigest()
-    path = root / f"{digest}.png"
-    if path.exists():
-        if path.read_bytes() != png:
-            raise CaptureEdgeError("CONTENT_ADDRESS_COLLISION")
-    else:
-        path.write_bytes(png)
-    return CaptureArtifact(
-        path=path,
-        sha256=digest,
-        region=region,
-        parent_full_sha256=parent_full_sha256,
-    )
+    # An underscored helper is not an authority boundary either.  No
+    # caller-selected filesystem root is valid until the missing composition
+    # consumer supplies a canonical, symlink-safe evidence root.
+    raise CaptureEdgeError("CAPTURE_TRUSTED_POLICY_CONSUMER_REQUIRED")
 
 
 class CaptureEdge:
@@ -491,6 +452,10 @@ class CaptureEdge:
         secret_policy: ReviewedSecretMaskPolicy,
         policy_resolver: ReviewedSecretMaskPolicyResolver | None = None,
     ) -> None:
+        # This worker owns no reviewed-policy configuration/consumer.  Do not
+        # turn a public constructor, Python object identity, or an underscored
+        # factory into a substitute trust boundary.
+        raise CaptureEdgeError("CAPTURE_TRUSTED_POLICY_CONSUMER_REQUIRED")
         resolver = secret_policy._issuer if type(secret_policy) is ReviewedSecretMaskPolicy else None
         if policy_resolver is not None:
             resolver = policy_resolver
@@ -507,95 +472,13 @@ class CaptureEdge:
 
     @staticmethod
     def _require_current(binding: RuntimeBinding, now_ns: int, max_age_ns: int) -> None:
-        if type(now_ns) is not int or type(max_age_ns) is not int or max_age_ns < 0:
-            raise ValueError("capture time bound invalid")
+        binding = _snapshot_binding(binding)
+        if type(now_ns) is not int or now_ns <= 0 or type(max_age_ns) is not int or max_age_ns < 0:
+            raise CaptureEdgeError("CAPTURE_CLOCK_INVALID")
         age = now_ns - binding.observed_monotonic_ns
         if age < 0 or age > max_age_ns:
             raise CaptureEdgeError("RUNTIME_BINDING_STALE")
 
-    def capture(
-        self,
-        *,
-        run_id: str,
-        evidence_root: Path,
-        max_binding_age_ns: int,
-        crop: PixelRegion | None = None,
-        previous_full_sha256: str | None = None,
-    ) -> CaptureEvidence:
-        if type(run_id) is not str or not run_id:
-            raise ValueError("run_id invalid")
-        if crop is not None and type(crop) is not PixelRegion:
-            raise ValueError("crop invalid")
-        if previous_full_sha256 is not None and (
-            type(previous_full_sha256) is not str
-            or len(previous_full_sha256) != 64
-            or any(c not in "0123456789abcdefABCDEF" for c in previous_full_sha256)
-        ):
-            raise ValueError("previous full sha256 invalid")
-        before = self._binding_reader()
-        binding_checked_ns = self._monotonic_ns()
-        self._require_current(before, binding_checked_ns, max_binding_age_ns)
-        geometry = self._frame_source.geometry(before)
-        if type(geometry) is not WindowGeometry:
-            raise CaptureEdgeError("CAPTURE_GEOMETRY_INVALID")
-        if (
-            geometry.width != self._secret_policy.expected_width
-            or geometry.height != self._secret_policy.expected_height
-        ):
-            raise CaptureEdgeError("CAPTURE_SECRET_POLICY_GEOMETRY_MISMATCH")
-        for region in self._secret_policy.secret_regions:
-            _require_region(region, geometry)
-        if crop is not None:
-            _require_region(crop, geometry)
-
-        acquisition_started_ns = self._monotonic_ns()
-        raw_pixels = self._frame_source.capture_rgb(before, geometry)
-        _require_rgb(geometry, raw_pixels)
-        safe_pixels = _mask_rgb(raw_pixels, geometry, self._secret_policy.secret_regions)
-        first_pixel = safe_pixels[:3]
-        is_blank = all(safe_pixels[offset : offset + 3] == first_pixel for offset in range(0, len(safe_pixels), 3))
-        is_black = max(safe_pixels, default=0) <= 4
-        crop_pixels = None if crop is None else _crop_rgb(safe_pixels, geometry, crop)
-
-        after = self._binding_reader()
-        if after != before:
-            raise CaptureEdgeError("RUNTIME_BINDING_CHANGED")
-        after_geometry = self._frame_source.geometry(after)
-        if type(after_geometry) is not WindowGeometry:
-            raise CaptureEdgeError("CAPTURE_GEOMETRY_INVALID")
-        if after_geometry != geometry:
-            raise CaptureEdgeError("CAPTURE_GEOMETRY_CHANGED")
-        final_binding = self._binding_reader()
-        if final_binding != before:
-            raise CaptureEdgeError("RUNTIME_BINDING_CHANGED")
-        full_png = _encode_rgb_png(geometry.width, geometry.height, safe_pixels)
-        crop_png = None if crop is None else _encode_rgb_png(crop.width, crop.height, crop_pixels)
-        root = Path(evidence_root)
-        root.mkdir(parents=True, exist_ok=True)
-        full_artifact = _persist_png(root, full_png)
-        changed_from_previous = (
-            None
-            if previous_full_sha256 is None
-            else full_artifact.sha256 != previous_full_sha256.lower()
-        )
-        crop_artifact = None
-        if crop is not None and crop_png is not None:
-            crop_artifact = _persist_png(
-                root,
-                crop_png,
-                region=crop,
-                parent_full_sha256=full_artifact.sha256,
-            )
-        return CaptureEvidence._issue(
-            issuance_token=_CAPTURE_EVIDENCE_ISSUANCE_TOKEN,
-            run_id=run_id,
-            runtime_binding=before,
-            geometry=geometry,
-            source_monotonic_ns=acquisition_started_ns,
-            full_frame=full_artifact,
-            secret_policy_ref=self._secret_policy.policy_ref,
-            is_blank=is_blank,
-            is_black=is_black,
-            changed_from_previous=changed_from_previous,
-            crop=crop_artifact,
-        )
+    def capture(self, *args, **kwargs) -> CaptureEvidence:
+        """Fail closed until the external policy/root composition consumer exists."""
+        raise CaptureEdgeError("CAPTURE_TRUSTED_POLICY_CONSUMER_REQUIRED")

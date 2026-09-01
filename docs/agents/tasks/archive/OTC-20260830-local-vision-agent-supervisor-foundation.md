@@ -95,7 +95,7 @@ This authorization permits repository implementation and tests only. It does **n
 
 Use `superpowers:using-git-worktrees`, `superpowers:subagent-driven-development`, and `superpowers:test-driven-development` exactly as applicable. Maintain the plan-scoped SDD ledger. Do not run multiple implementation subagents concurrently against shared files. Each implementation task requires its own independent spec/quality review before the next task.
 
-The Codex execution environment is available. Live Git/GitHub state was reconciled, an isolated worktree was verified, the clean baseline passed, and the plan-scoped SDD ledger contains the required dependency/interface scan and rulings. Tasks 1, 2, 3, and 5 are complete with clean independent reviews. Task 4 and Task 6 each reached a binding architecture boundary after independent adversarial review; ordinary independent findings in Task 6 were fixed and re-reviewed clean. Tasks 7Ã¢â‚¬â€œ10 remain dependency-blocked and were not dispatched.
+The Codex execution environment is available. Live Git/GitHub state was reconciled, an isolated worktree was verified, the clean baseline passed, and the plan-scoped SDD ledger contains the required dependency/interface scan and rulings. Tasks 1, 2, 3, and 5 are complete with clean independent reviews. Task 4 and Task 6 each reached a binding architecture boundary after independent adversarial review; ordinary independent findings in Task 6 were fixed and re-reviewed clean. Tasks 7–10 remain dependency-blocked and were not dispatched.
 
 ## Historical context checkpoint
 
@@ -141,8 +141,8 @@ unknown:
   - Architect-selected authenticated current-run/runtime/freshness binding for reviewed-causal runtime evidence.
   - Exact-head hosted CI outcome after publishing this checkpoint record.
 conflicts:
-  - TASK4_EXECUTOR_ATOMICITY_CONTRACT Ã¢â‚¬â€ the frozen execute(request)->receipt protocol has no final-commit/cancellation handshake capable of proving OWNER STOP dominance across an in-flight physical effect and crash-safe post-effect persistence.
-  - TASK6_CURRENT_PROVENANCE_CONTRACT Ã¢â‚¬â€ the frozen three-field RuntimeObservation and two-argument reconcile_state function have no trusted producer/run/runtime/time context capable of authenticating freshness; opaque refs cannot supply authority.
+  - TASK4_EXECUTOR_ATOMICITY_CONTRACT — the frozen execute(request)->receipt protocol has no final-commit/cancellation handshake capable of proving OWNER STOP dominance across an in-flight physical effect and crash-safe post-effect persistence.
+  - TASK6_CURRENT_PROVENANCE_CONTRACT — the frozen three-field RuntimeObservation and two-argument reconcile_state function have no trusted producer/run/runtime/time context capable of authenticating freshness; opaque refs cannot supply authority.
 first_failure:
   marker: TASK-CHECKPOINT-MISSING-001
   evidence: checkpoint validator reported that the pre-existing active task record lacked the required Context checkpoint section
@@ -177,19 +177,19 @@ blockers:
 next_action: Obtain supervising architect rulings for both formal packages in the SDD ledger/report, execute scoped RED-to-GREEN fixes and independent re-reviews, then dispatch Task 7 only when both dependency gates are clean.
 ```
 
-## Continuation checkpoint Ã¢â‚¬â€ 2026-08-31
+## Continuation checkpoint — 2026-08-31
 
 Tasks 4 and 6 were subsequently fixed under the architect rulings and independently reviewed clean. Task 7 is clean at `187ff4f1a012195175fe4ba81fdbef60d7727a1e`; Task 8 is clean at `213ec25eb881f596fe2f378280c27da9ae82eb31`.
 
 Task 9 committed only fake/offline foundation work:
 
-- `b548aded4fdcf273eb77f4e090246589fdc67f00` Ã¢â‚¬â€ bounded AÃ¢â‚¬â€œJ E2E/audit baseline;
-- `7e60466fa90a3c3a30a0abce509bf01b31428bcb` Ã¢â‚¬â€ truthful domain/API, Package B history, performed-unknown and audit hardening;
-- `ecf12922c125afa42bbceb8423f40b3bfbefd376` Ã¢â‚¬â€ audit-only closure of shadowed-validator/dynamic-import bypasses.
+- `b548aded4fdcf273eb77f4e090246589fdc67f00` — bounded A–J E2E/audit baseline;
+- `7e60466fa90a3c3a30a0abce509bf01b31428bcb` — truthful domain/API, Package B history, performed-unknown and audit hardening;
+- `ecf12922c125afa42bbceb8423f40b3bfbefd376` — audit-only closure of shadowed-validator/dynamic-import bypasses.
 
 The foundation audit, Package B audit, focused agent tests, full Control Center suite and frozen benchmark passed locally on their relevant heads. No production module, live runtime, Ollama, CUA, credentials, GUI/process/memory access or physical action was added. `physical_action_count` remains `0`.
 
-### ARCHITECT_REVIEW_REQUIRED Ã¢â‚¬â€ Task 9 model-slot/session contract
+### ARCHITECT_REVIEW_REQUIRED — Task 9 model-slot/session contract
 
 ```yaml
 Problem: >
@@ -262,7 +262,7 @@ approve this diff before Task 10 begins. Authority remains `runtime_access:none`
 all credential/runtime/effect permissions false, physical budget/count `0/0`,
 and production executor Null/unbound.
 
-## Task 10 closeout checkpoint Ã¢â‚¬â€ 2026-08-31
+## Task 10 closeout checkpoint — 2026-08-31
 
 The required independent Task 9 Architect Ruling C scoped re-review is
 **CLEAN** at `b5f83efae16203475a61e2887ad9952e435f84fd` (Critical/Important/
@@ -292,7 +292,7 @@ unmerged; it is not superseded because the replacement is also unmerged. See
 the Task 10 SDD report for complete command results and the one required next
 action.
 
-## Exact-head validation checkpoint Ã¢â‚¬â€ 2026-08-31
+## Exact-head validation checkpoint — 2026-08-31
 
 The normal credentialed Git push was unavailable. Under owner direction, the
 GitHub Git-object API published tree-identical commit history without source

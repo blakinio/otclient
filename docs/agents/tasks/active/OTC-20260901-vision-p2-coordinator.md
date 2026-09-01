@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260901-vision-p2-coordinator
-status: waiting
+status: implementing
 agent: ChatGPT
 session_role: programme_coordinator
 worker_alias: OTC-VISION-P2-COORDINATOR
@@ -9,12 +9,12 @@ project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: coordination
-phase: wave_1_worker_repair_and_revalidation
-branch: docs/OTC-20260901-vision-p2-coordinator-post-ci-repair
+phase: wave_1_benchmark_repair_and_final_validation
+branch: docs/OTC-20260901-vision-p2-coordinator-benchmark-reconcile
 base_branch: main
-base_main: 2917dc555e3c5fbd7a755c16f9b50a6c967e30d0
+base_main: d1cb8722c3116a0e0aeb72b9b360712f43151f17
 created: 2026-09-01T15:45:26+02:00
-updated_at: 2026-09-01T18:27:00+02:00
+updated_at: 2026-09-01T22:54:41+02:00
 risk: high
 execution_mode: chat_github
 run_scope: autonomous_program
@@ -51,7 +51,7 @@ network_payload_capture_allowed: false
 process_memory_access_allowed: false
 physical_action_budget: 0
 physical_action_count: 0
-worktree: NOT_APPLICABLE_GITHUB_ONLY
+worktree: C:/Users/barte/otclient-vision-p2-coordinator
 owned_paths:
   - docs/agents/tasks/active/OTC-20260901-vision-p2-coordinator.md
 depends_on:
@@ -69,12 +69,12 @@ related_prs:
   - PR #830 control-bridge worker Draft
   - PR #833 merged shared CI repair
   - PR #836 coordinator post-repair checkpoint
-current_blocker: WAVE_1_WORKER_REPAIR_REVALIDATION_AND_EDGE_TRANSPORT_EXECUTION
-next_action: consume the next durable worker handoff; require #826 and #828 to restack/revalidate on repaired trusted main, #827 to repair secret-safe self-certification, #830 to bind validated #826/#828 producer evidence, and #829 to execute its repository/static implementation before Wave 2
+current_blocker: CAPTURE_EDGE_BENCHMARK_REPAIR_AND_FINAL_WORKER_VALIDATION
+next_action: consume #827 benchmark repair, #829 current-main exact-head CI, and #830 independent review; then independently classify/promote accepted repository-static slices before any live observation
 invocation_started_at: 2026-09-01T17:47:00+02:00
-last_progress_at: 2026-09-01T18:27:00+02:00
+last_progress_at: 2026-09-01T22:54:41+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: post-ci-repair-pr-bound
+ci_check_generation: coordinator-benchmark-reconcile
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -101,74 +101,69 @@ Coordinate independently reviewed Wave 1 slices through current-main validation,
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T18:27:00+02:00
-head: 43e927df67412ab9d04831f2bae88af979c665c5
-head_semantics: post-repair ledger commit before PR-binding checkpoint
-branch: docs/OTC-20260901-vision-p2-coordinator-post-ci-repair
-pr: 836
-status: waiting
+updated_at: 2026-09-01T22:54:41+02:00
+head: d1cb8722c3116a0e0aeb72b9b360712f43151f17
+head_semantics: trusted_main_at_benchmark_reconciliation_before_coordinator_checkpoint_commit
+branch: docs/OTC-20260901-vision-p2-coordinator-benchmark-reconcile
+pr: PENDING
+status: implementing
 context_routes:
   - phase-2-read-only-coordination
   - worker-classification
+  - benchmark-adjudication
   - track-a-governance
 owned_paths:
   - docs/agents/tasks/active/OTC-20260901-vision-p2-coordinator.md
 proven:
-  - PR 833 merged the bounded Package A durable-doc path repair as main 2917dc555e3c5fbd7a755c16f9b50a6c967e30d0 after exact-head Package A, Track A governance, self-hosted boundary and CI / Required success; final PR state was clean with zero review threads/reviews.
-  - PR 826 head 0dbd823f6c89895e919f9bc07f7e99ecac9f31a6 is independently ACCEPTED as the static runtime-admission producer; real read-only acceptance remains RETURN_FOR_EVIDENCE and requires current-main revalidation before any observation window.
-  - PR 828 checkpoint head 80a218fa00b4e50823efaffc6af5f9ba28329ce9 is independently ACCEPTED as a static runtime-signal producer and requires current-main revalidation before promotion.
-  - PR 827 checkpoint head cc957a25ddb4c40e1416bec60eff03c38fda3ad9 still carries implementation 8685f7c6a8dae9e41d71f0acbe70a89a35a0ef38; coordinator RETURN_FOR_REPAIR finding 5496909848 requires eliminating unproven empty-policy self-certification of secret_safe.
-  - PR 830 head fc684f62ab9b4e79e23fab58c6fda942b8b969be has its prior BOM fixed and Track A governance green; coordinator RETURN_FOR_REPAIR finding 5496928156 requires machine-valid #826 admission and #828 runtime-signal binding rather than caller-declared read_only/opaque refs.
-  - PR 829 remains dispatch-only at 2ba5a90629c2b3cab3094948bfa3a1fda2b1fb0b with no implementation handoff.
-  - PR 836 is the single-path durable coordinator checkpoint for this post-repair state.
-  - no Official Tibia/Synology/Kasm live observation or mutation occurred; credentials/login/GUI input/process control/process memory/payload capture remain unused and physical action count is 0.
+  - trusted main is d1cb8722c3116a0e0aeb72b9b360712f43151f17; it includes runtime-admission promotion #838, runtime-signals promotion #839, benchmark record #841 and benchmark archive #842.
+  - runtime-admission and runtime-signals repository/static producers are merged; neither merge authorizes live Official Tibia observation.
+  - benchmark evidence on capture-edge target 53b6a7e515c0cd6820857f7910368cdbb0e1978d mechanically reproduced a forgeable public CaptureEvidence path and post-capture freshness timestamp flaw; the publicly constructible ReviewedSecretMaskPolicy remains a trust-boundary concern.
+  - promotion #840 carried identical capture_edge.py blob d53cd108c47c5cb9042c173c101d17c945f1b2a7 and test blob 2749a27957d4fdb684110790a07ea3b861c457cf to the benchmark target, so those later findings were not repaired by the promotion generation.
+  - coordinator closed #840 without merge, reopened Draft #827, and restored capture-edge classification to RETURN_FOR_REPAIR; a separate Terra/high repair worker is active on the existing #827 lane.
+  - #829 now contains the authenticated bounded edge-transport implementation rather than dispatch-only scaffolding; previous exact-head generation obtained green CI, Package A, Package B and Track A after its portability repair, and a separate Terra/medium worker is finalizing a current-main generation.
+  - #830 head 97238d35192b4a79e66cd9b58eccb20957568be8 reports the validated-admission/runtime-signal repair and exact-head CI/Package A/Package B/Track A success; coordinator has started an independent read-only Sol/medium review before classification.
+  - no Official Tibia/Synology/Kasm live observation, credentials, login, GUI input, process control, process memory, payload capture or physical action occurred; runtime_access remains none and physical action count/budget remain 0/0.
 derived:
-  - the old shared Package A failures are obsolete as a root cause but are not valid fresh pass evidence for worker heads; accepted workers must revalidate after restack onto repaired trusted main.
-  - Wave 2 is blocked by the open #827/#830 material findings and missing #829 implementation.
-  - no live observation window should be assigned before #826 is current-main validated and downstream repository/static integration is ready to consume admitted evidence safely.
+  - the earlier coordinator ACCEPT for #827 is superseded by later stronger benchmark evidence and cannot support promotion.
+  - #829 is no longer an implementation-missing blocker; its remaining gate is exact current-main generation evidence and coordinator classification.
+  - #830 must not be promoted solely from its worker self-report; independent coordinator review and fresh-main handling remain required.
+  - Wave 2 and all live read-only observation remain blocked while #827 has open material repository/static safety findings.
 unknown:
-  - repair outcomes for #827 and #830.
-  - implementation outcome for #829.
-  - current Synology/Kasm target identity/availability; no Phase 2 live read-only admission exists yet.
+  - final repaired exact head and exact-head checks for #827.
+  - final current-main exact head/check outcome and coordinator classification for #829.
+  - independent coordinator review disposition and required current-main restack for #830.
 conflicts: []
 first_failure:
-  marker: WAVE_1_NOT_INTEGRATION_READY
-  evidence: #827 and #830 have open material coordinator findings and #829 has no implementation handoff.
+  marker: CAPTURE_EDGE_BENCHMARK_FINDINGS_UNREPAIRED_IN_PROMOTION
+  evidence: promotion #840 implementation/test blobs are identical to the benchmarked vulnerable generation despite later mechanically reproduced material findings.
 rejected_hypotheses:
-  - PR 833 merge automatically converts prior failed worker check generations to PASS: rejected because exact-head validation is generation-specific.
-  - Wave 2 can start with only #826/#828 static producers: rejected by the programme acceptance/dependency graph.
-  - live runtime evidence can compensate for unresolved repository/static trust-boundary findings: rejected by Phase 2 ordering and admission policy.
+  - #840 can safely promote because #827 had an earlier ACCEPT: rejected; the ACCEPT predates stronger benchmark evidence.
+  - #829 remains dispatch-only: rejected by live branch/PR implementation, focused tests and hosted checks.
+  - #830 worker-declared PRODUCER_COMPLETE is sufficient for coordinator ACCEPT: rejected; independent coordinator review is mandatory.
 changed_paths:
   - docs/agents/tasks/active/OTC-20260901-vision-p2-coordinator.md
 validation:
-  - command: PR 833 final exact-head workflows/check-runs and hygiene
+  - command: live git/gh reconciliation of main and PRs #827/#829/#830/#840
     result: PASS
-    evidence: Package A 33530806517, Track A governance 33530806667, self-hosted boundary 33530806658, CI 33530806879 and CI / Required 99933414435 all SUCCESS on ea8e8fd91f87d0b3caccc71cf9a71348b22d620a; mergeable_state clean, exact two-path diff, zero review threads/reviews.
-  - command: squash merge PR 833 plus post-merge main readback
+    evidence: #840 closed unmerged; #827 reopened Draft; #829 and #830 remain Draft/open; live heads captured in the ledger below.
+  - command: capture-edge blob identity comparison between benchmark target and #840 promotion head
     result: PASS
-    evidence: merge returned 2917dc555e3c5fbd7a755c16f9b50a6c967e30d0 and main resolves to that SHA.
-  - command: post-merge worker PR 826-830 reconciliation
-    result: PASS
-    evidence: all five worker PRs remain Draft/open at the exact heads recorded above.
-  - command: PR 836 diff inspection
-    result: PASS_PENDING_EXACT_HEAD_CI
-    evidence: one changed path only, the coordinator task ledger.
+    evidence: implementation and focused-test blob ids are identical, proving benchmark findings were not repaired in #840.
 blockers:
-  - PR 827 secret-safety repair and fresh evidence.
-  - PR 830 validated producer binding repair and fresh evidence.
-  - PR 829 repository/static edge-transport implementation and durable handoff.
-  - PR 826 and PR 828 current-main restack/revalidation before promotion.
-next_action: consume the next durable worker handoff; require #826 and #828 to restack/revalidate on repaired trusted main, #827 to repair secret-safe self-certification, #830 to bind validated #826/#828 producer evidence, and #829 to execute its repository/static implementation before Wave 2.
+  - #827 must repair benchmark-confirmed forged-evidence and freshness findings and resolve reviewed-policy issuance trust before promotion.
+  - #829 must complete one coherent current-main exact-head validation generation and return for classification.
+  - #830 must complete independent coordinator review and any resulting current-main restack/repair before promotion.
+next_action: consume #827 repair, #829 exact-head CI, and #830 independent review; then independently classify/promote accepted repository-static slices before any live observation.
 ```
 
 ## Wave 1 live ledger
 
-| Alias | Draft PR | Current head | Coordinator state |
+| Alias | PR | Current head / integration | Coordinator state |
 |---|---:|---|---|
-| `OTC-VISION-P2-RUNTIME-ADMISSION` | #826 | `0dbd823f6c89895e919f9bc07f7e99ecac9f31a6` | static `ACCEPT`; current-main revalidation + later live `RETURN_FOR_EVIDENCE` |
-| `OTC-VISION-P2-CAPTURE-EDGE` | #827 | `cc957a25ddb4c40e1416bec60eff03c38fda3ad9` | `RETURN_FOR_REPAIR` secret-safety finding |
-| `OTC-VISION-P2-RUNTIME-SIGNALS` | #828 | `80a218fa00b4e50823efaffc6af5f9ba28329ce9` | static `ACCEPT`; current-main revalidation required |
-| `OTC-VISION-P2-EDGE-TRANSPORT` | #829 | `2ba5a90629c2b3cab3094948bfa3a1fda2b1fb0b` | no implementation handoff |
-| `OTC-VISION-P2-CONTROL-BRIDGE` | #830 | `fc684f62ab9b4e79e23fab58c6fda942b8b969be` | `RETURN_FOR_REPAIR` validated-producer binding gap |
+| `OTC-VISION-P2-RUNTIME-ADMISSION` | #838 promotion | merged `fb0c489f2ed166e872c4f197c6a78375a8576685` | repository/static producer `ACCEPT`; later serialized live evidence still required |
+| `OTC-VISION-P2-CAPTURE-EDGE` | #827 Draft | `b4a2664778d001344e3d0fdbd19ff4c9ac118e18` at dispatch | `RETURN_FOR_REPAIR`; #840 closed unmerged; Terra/high repair active |
+| `OTC-VISION-P2-RUNTIME-SIGNALS` | #839 promotion | merged `e883543403d5430d7b1d287f59043b23c98f37d6` | repository/static producer `ACCEPT` |
+| `OTC-VISION-P2-EDGE-TRANSPORT` | #829 Draft | current-main validation generation actively moving from `fe258ecdb65cbc6802b54d2adff57ecb4357865a` | implementation present; Terra/medium exact-head finalization active |
+| `OTC-VISION-P2-CONTROL-BRIDGE` | #830 Draft | `97238d35192b4a79e66cd9b58eccb20957568be8` | worker `PRODUCER_COMPLETE`; independent Sol/medium coordinator review active |
 
 Official runtime observation remains unauthorized at this checkpoint. All Phase 2 mutation/effect authorities remain false and physical action budget/count remain `0/0`.

@@ -6,9 +6,11 @@ import re
 import struct
 import subprocess
 import zlib
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Protocol
+from typing import Protocol
+from weakref import WeakValueDictionary
 
 from tools.tibia_re_control_center.agent_vision import SecretSafeCapture
 
@@ -89,33 +91,59 @@ class RuntimeBinding:
             raise ValueError("client sha256 invalid")
 
 
-@dataclass(frozen=True)
 class ReviewedSecretMaskPolicy:
-    policy_id: str
-    expected_width: int
-    expected_height: int
-    secret_regions: tuple[PixelRegion, ...]
+    """A policy can only be created by its trusted composition-time resolver."""
 
-    def __post_init__(self) -> None:
-        if type(self.policy_id) is not str or re.fullmatch(r"[A-Za-z0-9_.:-]{1,80}", self.policy_id) is None:
+    __slots__ = ("_issuer", "_sealed", "expected_height", "expected_width", "policy_id", "secret_regions")
+
+    def __init__(self, *args, **kwargs) -> None:
+        raise TypeError("ReviewedSecretMaskPolicy is resolver-issued")
+
+    def __setattr__(self, name: str, value: object) -> None:
+        if getattr(self, "_sealed", False):
+            raise AttributeError("ReviewedSecretMaskPolicy is immutable")
+        object.__setattr__(self, name, value)
+
+    @classmethod
+    def _issue(
+        cls,
+        issuer: ReviewedSecretMaskPolicyResolver,
+        issuance_token: object,
+        *,
+        policy_id: str,
+        expected_width: int,
+        expected_height: int,
+        secret_regions: tuple[PixelRegion, ...],
+    ) -> ReviewedSecretMaskPolicy:
+        if issuance_token is not _SECRET_POLICY_ISSUANCE_TOKEN:
+            raise TypeError("ReviewedSecretMaskPolicy is resolver-issued")
+        if type(policy_id) is not str or re.fullmatch(r"[A-Za-z0-9_.:-]{1,80}", policy_id) is None:
             raise ValueError("reviewed secret policy id invalid")
         if (
-            type(self.expected_width) is not int
-            or type(self.expected_height) is not int
-            or self.expected_width <= 0
-            or self.expected_height <= 0
+            type(expected_width) is not int
+            or type(expected_height) is not int
+            or expected_width <= 0
+            or expected_height <= 0
         ):
             raise ValueError("reviewed secret geometry invalid")
         if (
-            type(self.secret_regions) is not tuple
-            or not self.secret_regions
-            or any(type(region) is not PixelRegion for region in self.secret_regions)
+            type(secret_regions) is not tuple
+            or not secret_regions
+            or any(type(region) is not PixelRegion for region in secret_regions)
         ):
             raise ValueError("reviewed secret regions invalid")
-        geometry = WindowGeometry(0, 0, self.expected_width, self.expected_height)
-        for region in self.secret_regions:
+        geometry = WindowGeometry(0, 0, expected_width, expected_height)
+        for region in secret_regions:
             if region.x + region.width > geometry.width or region.y + region.height > geometry.height:
                 raise ValueError("reviewed secret regions invalid")
+        policy = object.__new__(cls)
+        policy.policy_id = policy_id
+        policy.expected_width = expected_width
+        policy.expected_height = expected_height
+        policy.secret_regions = secret_regions
+        policy._issuer = issuer
+        policy._sealed = True
+        return policy
 
     @property
     def policy_ref(self) -> str:
@@ -135,6 +163,34 @@ class ReviewedSecretMaskPolicy:
         return f"secret-mask:{hashlib.sha256(canonical).hexdigest()}"
 
 
+class ReviewedSecretMaskPolicyResolver:
+    """Trusted composition root that issues exactly one reviewed deterministic policy."""
+
+    def __init__(
+        self,
+        *,
+        policy_id: str,
+        expected_width: int,
+        expected_height: int,
+        secret_regions: tuple[PixelRegion, ...],
+    ) -> None:
+        self._policy = ReviewedSecretMaskPolicy._issue(
+            self,
+            _SECRET_POLICY_ISSUANCE_TOKEN,
+            policy_id=policy_id,
+            expected_width=expected_width,
+            expected_height=expected_height,
+            secret_regions=secret_regions,
+        )
+
+    @property
+    def policy(self) -> ReviewedSecretMaskPolicy:
+        return self._policy
+
+    def owns(self, policy: ReviewedSecretMaskPolicy) -> bool:
+        return policy is self._policy and policy._issuer is self
+
+
 class FrameSource(Protocol):
     def geometry(self, binding: RuntimeBinding) -> WindowGeometry: ...
 
@@ -152,8 +208,7 @@ class _SubprocessRunner:
                 list(args),
                 check=False,
                 stdin=subprocess.DEVNULL,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                capture_output=True,
                 timeout=timeout_s,
             )
         except (OSError, subprocess.TimeoutExpired):
@@ -235,19 +290,66 @@ class CaptureArtifact:
     parent_full_sha256: str | None = None
 
 
-@dataclass(frozen=True)
 class CaptureEvidence:
-    run_id: str
-    runtime_binding: RuntimeBinding
-    geometry: WindowGeometry
-    source_monotonic_ns: int
-    full_frame: CaptureArtifact
-    secret_safe: bool
-    secret_policy_ref: str
-    is_blank: bool
-    is_black: bool
-    changed_from_previous: bool | None
-    crop: CaptureArtifact | None = None
+    """Opaque producer-issued evidence; caller-created instances never reach vision."""
+
+    __slots__ = (
+        "__weakref__",
+        "_sealed",
+        "changed_from_previous",
+        "crop",
+        "full_frame",
+        "geometry",
+        "is_black",
+        "is_blank",
+        "run_id",
+        "runtime_binding",
+        "secret_policy_ref",
+        "secret_safe",
+        "source_monotonic_ns",
+    )
+
+    def __init__(self, *args, **kwargs) -> None:
+        raise TypeError("CaptureEvidence is producer-issued")
+
+    def __setattr__(self, name: str, value: object) -> None:
+        if getattr(self, "_sealed", False):
+            raise AttributeError("CaptureEvidence is immutable")
+        object.__setattr__(self, name, value)
+
+    @classmethod
+    def _issue(
+        cls,
+        *,
+        issuance_token: object,
+        run_id: str,
+        runtime_binding: RuntimeBinding,
+        geometry: WindowGeometry,
+        source_monotonic_ns: int,
+        full_frame: CaptureArtifact,
+        secret_policy_ref: str,
+        is_blank: bool,
+        is_black: bool,
+        changed_from_previous: bool | None,
+        crop: CaptureArtifact | None,
+    ) -> CaptureEvidence:
+        if issuance_token is not _CAPTURE_EVIDENCE_ISSUANCE_TOKEN:
+            raise TypeError("CaptureEvidence is producer-issued")
+        evidence = object.__new__(cls)
+        evidence.run_id = run_id
+        evidence.runtime_binding = runtime_binding
+        evidence.geometry = geometry
+        evidence.source_monotonic_ns = source_monotonic_ns
+        evidence.full_frame = full_frame
+        evidence.secret_safe = True
+        evidence.secret_policy_ref = secret_policy_ref
+        evidence.is_blank = is_blank
+        evidence.is_black = is_black
+        evidence.changed_from_previous = changed_from_previous
+        evidence.crop = crop
+        evidence._sealed = True
+        _ISSUED_EVIDENCE[id(evidence)] = evidence
+        return evidence
 
     def validated_vision_capture(
         self,
@@ -256,6 +358,8 @@ class CaptureEvidence:
         now_ns: int,
         max_age_ns: int,
     ) -> SecretSafeCapture:
+        if _ISSUED_EVIDENCE.get(id(self)) is not self:
+            raise CaptureEdgeError("CAPTURE_EVIDENCE_UNISSUED")
         if type(current_binding) is not RuntimeBinding:
             raise ValueError("current binding invalid")
         if type(now_ns) is not int or type(max_age_ns) is not int or max_age_ns < 0:
@@ -286,6 +390,11 @@ class CaptureEvidence:
             secret_safe=self.secret_safe,
             source_monotonic_ns=self.source_monotonic_ns,
         )
+
+
+_ISSUED_EVIDENCE: WeakValueDictionary[int, CaptureEvidence] = WeakValueDictionary()
+_SECRET_POLICY_ISSUANCE_TOKEN = object()
+_CAPTURE_EVIDENCE_ISSUANCE_TOKEN = object()
 
 
 def _png_chunk(kind: bytes, payload: bytes) -> bytes:
@@ -380,9 +489,17 @@ class CaptureEdge:
         frame_source: FrameSource,
         monotonic_ns: Callable[[], int],
         secret_policy: ReviewedSecretMaskPolicy,
+        policy_resolver: ReviewedSecretMaskPolicyResolver | None = None,
     ) -> None:
-        if type(secret_policy) is not ReviewedSecretMaskPolicy:
-            raise ValueError("reviewed secret policy invalid")
+        resolver = secret_policy._issuer if type(secret_policy) is ReviewedSecretMaskPolicy else None
+        if policy_resolver is not None:
+            resolver = policy_resolver
+        if (
+            type(secret_policy) is not ReviewedSecretMaskPolicy
+            or type(resolver) is not ReviewedSecretMaskPolicyResolver
+            or not resolver.owns(secret_policy)
+        ):
+            raise ValueError("reviewed secret policy issuer invalid")
         self._binding_reader = binding_reader
         self._frame_source = frame_source
         self._monotonic_ns = monotonic_ns
@@ -409,14 +526,15 @@ class CaptureEdge:
             raise ValueError("run_id invalid")
         if crop is not None and type(crop) is not PixelRegion:
             raise ValueError("crop invalid")
-        if previous_full_sha256 is not None:
-            if type(previous_full_sha256) is not str or len(previous_full_sha256) != 64 or any(
-                c not in "0123456789abcdefABCDEF" for c in previous_full_sha256
-            ):
-                raise ValueError("previous full sha256 invalid")
+        if previous_full_sha256 is not None and (
+            type(previous_full_sha256) is not str
+            or len(previous_full_sha256) != 64
+            or any(c not in "0123456789abcdefABCDEF" for c in previous_full_sha256)
+        ):
+            raise ValueError("previous full sha256 invalid")
         before = self._binding_reader()
-        started_ns = self._monotonic_ns()
-        self._require_current(before, started_ns, max_binding_age_ns)
+        binding_checked_ns = self._monotonic_ns()
+        self._require_current(before, binding_checked_ns, max_binding_age_ns)
         geometry = self._frame_source.geometry(before)
         if type(geometry) is not WindowGeometry:
             raise CaptureEdgeError("CAPTURE_GEOMETRY_INVALID")
@@ -430,6 +548,7 @@ class CaptureEdge:
         if crop is not None:
             _require_region(crop, geometry)
 
+        acquisition_started_ns = self._monotonic_ns()
         raw_pixels = self._frame_source.capture_rgb(before, geometry)
         _require_rgb(geometry, raw_pixels)
         safe_pixels = _mask_rgb(raw_pixels, geometry, self._secret_policy.secret_regions)
@@ -447,11 +566,8 @@ class CaptureEdge:
         if after_geometry != geometry:
             raise CaptureEdgeError("CAPTURE_GEOMETRY_CHANGED")
         final_binding = self._binding_reader()
-        observed_ns = self._monotonic_ns()
-        self._require_current(final_binding, observed_ns, max_binding_age_ns)
         if final_binding != before:
             raise CaptureEdgeError("RUNTIME_BINDING_CHANGED")
-
         full_png = _encode_rgb_png(geometry.width, geometry.height, safe_pixels)
         crop_png = None if crop is None else _encode_rgb_png(crop.width, crop.height, crop_pixels)
         root = Path(evidence_root)
@@ -470,13 +586,13 @@ class CaptureEdge:
                 region=crop,
                 parent_full_sha256=full_artifact.sha256,
             )
-        return CaptureEvidence(
+        return CaptureEvidence._issue(
+            issuance_token=_CAPTURE_EVIDENCE_ISSUANCE_TOKEN,
             run_id=run_id,
             runtime_binding=before,
             geometry=geometry,
-            source_monotonic_ns=observed_ns,
+            source_monotonic_ns=acquisition_started_ns,
             full_frame=full_artifact,
-            secret_safe=True,
             secret_policy_ref=self._secret_policy.policy_ref,
             is_blank=is_blank,
             is_black=is_black,

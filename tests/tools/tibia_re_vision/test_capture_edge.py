@@ -7,17 +7,16 @@ import zlib
 from dataclasses import replace
 from pathlib import Path
 
-
 _capture_edge = importlib.import_module("tools.tibia_re_vision.capture_edge") if importlib.util.find_spec("tools.tibia_re_vision.capture_edge") else None
 
 
 def _reviewed_policy(geometry, *, policy_id="fixture-mask-v1"):
-    return _capture_edge.ReviewedSecretMaskPolicy(
+    return _capture_edge.ReviewedSecretMaskPolicyResolver(
         policy_id=policy_id,
         expected_width=geometry.width,
         expected_height=geometry.height,
         secret_regions=(_capture_edge.PixelRegion(x=0, y=0, width=1, height=1),),
-    )
+    ).policy
 
 
 class _FrameSource:
@@ -54,12 +53,7 @@ class CaptureEdgeTests(unittest.TestCase):
         )
         binding = _binding()
         geometry = _capture_edge.WindowGeometry(x=0, y=0, width=2, height=1)
-        policy = _capture_edge.ReviewedSecretMaskPolicy(
-            policy_id="fixture-login-mask-v1",
-            expected_width=2,
-            expected_height=1,
-            secret_regions=(_capture_edge.PixelRegion(0, 0, 1, 1),),
-        )
+        policy = _reviewed_policy(geometry, policy_id="fixture-login-mask-v1")
         source = _FrameSource(geometry, bytes((9, 8, 7, 1, 2, 3)))
         edge = _capture_edge.CaptureEdge(
             binding_reader=lambda: binding,
@@ -83,7 +77,7 @@ class CaptureEdgeTests(unittest.TestCase):
     def test_reviewed_secret_policy_requires_nonempty_regions(self):
         geometry = _capture_edge.WindowGeometry(x=0, y=0, width=1, height=1)
         with self.assertRaisesRegex(ValueError, "reviewed secret regions invalid"):
-            _capture_edge.ReviewedSecretMaskPolicy(
+            _capture_edge.ReviewedSecretMaskPolicyResolver(
                 policy_id="fixture-empty-mask-v1",
                 expected_width=geometry.width,
                 expected_height=geometry.height,
@@ -93,11 +87,9 @@ class CaptureEdgeTests(unittest.TestCase):
     def test_reviewed_policy_geometry_mismatch_fails_before_capture_or_persistence(self):
         binding = _binding()
         geometry = _capture_edge.WindowGeometry(x=0, y=0, width=2, height=1)
-        wrong_geometry_policy = _capture_edge.ReviewedSecretMaskPolicy(
+        wrong_geometry_policy = _reviewed_policy(
+            _capture_edge.WindowGeometry(x=0, y=0, width=1, height=1),
             policy_id="fixture-wrong-geometry-v1",
-            expected_width=1,
-            expected_height=1,
-            secret_regions=(_capture_edge.PixelRegion(0, 0, 1, 1),),
         )
         source = _FrameSource(geometry, bytes((9, 8, 7, 1, 2, 3)))
         edge = _capture_edge.CaptureEdge(
@@ -172,12 +164,12 @@ class CaptureEdgeTests(unittest.TestCase):
             binding_reader=lambda: binding,
             frame_source=source,
             monotonic_ns=iter((1_100, 1_200)).__next__,
-            secret_policy=_capture_edge.ReviewedSecretMaskPolicy(
+            secret_policy=_capture_edge.ReviewedSecretMaskPolicyResolver(
                 policy_id="fixture-secret-crop-v1",
                 expected_width=geometry.width,
                 expected_height=geometry.height,
                 secret_regions=(secret,),
-            ),
+            ).policy,
         )
         crop = _capture_edge.PixelRegion(x=0, y=0, width=2, height=1)
         with tempfile.TemporaryDirectory() as raw:
@@ -343,11 +335,130 @@ class CaptureEdgeTests(unittest.TestCase):
                 (binding, 1_701, "CAPTURE_EVIDENCE_STALE"),
             )
             for current, now_ns, reason in cases:
-                with self.subTest(reason=reason):
-                    with self.assertRaisesRegex(_capture_edge.CaptureEdgeError, reason):
-                        evidence.validated_vision_capture(
-                            current_binding=current, now_ns=now_ns, max_age_ns=500
-                        )
+                with self.subTest(reason=reason), self.assertRaisesRegex(
+                    _capture_edge.CaptureEdgeError, reason
+                ):
+                    evidence.validated_vision_capture(
+                        current_binding=current, now_ns=now_ns, max_age_ns=500
+                    )
+
+    def test_publicly_constructed_evidence_cannot_bypass_producer_issuance(self):
+        binding = _binding()
+        geometry = _capture_edge.WindowGeometry(x=0, y=0, width=1, height=1)
+        edge = _capture_edge.CaptureEdge(
+            binding_reader=lambda: binding,
+            frame_source=_FrameSource(geometry, bytes((1, 2, 3))),
+            monotonic_ns=iter((1_100, 1_200)).__next__,
+            secret_policy=_reviewed_policy(geometry),
+        )
+        with tempfile.TemporaryDirectory() as raw:
+            evidence = edge.capture(
+                run_id="issued-evidence",
+                evidence_root=Path(raw),
+                max_binding_age_ns=500,
+            )
+            with self.assertRaisesRegex(TypeError, "producer-issued"):
+                _capture_edge.CaptureEvidence(
+                    run_id="forged-evidence",
+                    runtime_binding=binding,
+                    geometry=geometry,
+                    source_monotonic_ns=evidence.source_monotonic_ns,
+                    full_frame=evidence.full_frame,
+                    secret_safe=True,
+                    secret_policy_ref=evidence.secret_policy_ref,
+                    is_blank=False,
+                    is_black=False,
+                    changed_from_previous=None,
+                )
+            with self.assertRaisesRegex(TypeError, "producer-issued"):
+                _capture_edge.CaptureEvidence._issue(
+                    issuance_token=object(),
+                    run_id="forged-evidence",
+                    runtime_binding=binding,
+                    geometry=geometry,
+                    source_monotonic_ns=evidence.source_monotonic_ns,
+                    full_frame=evidence.full_frame,
+                    secret_policy_ref=evidence.secret_policy_ref,
+                    is_blank=False,
+                    is_black=False,
+                    changed_from_previous=None,
+                    crop=None,
+                )
+            with self.assertRaisesRegex(AttributeError, "immutable"):
+                evidence.secret_safe = False
+            forged = object.__new__(_capture_edge.CaptureEvidence)
+            with self.assertRaisesRegex(_capture_edge.CaptureEdgeError, "CAPTURE_EVIDENCE_UNISSUED"):
+                forged.validated_vision_capture(
+                    current_binding=binding, now_ns=1_300, max_age_ns=500
+                )
+
+    def test_freshness_is_bound_to_pixel_acquisition_start_not_postchecks(self):
+        binding = _binding()
+        geometry = _capture_edge.WindowGeometry(x=0, y=0, width=1, height=1)
+        clock = {"now": 1_100}
+
+        class _SlowFrameSource(_FrameSource):
+            def geometry(self, current_binding):
+                result = super().geometry(current_binding)
+                if len(self.geometry_calls) == 1:
+                    clock["now"] = 1_200
+                return result
+
+            def capture_rgb(self, current_binding, current_geometry):
+                result = super().capture_rgb(current_binding, current_geometry)
+                clock["now"] = 10_000
+                return result
+
+        edge = _capture_edge.CaptureEdge(
+            binding_reader=lambda: binding,
+            frame_source=_SlowFrameSource(geometry, bytes((1, 2, 3))),
+            monotonic_ns=lambda: clock["now"],
+            secret_policy=_reviewed_policy(geometry),
+        )
+        with tempfile.TemporaryDirectory() as raw:
+            evidence = edge.capture(
+                run_id="acquisition-time",
+                evidence_root=Path(raw),
+                max_binding_age_ns=500,
+            )
+            self.assertEqual(1_200, evidence.source_monotonic_ns)
+            with self.assertRaisesRegex(_capture_edge.CaptureEdgeError, "CAPTURE_EVIDENCE_STALE"):
+                evidence.validated_vision_capture(
+                    current_binding=binding, now_ns=2_201, max_age_ns=1_000
+                )
+
+    def test_foreign_or_caller_created_secret_policy_is_rejected_by_issuer(self):
+        geometry = _capture_edge.WindowGeometry(x=0, y=0, width=1, height=1)
+        resolver = _capture_edge.ReviewedSecretMaskPolicyResolver(
+            policy_id="trusted-mask-v1",
+            expected_width=geometry.width,
+            expected_height=geometry.height,
+            secret_regions=(_capture_edge.PixelRegion(0, 0, 1, 1),),
+        )
+        foreign_resolver = _capture_edge.ReviewedSecretMaskPolicyResolver(
+            policy_id="foreign-mask-v1",
+            expected_width=geometry.width,
+            expected_height=geometry.height,
+            secret_regions=(_capture_edge.PixelRegion(0, 0, 1, 1),),
+        )
+        with self.assertRaisesRegex(TypeError, "resolver-issued"):
+            _capture_edge.ReviewedSecretMaskPolicy(
+                policy_id="caller-mask-v1",
+                expected_width=geometry.width,
+                expected_height=geometry.height,
+                secret_regions=(_capture_edge.PixelRegion(0, 0, 1, 1),),
+            )
+        with self.assertRaisesRegex(AttributeError, "immutable"):
+            resolver.policy.secret_regions = ()
+        with self.assertRaisesRegex(ValueError, "reviewed secret policy issuer invalid"):
+            _capture_edge.CaptureEdge(
+                binding_reader=_binding,
+                frame_source=_FrameSource(geometry, bytes((1, 2, 3))),
+                monotonic_ns=lambda: 1_100,
+                secret_policy=foreign_resolver.policy,
+                policy_resolver=resolver,
+            )
+
 class CaptureAnalysisTests(unittest.TestCase):
     def test_black_and_blank_flags_are_deterministic(self):
         binding = _binding()

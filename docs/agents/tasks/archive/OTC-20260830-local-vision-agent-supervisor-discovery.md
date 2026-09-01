@@ -121,7 +121,9 @@ head: 21fedc04809f0f78a1ff673edb2804a83ab5fedb
 branch: main
 pr: 820
 status: completed
-context_routes: [local-vision-agent-supervisor-foundation, phase-2-read-only-coordination]
+context_routes:
+  - local-vision-agent-supervisor-foundation
+  - phase-2-read-only-coordination
 owned_paths: []
 proven:
   - PR 820 merged the accepted local vision-agent supervisor foundation.
@@ -131,13 +133,16 @@ derived:
   - Phase 2 coordinator may allocate non-overlapping worker ownership from refreshed main.
 unknown: []
 conflicts: []
-first_failure: {marker: none, evidence: none}
+first_failure:
+  marker: none
+  evidence: none
 rejected_hypotheses: []
-changed_paths: [docs/agents/tasks/archive/OTC-20260830-local-vision-agent-supervisor-discovery.md]
+changed_paths:
+  - docs/agents/tasks/archive/OTC-20260830-local-vision-agent-supervisor-discovery.md
 validation:
   - command: live GitHub lifecycle readback
     result: PASS
     evidence: PR 820 merged; PRs 808 and 810 closed
 blockers: []
-next_action: none
+next_action: preserve this archived task as terminal; all future Phase 2 work must use the OTC-VISION-P2-READONLY worker tasks
 ```

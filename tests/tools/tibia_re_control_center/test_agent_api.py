@@ -219,15 +219,73 @@ class AgentApiTests(unittest.TestCase):
         session = self.server.domain.agent.snapshot("agent-session-1")
         self.assertEqual(1, len([event for event in session["events"] if event.get("kind") == "TASK_ACCEPTED"]))
 
-    def test_task_body_is_exact_and_grants_no_runtime_or_physical_authority(self) -> None:
+    def test_task_body_is_exact_and_read_only_cannot_grant_physical_authority(self) -> None:
         for body in (
             {"task": task_envelope()},
             task_envelope(extra="unknown"),
-            task_envelope(runtime_access="read_only"),
+            task_envelope(runtime_access="read_only", allowed_actions=["ENTER_WORLD", "SCREENSHOT"]),
+            task_envelope(runtime_access="read_only", physical_action_budget=1),
+            task_envelope(runtime_access="read_only", secret_capability_ref="secret-ref"),
         ):
             with self.subTest(body=body):
                 status, _, payload = self.post("/v1/agent/tasks", body, f"bad-task-{len(json.dumps(body))}")
                 self.assertEqual(400, status, payload)
+        self.assertEqual([], self.server.domain.adapter.physical_effects)
+
+    def test_task_route_accepts_bounded_read_only_without_binding_executor(self) -> None:
+        status, _, payload = self.post(
+            "/v1/agent/tasks",
+            task_envelope(runtime_access="read_only"),
+            "agent-read-only-task",
+        )
+        self.assertEqual(201, status, payload)
+        session = payload["session"]
+        self.assertEqual("read_only", session["runtime_access"])
+        self.assertEqual(["SCREENSHOT"], session["allowed_actions"])
+        self.assertEqual(0, session["physical_action_budget"])
+        self.assertEqual(0, session["physical_action_count"])
+        self.assertEqual("NULL", session["executor"])
+        self.assertEqual("NONE", session["mutation_authority"])
+        self.assertEqual([], self.server.domain.adapter.physical_effects)
+
+    def test_agent_session_get_exposes_current_edge_state_without_physical_authority(self) -> None:
+        status, _, submitted = self.post(
+            "/v1/agent/tasks",
+            task_envelope(runtime_access="read_only"),
+            "agent-read-only-edge-task",
+        )
+        self.assertEqual(201, status, submitted)
+        now = self.server.domain.agent._now_epoch_ms()
+        self.server.domain.agent.ingest_edge_observation({
+            "schema": "otclient.local-agent.edge-observation.v1",
+            "session_id": "agent-session-1",
+            "run_id": "agent-run-1",
+            "edge_instance_id": "api-edge-1",
+            "observed_epoch_ms": now,
+            "heartbeat_epoch_ms": now,
+            "capture": {
+                "status": "AVAILABLE",
+                "artifact_ref": "api-capture-1",
+                "sha256": "c" * 64,
+                "observed_epoch_ms": now,
+                "secret_safe": True,
+            },
+            "runtime": {
+                "status": "IN_GAME",
+                "evidence_refs": ["api-runtime-1"],
+                "observed_epoch_ms": now,
+            },
+        })
+
+        get_status, _, session = self.get("/v1/agent/session?session_id=agent-session-1")
+        self.assertEqual(200, get_status, session)
+        self.assertEqual("READ_ONLY", session["official_client_access"])
+        self.assertTrue(session["edge"]["current"])
+        self.assertEqual("api-capture-1", session["edge"]["capture"]["artifact_ref"])
+        self.assertEqual("IN_GAME", session["edge"]["runtime"]["status"])
+        self.assertEqual("NULL", session["executor"])
+        self.assertEqual("NONE", session["mutation_authority"])
+        self.assertEqual(0, session["physical_action_count"])
         self.assertEqual([], self.server.domain.adapter.physical_effects)
 
     def test_pause_resume_and_stop_delegate_to_authoritative_owner_control(self) -> None:

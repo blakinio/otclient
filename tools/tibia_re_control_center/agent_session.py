@@ -10,6 +10,7 @@ from dataclasses import asdict, dataclass, replace
 from enum import Enum
 from typing import Any, Protocol
 
+from .agent_edge_bridge import AgentEdgeBridge
 from .agent_protocol import (
     AgentEvent,
     AgentOperationalState,
@@ -359,6 +360,7 @@ class AgentSessionCoordinator:
                 "guarded executor must be the exact MutationCoordinator-backed facade for this control domain",
             )
         self.guarded_executor = guarded_executor
+        self.edge = AgentEdgeBridge()
         self._lock = threading.RLock()
         self._sessions: dict[str, AgentSessionRecord] = {}
         self._tasks: dict[str, TaskEnvelope] = {}
@@ -589,6 +591,7 @@ class AgentSessionCoordinator:
         action_id: str | None = None,
         artifact_refs: tuple[str, ...] = (),
         payload: dict[str, object] | None = None,
+        heartbeat_epoch_ms: int | None = None,
         operation: str = "agent_session_event",
     ) -> AgentSessionRecord:
         record = self.ensure_session(session_id)
@@ -618,6 +621,11 @@ class AgentSessionCoordinator:
             operational_state=target_state,
             pause_latched=record.pause_latched if pause_latched is None else pause_latched,
             stop_latched=record.stop_latched if stop_latched is None else stop_latched,
+            heartbeat_epoch_ms=(
+                record.heartbeat_epoch_ms
+                if heartbeat_epoch_ms is None
+                else heartbeat_epoch_ms
+            ),
         )
         next_record, _ = self.store.atomic_agent_transition(
             next_record,
@@ -683,10 +691,21 @@ class AgentSessionCoordinator:
             # Re-parse direct dataclass construction before any durable write.
             parsed_input = TaskEnvelope.from_mapping(asdict(envelope))
             ensure_no_secret_material(asdict(parsed_input), key_path="agent_task")
-            if parsed_input.runtime_access != "none":
+            if parsed_input.runtime_access == "read_only":
+                safe_read_only = (
+                    parsed_input.physical_action_budget == 0
+                    and parsed_input.secret_capability_ref is None
+                    and all(action is NamedAgentAction.SCREENSHOT for action in parsed_input.allowed_actions)
+                )
+                if not safe_read_only:
+                    raise ValidationError(
+                        "RUNTIME_ACCESS_UNAVAILABLE",
+                        "read-only runtime access cannot carry physical actions, budget, or secret capabilities",
+                    )
+            elif parsed_input.runtime_access != "none":
                 raise ValidationError(
                     "RUNTIME_ACCESS_UNAVAILABLE",
-                    "the repository foundation has no runtime access",
+                    "this Control Center phase admits only none or bounded read_only runtime access",
                 )
             prior_event = self._operation_event(
                 parsed_input.session_id,
@@ -811,6 +830,146 @@ class AgentSessionCoordinator:
                 "envelope": _jsonable(accepted["envelope"]),
                 "result": _jsonable(accepted["result"]),
             }
+
+    def ingest_edge_observation(self, value: Mapping[str, Any]) -> dict[str, object]:
+        """Persist one normalized read-only edge observation without creating effect authority."""
+        with self._lock:
+            if not isinstance(value, Mapping):
+                raise ValidationError("EDGE_OBSERVATION_INVALID", "edge observation must be a mapping")
+            session_id = value.get("session_id")
+            if not isinstance(session_id, str):
+                raise ValidationError("EDGE_OBSERVATION_INVALID", "edge observation session_id is invalid")
+            session = self.ensure_session(session_id)
+            task = self._tasks.get(session_id)
+            if task is None or task.runtime_access != "read_only":
+                raise ValidationError("EDGE_RUNTIME_NOT_ADMITTED", "edge observation requires an accepted read-only task")
+            if session.current_run_id != task.run_id:
+                raise ValidationError("EDGE_BINDING_MISMATCH", "edge observation requires the active task run")
+            previous_observed_epoch_ms = next((
+                payload.get("observed_epoch_ms")
+                for event in reversed(self._events_for(session_id))
+                if event.get("kind") == "EDGE_OBSERVATION"
+                and event.get("run_id") == task.run_id
+                and isinstance((payload := event.get("payload")), Mapping)
+                and type(payload.get("observed_epoch_ms")) is int
+            ), None)
+            now = self._now_epoch_ms()
+            observation = self.edge.accept(
+                value,
+                now_epoch_ms=now,
+                expected_session_id=session_id,
+                expected_run_id=task.run_id,
+                previous_observed_epoch_ms=previous_observed_epoch_ms,
+            )
+            fresh = self.edge.heartbeat_is_fresh(observation.heartbeat_epoch_ms, now_epoch_ms=now)
+            target_state = session.operational_state
+            if not fresh and target_state not in {
+                AgentOperationalState.PAUSED,
+                AgentOperationalState.PAUSED_AUTHORITY,
+                AgentOperationalState.STOPPED,
+                AgentOperationalState.TERMINAL,
+            }:
+                target_state = AgentOperationalState.DEGRADED
+            elif fresh and target_state is AgentOperationalState.DEGRADED:
+                target_state = AgentOperationalState.RUNNING
+            refs: list[str] = []
+            if observation.capture is not None and observation.capture.artifact_ref is not None:
+                refs.append(observation.capture.artifact_ref)
+            if observation.runtime is not None:
+                refs.extend(observation.runtime.evidence_refs)
+            payload = {
+                "edge_instance_id": observation.edge_instance_id,
+                "observed_epoch_ms": observation.observed_epoch_ms,
+                "heartbeat_epoch_ms": observation.heartbeat_epoch_ms,
+                "capture": None if observation.capture is None else _jsonable(asdict(observation.capture)),
+                "runtime": None if observation.runtime is None else _jsonable(asdict(observation.runtime)),
+                "physical_effect": False,
+            }
+            self._persist_event(
+                session_id,
+                provenance=AgentProvenance.RUNTIME,
+                kind="EDGE_OBSERVATION",
+                state_after=target_state,
+                heartbeat_epoch_ms=observation.heartbeat_epoch_ms,
+                artifact_refs=tuple(dict.fromkeys(refs)),
+                payload=payload,
+                operation="agent_edge_observation",
+            )
+            evidence = self._evidence_refs.setdefault(session_id, [])
+            for ref in refs:
+                if ref not in evidence:
+                    evidence.append(ref)
+            return self.snapshot(session_id)
+
+    def edge_disconnected(self, session_id: str, *, edge_instance_id: str | None = None) -> dict[str, object]:
+        """Fail closed when the read-only runtime edge disconnects."""
+        with self._lock:
+            session = self.ensure_session(session_id)
+            self.edge.disconnect(session_id, edge_instance_id)
+            target_state = session.operational_state
+            if target_state not in {
+                AgentOperationalState.PAUSED,
+                AgentOperationalState.PAUSED_AUTHORITY,
+                AgentOperationalState.STOPPED,
+                AgentOperationalState.TERMINAL,
+            }:
+                target_state = AgentOperationalState.DEGRADED
+            self._persist_event(
+                session_id,
+                provenance=AgentProvenance.SYSTEM,
+                kind="EDGE_DISCONNECTED",
+                state_after=target_state,
+                payload={"edge_instance_id": edge_instance_id, "physical_effect": False},
+                operation="agent_edge_disconnect",
+            )
+            return self.snapshot(session_id)
+
+    def _edge_status(
+        self,
+        session: AgentSessionRecord,
+        task: TaskEnvelope | None,
+        events: list[dict[str, Any]],
+    ) -> dict[str, object]:
+        return self.edge.status(
+            session_id=session.session_id,
+            current_run_id=session.current_run_id,
+            runtime_access="none" if task is None else task.runtime_access,
+            heartbeat_epoch_ms=session.heartbeat_epoch_ms,
+            events=events,
+            now_epoch_ms=self._now_epoch_ms(),
+        )
+
+    def _reconcile_stale_edge(
+        self,
+        session: AgentSessionRecord,
+        task: TaskEnvelope | None,
+        events: list[dict[str, Any]],
+    ) -> AgentSessionRecord:
+        if task is None or task.runtime_access != "read_only" or session.heartbeat_epoch_ms is None:
+            return session
+        status = self._edge_status(session, task, events)
+        if status.get("reason") not in {"HEARTBEAT_STALE", "EVIDENCE_STALE"}:
+            return session
+        if session.operational_state in {
+            AgentOperationalState.DEGRADED,
+            AgentOperationalState.PAUSED,
+            AgentOperationalState.PAUSED_AUTHORITY,
+            AgentOperationalState.STOPPED,
+            AgentOperationalState.TERMINAL,
+        }:
+            return session
+        return self._persist_event(
+            session.session_id,
+            provenance=AgentProvenance.SYSTEM,
+            kind="EDGE_HEARTBEAT_STALE",
+            state_after=AgentOperationalState.DEGRADED,
+            payload={
+                "edge_instance_id": status.get("edge_instance_id"),
+                "heartbeat_epoch_ms": session.heartbeat_epoch_ms,
+                "physical_effect": False,
+            },
+            operation="agent_edge_stale",
+        )
 
     @staticmethod
     def _command(command: OwnerControlCommand | str) -> OwnerControlCommand:
@@ -1481,10 +1640,22 @@ class AgentSessionCoordinator:
     ) -> dict[str, object]:
         session = self.ensure_session(session_id)
         run_id = session.current_run_id or f"{session_id}-idle"
-        try:
-            receipt = self.executor.screenshot(session_id, run_id)
-        except Exception:  # noqa: BLE001 -- read-only capture boundary fails closed
-            receipt = CaptureReceipt("UNAVAILABLE", None, None, True)
+        task = self._tasks.get(session_id)
+        events = self._events_for(session_id)
+        edge_status = self._edge_status(session, task, events)
+        edge_capture = edge_status.get("capture")
+        if isinstance(edge_capture, Mapping) and edge_capture.get("current") is True:
+            receipt = CaptureReceipt(
+                status=str(edge_capture.get("status", "UNAVAILABLE")),
+                artifact_ref=edge_capture.get("artifact_ref") if isinstance(edge_capture.get("artifact_ref"), str) else None,
+                sha256=edge_capture.get("sha256") if isinstance(edge_capture.get("sha256"), str) else None,
+                secret_safe=edge_capture.get("secret_safe") is True,
+            )
+        else:
+            try:
+                receipt = self.executor.screenshot(session_id, run_id)
+            except Exception:  # noqa: BLE001 -- read-only capture boundary fails closed
+                receipt = CaptureReceipt("UNAVAILABLE", None, None, True)
         valid = (
             type(receipt) is CaptureReceipt
             and isinstance(receipt.status, str) and bool(receipt.status)
@@ -1628,6 +1799,10 @@ class AgentSessionCoordinator:
             else:
                 remaining_budget = ledger.dimensions["max_actions"].available()
             events = self._events_for(session_id)
+            session = self._reconcile_stale_edge(session, task, events)
+            if session.last_event_seq != (events[-1]["seq"] if events else 0):
+                events = self._events_for(session_id)
+            edge_status = self._edge_status(session, task, events)
             return {
                 "session_id": session.session_id,
                 "operational_state": session.operational_state.value,
@@ -1636,6 +1811,7 @@ class AgentSessionCoordinator:
                 "pause_latched": session.pause_latched,
                 "stop_latched": session.stop_latched,
                 "heartbeat_epoch_ms": session.heartbeat_epoch_ms,
+                "edge": edge_status,
                 "task_id": None if task is None else task.task_id,
                 "trusted_main_sha": None if task is None else task.trusted_main_sha,
                 "runtime_access": "none" if task is None else task.runtime_access,
@@ -1653,7 +1829,9 @@ class AgentSessionCoordinator:
                 "events": events,
                 "executor": "NULL" if type(self.executor) is NullBoundedActionExecutor else "INJECTED_TEST",
                 "mutation_authority": "NONE",
-                "official_client_access": "NONE",
+                "official_client_access": (
+                    "READ_ONLY" if task is not None and task.runtime_access == "read_only" else "NONE"
+                ),
             }
 
     def foundation_status(self) -> dict[str, object]:

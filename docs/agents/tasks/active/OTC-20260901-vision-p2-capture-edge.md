@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260901-vision-p2-capture-edge
-status: implementing
+status: validating
 agent: ChatGPT
 session_role: phase2_worker
 worker_alias: OTC-VISION-P2-CAPTURE-EDGE
@@ -9,12 +9,12 @@ project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: implementation
-phase: benchmark_reclassification_trust_boundary_repair
+phase: benchmark_reclassification_repaired_local_validation
 branch: feat/OTC-20260901-vision-p2-capture-edge
 base_branch: main
 base_main: d1cb8722c3116a0e0aeb72b9b360712f43151f17
 created: 2026-09-01T16:27:39+02:00
-updated_at: 2026-09-01T22:50:00+02:00
+updated_at: 2026-09-01T23:05:00+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: isolated_worker_branch
@@ -66,7 +66,7 @@ depends_on:
 related_prs:
   - PR #827 Wave 1 worker Draft
 current_blocker: coordinator reclassification 5500210008: forged CaptureEvidence, post-capture freshness, and policy-issuance trust boundaries require repair
-next_action: add focused RED tests for forged evidence rejection, acquisition-start freshness, and resolver-issued policy provenance; then make the smallest owned capture-edge repair
+next_action: run Track A governance and checkpoint/path validation on the repaired exact head, push with a lease, then request coordinator re-review of Draft PR #827
 invocation_started_at: 2026-09-01T16:58:39+02:00
 last_progress_at: 2026-09-01T22:29:51+02:00
 ci_checks_for_current_head: 0
@@ -140,8 +140,6 @@ DEPENDENCIES:
 runtime_access: none
 ```
 
-## Context checkpoint
-
 ## Recovery checkpoint
 
 ```yaml
@@ -150,12 +148,12 @@ recovery:
   generation: 1
   session_id: 2026-09-01T22:50:00+02:00
   session_started_at: 2026-09-01T22:50:00+02:00
-  checkpointed_at: 2026-09-01T22:50:00+02:00
-  last_progress_at: 2026-09-01T22:50:00+02:00
-  phase: benchmark_reclassification_trust_boundary_repair
-  exact_head: b4a2664778d001344e3d0fdbd19ff4c9ac118e18
+  checkpointed_at: 2026-09-01T23:05:00+02:00
+  last_progress_at: 2026-09-01T23:05:00+02:00
+  phase: benchmark_reclassification_repaired_local_validation
+  exact_head: 14cb64db3ef13c753ba196529ee1f6672d215879
   pull_request: 827
-  active_operation: local RED-to-GREEN trust-boundary repair
+  active_operation: local governance and checkpoint validation
   external_run_ids: []
   operation_started_at: null
   wait_deadline_at: null
@@ -164,18 +162,20 @@ recovery:
   status: active
   safe_to_resume: true
   resume_condition: existing worker branch remains exclusively owned and the three reproduced benchmark findings remain unresolved
-  next_action: add focused RED tests for forged evidence rejection, acquisition-start freshness, and resolver-issued policy provenance; then make the smallest owned capture-edge repair
+  next_action: run Track A governance and checkpoint/path validation on the repaired exact head, push with a lease, then request coordinator re-review of Draft PR #827
 ```
+
+## Context checkpoint
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T22:29:51+02:00
-head: be1a5f2c5bedc3e89fc252d439eb2355a22bb362
-head_semantics: implementation_commit_before_checkpoint_docs
+updated_at: 2026-09-01T23:05:00+02:00
+head: 14cb64db3ef13c753ba196529ee1f6672d215879
+head_semantics: benchmark-reclassification repair implementation before current checkpoint docs
 branch: feat/OTC-20260901-vision-p2-capture-edge
 pr: 827
-status: ready
-phase: worker_current_main_revalidation_ready_for_coordinator
+status: validating
+phase: benchmark_reclassification_repaired_local_validation
 context_routes:
   - phase-2-read-only-coordination
   - track-a-governance
@@ -186,6 +186,12 @@ owned_paths:
   - tools/tibia_re_vision/capture_edge.py
   - tests/tools/tibia_re_vision/test_capture_edge.py
 proven:
+  - coordinator comment 5500210008 mechanically proved promotion head b4a2664778d001344e3d0fdbd19ff4c9ac118e18 retained the benchmark-target capture_edge.py and test_capture_edge.py blobs, so prior ACCEPT is superseded.
+  - focused RED reproduced the three repair categories: public CaptureEvidence constructor accepted caller-provided secret_safe/hash/binding fields; source_monotonic_ns was sampled after capture; and ReviewedSecretMaskPolicy was publicly constructible.
+  - CaptureEvidence is now an immutable producer-issued opaque object; public construction and wrong-token issuance fail, and validation rejects an object allocated outside the producer issuance registry before reading caller fields.
+  - ReviewedSecretMaskPolicy is now immutable and resolver-issued; CaptureEdge accepts only the exact policy issued by its composition-time resolver and rejects a foreign resolver policy when a resolver is explicitly bound.
+  - source_monotonic_ns is sampled immediately before capture_rgb and is no longer replaced by a later post-capture/postcheck time.
+  - local GREEN evidence after the repair: focused capture-edge 17/17, capture-edge plus existing vision evidence 21/21, complete vision suite 24/24, py_compile, ruff and diff check PASS.
   - coordinator comment 5497472188 identified the broader remaining gap: arbitrary non-empty per-call masks could still self-certify secret_safe.
   - focused RED required ReviewedSecretMaskPolicy at trusted composition time and failed because the published module lacked that contract.
   - ReviewedSecretMaskPolicy is immutable, binds a reviewed policy id, exact expected frame dimensions, deterministic non-empty regions and content-addressed policy_ref.
@@ -196,18 +202,23 @@ proven:
   - post-restack focused capture-edge suite passes 14/14; capture-edge plus existing vision-evidence suite passes 18/18.
   - post-restack py_compile, Track A runtime governance, checkpoint validation and git diff --check pass; changed paths remain exactly four worker-owned paths.
   - public-surface audit confirms capture parameters are self, run_id, evidence_root, max_binding_age_ns, crop and previous_full_sha256; legacy SecretSafetyPolicy is absent.
-  - exact checkpoint head 1f550b658ca6f17c02f4aeec80fd01cc212122b5 passed GitHub CI run 33545702287 and Track A governance run 33545701984.
 derived:
+  - producer-issued evidence plus validation-time issuance verification closes the public dataclass-forgery bypass without relaxing runtime/hash/geometry/crop fences.
+  - the explicit resolver boundary makes the trusted composition root the policy issuance authority; a public direct policy constructor and cross-resolver policy injection cannot certify secret safety.
   - the arbitrary per-call secret-mask authority found in coordinator re-review is removed from the capture request surface.
   - no repository/static result proves real Official Tibia runtime capture behavior.
 unknown:
+  - exact-head GitHub CI/governance and independent coordinator re-review of this repair generation.
   - independent coordinator re-review disposition on the second repaired generation.
   - real admitted Linux/Synology/Kasm read-only runtime verification; not authorized in this worker checkpoint.
 conflicts: []
 first_failure:
-  marker: RED-REVIEWED-MASK-NOT-COMPOSITION-BOUND
-  evidence: focused test test_reviewed_secret_policy_is_bound_to_edge_not_each_capture failed because ReviewedSecretMaskPolicy did not exist.
+  marker: RED-BENCHMARK-FORGED-EVIDENCE-FRESHNESS-ISSUANCE
+  evidence: focused test run failed with public CaptureEvidence forging accepted, post-capture freshness behavior, and no ReviewedSecretMaskPolicyResolver surface before the repair.
 rejected_hypotheses:
+  - content hashes, binding equality and caller-set secret_safe alone constitute trusted capture provenance: rejected because they are reproducible by caller-constructed evidence.
+  - a post-capture/postcheck timestamp may represent the pixel acquisition time: rejected because it makes earlier pixels appear younger.
+  - a syntactically valid public ReviewedSecretMaskPolicy is reviewed: rejected; issuance is now resolver-owned and edge-bound.
   - any non-empty per-call mask is sufficient proof of secret safety: rejected by coordinator re-review and removed from the public capture API.
   - GitHub-only production patching should bypass the local RED-to-GREEN loop while the host is offline: rejected; production remained untouched until Molehill-PC returned online.
 changed_paths:
@@ -216,6 +227,27 @@ changed_paths:
   - tools/tibia_re_vision/capture_edge.py
   - tests/tools/tibia_re_vision/test_capture_edge.py
 validation:
+  - command: focused RED `python -m unittest tests.tools.tibia_re_vision.test_capture_edge -q`
+    result: FAIL
+    evidence: 17-test run failed before repair: public forged evidence accepted, post-capture freshness rejected the new acquisition assertion, and resolver issuer was absent.
+  - command: `python -m unittest tests.tools.tibia_re_vision.test_capture_edge -q`
+    result: PASS
+    evidence: 17 tests, zero failures/errors after repair.
+  - command: `python -m unittest tests.tools.tibia_re_vision.test_evidence tests.tools.tibia_re_vision.test_capture_edge -q`
+    result: PASS
+    evidence: 21 tests, zero failures/errors after repair.
+  - command: `python -m unittest discover -s tests/tools/tibia_re_vision -p 'test_*.py' -q`
+    result: PASS
+    evidence: 24 tests, zero failures/errors after repair.
+  - command: py_compile and `ruff check tools/tibia_re_vision tests/tools/tibia_re_vision`
+    result: PASS
+    evidence: both changed modules compile and ruff reports all checks passed.
+  - command: `python .github/scripts/test_track_a_agent_runtime_governance.py --changed-from origin/main --expected-branch feat/OTC-20260901-vision-p2-capture-edge`
+    result: PASS
+    evidence: TRACK_A_AGENT_RUNTIME_GOVERNANCE_PASS=true; changed tasks and branch-bound tasks both equal 1.
+  - command: checkpoint validator, resume generator and changed-path audit
+    result: PASS
+    evidence: checkpoint validates, resume resolves this task, diff check passes, and origin/main...HEAD contains exactly the four owned paths.
   - command: python -m unittest tests.tools.tibia_re_vision.test_capture_edge -q
     result: PASS
     evidence: 14 tests, zero failures/errors after restack.
@@ -232,5 +264,5 @@ validation:
     result: PASS
     evidence: checkpoint schema valid and no whitespace/path-boundary finding.
 blockers: []
-next_action: publish current-main-restacked Draft PR #827, require exact-head hosted CI/governance, then return to OTC-VISION-P2-COORDINATOR for promotion; worker must not self-promote or merge.
+next_action: run Track A governance and checkpoint/path validation on the repaired exact head, push with a lease, then request coordinator re-review of Draft PR #827; worker must not self-promote or merge.
 ```

@@ -48,3 +48,17 @@ Earlier generations passed their own CI/governance but were superseded by coordi
 After PR #839 merged, the accepted capture-edge branch was restacked conflict-free onto main@e883543403d5430d7b1d287f59043b23c98f37d6. The promoted runtime-signals change touched none of this worker's four owned paths. Fresh post-restack validation on implementation/history head e1a5f2c5bedc3e89fc252d439eb2355a22bb362 passed: focused capture-edge **14/14**, capture-edge plus existing vision evidence **18/18**, targeted py_compile, Track A runtime governance, checkpoint validation and git diff --check. Public API audit still shows no per-call secret_policy, no legacy SecretSafetyPolicy, ReviewedSecretMaskPolicy present, and shell=True count zero.
 
 This is repository/static evidence only. No Official Tibia/Synology/Kasm live capture or observation is claimed. The current-main checkpoint will be published once; exact-head hosted CI/governance must pass before coordinator promotion.
+
+## Benchmark reclassification repair
+
+Coordinator safety reclassification `5500210008` mechanically established that promotion head `b4a2664778d001344e3d0fdbd19ff4c9ac118e18` preserved the benchmark target blobs. The earlier ACCEPT is therefore superseded.
+
+This repair adds focused RED-to-GREEN coverage and makes three bounded changes:
+
+- `CaptureEvidence` is now immutable, producer-issued and registry-verified before vision handoff. Public construction, wrong-token issuance and unissued allocated instances fail closed with `CAPTURE_EVIDENCE_UNISSUED`; matching caller hashes, binding and `secret_safe=True` are insufficient.
+- `source_monotonic_ns` is sampled immediately before `capture_rgb()`, after geometry/policy checks and before pixel acquisition. Later binding/geometry postchecks cannot overwrite that source time.
+- `ReviewedSecretMaskPolicy` is immutable and resolver-issued. The composition-time resolver owns its exact policy; direct caller construction and explicit foreign-resolver policy injection into an edge are rejected.
+
+Fresh local validation on implementation head `14cb64db3ef13c753ba196529ee1f6672d215879`: focused capture-edge **17/17 PASS**; capture-edge plus existing vision evidence **21/21 PASS**; complete vision suite **24/24 PASS**; targeted `py_compile`, `ruff check tools/tibia_re_vision tests/tools/tibia_re_vision`, and `git diff --check` PASS. Track A governance, checkpoint/path validation and exact-head GitHub CI remain required before coordinator re-review.
+
+This remains a repository/static producer repair only. `runtime_access:none`; no Official Tibia/Synology/Kasm observation, credential/login, GUI/process/memory/payload action or physical effect occurred. Physical action budget/count remain `0/0`.

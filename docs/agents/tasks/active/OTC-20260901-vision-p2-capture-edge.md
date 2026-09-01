@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260901-vision-p2-capture-edge
-status: validating
+status: ready
 agent: ChatGPT
 session_role: phase2_worker
 worker_alias: OTC-VISION-P2-CAPTURE-EDGE
@@ -9,12 +9,12 @@ project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: implementation
-phase: worker_local_validation
+phase: worker_ready_for_coordinator
 branch: feat/OTC-20260901-vision-p2-capture-edge
 base_branch: main
 base_main: 0fe1ecb3569f1d8372209c857ab57f3b626c29ae
 created: 2026-09-01T16:27:39+02:00
-updated_at: 2026-09-01T17:57:37+02:00
+updated_at: 2026-09-01T18:01:05+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: isolated_worker_branch
@@ -66,13 +66,13 @@ depends_on:
 related_prs:
   - PR #827 Wave 1 worker Draft
 current_blocker: none
-next_action: commit and publish the worker implementation/report checkpoint, then verify exact-head GitHub CI/governance and return Draft PR #827 to OTC-VISION-P2-COORDINATOR for classification
+next_action: return Draft PR #827 to OTC-VISION-P2-COORDINATOR for classification/integration; this worker must not mark Ready or merge
 invocation_started_at: 2026-09-01T16:58:39+02:00
-last_progress_at: 2026-09-01T17:57:37+02:00
-ci_checks_for_current_head: 0
-ci_check_generation: implementation-unpublished
-terminal_ci_wait_started_at: null
-terminal_ci_checks_for_current_generation: 0
+last_progress_at: 2026-09-01T18:01:05+02:00
+ci_checks_for_current_head: 2
+ci_check_generation: implementation-head-8685f7c6a8dae9e41d71f0acbe70a89a35a0ef38
+terminal_ci_wait_started_at: 2026-09-01T17:58:40+02:00
+terminal_ci_checks_for_current_generation: 4
 unchanged_state_checks: 0
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
@@ -144,11 +144,11 @@ runtime_access: none
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T17:57:37+02:00
-head: dd40d914fa5d05cdf5ff2957cc798ee7aa336d9b
+updated_at: 2026-09-01T18:01:05+02:00
+head: 8685f7c6a8dae9e41d71f0acbe70a89a35a0ef38
 branch: feat/OTC-20260901-vision-p2-capture-edge
 pr: 827
-status: validating
+status: ready
 context_routes:
   - phase-2-read-only-coordination
   - track-a-governance
@@ -159,17 +159,18 @@ owned_paths:
   - tools/tibia_re_vision/capture_edge.py
   - tests/tools/tibia_re_vision/test_capture_edge.py
 proven:
-  - Draft PR 827 remains the pre-bound worker PR; local branch/worktree ownership was revalidated before implementation.
+  - Draft PR 827 remains the exact pre-bound worker PR and live GitHub head equals implementation head 8685f7c6a8dae9e41d71f0acbe70a89a35a0ef38.
   - runtime_access is none; all mutation/runtime-effect authorities are false and physical action budget/count are 0/0.
-  - RED-to-GREEN focused tests cover exact binding/freshness, secret-safe in-memory masking, crop/full hash binding, content addressing, blank/black/change metadata, downstream integrity/currentness, fixed read-only Kasm/X11/ffmpeg command construction, geometry-drift refusal, final binding-race refusal, and absence of an unchecked public vision-conversion bypass.
+  - RED-to-GREEN focused tests cover exact binding/freshness, pre/post geometry binding, final binding-race closure, secret-safe in-memory masking, crop/full hash binding, content addressing, blank/black/change metadata, downstream integrity/currentness, fixed read-only Kasm/X11/ffmpeg command construction, and absence of an unchecked public vision-conversion bypass.
   - focused capture-edge suite passes 11/11; capture-edge plus existing vision-evidence suite passes 15/15; targeted py_compile passes.
-  - Track A runtime governance, checkpoint validation and git diff --check pass locally for the worker branch before publication.
-  - the one broader agent_vision error and foundation synthetic-E2E failure reproduce unchanged from clean committed head dd40d914fa5d05cdf5ff2957cc798ee7aa336d9b and are pre-existing outside worker ownership.
+  - local Track A runtime governance, checkpoint validation and git diff --check pass.
+  - GitHub CI run 33529034080 and Track A agent runtime governance run 33529033773 both completed SUCCESS on exact implementation head 8685f7c6a8dae9e41d71f0acbe70a89a35a0ef38.
+  - the one broader agent_vision error and foundation synthetic-E2E failure reproduce unchanged from clean committed pre-implementation head dd40d914fa5d05cdf5ff2957cc798ee7aa336d9b and are pre-existing outside worker ownership.
 derived:
-  - the worker implementation is ready to publish for exact-head CI and coordinator classification, but is not a claim of real-runtime capture success.
+  - the repository/static capture-edge worker slice is ready for coordinator classification/integration.
+  - no result in this worker proves real Official Tibia runtime capture behavior.
 unknown:
-  - exact-head GitHub CI/governance outcome after publication.
-  - independent coordinator review/integration disposition.
+  - independent coordinator review/integration disposition and any shared MODULE_CATALOG/CHANGELOG update.
   - real admitted Linux/Synology/Kasm read-only runtime verification; not authorized in this worker checkpoint.
 conflicts: []
 first_failure:
@@ -197,9 +198,15 @@ validation:
   - command: Track A runtime governance validator for changed-from 0fe1ecb3569f1d8372209c857ab57f3b626c29ae and expected worker branch
     result: PASS
     evidence: TRACK_A_AGENT_RUNTIME_GOVERNANCE_PASS=true.
+  - command: GitHub CI run 33529034080 on 8685f7c6a8dae9e41d71f0acbe70a89a35a0ef38
+    result: PASS
+    evidence: workflow completed with conclusion success.
+  - command: GitHub Track A agent runtime governance run 33529033773 on 8685f7c6a8dae9e41d71f0acbe70a89a35a0ef38
+    result: PASS
+    evidence: workflow completed with conclusion success.
   - command: broader test_agent_vision and synthetic foundation E2E baseline comparison
     result: FAIL
-    evidence: both observed failures reproduce from clean archive of committed head dd40d914fa5d05cdf5ff2957cc798ee7aa336d9b; no worker-owned file is involved.
+    evidence: both observed failures reproduce from clean archive of committed pre-implementation head dd40d914fa5d05cdf5ff2957cc798ee7aa336d9b; no worker-owned file is involved.
 blockers: []
-next_action: commit and publish the worker implementation/report checkpoint, then verify exact-head GitHub CI/governance and return Draft PR #827 to OTC-VISION-P2-COORDINATOR for classification.
+next_action: return Draft PR #827 to OTC-VISION-P2-COORDINATOR for classification/integration; this worker must not mark Ready or merge.
 ```

@@ -128,6 +128,11 @@ Focused RED-to-GREEN evidence on the working repair tree:
 - WSL/Linux-compatible full relevant `test_agent*.py`: 263 PASS, 1 skipped;
 - `compileall`, focused Ruff and `git diff --check`: PASS.
 
+Fresh deterministic safety evidence also passes: Agent Foundation audit, Package A
+and P1 audits, Package B audit, and Package B Chrome/CLI/restart E2E. Package A
+scripts were invoked as Python modules from the repository root; direct script
+execution has the pre-existing import-path limitation and is not a product failure.
+
 Fresh exact-head audit, Package A/Package B/Track A and CI remain pending after
 the repair commit is published. The Draft PR remains coordinator-owned for
 classification; this worker will not merge or promote it.

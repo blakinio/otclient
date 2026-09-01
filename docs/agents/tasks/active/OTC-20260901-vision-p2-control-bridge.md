@@ -14,7 +14,7 @@ branch: feat/OTC-20260901-vision-p2-control-bridge
 base_branch: main
 base_main: d1cb8722c3116a0e0aeb72b9b360712f43151f17
 created: 2026-09-01T16:27:39+02:00
-updated_at: 2026-09-01T23:04:01+02:00
+updated_at: 2026-09-01T23:06:00+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: isolated_worker_branch
@@ -76,9 +76,9 @@ depends_on:
 related_prs:
   - PR #830 Wave 1 worker Draft
 current_blocker: exact-head coordinator review 5500323278 returned two material authority/lifetime findings for repair
-next_action: run the full relevant hosted-equivalent suite after focused RED-to-GREEN authority and lifetime repair
+next_action: push the restacked authority/lifetime repair with a lease and inspect fresh exact-head checks
 invocation_started_at: 2026-09-01T16:49:00+02:00
-last_progress_at: 2026-09-01T23:04:01+02:00
+last_progress_at: 2026-09-01T23:06:00+02:00
 ci_checks_for_current_head: 4
 ci_check_generation: exact-head-green-274955658
 terminal_ci_wait_started_at: null
@@ -174,11 +174,11 @@ runtime_access: none
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T22:16:27+02:00
-head: 274955658f08c8631d24511be1646a9ec16fff6c
+updated_at: 2026-09-01T23:06:00+02:00
+head: d41deb135f212517f7931a54b2dae9b1d7746bf2
 branch: feat/OTC-20260901-vision-p2-control-bridge
 pr: 830
-status: ready
+status: validating
 context_routes:
   - phase-2-read-only-coordination
   - track-a-governance
@@ -199,6 +199,8 @@ owned_paths:
   - tests/tools/tibia_re_control_center/test_agent_mcp.py
   - tests/tools/tibia_re_control_center/test_agent_persistence.py
 proven:
+  - coordinator review 5500323278 is remediated on implementation commit d41deb135f212517f7931a54b2dae9b1d7746bf2: the bridge consumes a one-shot composition-registry receipt that seals accepted admission, resolver contracts/configuration, task/run/runtime binding and task client identity; caller-supplied components are rejected before a live edge exists.
+  - `TaskEnvelope.deadline_epoch_ms` is now fail-closed on bind, runtime-signal ingest, edge-observation ingest and currentness/status; expiry removes effective read-only access and retains physical action budget/count at 0/0.
   - trusted main e883543403d5430d7b1d287f59043b23c98f37d6 contains merged runtime-admission producer #838 and merged runtime-signals producer #839; neither promotion overlaps this worker's five implementation/test paths.
   - repair commit 7ec06d4d9bdec9f10f76cb7b8b49d5f696e28ecd requires the exact merged ReadOnlyRuntimeAdmission, RuntimeSignalResolver, RuntimeSignalBinding and RuntimeSignalEvidence types before any edge state can become current.
   - caller-declared TaskEnvelope runtime_access read_only is insufficient: without fresh machine-revalidated admission, official_client_access remains NONE and edge reason is RUNTIME_ADMISSION_REQUIRED.
@@ -208,7 +210,7 @@ proven:
   - production executor remains NULL, mutation authority NONE, physical action budget/count 0/0; no second control plane/store was added.
   - this invocation performed no Synology/Kasm/Official Tibia observation or mutation and used runtime_access none.
 derived:
-  - the coordinator's material RETURN_FOR_REPAIR finding is addressed locally and the worker is ready for hosted exact-head validation.
+  - focused authority/lifetime repair tests (20), full WSL relevant suite (263, 1 skipped), foundation audit, Package A/P1 audits, Package B audit and Package B Chrome/CLI/restart E2E pass on the repair tree.
 unknown:
   - independent coordinator reclassification of repaired Draft PR #830.
 conflicts: []
@@ -261,8 +263,20 @@ validation:
   - command: exact-head GitHub Actions on 274955658f08c8631d24511be1646a9ec16fff6c
     result: PASS
     evidence: Track A governance 33554082006 SUCCESS; Package A 33554082232 SUCCESS; Package B 33554082117 SUCCESS including full regression and real-browser E2E; CI 33554082565 SUCCESS with CI / Required PASS.
+  - command: python -m unittest tests.tools.tibia_re_control_center.test_agent_edge_bridge -q
+    result: PASS
+    evidence: 20 focused tests pass, including exact-class unapproved-causal resolver, self-minted valid admission, pre-connect substitution and deadline negatives.
+  - command: WSL python3 -m unittest discover -s tests/tools/tibia_re_control_center -p test_agent*.py -q
+    result: PASS
+    evidence: 263 tests passed, 1 skipped.
+  - command: Windows python -m unittest discover -s tests/tools/tibia_re_control_center -p test_agent*.py -q
+    result: BASELINE_FAIL
+    evidence: 263 tests executed; existing four loopback WinError 10054 resets and one MODEL_INFERENCE_FAILED vision error only, with no bridge failure.
+  - command: foundation, Package A/P1, Package B and Package B E2E audits
+    result: PASS
+    evidence: all required safety, authority, Chrome/CLI/restart and physical-0/0 assertions passed; Package A scripts require module invocation from repository root.
 blockers: []
-next_action: OTC-VISION-P2-COORDINATOR independently reclassify repaired Draft PR #830 against exact-head green evidence and current live integration state.
+next_action: push implementation commit d41deb135f212517f7931a54b2dae9b1d7746bf2 and this checkpoint using force-with-lease, then inspect fresh exact-head required checks.
 ```
 
 ## Recovery checkpoint
@@ -273,19 +287,19 @@ recovery:
   generation: 1
   session_id: control-bridge-repair-20260901T230401+0200
   session_started_at: 2026-09-01T22:16:27+02:00
-  checkpointed_at: 2026-09-01T23:04:01+02:00
-  last_progress_at: 2026-09-01T23:04:01+02:00
+  checkpointed_at: 2026-09-01T23:06:00+02:00
+  last_progress_at: 2026-09-01T23:06:00+02:00
   phase: validating
-  exact_head: working-tree-on-5e615ee27c50edb827bc2bdd4a718f6dbc052706
+  exact_head: d41deb135f212517f7931a54b2dae9b1d7746bf2
   pull_request: 830
-  active_operation: repair commit and deterministic safety audit
+  active_operation: publish restacked repair with force-with-lease
   external_run_ids: []
   operation_started_at: null
   wait_deadline_at: null
-  check_generation: repair-pending-local-audit
+  check_generation: repair-pending-push
   checks_used: 0
   status: active
   safe_to_resume: true
-  resume_condition: repair commit is published and deterministic safety audits have completed
-  next_action: commit and push the bounded authority/lifetime repair, then run Package A, Package B and Track A validation
+  resume_condition: repair checkpoint is published and exact-head GitHub checks exist
+  next_action: push with force-with-lease, then inspect the aggregate exact-head required checks once
 ```

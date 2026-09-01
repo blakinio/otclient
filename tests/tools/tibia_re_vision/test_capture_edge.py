@@ -11,6 +11,12 @@ from pathlib import Path
 _capture_edge = importlib.import_module("tools.tibia_re_vision.capture_edge") if importlib.util.find_spec("tools.tibia_re_vision.capture_edge") else None
 
 
+def _masked_policy():
+    return _capture_edge.SecretSafetyPolicy.mask_regions(
+        (_capture_edge.PixelRegion(x=0, y=0, width=1, height=1),)
+    )
+
+
 class _FrameSource:
     def __init__(self, geometry, pixels):
         self.geometry_value = geometry
@@ -38,6 +44,30 @@ class _GeometryDriftSource(_FrameSource):
 
 
 class CaptureEdgeTests(unittest.TestCase):
+    def test_unproven_empty_secret_policy_fails_before_frame_capture_or_persistence(self):
+        binding = _binding()
+        geometry = _capture_edge.WindowGeometry(x=0, y=0, width=1, height=1)
+        source = _FrameSource(geometry, bytes((9, 8, 7)))
+        edge = _capture_edge.CaptureEdge(
+            binding_reader=lambda: binding,
+            frame_source=source,
+            monotonic_ns=iter((1_100, 1_200)).__next__,
+        )
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            with self.assertRaisesRegex(
+                _capture_edge.CaptureEdgeError, "CAPTURE_SECRET_POLICY_UNPROVEN"
+            ):
+                edge.capture(
+                    run_id="run-unproven-secret-policy",
+                    evidence_root=root,
+                    secret_policy=_capture_edge.SecretSafetyPolicy.no_secret_fields(),
+                    max_binding_age_ns=500,
+                )
+            self.assertEqual([], list(root.iterdir()))
+        self.assertEqual([], source.geometry_calls)
+        self.assertEqual([], source.capture_calls)
+
     def test_stable_capture_is_content_addressed_and_feeds_vision_foundation(self):
         self.assertIsNotNone(_capture_edge, "capture_edge module must exist")
         binding = _binding()
@@ -55,7 +85,7 @@ class CaptureEdgeTests(unittest.TestCase):
             evidence = edge.capture(
                 run_id="run-1",
                 evidence_root=Path(raw),
-                secret_policy=_capture_edge.SecretSafetyPolicy.no_secret_fields(),
+                secret_policy=_masked_policy(),
                 max_binding_age_ns=500,
             )
             artifact_bytes = evidence.full_frame.path.read_bytes()
@@ -131,7 +161,7 @@ class CaptureEdgeTests(unittest.TestCase):
                 edge.capture(
                     run_id="run-stale",
                     evidence_root=root,
-                    secret_policy=_capture_edge.SecretSafetyPolicy.no_secret_fields(),
+                    secret_policy=_masked_policy(),
                     max_binding_age_ns=500,
                 )
             self.assertEqual([], list(root.iterdir()))
@@ -153,7 +183,7 @@ class CaptureEdgeTests(unittest.TestCase):
                 edge.capture(
                     run_id="run-drift",
                     evidence_root=root,
-                    secret_policy=_capture_edge.SecretSafetyPolicy.no_secret_fields(),
+                    secret_policy=_masked_policy(),
                     max_binding_age_ns=500,
                 )
             self.assertEqual([], list(root.iterdir()))
@@ -175,7 +205,7 @@ class CaptureEdgeTests(unittest.TestCase):
                 edge.capture(
                     run_id="run-final-binding-drift",
                     evidence_root=root,
-                    secret_policy=_capture_edge.SecretSafetyPolicy.no_secret_fields(),
+                    secret_policy=_masked_policy(),
                     max_binding_age_ns=500,
                 )
             self.assertEqual([], list(root.iterdir()))
@@ -199,7 +229,7 @@ class CaptureEdgeTests(unittest.TestCase):
                 edge.capture(
                     run_id="run-geometry-drift",
                     evidence_root=root,
-                    secret_policy=_capture_edge.SecretSafetyPolicy.no_secret_fields(),
+                    secret_policy=_masked_policy(),
                     max_binding_age_ns=500,
                 )
             self.assertEqual([], list(root.iterdir()))
@@ -218,7 +248,7 @@ class CaptureEdgeTests(unittest.TestCase):
             evidence = edge.capture(
                 run_id="run-integrity",
                 evidence_root=Path(raw),
-                secret_policy=_capture_edge.SecretSafetyPolicy.no_secret_fields(),
+                secret_policy=_masked_policy(),
                 crop=_capture_edge.PixelRegion(0, 0, 1, 1),
                 max_binding_age_ns=500,
             )
@@ -244,7 +274,7 @@ class CaptureEdgeTests(unittest.TestCase):
             evidence = edge.capture(
                 run_id="run-currentness",
                 evidence_root=Path(raw),
-                secret_policy=_capture_edge.SecretSafetyPolicy.no_secret_fields(),
+                secret_policy=_masked_policy(),
                 max_binding_age_ns=500,
             )
             cases = (
@@ -270,7 +300,7 @@ class CaptureAnalysisTests(unittest.TestCase):
             evidence = edge.capture(
                 run_id="run-black",
                 evidence_root=Path(raw),
-                secret_policy=_capture_edge.SecretSafetyPolicy.no_secret_fields(),
+                secret_policy=_masked_policy(),
                 max_binding_age_ns=500,
             )
         self.assertTrue(evidence.is_black)
@@ -278,16 +308,18 @@ class CaptureAnalysisTests(unittest.TestCase):
 
     def test_change_flag_binds_to_previous_full_frame_digest(self):
         binding = _binding()
-        geometry = _capture_edge.WindowGeometry(x=0, y=0, width=1, height=1)
+        geometry = _capture_edge.WindowGeometry(x=0, y=0, width=2, height=1)
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
-            first = _capture_once(binding, geometry, bytes((1, 2, 3)), root, "run-first")
+            first = _capture_once(
+                binding, geometry, bytes((9, 9, 9, 1, 2, 3)), root, "run-first"
+            )
             same = _capture_once(
-                binding, geometry, bytes((1, 2, 3)), root, "run-same",
+                binding, geometry, bytes((9, 9, 9, 1, 2, 3)), root, "run-same",
                 previous_full_sha256=first.full_frame.sha256,
             )
             changed = _capture_once(
-                binding, geometry, bytes((4, 5, 6)), root, "run-changed",
+                binding, geometry, bytes((9, 9, 9, 4, 5, 6)), root, "run-changed",
                 previous_full_sha256=first.full_frame.sha256,
             )
         self.assertIsNone(first.changed_from_previous)
@@ -351,7 +383,7 @@ def _capture_once(binding, geometry, pixels, root, run_id, *, previous_full_sha2
     return edge.capture(
         run_id=run_id,
         evidence_root=root,
-        secret_policy=_capture_edge.SecretSafetyPolicy.no_secret_fields(),
+        secret_policy=_masked_policy(),
         max_binding_age_ns=500,
         previous_full_sha256=previous_full_sha256,
     )

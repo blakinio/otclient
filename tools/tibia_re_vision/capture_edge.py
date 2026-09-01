@@ -374,6 +374,8 @@ class CaptureEdge:
             raise ValueError("run_id invalid")
         if type(secret_policy) is not SecretSafetyPolicy:
             raise ValueError("secret policy invalid")
+        if not secret_policy.secret_regions:
+            raise CaptureEdgeError("CAPTURE_SECRET_POLICY_UNPROVEN")
         if crop is not None and type(crop) is not PixelRegion:
             raise ValueError("crop invalid")
         if previous_full_sha256 is not None:

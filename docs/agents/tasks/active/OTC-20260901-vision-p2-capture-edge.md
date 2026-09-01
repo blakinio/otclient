@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260901-vision-p2-capture-edge
-status: ready
+status: implementing
 agent: ChatGPT
 session_role: phase2_worker
 worker_alias: OTC-VISION-P2-CAPTURE-EDGE
@@ -9,12 +9,12 @@ project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: implementation
-phase: worker_current_main_revalidation_ready_for_coordinator
+phase: benchmark_reclassification_trust_boundary_repair
 branch: feat/OTC-20260901-vision-p2-capture-edge
 base_branch: main
-base_main: e883543403d5430d7b1d287f59043b23c98f37d6
+base_main: d1cb8722c3116a0e0aeb72b9b360712f43151f17
 created: 2026-09-01T16:27:39+02:00
-updated_at: 2026-09-01T22:29:51+02:00
+updated_at: 2026-09-01T22:50:00+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: isolated_worker_branch
@@ -65,8 +65,8 @@ depends_on:
   - main 0fe1ecb3569f1d8372209c857ab57f3b626c29ae
 related_prs:
   - PR #827 Wave 1 worker Draft
-current_blocker: none
-next_action: publish current-main-restacked Draft PR #827, require exact-head hosted CI/governance, then return to OTC-VISION-P2-COORDINATOR for promotion; worker must not self-promote or merge
+current_blocker: coordinator reclassification 5500210008: forged CaptureEvidence, post-capture freshness, and policy-issuance trust boundaries require repair
+next_action: add focused RED tests for forged evidence rejection, acquisition-start freshness, and resolver-issued policy provenance; then make the smallest owned capture-edge repair
 invocation_started_at: 2026-09-01T16:58:39+02:00
 last_progress_at: 2026-09-01T22:29:51+02:00
 ci_checks_for_current_head: 0
@@ -141,6 +141,31 @@ runtime_access: none
 ```
 
 ## Context checkpoint
+
+## Recovery checkpoint
+
+```yaml
+recovery:
+  policy_version: 1
+  generation: 1
+  session_id: 2026-09-01T22:50:00+02:00
+  session_started_at: 2026-09-01T22:50:00+02:00
+  checkpointed_at: 2026-09-01T22:50:00+02:00
+  last_progress_at: 2026-09-01T22:50:00+02:00
+  phase: benchmark_reclassification_trust_boundary_repair
+  exact_head: b4a2664778d001344e3d0fdbd19ff4c9ac118e18
+  pull_request: 827
+  active_operation: local RED-to-GREEN trust-boundary repair
+  external_run_ids: []
+  operation_started_at: null
+  wait_deadline_at: null
+  check_generation: benchmark-reclassification-repair
+  checks_used: 0
+  status: active
+  safe_to_resume: true
+  resume_condition: existing worker branch remains exclusively owned and the three reproduced benchmark findings remain unresolved
+  next_action: add focused RED tests for forged evidence rejection, acquisition-start freshness, and resolver-issued policy provenance; then make the smallest owned capture-edge repair
+```
 
 ```yaml
 checkpoint_version: 1

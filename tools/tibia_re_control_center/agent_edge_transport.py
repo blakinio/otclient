@@ -227,8 +227,6 @@ def _canonical_unsigned(value: Mapping[str, Any]) -> bytes:
     return jcs_dumps(value).encode("utf-8")
 
 
-_VERIFIED_FRAME_PROOF = object()
-_OUTBOUND_CHANNEL_PROOF = object()
 
 
 def _opaque(value: Any, field_name: str) -> str:
@@ -483,8 +481,15 @@ def verify_artifact_bytes(descriptor: EdgeArtifactDescriptor, data: bytes) -> by
     return bytes(data)
 
 
-@dataclass(frozen=True, init=False)
+@dataclass(frozen=True, slots=True)
 class VerifiedEdgeFrame:
+    """Authority-neutral frame data returned after verifier-side cryptographic checks.
+
+    Constructing this value directly carries no peer-authentication authority. The
+    authentication boundary is the successful EdgeTransportVerifier.verify call,
+    not Python object provenance.
+    """
+
     kind: EdgeFrameKind
     sender_peer_id: str
     session_id: str
@@ -494,20 +499,6 @@ class VerifiedEdgeFrame:
     sequence: int
     sent_epoch_ms: int
     payload: Mapping[str, Any]
-    mutation_authorized: bool = False
-    physical_action_budget: int = 0
-    evidence_fresh: bool = False
-    action_resume_allowed: bool = False
-
-    def __init__(self, *, _proof: object, **values: Any) -> None:
-        if _proof is not _VERIFIED_FRAME_PROOF:
-            raise TypeError("VerifiedEdgeFrame instances are issued only by EdgeTransportVerifier")
-        for name, value in values.items():
-            object.__setattr__(self, name, value)
-
-    @property
-    def peer_authenticated(self) -> bool:
-        return True
 
 
 class EdgeTransportSigner:
@@ -703,7 +694,6 @@ class EdgeTransportVerifier:
                 sequence,
             )
         return VerifiedEdgeFrame(
-            _proof=_VERIFIED_FRAME_PROOF,
             kind=kind,
             sender_peer_id=self.expected_peer_id,
             session_id=session_id,
@@ -770,6 +760,16 @@ def receive_artifact_bytes(
 
 
 class EdgeOutboundChannel:
+    __slots__ = (
+        "_closed",
+        "_connection",
+        "_next_sequence",
+        "_send_lock",
+        "_signer",
+        "connection_generation",
+        "connection_id",
+    )
+
     def __init__(
         self,
         *,
@@ -777,10 +777,7 @@ class EdgeOutboundChannel:
         signer: EdgeTransportSigner,
         connection_id: str,
         connection_generation: str,
-        _proof: object,
     ) -> None:
-        if _proof is not _OUTBOUND_CHANNEL_PROOF:
-            raise TypeError("EdgeOutboundChannel instances are issued only by EdgeOutboundClient.connect")
         self._connection = connection
         self._signer = signer
         self.connection_id = validate_opaque_id(connection_id, field_name="connection_id")
@@ -788,10 +785,6 @@ class EdgeOutboundChannel:
         self._next_sequence = 2
         self._closed = False
         self._send_lock = threading.RLock()
-        self.peer_authenticated = True
-        self.mutation_authorized = False
-        self.action_resume_allowed = False
-        self.evidence_fresh = False
 
     def send(self, kind: EdgeFrameKind, payload: Mapping[str, Any], *, sent_epoch_ms: int) -> int:
         with self._send_lock:
@@ -952,7 +945,6 @@ class EdgeOutboundClient:
                 signer=self._signer,
                 connection_id=connection_id,
                 connection_generation=connection_generation,
-                _proof=_OUTBOUND_CHANNEL_PROOF,
             )
         except (OSError, ValidationError):
             try:

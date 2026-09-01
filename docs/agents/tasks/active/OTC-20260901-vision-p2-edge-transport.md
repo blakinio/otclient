@@ -9,16 +9,16 @@ project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: implementation
-phase: security_repair_local_validation_passed
+phase: mcp_auth_claim_repair_validated
 branch: feat/OTC-20260901-vision-p2-edge-transport
 base_branch: main
-base_main: 103fa3071ee4d82d7dff934034e2442c32bd3a81
+base_main: 427a9e3ddca0f2c184b75741fb9b067a8a6520e5
 created: 2026-09-01T16:27:39+02:00
-updated_at: 2026-09-01T23:26:36+02:00
+updated_at: 2026-09-02T00:01:00+02:00
 risk: high
 execution_class: github_hosted
-execution_mode: isolated_worker_branch
-preferred_execution: codex
+execution_mode: direct_mcp_owner_authorized
+preferred_execution: mcp
 run_scope: wave_1_worker
 continuation_policy: continue_until_real_stop
 task_completion_policy: return_to_coordinator_for_classification
@@ -65,10 +65,10 @@ depends_on:
   - current main d1cb8722c3116a0e0aeb72b9b360712f43151f17 after the subsequent main advance
 related_prs:
   - PR #829 Wave 1 worker Draft
-current_blocker: main advanced to 103fa3071ee4d82d7dff934034e2442c32bd3a81 after the previous exact-head aggregate; the branch has now been restacked cleanly again.
-next_action: force-with-lease publish the current final-main-restacked head and obtain one fresh exact-head aggregate before coordinator re-review; worker must not mark it ready, promote, or merge.
+current_blocker: fresh exact-head hosted CI and coordinator classification are required for the owner-authorized MCP repair.
+next_action: commit and force-with-lease publish the owner-authorized MCP auth-claim repair, obtain exact-head CI/Package A/Package B/Track A, then return to coordinator classification; do not self-promote or merge.
 invocation_started_at: 2026-09-01T17:03:28+02:00
-last_progress_at: 2026-09-01T22:52:27+02:00
+last_progress_at: 2026-09-02T00:01:00+02:00
 ci_checks_for_current_head: 1
 ci_check_generation: ca565c49-exact-head
 terminal_ci_wait_started_at: null
@@ -158,72 +158,67 @@ runtime_access: none
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T22:49:31+02:00
-head: c23f404143ad092687a1b365fc836c73893b86e7
-head_semantics: current_main_d1cb872_restak_head_before_validated_checkpoint_commit
+updated_at: 2026-09-02T00:01:00+02:00
+head: 3954180142689425f33424ede48aee8c05a4be5a
+head_semantics: owner_authorized_mcp_repair_parent_before_checkpoint_commit
 branch: feat/OTC-20260901-vision-p2-edge-transport
 pr: 829
 status: validating
-phase: worker_current_main_restack_validated
+phase: direct_mcp_auth_claim_repair
 context_routes:
   - phase-2-read-only-coordination
-  - track-a-governance
   - edge-transport
+  - authentication-boundary
+  - owner-authorized-mcp-execution
 owned_paths:
   - docs/agents/tasks/active/OTC-20260901-vision-p2-edge-transport.md
   - docs/agents/reports/OTC-20260901-vision-p2-edge-transport.md
   - tools/tibia_re_control_center/agent_edge_transport.py
   - tests/tools/tibia_re_control_center/test_agent_edge_transport.py
 proven:
-  - current main subsequently advanced to d1cb8722c3116a0e0aeb72b9b360712f43151f17; this branch rebased cleanly onto that exact main.
-  - current diff against main remains exactly the four declared owned paths with no shared Control Center integration file.
-  - prior head 15bcb86626edf9a21404459ec41d44d3ea516eae fixed the task-owned recursion-test portability failure: Package B then passed fully and Package A edge-transport tests all passed.
-  - Package A run 33556598887 failed its path-boundary audit because the PR event base was e8835434 while main had advanced through #841; the reported unexpected paths are now part of current main and disappear from current main...HEAD diff after restack.
-  - the same Package A run also hit test_agent_session.test_concurrent_duplicate_action_executes_once; that path is unowned by this worker and Package B on the same exact head passed.
-  - a local 12-run probe reproduced the unowned concurrency test as flaky: five consecutive passes followed by the same REFUSED_BUDGET_EXHAUSTED versus PERFORMED mismatch.
-  - focused edge transport passes 30/30, protocol+transport passes 47/47, Ruff and py_compile pass after the d1cb872 restack.
-  - fresh independent temp-validator audit of edge-transport authority, endpoint, control-surface and artifact invariants reports zero findings.
-  - runtime_access remains none and physical action count/budget remain 0/0; no live runtime operation occurred.
+  - trusted main is 427a9e3ddca0f2c184b75741fb9b067a8a6520e5 and contains the merged owner-authorized direct-MCP coordinator override PR #848.
+  - coordinator mechanically reproduced that module-global proof objects could mint peer_authenticated transport objects on the prior exact head even with all hosted gates green.
+  - RED required the real proof globals and authority-looking local attributes to be absent and failed on the prior implementation.
+  - the repair removes _VERIFIED_FRAME_PROOF and _OUTBOUND_CHANNEL_PROOF entirely; VerifiedEdgeFrame and EdgeOutboundChannel carry no peer_authenticated, mutation_authorized, physical_action_budget, evidence_fresh or action_resume_allowed attributes.
+  - VerifiedEdgeFrame uses frozen slots and EdgeOutboundChannel uses explicit slots, so callers cannot attach those authority-looking attributes after construction.
+  - wire frames still carry authority_scope=PEER_IDENTITY_ONLY plus mutation_authorized=false, physical_action_budget=0, evidence_fresh=false and action_resume_allowed=false, and verifier-side schema/HMAC checks reject expansion before returning neutral data.
+  - focused edge transport passes 38/38 and protocol-plus-transport passes 55/55; Ruff and git diff whitespace checks pass.
+  - runtime_access remains none; no Official Tibia/Synology/Kasm observation, credentials, login, GUI input, process control, process memory, payload capture or physical action occurred.
 derived:
-  - restacking onto current main removes the Package A stale-base path-boundary false failure without changing worker behavior.
-  - the remaining observed session concurrency failure is an unrelated flaky gate in a path owned by OTC-VISION-P2-CONTROL-BRIDGE; this worker must not edit it.
-  - a new exact head should be published and validated before deciding whether that external flake is an actual current blocker.
+  - Python object provenance is no longer treated as an authentication boundary; authentication is a property of the successful cryptographic verify/handshake call path only.
+  - direct construction can create only authority-neutral data/channel objects and cannot manufacture a local authentication or Track A authority claim.
+  - replay-ledger durable persistence remains an integration concern assigned to PR #846 and is not widened into this worker's four-path scope.
 unknown:
-  - coordinator classification after a valid exact-head run.
+  - exact-head hosted CI/Package A/Package B/Track A result for the MCP repair commit.
+  - independent coordinator classification of the exact published repair head.
 conflicts: []
 first_failure:
-  marker: PRIOR-PACKAGE-A-STALE-BASE-AND-UNOWNED-FLAKE
-  evidence: run 33556598887 path audit listed PR #841 files as unexpected from stale base e8835434, while deterministic core failed only test_agent_session.test_concurrent_duplicate_action_executes_once; current diff and local repeated probe isolate both causes.
+  marker: RED-CALLER-MINTABLE-AUTH-CLAIM
+  evidence: focused negative test failed because _VERIFIED_FRAME_PROOF existed and direct objects exposed authentication/authority-looking fields.
 rejected_hypotheses:
-  - recursion portability repair is still failing hosted Linux: rejected; Package A log shows the repaired edge recursion test PASS and Package B is fully SUCCESS.
-  - Package A path-boundary failure is caused by worker scope expansion: rejected; current main...HEAD diff contains only four declared worker paths.
-  - session concurrency failure is deterministic edge-transport damage: rejected; no import edge exists and the same unowned test alternates PASS/FAIL under repeated local execution.
+  - module-private proof objects are a sufficient Python security boundary: rejected by direct use of the real module globals.
+  - keeping authority fields hard-coded false on a constructible object is sufficient: rejected because callers could supply or attach alternate values outside verifier provenance.
 changed_paths:
   - docs/agents/tasks/active/OTC-20260901-vision-p2-edge-transport.md
   - docs/agents/reports/OTC-20260901-vision-p2-edge-transport.md
   - tools/tibia_re_control_center/agent_edge_transport.py
   - tests/tools/tibia_re_control_center/test_agent_edge_transport.py
 validation:
-  - command: exact-head workflows for 15bcb86626edf9a21404459ec41d44d3ea516eae
-    result: FAIL
-    evidence: Package B, CI and Track A governance SUCCESS; Package A failure isolated to stale-base path audit plus one unowned concurrency flake, while every edge-transport test passed.
-  - command: git rebase origin/main at d1cb8722c3116a0e0aeb72b9b360712f43151f17; git diff --name-status origin/main...HEAD
+  - command: focused caller-mintable authentication-claim RED then GREEN
     result: PASS
-    evidence: clean rebase and exactly four owned changed paths.
-  - command: focused edge transport and protocol+transport suites after restack
+    evidence: RED reproduced the reachable proof global; GREEN proves proof globals and authority-looking object attributes are absent and cannot be attached through normal or object.__setattr__ paths.
+  - command: python -m unittest tests.tools.tibia_re_control_center.test_agent_edge_transport
     result: PASS
-    evidence: 30/30 and 47/47.
-  - command: python -m unittest tests.tools.tibia_re_control_center.test_agent_edge_transport; python -m unittest tests.tools.tibia_re_control_center.test_agent_protocol tests.tools.tibia_re_control_center.test_agent_edge_transport; python -m ruff check tools/tibia_re_control_center/agent_edge_transport.py tests/tools/tibia_re_control_center/test_agent_edge_transport.py; python -m py_compile tools/tibia_re_control_center/agent_edge_transport.py tests/tools/tibia_re_control_center/test_agent_edge_transport.py; git diff --check origin/main...HEAD
+    evidence: 38/38.
+  - command: python -m unittest tests.tools.tibia_re_control_center.test_agent_protocol tests.tools.tibia_re_control_center.test_agent_edge_transport
     result: PASS
-    evidence: 30/30 focused, 47/47 protocol+transport, Ruff, py_compile and diff whitespace checks passed after the d1cb872 restack.
-  - command: repeated unowned test_agent_session concurrent-duplicate probe
-    result: FAIL
-    evidence: five passes then same CI failure signature, establishing external flakiness; no worker-owned edit made.
-  - command: fresh temp validator audit
+    evidence: 55/55.
+  - command: python -m ruff check plus git diff --check
     result: PASS
-    evidence: EDGE_TRANSPORT_FRESH_AUDIT_FINDINGS=0.
-blockers: []
-next_action: coordinator must classify Draft PR #829; worker must not mark it ready, promote, or merge.
+    evidence: all checks passed.
+blockers:
+  - exact-head hosted aggregate and coordinator classification remain required before promotion.
+next_action: publish this exact MCP repair with safe lease, obtain one exact-head hosted aggregate, and return to coordinator classification without self-promoting.
 ```
 
 ## Recovery checkpoint
@@ -235,7 +230,7 @@ recovery:
   session_id: 2026-09-01T22:49:31+02:00
   session_started_at: 2026-09-01T22:43:34+02:00
   checkpointed_at: 2026-09-01T22:52:27+02:00
-  last_progress_at: 2026-09-01T22:52:27+02:00
+  last_progress_at: 2026-09-02T00:01:00+02:00
   phase: exact-head-ci-passed-return-to-coordinator
   exact_head: ca565c49fd2ab222f247ad11bf2742ca5bf4d780
   pull_request: 829

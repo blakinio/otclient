@@ -34,12 +34,12 @@ class AgentEdgeTransportTests(unittest.TestCase):
         )
         verified = verifier.verify(packet, now_epoch_ms=1_000_100)
 
-        self.assertTrue(verified.peer_authenticated)
+        self.assertFalse(hasattr(verified, "peer_authenticated"))
         self.assertEqual("LOGIN_SCREEN", verified.payload["runtime_signal"])
-        self.assertFalse(verified.mutation_authorized)
-        self.assertEqual(0, verified.physical_action_budget)
-        self.assertFalse(verified.evidence_fresh)
-        self.assertFalse(verified.action_resume_allowed)
+        self.assertFalse(hasattr(verified, "mutation_authorized"))
+        self.assertFalse(hasattr(verified, "physical_action_budget"))
+        self.assertFalse(hasattr(verified, "evidence_fresh"))
+        self.assertFalse(hasattr(verified, "action_resume_allowed"))
 
 
     def test_duplicate_json_keys_are_rejected_before_authentication(self):
@@ -98,8 +98,8 @@ class AgentEdgeTransportTests(unittest.TestCase):
             payload={"edge_state": "ONLINE"},
         )
         verified = verifier.verify(second, now_epoch_ms=1_000_003)
-        self.assertFalse(verified.evidence_fresh)
-        self.assertFalse(verified.action_resume_allowed)
+        self.assertFalse(hasattr(verified, "evidence_fresh"))
+        self.assertFalse(hasattr(verified, "action_resume_allowed"))
 
         old_connection = signer.seal(
             kind=EdgeFrameKind.HEARTBEAT,
@@ -229,9 +229,9 @@ class AgentEdgeTransportTests(unittest.TestCase):
         )
         channel = client.connect(host, port, now_epoch_ms=1_000_000)
         try:
-            self.assertTrue(channel.peer_authenticated)
-            self.assertFalse(channel.mutation_authorized)
-            self.assertFalse(channel.action_resume_allowed)
+            self.assertFalse(hasattr(channel, "peer_authenticated"))
+            self.assertFalse(hasattr(channel, "mutation_authorized"))
+            self.assertFalse(hasattr(channel, "action_resume_allowed"))
             channel.send(
                 EdgeFrameKind.OBSERVATION,
                 {"runtime_signal": "LOGIN_SCREEN", "artifact_refs": []},
@@ -245,7 +245,7 @@ class AgentEdgeTransportTests(unittest.TestCase):
             raise failures[0]
         self.assertEqual(1, len(received))
         self.assertEqual(EdgeFrameKind.OBSERVATION, received[0].kind)
-        self.assertFalse(received[0].evidence_fresh)
+        self.assertFalse(hasattr(received[0], "evidence_fresh"))
 
 
     def test_artifact_descriptor_metadata_is_versioned_and_self_consistent(self):
@@ -420,7 +420,6 @@ class AgentEdgeTransportTests(unittest.TestCase):
 
 
     def test_send_failure_latches_channel_closed_and_never_retries_same_stream(self):
-        import tools.tibia_re_control_center.agent_edge_transport as transport
         from tools.tibia_re_control_center.agent_edge_transport import (
             EdgeOutboundChannel,
         )
@@ -447,7 +446,6 @@ class AgentEdgeTransportTests(unittest.TestCase):
             signer=EdgeTransportSigner(local_peer_id="synology-edge", local_auth_key=EDGE_KEY),
             connection_id="connection-failed",
             connection_generation="test-generation-failed",
-            _proof=transport._OUTBOUND_CHANNEL_PROOF,
         )
         with self.assertRaises(ValidationError) as first:
             channel.send(
@@ -471,7 +469,6 @@ class AgentEdgeTransportTests(unittest.TestCase):
         import threading
         import time
 
-        import tools.tibia_re_control_center.agent_edge_transport as transport
         from tools.tibia_re_control_center.agent_edge_transport import (
             EdgeOutboundChannel,
         )
@@ -502,7 +499,6 @@ class AgentEdgeTransportTests(unittest.TestCase):
             signer=EdgeTransportSigner(local_peer_id="synology-edge", local_auth_key=EDGE_KEY),
             connection_id="connection-concurrent",
             connection_generation="test-generation-concurrent",
-            _proof=transport._OUTBOUND_CHANNEL_PROOF,
         )
         sequences = []
 
@@ -689,7 +685,6 @@ class AgentEdgeTransportTests(unittest.TestCase):
 
 
     def test_generic_metadata_send_cannot_bypass_separate_artifact_path(self):
-        import tools.tibia_re_control_center.agent_edge_transport as transport
         from tools.tibia_re_control_center.agent_edge_transport import (
             EdgeOutboundChannel,
         )
@@ -714,7 +709,6 @@ class AgentEdgeTransportTests(unittest.TestCase):
             signer=EdgeTransportSigner(local_peer_id="synology-edge", local_auth_key=EDGE_KEY),
             connection_id="connection-artifact-bypass",
             connection_generation="test-generation-artifact",
-            _proof=transport._OUTBOUND_CHANNEL_PROOF,
         )
         with self.assertRaises(ValidationError) as raised:
             channel.send(
@@ -1044,7 +1038,8 @@ class AgentEdgeTransportTests(unittest.TestCase):
             verifier.verify(original_a, now_epoch_ms=1_004)
         self.assertEqual("EDGE_EPOCH_REUSE_REJECTED", raised.exception.code)
 
-    def test_authenticated_objects_cannot_be_minted_by_direct_construction(self):
+    def test_transport_objects_carry_no_caller_mintable_authentication_claim(self):
+        import tools.tibia_re_control_center.agent_edge_transport as transport
         from tools.tibia_re_control_center.agent_edge_transport import (
             EdgeOutboundChannel,
             VerifiedEdgeFrame,
@@ -1060,21 +1055,45 @@ class AgentEdgeTransportTests(unittest.TestCase):
             def close(self):
                 return None
 
-        with self.assertRaises(TypeError):
-            VerifiedEdgeFrame(
-                kind=EdgeFrameKind.HEARTBEAT,
-                sender_peer_id="synology-edge",
-                connection_id="direct-frame",
-                sequence=1,
-                sent_epoch_ms=1_000,
-                payload={},
-            )
-        with self.assertRaises(TypeError):
-            EdgeOutboundChannel(
-                connection=SinkSocket(),
-                signer=EdgeTransportSigner(local_peer_id="synology-edge", local_auth_key=EDGE_KEY),
-                connection_id="direct-channel",
-            )
+        self.assertFalse(hasattr(transport, "_VERIFIED_FRAME_PROOF"))
+        self.assertFalse(hasattr(transport, "_OUTBOUND_CHANNEL_PROOF"))
+        frame = VerifiedEdgeFrame(
+            kind=EdgeFrameKind.HEARTBEAT,
+            sender_peer_id="synology-edge",
+            session_id="session-direct",
+            run_id="run-direct",
+            connection_id="direct-frame",
+            connection_generation="generation-direct",
+            sequence=1,
+            sent_epoch_ms=1_000,
+            payload={},
+        )
+        self.assertFalse(hasattr(frame, "peer_authenticated"))
+        self.assertFalse(hasattr(frame, "mutation_authorized"))
+        self.assertFalse(hasattr(frame, "physical_action_budget"))
+        with self.assertRaises(AttributeError):
+            object.__setattr__(frame, "peer_authenticated", True)
+        with self.assertRaises(AttributeError):
+            object.__setattr__(frame, "mutation_authorized", True)
+        channel = EdgeOutboundChannel(
+            connection=SinkSocket(),
+            signer=EdgeTransportSigner(
+                local_peer_id="synology-edge",
+                local_auth_key=EDGE_KEY,
+                session_id="session-direct",
+                run_id="run-direct",
+            ),
+            connection_id="direct-channel",
+            connection_generation="generation-direct",
+        )
+        self.assertFalse(hasattr(channel, "peer_authenticated"))
+        self.assertFalse(hasattr(channel, "mutation_authorized"))
+        self.assertFalse(hasattr(channel, "action_resume_allowed"))
+        self.assertFalse(hasattr(channel, "evidence_fresh"))
+        with self.assertRaises(AttributeError):
+            channel.peer_authenticated = True
+        with self.assertRaises(AttributeError):
+            channel.mutation_authorized = True
 
     def test_signed_integer_cannot_be_substituted_with_float(self):
         from tools.tibia_re_control_center.model import ValidationError

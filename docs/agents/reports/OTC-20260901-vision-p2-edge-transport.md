@@ -163,3 +163,11 @@ No runtime access or physical action occurred. The required next evidence is a f
 Draft PR #829 was safely force-with-lease updated to exact head `ca565c49fd2ab222f247ad11bf2742ca5bf4d780` on base `d1cb8722c3116a0e0aeb72b9b360712f43151f17`. All required checks for that head passed: CI run `33557712369`, Package A run `33557712221`, Package B run `33557712165`, and Track A runtime governance run `33557712147`. Package B's browser/CLI E2E also passed. This is hosted test evidence only; it does not alter the no-runtime, no-physical-action classification.
 
 The PR remains Draft. Coordinator classification is required; the worker has not marked it ready, promoted it, or merged it.
+
+## Owner-authorized direct MCP authentication-claim repair
+
+After the coordinator's stronger exact-head probe, full GREEN CI was not accepted as sufficient because the module-global proof objects themselves were reachable. The owner explicitly authorized completing #829 and #846 directly through MCP/GitHub without invoking Codex; that override is merged on trusted main via PR #848.
+
+The repair removes Python-object provenance as an authentication boundary. `_VERIFIED_FRAME_PROOF`, `_OUTBOUND_CHANNEL_PROOF` and every local `peer_authenticated`/authority-looking result attribute are removed. `VerifiedEdgeFrame` is now a frozen slotted authority-neutral data value; `EdgeOutboundChannel` has explicit slots and carries no authentication, mutation, freshness, resume or physical-budget claim. Authentication remains exclusively the successful HMAC/peer/schema/freshness/replay verification and handshake call path. The signed wire contract still requires authority scope `PEER_IDENTITY_ONLY` with all effect/freshness/resume fields false/zero.
+
+TDD mechanically reproduced the old proof-global bypass first. Fresh local results after repair: focused transport **38/38 PASS**; protocol + transport **55/55 PASS**; Ruff and `git diff --check` PASS. No live runtime access or physical action occurred. Replay-ledger persistence remains intentionally assigned to trusted-composition PR #846 rather than expanding this worker's scope.

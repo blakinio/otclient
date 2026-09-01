@@ -37,3 +37,6 @@ Focused RED→GREEN cycles proved missing behavior before implementation for: mo
 No Linux/Synology/Kasm runtime execution of the new backend has been performed or claimed. Real read-only verification requires a future coordinator-assigned observation window with fresh `runtime_access: read_only` admission and exact-target proof.
 
 `docs/agents/MODULE_CATALOG.md` and `docs/agents/CHANGELOG.md` are shared coordinator-owned paths and are deliberately untouched despite the new reusable module. The coordinator must classify the worker slice and perform any required shared catalogue/changelog/integration update after acceptance. PR #827 must remain Draft and must not be self-merged by this worker.
+## Exact-head GitHub verification
+
+Implementation head `8685f7c6a8dae9e41d71f0acbe70a89a35a0ef38` passed GitHub `CI` run `33529034080` and `Track A agent runtime governance` run `33529033773`. PR #827 remained open, mergeable and Draft with exactly four changed files at the verified implementation head.

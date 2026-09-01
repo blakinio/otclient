@@ -12,7 +12,7 @@ task_kind: implementation
 phase: mcp_auth_claim_repair_validated
 branch: feat/OTC-20260901-vision-p2-edge-transport
 base_branch: main
-base_main: 427a9e3ddca0f2c184b75741fb9b067a8a6520e5
+base_main: 6c21ef021875aab15663505629b6e72655b1fcf1
 created: 2026-09-01T16:27:39+02:00
 updated_at: 2026-09-02T00:01:00+02:00
 risk: high
@@ -66,7 +66,7 @@ depends_on:
 related_prs:
   - PR #829 Wave 1 worker Draft
 current_blocker: fresh exact-head hosted CI and coordinator classification are required for the owner-authorized MCP repair.
-next_action: commit and force-with-lease publish the owner-authorized MCP auth-claim repair, obtain exact-head CI/Package A/Package B/Track A, then return to coordinator classification; do not self-promote or merge.
+next_action: force-with-lease publish the current-main-restacked MCP repair, obtain exact-head CI/Package A/Package B/Track A, then return to coordinator classification; do not self-promote or merge.
 invocation_started_at: 2026-09-01T17:03:28+02:00
 last_progress_at: 2026-09-02T00:01:00+02:00
 ci_checks_for_current_head: 1
@@ -159,8 +159,8 @@ runtime_access: none
 ```yaml
 checkpoint_version: 1
 updated_at: 2026-09-02T00:01:00+02:00
-head: 3954180142689425f33424ede48aee8c05a4be5a
-head_semantics: owner_authorized_mcp_repair_parent_before_checkpoint_commit
+head: eb8ecbe9b315800575f0abbae9e2d520c54d363d
+head_semantics: owner_authorized_mcp_repair_rebased_to_current_main_before_final_metadata_commit
 branch: feat/OTC-20260901-vision-p2-edge-transport
 pr: 829
 status: validating
@@ -176,7 +176,7 @@ owned_paths:
   - tools/tibia_re_control_center/agent_edge_transport.py
   - tests/tools/tibia_re_control_center/test_agent_edge_transport.py
 proven:
-  - trusted main is 427a9e3ddca0f2c184b75741fb9b067a8a6520e5 and contains the merged owner-authorized direct-MCP coordinator override PR #848.
+  - trusted main is 6c21ef021875aab15663505629b6e72655b1fcf1; it contains owner-authorized direct-MCP coordinator override PR #848 and the later Codex cost-control governance #849, which changes no worker-owned transport path.
   - coordinator mechanically reproduced that module-global proof objects could mint peer_authenticated transport objects on the prior exact head even with all hosted gates green.
   - RED required the real proof globals and authority-looking local attributes to be absent and failed on the prior implementation.
   - the repair removes _VERIFIED_FRAME_PROOF and _OUTBOUND_CHANNEL_PROOF entirely; VerifiedEdgeFrame and EdgeOutboundChannel carry no peer_authenticated, mutation_authorized, physical_action_budget, evidence_fresh or action_resume_allowed attributes.
@@ -218,7 +218,7 @@ validation:
     evidence: all checks passed.
 blockers:
   - exact-head hosted aggregate and coordinator classification remain required before promotion.
-next_action: publish this exact MCP repair with safe lease, obtain one exact-head hosted aggregate, and return to coordinator classification without self-promoting.
+next_action: publish the current-main-restacked MCP repair with safe lease, obtain one exact-head hosted aggregate, and return to coordinator classification without self-promoting.
 ```
 
 ## Recovery checkpoint

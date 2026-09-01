@@ -13,8 +13,9 @@ branch: docs/OTC-20260901-codex-model-effort-routing-policy
 base_branch: main
 base_sha: ca1a71b5852f6e00ba144ed183af470555c51f56
 created: 2026-09-01T17:49:12+02:00
-updated: 2026-09-01T17:53:12+02:00
+updated: 2026-09-01T17:56:35+02:00
 risk: low
+related_pr: "831"
 owned_paths:
   - docs/agents/EXECUTION_PROTOCOL.md
   - docs/agents/tasks/active/OTC-20260901-codex-model-effort-routing-policy.md
@@ -65,9 +66,9 @@ gameplay_allowed: false
 transaction_authorized: false
 owner_funded_ai_api_authorized: false
 invocation_started_at: 2026-09-01T17:49:12+02:00
-last_progress_at: 2026-09-01T17:53:12+02:00
+last_progress_at: 2026-09-01T17:56:35+02:00
 current_blocker: none
-next_action: commit the validated documentation-only policy, publish its PR, and verify exact-head repository checks
+next_action: run independent review and exact-head required checks for PR #831; if clean, mark it ready and merge under repository protection
 ---
 
 # Codex model and reasoning-effort routing policy
@@ -91,10 +92,10 @@ No product code, runtime observation, credentials, login, GUI input, gameplay ac
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T17:53:12+02:00
+updated_at: 2026-09-01T17:56:35+02:00
 head: ca1a71b5852f6e00ba144ed183af470555c51f56
 branch: docs/OTC-20260901-codex-model-effort-routing-policy
-pr: NOT_ASSIGNED
+pr: 831
 status: validating
 context_routes:
   - agent-governance
@@ -129,5 +130,5 @@ validation:
     result: PASS
     evidence: Fresh repository-root Control Room run exited 0; unrelated pre-existing stale tasks remain visible but this docs task introduces no ownership conflict.
 blockers: []
-next_action: commit the validated documentation-only policy, publish its PR, and verify exact-head repository checks
+next_action: run independent review and exact-head required checks for PR #831; if clean, mark it ready and merge under repository protection
 ```

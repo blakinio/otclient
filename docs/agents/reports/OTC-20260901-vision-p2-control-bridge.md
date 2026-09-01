@@ -6,9 +6,9 @@
 programme_id: OTC-VISION-P2-READONLY
 worker_alias: OTC-VISION-P2-CONTROL-BRIDGE
 task_id: OTC-20260901-vision-p2-control-bridge
-implementation_head: aa2bfaa8fc47c4c7abdb1ddd28a80e5178ed903e
+implementation_head: 7ec06d4d9bdec9f10f76cb7b8b49d5f696e28ecd
 pr: 830
-worker_result: PRODUCER_COMPLETE
+worker_result: VALIDATING_REPAIR
 promotion_authority: coordinator_only
 runtime_access_used: none
 physical_action_count: 0
@@ -67,3 +67,28 @@ Coordinator classification guidance:
 - distinguish worker correctness from the two CI failures above: decide whether Package A's path-boundary allowlist needs coordinator-owned adjustment/waiver, and whether the Lua setup failure should simply be rerun after infrastructure recovery;
 - preserve Phase 2 authority: this worker used `runtime_access:none`, performed no Synology/Kasm/Official Tibia observation or mutation, and physical action count stayed `0`;
 - independently classify PR `#830` as `ACCEPT`, `ACCEPT_WITH_EDITS`, `RETURN_FOR_EVIDENCE`, or `REJECT/SUPERSEDE` only after the live CI/policy state and sibling contracts are reconciled.
+## Coordinator RETURN_FOR_REPAIR response - 2026-09-01 22:12 CEST
+
+Trusted integration base is `main@e883543403d5430d7b1d287f59043b23c98f37d6`. Runtime admission producer #838 and runtime-signals producer #839 are both merged on this base. The worker restacked conflict-free; neither promotion overlaps the bridge-owned implementation/test paths.
+
+Repair commit: `7ec06d4d9bdec9f10f76cb7b8b49d5f696e28ecd`.
+
+The coordinator finding is addressed as follows:
+- `TaskEnvelope.runtime_access=read_only` remains only a requested class; it does not make the edge or Official client access current. `official_client_access` is `NONE` until a fresh canonical `ReadOnlyRuntimeAdmission` is bound.
+- `bind_read_only_runtime()` accepts the exact merged `ReadOnlyRuntimeAdmission`, `RuntimeSignalResolver` and `RuntimeSignalBinding` types and revalidates admission freshness/canonicality, task ownership, run/runtime binding hash and exact task client identity.
+- edge observations may no longer inject runtime semantic strings or opaque refs. Runtime semantics are accepted only through exact merged `RuntimeSignalEvidence` produced/recognized by the bound resolver.
+- the bridge recomputes the #839 content-addressed runtime-signal digest, so producer/contract/source provenance cannot be altered while retaining a trusted signal ref.
+- stale/forged/foreign/duck-typed admission or signal data, resolver swaps, replay, competing edge instances, disconnect and restart all fail closed. Restart/disconnect discard live authority and require a fresh bind.
+- the existing AgentEvent/session store remains the only durable plane. Production executor is still `NULL`, mutation authority `NONE`, and physical action budget/count `0/0`.
+
+Fresh local validation after merged #839:
+- edge bridge focused suite: 17/17 PASS;
+- full Linux-compatible `test_agent*.py`: 260 PASS, 1 skipped;
+- Ruff 0.16.1: PASS; compileall: PASS; `git diff --check`: PASS;
+- Agent Foundation audit: PASS;
+- Package A and P1 audits: PASS with `MATERIAL_FINDINGS_OPEN=0` and `RUNTIME_ACCESS_NONE=PASS`;
+- Package B audit: PASS; real Chrome/CLI/restart E2E: PASS with `OFFICIAL_CLIENT_ACCESS=NONE`.
+
+Windows-only baseline remains the previously isolated loopback reset family (`WinError 10054`) plus the existing broader vision `MODEL_INFERENCE_FAILED` case; the same final tree is green under WSL/Linux and no bridge-specific failure signature was introduced.
+
+No live Synology/Kasm/Official Tibia observation was performed or authorized. This worker invocation stayed `runtime_access:none` and physical action count remained `0`. Exact-head hosted CI and coordinator reclassification remain the next gates.

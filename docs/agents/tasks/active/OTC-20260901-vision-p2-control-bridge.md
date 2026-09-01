@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260901-vision-p2-control-bridge
-status: ready
+status: validating
 agent: chatgpt-gpt-5.6-sol
 session_role: phase2_worker
 worker_alias: OTC-VISION-P2-CONTROL-BRIDGE
@@ -12,9 +12,9 @@ task_kind: implementation
 phase: validate
 branch: feat/OTC-20260901-vision-p2-control-bridge
 base_branch: main
-base_main: ca1a71b5852f6e00ba144ed183af470555c51f56
+base_main: e883543403d5430d7b1d287f59043b23c98f37d6
 created: 2026-09-01T16:27:39+02:00
-updated_at: 2026-09-01T18:01:19+02:00
+updated_at: 2026-09-01T22:12:42+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: isolated_worker_branch
@@ -72,20 +72,20 @@ owned_paths:
 depends_on:
   - PR #820 merged foundation
   - PR #824 merged Wave 0 coordinator cleanup
-  - main ca1a71b5852f6e00ba144ed183af470555c51f56
+  - main e883543403d5430d7b1d287f59043b23c98f37d6
 related_prs:
   - PR #830 Wave 1 worker Draft
-current_blocker: none
-next_action: OTC-VISION-P2-COORDINATOR independently classify Draft PR #830 against live exact-head CI and sibling contracts before any integration promotion
+current_blocker: exact-head GitHub CI pending after coordinator-requested authority-binding repair
+next_action: publish the trusted-main integration repair, obtain exact-head CI, then return Draft PR #830 to OTC-VISION-P2-COORDINATOR for independent reclassification
 invocation_started_at: 2026-09-01T16:49:00+02:00
-last_progress_at: 2026-09-01T18:01:19+02:00
+last_progress_at: 2026-09-01T22:12:42+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: worker-ci-repair
+ci_check_generation: post-839-authority-binding-repair
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 1
+repair_cycles_for_current_gate: 2
 context_reconstruction_attempts: 0
 stall_warnings: 0
 runtime_nonclaims:
@@ -174,11 +174,11 @@ runtime_access: none
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T18:01:19+02:00
-head: 3036ee5bc3e05765c4eb6988602cc9b0187b7696
+updated_at: 2026-09-01T22:12:42+02:00
+head: 7ec06d4d9bdec9f10f76cb7b8b49d5f696e28ecd
 branch: feat/OTC-20260901-vision-p2-control-bridge
 pr: 830
-status: ready
+status: validating
 context_routes:
   - phase-2-read-only-coordination
   - track-a-governance
@@ -199,25 +199,27 @@ owned_paths:
   - tests/tools/tibia_re_control_center/test_agent_mcp.py
   - tests/tools/tibia_re_control_center/test_agent_persistence.py
 proven:
-  - implementation commit aa2bfaa8fc47c4c7abdb1ddd28a80e5178ed903e extends the existing Control Center session/event backend with a fail-closed read-only edge bridge; no second store/control plane was added.
-  - bounded read_only tasks require zero physical budget, no secret capability and SCREENSHOT-only action vocabulary; all other runtime classes remain refused here.
-  - edge heartbeat/capture/runtime evidence is durable through existing AgentEvent storage; disconnect, stale heartbeat, restart, replay and competing edge-instance cases fail closed.
-  - owner session/API/MCP/UI can observe edge status while production executor remains NULL, mutation authority NONE and physical action count/budget 0/0.
-  - this invocation performed no Official Tibia/Kasm/Synology observation or mutation; runtime_access remained none.
+  - trusted main e883543403d5430d7b1d287f59043b23c98f37d6 contains merged runtime-admission producer #838 and merged runtime-signals producer #839; neither promotion overlaps this worker's five implementation/test paths.
+  - repair commit 7ec06d4d9bdec9f10f76cb7b8b49d5f696e28ecd requires the exact merged ReadOnlyRuntimeAdmission, RuntimeSignalResolver, RuntimeSignalBinding and RuntimeSignalEvidence types before any edge state can become current.
+  - caller-declared TaskEnvelope runtime_access read_only is insufficient: without fresh machine-revalidated admission, official_client_access remains NONE and edge reason is RUNTIME_ADMISSION_REQUIRED.
+  - direct runtime strings/opaque refs in edge observations are rejected; semantic runtime state is accepted only from current resolver-owned reviewed RuntimeSignalEvidence whose content-addressed provenance digest matches the merged #839 contract.
+  - admission is rebound to the same task, run, runtime namespace/binding hash and exact TaskEnvelope client identity; stale, forged, foreign, duck-typed, replayed or silently replaced authority fails closed.
+  - disconnect and process restart discard live runtime authority; fresh admission plus reviewed runtime evidence is required again.
+  - production executor remains NULL, mutation authority NONE, physical action budget/count 0/0; no second control plane/store was added.
+  - this invocation performed no Synology/Kasm/Official Tibia observation or mutation and used runtime_access none.
 derived:
-  - the worker slice is repository/static producer-complete and ready for independent coordinator classification, not Phase 2 programme completion.
+  - the coordinator's material RETURN_FOR_REPAIR finding is addressed locally and the worker is ready for hosted exact-head validation.
 unknown:
-  - exact-head GitHub CI outcome after publishing the final checkpoint commit.
-  - coordinator classification and compatibility with later sibling producer contracts from PRs 826-829.
-  - any real admitted read-only runtime evidence; none was authorized or claimed by this worker.
-conflicts:
-  - unchanged origin/main agent-foundation standalone E2E submits physical_action_budget 1 through an API guard that requires 0; this pre-existing baseline defect is outside this worker ownership.
+  - exact-head GitHub CI outcome after publishing this checkpoint generation.
+  - independent coordinator reclassification of repaired Draft PR #830.
+conflicts: []
 first_failure:
-  marker: TRACK_A_TASK_FRONTMATTER_NOT_DETECTED
-  evidence: exact-head governance run 33529055205 job 99927229354 failed because the task file began with UTF-8 BOM before the YAML marker.
+  marker: COORDINATOR_RETURN_FOR_REPAIR_RUNTIME_AUTHORITY_NOT_BOUND
+  evidence: live PR #830 required machine validation of accepted #826/#838 admission and #828/#839 typed runtime-signal evidence; initial REDs proved caller-declared read_only and duck-typed/fabricated runtime evidence could pass the prior bridge boundary.
 rejected_hypotheses:
-  - replaying an earlier observation after disconnect is safely equivalent to fresh evidence: rejected by RED and fixed with monotonic run-timeline rejection.
-  - a second edge instance may replace the connected instance without disconnect: rejected by RED and fixed fail-closed.
+  - caller-declared read_only is sufficient runtime authority: rejected; official client access stays NONE until a fresh canonical admission is bound.
+  - arbitrary runtime status plus opaque refs is acceptable semantic evidence: rejected; edge payload runtime semantics are forbidden.
+  - structural/duck-typed lookalikes are equivalent to accepted producer contracts: rejected; exact merged #839 classes are required.
 changed_paths:
   - docs/agents/tasks/active/OTC-20260901-vision-p2-control-bridge.md
   - docs/agents/reports/OTC-20260901-vision-p2-control-bridge.md
@@ -226,35 +228,38 @@ changed_paths:
   - tools/tibia_re_control_center/control_ui.py
   - tests/tools/tibia_re_control_center/test_agent_edge_bridge.py
   - tests/tools/tibia_re_control_center/test_agent_api.py
-  - tests/tools/tibia_re_control_center/test_agent_mcp.py
 validation:
+  - command: git rebase --autostash origin/main
+    result: PASS
+    evidence: worker restacked conflict-free onto trusted main e883543403d5430d7b1d287f59043b23c98f37d6; main drift was only merged runtime-signals promotion #839 and had no worker-path overlap.
   - command: ruff 0.16.1 on all changed Python implementation/tests
     result: PASS
-    evidence: All checks passed.
+    evidence: All checks passed after exact #839 type integration.
   - command: python3 -m compileall -q tools/tibia_re_control_center tests/tools/tibia_re_control_center
     result: PASS
-    evidence: compileall completed successfully after final implementation edits.
-  - command: focused unittest edge bridge + session + API + MCP + persistence
+    evidence: compileall completed successfully on the final local repair tree.
+  - command: WSL python3 -m unittest discover -s tests/tools/tibia_re_control_center -p test_agent*.py -q
     result: PASS
-    evidence: 121 tests passed under Linux-compatible WSL after replay/instance hardening.
-  - command: tests/tools/tibia_re_control_center/audit_agent_foundation.py
-    result: PASS
-    evidence: AGENT_FOUNDATION_AUDIT, runtime surfaces, authority boundaries and MCP allowlist all PASS.
-  - command: tests/tools/tibia_re_control_center/audit_package_b.py
-    result: PASS
-    evidence: Package B boundary/transport/idempotency/restart/privacy audit PASS on Windows with repository Git available.
-  - command: tests/tools/tibia_re_control_center/e2e_package_b.py
-    result: PASS
-    evidence: backend, CLI, real Chrome browser and restart/idempotency E2E PASS on Molehill Windows; Official client access remained NONE.
-  - command: tests/tools/tibia_re_control_center/e2e_agent_foundation.py
+    evidence: 260 tests passed, 1 skipped on Linux-compatible WSL.
+  - command: Windows agent suite
     result: FAIL
-    evidence: pre-existing origin/main fixture/API contradiction PHYSICAL_ACTION_BUDGET_UNAVAILABLE; both involved files are unchanged from origin/main.
-  - command: full unittest discovery under WSL /mnt/c
-    result: BLOCKED
-    evidence: local Windows-mount I/O stayed in D state and was terminated after 462 seconds without emitting a test failure; exact-head GitHub CI remains authoritative for the full suite.
-  - command: python .github/scripts/test_track_a_agent_runtime_governance.py --changed-from ca1a71b5852f6e00ba144ed183af470555c51f56 --expected-branch feat/OTC-20260901-vision-p2-control-bridge
+    evidence: only established platform baseline remained: four WinError 10054 loopback POST resets and one existing MODEL_INFERENCE_FAILED vision test in the broader run; no bridge-specific failure signature.
+  - command: audit_agent_foundation.py
     result: PASS
-    evidence: after removing the pre-existing UTF-8 BOM, the exact deterministic governance command reports TRACK_A_AGENT_RUNTIME_GOVERNANCE_PASS=true.
-blockers: []
-next_action: OTC-VISION-P2-COORDINATOR independently classify Draft PR #830 against live exact-head CI and sibling contracts before any integration promotion.
+    evidence: runtime surfaces, authority boundaries and MCP allowlist PASS.
+  - command: audit_package_a.py plus audit_package_a_p1.py
+    result: PASS
+    evidence: MATERIAL_FINDINGS_OPEN=0, RUNTIME_ACCESS_NONE=PASS and all Package A/P1 safety fences PASS.
+  - command: audit_package_b.py
+    result: PASS
+    evidence: boundary, transport, idempotency, restart and privacy audit PASS with OFFICIAL_CLIENT_ACCESS=NONE.
+  - command: e2e_package_b.py
+    result: PASS
+    evidence: backend, CLI, real Chrome browser and restart/idempotency E2E PASS with OFFICIAL_CLIENT_ACCESS=NONE.
+  - command: git diff --check
+    result: PASS
+    evidence: no whitespace errors on the repair diff.
+blockers:
+  - exact-head GitHub CI pending after publication.
+next_action: publish repaired Draft PR #830 on this trusted-main generation, verify exact-head CI once, then return to OTC-VISION-P2-COORDINATOR for independent classification.
 ```

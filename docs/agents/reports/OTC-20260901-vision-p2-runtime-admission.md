@@ -82,7 +82,7 @@ git diff --check: PASS
 changed paths: exact four worker-owned paths
 ```
 
-This revalidation does not authorize live observation. Exact-head GitHub CI / Package A / Track A governance must be fresh on the published restack before the coordinator may assign the serialized read-only observation window.
+This revalidation does not authorize live observation. Exact head `04577d654f7c1a78448abb096d3e4821a06d6b43` passed CI `33533952869`, Package A `33533952529`, Package B `33533952523` and Track A governance `33533952492`. Package B required one retry of an unchanged `agent_session` concurrency test outside worker ownership; the falsification audit and real browser+CLI E2E were green on the first attempt. The coordinator may now consider assigning the serialized read-only observation window, but none has been assigned or used yet.
 
 ## Runtime / physical E2E
 

@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260901-vision-p2-runtime-admission
-status: validating
+status: waiting
 agent: ChatGPT
 session_role: phase2_worker
 worker_alias: OTC-VISION-P2-RUNTIME-ADMISSION
@@ -9,12 +9,12 @@ project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: implementation
-phase: current_main_revalidation_complete
+phase: waiting_runtime_observation
 branch: feat/OTC-20260901-vision-p2-runtime-admission
 base_branch: main
 base_main: 54a20bbd8721e92d069974af14d6ebd2f4f5a55d
 created: 2026-09-01T16:27:39+02:00
-updated_at: 2026-09-01T18:46:29+02:00
+updated_at: 2026-09-01T18:52:38+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: isolated_worker_branch
@@ -65,14 +65,14 @@ depends_on:
   - main ca1a71b5852f6e00ba144ed183af470555c51f56
 related_prs:
   - PR #826 Wave 1 worker Draft
-current_blocker: exact-head CI Package A and Track A governance pending on current-main restack; live observation remains unauthorized
-next_action: publish current-main restack and obtain fresh exact-head CI Package A and Track A governance; after green coordinator may assign one serialized read-only observation window
+current_blocker: coordinator-assigned serialized read-only observation window not granted; live runtime remains unauthorized
+next_action: return current-main-green Draft PR #826 to OTC-VISION-P2-COORDINATOR; coordinator may then assign exactly one serialized read-only observation window for fresh admission evidence
 invocation_started_at: 2026-09-01T16:47:00+02:00
-last_progress_at: 2026-09-01T18:46:29+02:00
-ci_checks_for_current_head: 0
-ci_check_generation: current-main-restack-79fa5fbca652
-terminal_ci_wait_started_at: null
-terminal_ci_checks_for_current_generation: 0
+last_progress_at: 2026-09-01T18:52:38+02:00
+ci_checks_for_current_head: 4
+ci_check_generation: current-main-green-04577d654f7c
+terminal_ci_wait_started_at: 2026-09-01T18:47:56+02:00
+terminal_ci_checks_for_current_generation: 5
 unchanged_state_checks: 0
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
@@ -144,11 +144,11 @@ runtime_access: none
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T18:46:29+02:00
+updated_at: 2026-09-01T18:52:38+02:00
 head: 79fa5fbca652048e6fb9408d03140d5d707d075d
 branch: feat/OTC-20260901-vision-p2-runtime-admission
 pr: 826
-status: validating
+status: waiting
 context_routes:
   - phase-2-read-only-coordination
   - track-a-governance
@@ -165,12 +165,12 @@ proven:
   - accepted static admission contract is unchanged by the restack and remains fail-closed on freshness, uniqueness, locator, process/X11 identity, ownership, namespace and forbidden effects.
   - fresh post-restack focused runtime-admission suite passes 14/14; Ruff and py_compile pass.
   - fresh post-restack Track A runtime governance, checkpoint validator and git diff --check pass; changed paths remain exactly the four worker-owned paths.
+  - exact head 04577d654f7c1a78448abb096d3e4821a06d6b43 passed CI 33533952869, Package A 33533952529, Package B 33533952523 after one transient concurrency-test rerun, and Track A governance 33533952492.
   - no credentials, GUI input, process control, process memory access, network payload capture, runtime observation or physical action occurred.
 derived:
-  - current-main repository/static revalidation is locally green and ready for hosted exact-head checks.
+  - current-main repository/static revalidation is fully green locally and on exact-head hosted checks.
   - live read-only observation remains illegal until hosted revalidation is green and the coordinator separately assigns one serialized observation window.
 unknown:
-  - exact-head CI Package A and Track A governance outcome after publishing the restack.
   - current exact live Synology/Kasm client process identity, locator reachability, inventory uniqueness and X11 ownership.
 conflicts: []
 first_failure:
@@ -197,8 +197,10 @@ validation:
   - command: checkpoint validator and git diff --check origin/main...HEAD
     result: PASS
     evidence: checkpoint valid and exact changed paths remain four worker-owned files.
+  - command: GitHub exact-head hosted gates on 04577d654f7c1a78448abb096d3e4821a06d6b43
+    result: PASS
+    evidence: CI 33533952869, Package A 33533952529, Package B 33533952523 and Track A governance 33533952492 all conclude success; Package B needed one retry of an unchanged agent_session concurrency test outside worker-owned paths.
 blockers:
-  - exact-head hosted CI Package A and Track A governance pending after publication.
-  - real runtime observation remains separately coordinator-gated.
-next_action: publish current-main restack and obtain fresh exact-head CI Package A and Track A governance; after green coordinator may assign one serialized read-only observation window.
+  - real runtime observation remains separately coordinator-gated and has not been assigned.
+next_action: return current-main-green Draft PR #826 to OTC-VISION-P2-COORDINATOR; coordinator may then assign exactly one serialized read-only observation window for fresh admission evidence.
 ```

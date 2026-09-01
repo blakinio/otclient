@@ -1,7 +1,7 @@
 # OTC Vision P2 Read-Only — Owner Alias Registry
 
 ```yaml
-alias_registry_version: 1.0.0
+alias_registry_version: 1.1.0
 programme_id: OTC-VISION-P2-READONLY
 repository: blakinio/otclient
 canonical_prompt_family: docs/agents/prompts/OTC_20260901_VISION_P2_READONLY_MULTIAGENT.md
@@ -16,11 +16,11 @@ Run the coordinator first:
 Uruchom OTC-VISION-P2-COORDINATOR autonomicznie.
 ```
 
-The coordinator must refresh live state, create/reconcile concrete worker tasks/branches/ownership and prepare Wave 1. Do not manually invent worker branches or duplicate tasks when the coordinator has already assigned them.
+The coordinator must refresh live state, create/reconcile concrete worker tasks/branches/ownership and prepare Wave 1. When coordinator-managed Codex execution is available, it also selects and invokes the subordinate workers itself. Do not manually invent worker branches, select worker models/effort, or duplicate tasks when the coordinator can resolve and dispatch them.
 
 ## Wave 1 — up to five workers
 
-After coordinator dispatch, open separate agent windows and run:
+Normal mode: the supervising coordinator invokes these worker aliases itself through available Codex execution tooling after live anti-duplication/ownership checks. The commands below are manual fallback/resume entry points only when the execution bridge is unavailable or the owner explicitly chooses separate worker windows:
 
 ```text
 Uruchom OTC-VISION-P2-RUNTIME-ADMISSION autonomicznie.
@@ -72,7 +72,7 @@ The canonical prompt requires the outgoing worker to persist a coherent task che
 
 | Alias | Primary agent/mode | Reasoning effort | Why |
 |---|---|---:|---|
-| `OTC-VISION-P2-COORDINATOR` | Chat/GitHub coordinator; Codex only when integration edits require checkout | **xhigh** | cross-lane dependencies, authority, acceptance and final integration |
+| `OTC-VISION-P2-COORDINATOR` | Chat/GitHub supervising coordinator; invokes subordinate Codex workers for execution/audit and uses its own checkout only when coordinator-owned edits require it | **xhigh coordinator reasoning; worker model/effort dynamic** | cross-lane dependencies, authority, dispatch, acceptance and final integration |
 | `OTC-VISION-P2-RUNTIME-ADMISSION` | Codex | **xhigh** | live target identity/governance mistakes have high downstream blast radius |
 | `OTC-VISION-P2-CAPTURE-EDGE` | Codex | **high** | bounded implementation with secret-safe capture/integrity constraints |
 | `OTC-VISION-P2-RUNTIME-SIGNALS` | Codex | **xhigh** | provenance/freshness/semantic-authority discrimination is subtle and safety-critical |
@@ -81,7 +81,7 @@ The canonical prompt requires the outgoing worker to persist a coherent task che
 | `OTC-VISION-P2-VISION-RECONCILIATION` | Codex | **xhigh** | combines untrusted model evidence with authoritative runtime evidence |
 | `OTC-VISION-P2-E2E-AUDIT` | **fresh Codex validator** | **xhigh** | must actively falsify the exact integration result with independent context |
 
-If the client exposes only `low/medium/high`, use **high** wherever this table says `xhigh`.
+Worker effort values in this table are historical risk recommendations, not mandatory fixed dispatch settings. A coordinator-managed Codex dispatch follows `EXECUTION_PROTOCOL.md` and its empirical calibration, selecting the smallest sufficient model/effort for the live task. If a manually selected client exposes only `low/medium/high`, use **high** where a manual fallback explicitly requires `xhigh`.
 
 ## Spark note
 

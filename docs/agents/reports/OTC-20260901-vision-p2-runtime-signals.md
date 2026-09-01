@@ -80,11 +80,24 @@ The unfiltered Control Center discovery on the implementation worktree reported 
 
 No fix was attempted because those files are outside this worker's owned paths and clean-head reproduction isolates them from this slice.
 
+## Current-main revalidation
+
+After shared Package A repair #833 and coordinator checkpoint #836 merged, this worker was restacked conflict-free onto trusted `main@54a20bbd8721e92d069974af14d6ebd2f4f5a55d` without changing the accepted static producer contract. Fresh local validation:
+
+- focused runtime-signals: `21/21 PASS`;
+- Ruff and targeted `py_compile`: PASS;
+- frozen vision benchmark: `34/34 PASS`;
+- Track A runtime governance and checkpoint validator: PASS;
+- `git diff --check`: PASS;
+- exact changed paths remain the four worker-owned files.
+
+No live runtime evidence is claimed or authorized. Fresh exact-head GitHub CI / Package A / Package B / Track A governance is required after publication before coordinator promotion.
+
 ## Remaining proof boundary
 
 Real Official Tibia observation remains NOT RUN and unauthorized here. No exact current client PID/session/display/runtime claim, process-memory read, packet/payload capture, model inference, GUI input, credentials, login, process control or physical action occurred.
 
-The coordinator must classify this Draft PR and integrate it with the separately owned runtime-admission, capture, edge-transport and Control-Bridge slices before any serialized read-only observation or Phase 2 E2E can satisfy programme-level acceptance.
+The coordinator has accepted this bounded static producer contract. Fresh current-main hosted revalidation is now the repository gate before promotion; consumer integration must still bind only to accepted current admission/runtime evidence before any serialized read-only observation or Phase 2 E2E can satisfy programme-level acceptance.
 
 ## Exact-head GitHub classification - 426a9aaf1
 

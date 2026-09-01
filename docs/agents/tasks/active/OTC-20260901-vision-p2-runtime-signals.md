@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260901-vision-p2-runtime-signals
-status: waiting
+status: validating
 agent: ChatGPT
 session_role: phase2_worker
 worker_alias: OTC-VISION-P2-RUNTIME-SIGNALS
@@ -9,12 +9,12 @@ project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: implementation
-phase: waiting_shared_ci_repair
+phase: current_main_revalidation_complete
 branch: feat/OTC-20260901-vision-p2-runtime-signals
 base_branch: main
-base_main: 0fe1ecb3569f1d8372209c857ab57f3b626c29ae
+base_main: 54a20bbd8721e92d069974af14d6ebd2f4f5a55d
 created: 2026-09-01T16:27:39+02:00
-updated_at: 2026-09-01T18:08:48+02:00
+updated_at: 2026-09-01T18:51:01+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: isolated_worker_branch
@@ -65,12 +65,12 @@ depends_on:
   - main 0fe1ecb3569f1d8372209c857ab57f3b626c29ae
 related_prs:
   - PR #828 Wave 1 worker Draft
-current_blocker: shared Package A path-boundary audit rejects Phase-2 durable docs; coordinator repair PR #833 is open and outside this worker owned_paths
-next_action: after coordinator PR #833 merges, refresh/rebase this worker on current main without changing the accepted contract, rerun exact-head PR #828 checks, and return the result to OTC-VISION-P2-COORDINATOR
+current_blocker: exact-head CI Package A Package B and Track A governance pending on current-main restack
+next_action: publish current-main restack, obtain fresh exact-head CI Package A Package B and Track A governance, then return Draft PR #828 to OTC-VISION-P2-COORDINATOR
 invocation_started_at: 2026-09-01T17:02:17+02:00
-last_progress_at: 2026-09-01T18:08:48+02:00
-ci_checks_for_current_head: 1
-ci_check_generation: package-a-path-boundary-blocked
+last_progress_at: 2026-09-01T18:51:01+02:00
+ci_checks_for_current_head: 0
+ci_check_generation: current-main-restack-d240e63c51d6
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -144,11 +144,11 @@ runtime_access: none
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T18:08:48+02:00
-head: 426a9aaf15c440531fb9d0bc315f382bf5465ea0
+updated_at: 2026-09-01T18:51:01+02:00
+head: d240e63c51d672356e1f9b396f14cfda10b0dc45
 branch: feat/OTC-20260901-vision-p2-runtime-signals
 pr: 828
-status: waiting
+status: validating
 context_routes:
   - phase-2-read-only-coordination
   - track-a-governance
@@ -159,33 +159,27 @@ owned_paths:
   - tools/tibia_re_control_center/agent_runtime_signals.py
   - tests/tools/tibia_re_control_center/test_agent_runtime_signals.py
 proven:
-  - Draft PR 828 remains open, Draft, mergeable and bound to feat/OTC-20260901-vision-p2-runtime-signals; PR 820 and PR 824 are merged prerequisites.
-  - refreshed origin/main ca1a71b5852f6e00ba144ed183af470555c51f56 changes none of this worker's owned paths.
-  - repository/static RED-to-GREEN implementation provides reviewed-source, session/run/runtime/runtime-instance, admission runtime_binding_sha256, clock-domain, freshness, content-addressing, supersession and causal-conflict fail-closed behavior.
-  - semantic IN_GAME or WORLD_EXIT output is accepted only from REVIEWED_CAUSAL contract rules; STRUCTURAL_ONLY and UNKNOWN rules may emit only UNKNOWN.
-  - RuntimeSignalSample cannot supply runtime_state, evidence_class, producer_id or contract_id, so sample/model payload cannot self-select semantic authority through this interface.
-  - RuntimeSignalBinding requires the exact lowercase 64-hex runtime_binding_sha256 from the sibling admission contract, preventing a signal from crossing to a different freshly admitted target.
-  - focused runtime-signals suite passes 21 tests and Ruff passes on both owned Python files.
-  - filtered Control Center regression passes 476 tests with 2 skips after excluding exactly three pre-existing failing test methods; frozen vision benchmark passes 34 tests.
-  - the three excluded methods reproduce with identical failure classes on clean branch head 11fc18820 before local implementation is restored.
-  - runtime_access remains none; no Official Tibia observation, process-memory read, packet/payload capture, model inference, GUI input, credentials, login, process control or physical action occurred.
+  - coordinator independent review comment 5496967667 accepts the bounded repository/static runtime-signal producer contract with no live-runtime claim.
+  - shared Package A durable-doc repair #833 and coordinator checkpoint #836 are merged into trusted current main 54a20bbd8721e92d069974af14d6ebd2f4f5a55d.
+  - worker branch restacked conflict-free onto trusted current main; main changes none of the four worker-owned paths.
+  - accepted runtime-signal contract is unchanged: sample payload cannot author semantic authority, reviewed-source handles are resolver-owned, exact runtime/admission hash and clock-domain binding remain fail-closed.
+  - fresh post-restack focused runtime-signals suite passes 21/21; Ruff and py_compile pass.
+  - fresh frozen vision benchmark passes 34/34.
+  - fresh Track A runtime governance, checkpoint validation and git diff --check pass; changed paths remain exactly four worker-owned files.
+  - no Official Tibia observation, model inference, credentials, GUI input, process control, process memory, payload capture or physical action occurred.
 derived:
-  - no production REVIEWED_CAUSAL producer is hard-coded because current repository evidence does not safely qualify one under this task authority; later coordinator integration must bind only separately reviewed current producers.
-  - the local slice is coherent for publication and exact-head hosted validation; clean-head baseline failures are not owned by this worker and must not be repaired here.
+  - current-main repository/static revalidation is locally green and ready for fresh hosted exact-head checks.
+  - consumer/integration must still construct runtime-signal binding only from an accepted current #826 admission; this worker does not self-grant that authority.
 unknown:
-  - merge/terminal outcome of coordinator-owned CI repair PR #833.
-  - final exact-head GitHub outcome for PR #828 after #833 merges and this worker is refreshed on current main.
-  - coordinator classification and any later serialized real read-only observation evidence.
+  - exact-head CI Package A Package B and Track A governance outcome after publication.
+  - coordinator promotion/integration disposition after fresh hosted validation.
 conflicts: []
 first_failure:
-  marker: PACKAGE_A_CHANGED_PATHS_REJECT_PHASE2_DURABLE_DOCS
-  evidence: exact-head Package A run 33529133500 job 99927496940 failed only at Verify declared Package A path boundary; deterministic Package A core, CI / Required, both Track A governance jobs and all Package B jobs passed.
+  marker: historical-package-a-path-boundary
+  evidence: prior exact generation failed only the old Phase-2 durable-doc allowlist; repair #833 is merged and fresh validation is required.
 rejected_hypotheses:
-  - runtime-signals implementation caused the exact-head CI failure: rejected; the failed audit reports only Phase-2 documentation paths, while the implementation/test prefixes are already allowed and Package A deterministic core passed.
-  - this worker should edit the shared Package A workflow: rejected by exact owned_paths; coordinator PR #833 already owns the narrow repair.
-  - the five full-suite errors were introduced by runtime-signals changes: rejected because the exact three failing test methods reproduce on clean head 11fc18820 with the local implementation stashed.
-  - structural/QMeta/window/model evidence may assert IN_GAME: rejected by the binding Phase 2 contract and enforced by contract validation.
-  - fake/hosted evidence can satisfy real-runtime acceptance: rejected; this report makes no real-runtime claim.
+  - old Package A failure remains current after #833: rejected; this restack must obtain new exact-head results.
+  - sample/model payload may self-select runtime state or evidence class: rejected by accepted typed contract and focused tests.
 changed_paths:
   - docs/agents/tasks/active/OTC-20260901-vision-p2-runtime-signals.md
   - docs/agents/reports/OTC-20260901-vision-p2-runtime-signals.md
@@ -194,20 +188,17 @@ changed_paths:
 validation:
   - command: python -m unittest tests.tools.tibia_re_control_center.test_agent_runtime_signals -q
     result: PASS
-    evidence: 21 tests passed.
-  - command: filtered Control Center discovery excluding the three clean-head baseline-failing methods
+    evidence: 21 tests, zero failures/errors after current-main restack.
+  - command: Ruff and py_compile on runtime-signals implementation and test
     result: PASS
-    evidence: 476 tests passed, 2 skipped; TOTAL_DISCOVERED=479, EXCLUDED=3.
-  - command: python -m unittest discover -s tools/tibia-re-vision-benchmark/tests -p test_*.py -q
+    evidence: both static checks pass.
+  - command: frozen vision benchmark
     result: PASS
-    evidence: 34 tests passed.
-  - command: GitHub Actions exact head 426a9aaf15c440531fb9d0bc315f382bf5465ea0
-    result: FAIL
-    evidence: CI run 33529133602 PASS required; Track A run 33529133440 both PASS; Package B run 33529133331 all PASS; Package A run 33529133500 deterministic core PASS but falsification job 99927496940 failed only on historical changed-path allowlist.
-  - command: exact Package A failed-job log
-    result: BLOCKED
-    evidence: unexpected paths are this worker report/task plus coordinator task; coordinator PR #833 owns the bounded workflow repair.
+    evidence: 34 tests, zero failures/errors.
+  - command: Track A governance checkpoint validator and git diff --check
+    result: PASS
+    evidence: governance and checkpoint pass; exact changed paths remain four worker-owned files.
 blockers:
-  - shared Package A Phase-2 durable-doc path boundary is pending coordinator PR #833; no worker-owned repair remains
-next_action: after coordinator PR #833 merges, refresh/rebase this worker on current main without changing the accepted contract, rerun exact-head PR #828 checks, and return the result to OTC-VISION-P2-COORDINATOR.
+  - exact-head hosted CI Package A Package B and Track A governance pending after publication.
+next_action: publish current-main restack, obtain fresh exact-head CI Package A Package B and Track A governance, then return Draft PR #828 to OTC-VISION-P2-COORDINATOR.
 ```

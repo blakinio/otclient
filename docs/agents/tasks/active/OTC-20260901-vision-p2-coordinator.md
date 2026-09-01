@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260901-vision-p2-coordinator
-status: implementing
+status: blocked
 agent: ChatGPT
 session_role: programme_coordinator
 worker_alias: OTC-VISION-P2-COORDINATOR
@@ -9,12 +9,12 @@ project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: coordination
-phase: wave_1_benchmark_repair_and_final_validation
+phase: wave_1_trusted_composition_repair_and_edge_transport_rfr
 branch: docs/OTC-20260901-vision-p2-coordinator-benchmark-reconcile
 base_branch: main
-base_main: d1cb8722c3116a0e0aeb72b9b360712f43151f17
+base_main: 103fa3071ee4d82d7dff934034e2442c32bd3a81
 created: 2026-09-01T15:45:26+02:00
-updated_at: 2026-09-01T23:12:20+02:00
+updated_at: 2026-09-01T23:34:35+02:00
 risk: high
 execution_mode: chat_github
 run_scope: autonomous_program
@@ -70,12 +70,13 @@ related_prs:
   - PR #833 merged shared CI repair
   - PR #836 coordinator post-repair checkpoint
   - PR #843 coordinator benchmark reconciliation checkpoint
-current_blocker: CAPTURE_EDGE_AND_EDGE_TRANSPORT_REPAIR_PLUS_CONTROL_BRIDGE_REREVIEW
-next_action: consume #827 and #829 repair handoffs plus #830 independent re-review; then independently classify/promote only zero-finding repository-static slices before any live observation
+  - PR #846 trusted-composition integration Draft
+current_blocker: CODEX_SPARK_QUOTA_EXHAUSTED_AND_EDGE_TRANSPORT_AUTH_PROOF_RFR
+next_action: after Spark quota reset, dispatch the existing #829 proof-boundary repair and #846 trusted-composition implementation; independently re-review exact heads before any Wave 2 or live observation
 invocation_started_at: 2026-09-01T17:47:00+02:00
-last_progress_at: 2026-09-01T23:12:20+02:00
+last_progress_at: 2026-09-01T23:34:35+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: coordinator-pr843-worker-reconcile
+ci_check_generation: coordinator-pr843-post-integration-scaffold
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -102,69 +103,79 @@ Coordinate independently reviewed Wave 1 slices through current-main validation,
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T23:12:20+02:00
-head: a3be7df45118be860f73f6c3ae450c946abecaca
-head_semantics: coordinator_pr843_worker_reconcile_commit_before_current_round_checkpoint
+updated_at: 2026-09-01T23:34:35+02:00
+head: 23862b6dbbe006672740413570d481f372f2f84d
+head_semantics: coordinator_branch_rebased_to_current_main_before_final_checkpoint_commit
 branch: docs/OTC-20260901-vision-p2-coordinator-benchmark-reconcile
 pr: 843
-status: implementing
+status: blocked
 context_routes:
   - phase-2-read-only-coordination
   - worker-classification
-  - benchmark-adjudication
-  - track-a-governance
+  - trusted-composition-integration
+  - edge-transport-security-repair
+  - codex-spark-quota-stop
 owned_paths:
   - docs/agents/tasks/active/OTC-20260901-vision-p2-coordinator.md
 proven:
-  - trusted main is d1cb8722c3116a0e0aeb72b9b360712f43151f17; it includes runtime-admission promotion #838, runtime-signals promotion #839, benchmark record #841 and benchmark archive #842.
-  - runtime-admission and runtime-signals repository/static producers are merged; neither merge authorizes live Official Tibia observation.
-  - benchmark evidence on capture-edge target 53b6a7e515c0cd6820857f7910368cdbb0e1978d mechanically reproduced a forgeable public CaptureEvidence path and post-capture freshness timestamp flaw; the publicly constructible ReviewedSecretMaskPolicy remains a trust-boundary concern.
-  - promotion #840 carried identical capture_edge.py blob d53cd108c47c5cb9042c173c101d17c945f1b2a7 and test blob 2749a27957d4fdb684110790a07ea3b861c457cf to the benchmark target, so those later findings were not repaired by the promotion generation.
-  - #827 repair head 06a031afd186e0656b188d10b7dc455917556def reached green focused/full vision tests plus exact-head CI/Track A, but independent Sol/medium re-review reproduced forgeable module-token/registry issuance, caller-self-reviewed mutable mask policy, incomplete final freshness and same-object binding-mutation bypasses; coordinator returned it for another repair and Terra/high is active on the existing lane.
-  - #829 exact green head fe258ecdb65cbc6802b54d2adff57ecb4357865a passed focused 30/30, protocol+transport 47/47 and all hosted gates, but independent Sol/medium review mechanically reproduced open-ended authenticated payload schemas, A-B-A/restart replay reopening, caller-mintable authenticated-looking objects and JCS numeric-type substitution; coordinator classified RETURN_FOR_REPAIR and Terra/high is active on the existing lane.
-  - #830 repaired the first independent-review findings and published exact head 971787f380d52d0e141c50b9201498b0c99e752d; focused 20/20, WSL relevant 263 PASS/1 skipped, Package B browser/CLI/restart and fresh Track A/falsification checks passed, full hosted Package A/B/CI were still attaching; independent Sol/medium re-review is active before any ACCEPT.
+  - trusted main is 103fa3071ee4d82d7dff934034e2442c32bd3a81; it includes merged runtime-admission #838, runtime-signals #839, benchmark #841/#842 and coordinator Codex-dispatch prompt updates #844/#845.
+  - PR #827 exact source head 6991b98f3f970c6ffc9d1bec9bf032aed89f0f2d is coordinator ACCEPT_WITH_EDITS for a safe fail-closed capture boundary; source PR is closed without merge and frozen for integration in #846.
+  - PR #830 exact source head 971787f380d52d0e141c50b9201498b0c99e752d is coordinator ACCEPT_WITH_EDITS with Package A/B, Track A and CI Required green; source PR is closed without merge and frozen for integration in #846.
+  - production ControlDomainService still constructs AgentSessionCoordinator without ReviewedRuntimeAuthorityConfiguration, so #830 remains safely disabled until trusted composition is wired.
+  - PR #829 exact current head 6031cf5862f7dd019aafa9314aaee408c67b20fe is CLEAN and all hosted gates are green, with exact schema/type/replay-epoch repairs retained.
+  - PR #829 nevertheless remains RETURN_FOR_REPAIR: direct use of reachable module globals _VERIFIED_FRAME_PROOF and _OUTBOUND_CHANNEL_PROOF still creates peer_authenticated objects without cryptographic verifier/handshake issuance.
+  - EdgeReplayLedger has no production persistence/reuse callsite; a fresh ledger is constructed by EdgeOutboundClient.connect, so durable restart replay state is assigned to integration PR #846 after #829 reaches ACCEPT.
+  - PR #846 exact scaffold head dda2df589a448d0d9c9d0fe4871ab074a4433c6d is Draft/CLEAN with CI Required and Track A governance SUCCESS; it is the single integration owner for capture policy/root, runtime authority composition and later replay persistence.
+  - Codex Spark quota is exhausted until 2026-09-02T04:15+02:00; no unapproved model substitution will be used.
   - no Official Tibia/Synology/Kasm live observation, credentials, login, GUI input, process control, process memory, payload capture or physical action occurred; runtime_access remains none and physical action count/budget remain 0/0.
 derived:
-  - the earlier coordinator ACCEPT for #827 is superseded by later stronger benchmark evidence and cannot support promotion.
-  - #829 remains a repository/static security blocker despite green CI until the four independently reproduced transport trust findings are repaired and re-audited.
-  - #830 has a published repair generation but remains unaccepted until independent re-review proves trusted-composition issuance and task-lifetime closure.
-  - Wave 2 and all live read-only observation remain blocked while #827 has open material repository/static safety findings.
+  - source PRs #827 and #830 must not receive further writes while #846 owns their integration paths.
+  - green CI cannot override #829's mechanically reproduced authentication-boundary flaw.
+  - Wave 2 and all live read-only observation remain blocked until #829 is independently ACCEPTED and #846 implements/reviews the trusted composition root on one exact head.
+  - switching from Spark to a different owner-funded model without fresh owner authorization would violate current execution governance.
 unknown:
-  - final zero-finding repaired exact head and hosted checks for #827 after the second coordinator re-review rejection.
-  - final zero-finding repaired exact head and hosted checks for #829 after transport security RETURN_FOR_REPAIR.
-  - independent re-review disposition and final hosted check outcome for #830 head 971787f380d52d0e141c50b9201498b0c99e752d or its successor.
+  - final repaired #829 exact head and independent coordinator disposition.
+  - final #846 integrated exact head and trusted reviewed capture-policy representation.
+  - final existing-store replay-ledger persistence schema/keying.
 conflicts: []
 first_failure:
-  marker: CAPTURE_EDGE_BENCHMARK_FINDINGS_UNREPAIRED_IN_PROMOTION
-  evidence: promotion #840 implementation/test blobs are identical to the benchmarked vulnerable generation despite later mechanically reproduced material findings.
+  marker: EDGE_TRANSPORT_CALLER_MINTABLE_AUTH_PROOF
+  evidence: on exact current #829 source, VerifiedEdgeFrame(_proof=module._VERIFIED_FRAME_PROOF) and EdgeOutboundChannel(...,_proof=module._OUTBOUND_CHANNEL_PROOF) both report peer_authenticated=True without verifier/handshake issuance.
 rejected_hypotheses:
-  - #840 can safely promote because #827 had an earlier ACCEPT: rejected; the ACCEPT predates stronger benchmark evidence.
-  - #829 remains dispatch-only: rejected by live branch/PR implementation, focused tests and hosted checks.
-  - #830 worker-declared PRODUCER_COMPLETE is sufficient for coordinator ACCEPT: rejected; independent coordinator review is mandatory.
+  - module-private proof objects are a sufficient same-process authentication boundary: rejected by direct exact-head construction using the real exported module globals.
+  - full hosted GREEN is sufficient to promote #829: rejected because the adversarial proof bypass is outside existing negative coverage.
+  - accepted-with-edits source PRs #827/#830 should be merged standalone: rejected by Phase-2 completeness rules; they are frozen source inputs for #846.
 changed_paths:
   - docs/agents/tasks/active/OTC-20260901-vision-p2-coordinator.md
 validation:
-  - command: live git/gh reconciliation of main and PRs #827/#829/#830/#840
+  - command: live git/gh reconciliation of main and PRs #827/#829/#830/#846
     result: PASS
-    evidence: #840 closed unmerged; #827 reopened Draft; #829 and #830 remain Draft/open; live heads captured in the ledger below.
-  - command: capture-edge blob identity comparison between benchmark target and #840 promotion head
+    evidence: main 103fa3071; #827/#830 closed unmerged at exact frozen heads; #829 open Draft 6031cf586 with all hosted gates green/CLEAN; #846 open Draft dda2df589.
+  - command: direct current-head #829 authentication-object probe
+    result: FAIL_EXPECTED
+    evidence: real module proof globals mint peer_authenticated VerifiedEdgeFrame and EdgeOutboundChannel objects, preserving RETURN_FOR_REPAIR.
+  - command: production composition/replay callsite search
     result: PASS
-    evidence: implementation and focused-test blob ids are identical, proving benchmark findings were not repaired in #840.
+    evidence: ControlDomain lacks ReviewedRuntimeAuthorityConfiguration and transport replay ledger has no production persistence consumer; both are explicitly assigned to #846.
+  - command: PR #846 scaffold checkpoint / Track A governance / CI Required
+    result: PASS
+    evidence: checkpoint PASS, local Track A governance PASS after metadata repair, GitHub Track A and CI Required SUCCESS on dda2df589.
 blockers:
-  - #827 must replace Python-privacy/token/registry self-certification with recomputable trusted-policy validation, close timing/binding/root findings, and return zero-finding independent review.
-  - #829 must repair exact per-kind schemas, run/generation replay binding, authenticated-object issuance and canonical numeric typing, then return zero-finding independent review.
-  - #830 must pass independent re-review of its composition-owned authority/lifetime repair and finish all exact-head hosted gates before promotion.
-next_action: consume #827 and #829 repair handoffs plus #830 independent re-review; then independently classify/promote only zero-finding repository-static slices before any live observation.
+  - Codex Spark quota unavailable until 2026-09-02T04:15+02:00.
+  - PR #829 requires removal of caller-mintable authentication proof objects and fresh exact-head re-review.
+  - PR #846 requires implementation/integration after Spark reset and after accepted #829 is available for replay persistence consumption.
+next_action: after Spark quota reset, resume the existing #829 worker for the single remaining auth-proof repair and dispatch #846 for trusted-composition integration; independently re-review exact heads before Wave 2 or any live observation.
 ```
 
 ## Wave 1 live ledger
 
-| Alias | PR | Current head / integration | Coordinator state |
+| Alias / repair | PR | Current exact state | Coordinator disposition |
 |---|---:|---|---|
-| `OTC-VISION-P2-RUNTIME-ADMISSION` | #838 promotion | merged `fb0c489f2ed166e872c4f197c6a78375a8576685` | repository/static producer `ACCEPT`; later serialized live evidence still required |
-| `OTC-VISION-P2-CAPTURE-EDGE` | #827 Draft | `06a031afd186e0656b188d10b7dc455917556def` rejected repair head | independent re-review `RETURN_FOR_REPAIR`; next Terra/high repair active |
-| `OTC-VISION-P2-RUNTIME-SIGNALS` | #839 promotion | merged `e883543403d5430d7b1d287f59043b23c98f37d6` | repository/static producer `ACCEPT` |
-| `OTC-VISION-P2-EDGE-TRANSPORT` | #829 Draft | `fe258ecdb65cbc6802b54d2adff57ecb4357865a` rejected green head | independent security `RETURN_FOR_REPAIR`; Terra/high repair active |
-| `OTC-VISION-P2-CONTROL-BRIDGE` | #830 Draft | `971787f380d52d0e141c50b9201498b0c99e752d` | repair published; independent Sol/medium re-review + hosted gates active |
+| `OTC-VISION-P2-RUNTIME-ADMISSION` | #838 | merged `fb0c489f2ed166e872c4f197c6a78375a8576685` | repository/static `ACCEPT`; later serialized live evidence still required |
+| `OTC-VISION-P2-CAPTURE-EDGE` | #827 source | closed unmerged at `6991b98f3f970c6ffc9d1bec9bf032aed89f0f2d` | `ACCEPT_WITH_EDITS`; safe fail-closed source frozen into #846 |
+| `OTC-VISION-P2-RUNTIME-SIGNALS` | #839 | merged `e883543403d5430d7b1d287f59043b23c98f37d6` | repository/static `ACCEPT` |
+| `OTC-VISION-P2-EDGE-TRANSPORT` | #829 Draft | `6031cf5862f7dd019aafa9314aaee408c67b20fe`, hosted GREEN/CLEAN | `RETURN_FOR_REPAIR`; caller-mintable module proof objects remain |
+| `OTC-VISION-P2-CONTROL-BRIDGE` | #830 source | closed unmerged at `971787f380d52d0e141c50b9201498b0c99e752d` | `ACCEPT_WITH_EDITS`; safe source frozen into #846 |
+| trusted composition repair | #846 Draft | scaffold `dda2df589a448d0d9c9d0fe4871ab074a4433c6d`, CI/Track A GREEN | blocked on Spark reset + accepted #829; sole integration owner |
 
 Official runtime observation remains unauthorized at this checkpoint. All Phase 2 mutation/effect authorities remain false and physical action budget/count remain `0/0`.

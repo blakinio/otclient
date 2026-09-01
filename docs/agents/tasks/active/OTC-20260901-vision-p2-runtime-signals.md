@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260901-vision-p2-runtime-signals
-status: validating
+status: ready
 agent: ChatGPT
 session_role: phase2_worker
 worker_alias: OTC-VISION-P2-RUNTIME-SIGNALS
@@ -9,12 +9,12 @@ project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: implementation
-phase: worker_post_admission_revalidation
+phase: worker_post_admission_ready_for_coordinator
 branch: feat/OTC-20260901-vision-p2-runtime-signals
 base_branch: main
 base_main: fb0c489f2ed166e872c4f197c6a78375a8576685
 created: 2026-09-01T16:27:39+02:00
-updated_at: 2026-09-01T20:49:40+02:00
+updated_at: 2026-09-01T20:53:26+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: isolated_worker_branch
@@ -65,14 +65,14 @@ depends_on:
   - main 0fe1ecb3569f1d8372209c857ab57f3b626c29ae
 related_prs:
   - PR #828 Wave 1 worker Draft
-current_blocker: exact-head CI / Package A / Package B / Track A pending after restack onto merged runtime-admission producer
-next_action: publish post-admission restack checkpoint, wait for exact-head hosted gates, then return Draft PR #828 to coordinator for promotion
+current_blocker: none
+next_action: return exact-head-green Draft PR #828 to coordinator for promotion; worker must not self-promote or merge
 invocation_started_at: 2026-09-01T17:02:17+02:00
-last_progress_at: 2026-09-01T20:49:40+02:00
-ci_checks_for_current_head: 0
-ci_check_generation: post-admission-8a2e334495a6
-terminal_ci_wait_started_at: 2026-09-01T20:49:40+02:00
-terminal_ci_checks_for_current_generation: 0
+last_progress_at: 2026-09-01T20:53:26+02:00
+ci_checks_for_current_head: 4
+ci_check_generation: post-admission-green-88571bc8270a
+terminal_ci_wait_started_at: 2026-09-01T20:51:19+02:00
+terminal_ci_checks_for_current_generation: 4
 unchanged_state_checks: 0
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
@@ -144,13 +144,13 @@ runtime_access: none
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T20:49:40+02:00
+updated_at: 2026-09-01T20:53:26+02:00
 head: 8a2e334495a6b072221f08324130afaee2ac6915
 head_semantics: implementation_and_prior_checkpoint_after_rebase_before_current_docs_checkpoint
 branch: feat/OTC-20260901-vision-p2-runtime-signals
 pr: 828
-status: validating
-phase: worker_post_admission_revalidation
+status: ready
+phase: worker_post_admission_ready_for_coordinator
 context_routes:
   - phase-2-read-only-coordination
   - track-a-governance
@@ -168,12 +168,12 @@ proven:
   - post-restack focused runtime-signals suite passes 21/21.
   - canonical frozen vision benchmark command python -m unittest discover -s tools/tibia-re-vision-benchmark/tests -v passes 34/34.
   - Ruff, py_compile, Track A governance, checkpoint validation and git diff --check pass.
+  - exact checkpoint head 88571bc8270a6aa326a193dcd9d8b8bd81c799aa passed CI 33546079127, Package A 33546079141, Package B 33546078864 and Track A governance 33546078993.
   - no Official Tibia observation, model inference, credentials, GUI input, process control, process memory, payload capture or physical action occurred.
 derived:
   - accepted runtime-signals producer is locally current with the now-merged runtime-admission producer dependency.
   - coordinator promotion remains separate from any live runtime claim.
 unknown:
-  - exact-head CI / Package A / Package B / Track A results after publication of this post-admission checkpoint.
 conflicts: []
 first_failure:
   marker: INVALID-LOCAL-BENCHMARK-COMMAND
@@ -199,7 +199,6 @@ validation:
   - command: Track A governance changed-from fb0c489f2ed166e872c4f197c6a78375a8576685; checkpoint validator; git diff --check
     result: PASS
     evidence: governance/checkpoint/whitespace gates pass.
-blockers:
-  - exact-head hosted gates pending after publication.
-next_action: publish this checkpoint, wait for exact-head hosted gates, then return Draft PR #828 to coordinator for promotion.
+blockers: []
+next_action: return exact-head-green Draft PR #828 to coordinator for promotion; worker must not self-promote or merge.
 ```

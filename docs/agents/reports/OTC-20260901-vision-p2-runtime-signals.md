@@ -134,4 +134,4 @@ Fresh local validation:
 - Track A runtime governance, checkpoint validator and `git diff --check`: PASS;
 - exact changed paths remain the four declared worker-owned paths.
 
-Exact-head hosted CI / Package A / Package B / Track A are pending publication of this post-admission checkpoint. No live runtime evidence is claimed or authorized.
+Exact checkpoint head `88571bc8270a6aa326a193dcd9d8b8bd81c799aa` passed CI `33546079127`, Package A `33546079141`, Package B `33546078864` and Track A governance `33546078993`. The Draft returns to the coordinator for promotion. No live runtime evidence is claimed or authorized.

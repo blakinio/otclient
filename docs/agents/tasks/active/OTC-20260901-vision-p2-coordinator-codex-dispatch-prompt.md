@@ -12,7 +12,7 @@ branch: docs/OTC-20260901-vision-p2-coordinator-codex-dispatch-prompt
 base_branch: main
 base_sha: d1cb8722c3116a0e0aeb72b9b360712f43151f17
 created: 2026-09-01T22:55:00+02:00
-updated_at: 2026-09-01T23:06:06+02:00
+updated_at: 2026-09-01T23:08:08+02:00
 risk: low
 execution_class: local_owner_pc
 execution_mode: remote_desktop_plus_github
@@ -60,10 +60,11 @@ depends_on:
   - merged benchmark closeout PR #842
 blocks: []
 cross_repository_task_ids: []
+related_pr: 844
 invocation_started_at: 2026-09-01T22:55:00+02:00
-last_progress_at: 2026-09-01T23:06:06+02:00
+last_progress_at: 2026-09-01T23:08:08+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: prompt-contract-content-637794abaa7f
+ci_check_generation: pr844-bound-pending
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -71,8 +72,8 @@ identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 0
 stall_warnings: 0
-current_blocker: none
-next_action: commit the validated checkpoint, push the isolated branch, open a Draft PR, then require exact-head CI/governance and PR hygiene before merge
+current_blocker: exact-head GitHub CI/governance pending after PR #844 binding
+next_action: push this PR-bound checkpoint, then require exact-head CI/governance, static prompt regression, zero review findings and current-main freshness before readiness/merge
 ---
 
 # Vision P2 coordinator-managed Codex dispatch prompt
@@ -85,11 +86,11 @@ Make a newly started `OTC-VISION-P2-COORDINATOR` understand that it is the super
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T23:06:06+02:00
+updated_at: 2026-09-01T23:08:08+02:00
 head: 637794abaa7f1a476d36bf5d42634618d2deedf2
 head_semantics: prompt_contract_content_commit_before_pr_binding
 branch: docs/OTC-20260901-vision-p2-coordinator-codex-dispatch-prompt
-pr: null
+pr: 844
 status: validating
 context_routes:
   - agent-governance
@@ -138,5 +139,5 @@ validation:
     result: PASS
     evidence: task recognized as policy-v2 documentation task; active_sessions=0.
 blockers: []
-next_action: commit the validated checkpoint, push the isolated branch, open a Draft PR, then require exact-head CI/governance and PR hygiene before merge
+next_action: push this PR-bound checkpoint, then require exact-head CI/governance, static prompt regression, zero review findings and current-main freshness before readiness/merge
 ```

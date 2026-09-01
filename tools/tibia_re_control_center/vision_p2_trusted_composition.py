@@ -8,7 +8,7 @@ import struct
 import threading
 import zlib
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -173,7 +173,13 @@ def _prepare_capture_root(parent: Path) -> Path:
     return resolved
 
 
-def _persist_png(root: Path, payload: bytes, *, region: PixelRegion | None = None, parent_sha: str | None = None) -> TrustedCaptureArtifact:
+def _persist_png(
+    root: Path,
+    payload: bytes,
+    *,
+    region: PixelRegion | None = None,
+    parent_sha: str | None = None,
+) -> TrustedCaptureArtifact:
     if root.is_symlink() or not root.is_dir():
         raise CaptureEdgeError("CAPTURE_EVIDENCE_ROOT_INVALID")
     digest = hashlib.sha256(payload).hexdigest()
@@ -192,7 +198,12 @@ def _persist_png(root: Path, payload: bytes, *, region: PixelRegion | None = Non
             path.write_bytes(payload)
         except OSError:
             raise CaptureEdgeError("CAPTURE_PERSIST_FAILED") from None
-    return TrustedCaptureArtifact(path=path, sha256=digest, region=region, parent_full_sha256=parent_sha)
+    return TrustedCaptureArtifact(
+        path=path,
+        sha256=digest,
+        region=region,
+        parent_full_sha256=parent_sha,
+    )
 
 
 def _decode_rgb_png(payload: bytes) -> tuple[int, int, bytes]:
@@ -287,7 +298,8 @@ class TrustedCaptureEdge:
         if crop is not None and type(crop) is not PixelRegion:
             raise ValueError("crop invalid")
         if previous_full_sha256 is not None and (
-            type(previous_full_sha256) is not str or _SHA256.fullmatch(previous_full_sha256.lower()) is None
+            type(previous_full_sha256) is not str
+            or _SHA256.fullmatch(previous_full_sha256.lower()) is None
         ):
             raise ValueError("previous full sha256 invalid")
         before = _snapshot_binding(self._binding_reader())
@@ -296,7 +308,10 @@ class TrustedCaptureEdge:
         geometry = self._frame_source.geometry(before)
         if type(geometry) is not WindowGeometry:
             raise CaptureEdgeError("CAPTURE_GEOMETRY_INVALID")
-        if (geometry.width, geometry.height) != (self._policy.expected_width, self._policy.expected_height):
+        if (geometry.width, geometry.height) != (
+            self._policy.expected_width,
+            self._policy.expected_height,
+        ):
             raise CaptureEdgeError("CAPTURE_SECRET_POLICY_GEOMETRY_MISMATCH")
         for region in self._policy.secret_regions:
             _require_region(region, geometry)
@@ -332,8 +347,15 @@ class TrustedCaptureEdge:
             raise CaptureEdgeError("CAPTURE_CLOCK_INVALID")
         _require_current(final, final_ns, max_binding_age_ns)
         root = _prepare_capture_root(self._root.parent)
-        full = _persist_png(root, _encode_rgb_png(geometry.width, geometry.height, safe_pixels))
-        changed = None if previous_full_sha256 is None else full.sha256 != previous_full_sha256.lower()
+        full = _persist_png(
+            root,
+            _encode_rgb_png(geometry.width, geometry.height, safe_pixels),
+        )
+        changed = (
+            None
+            if previous_full_sha256 is None
+            else full.sha256 != previous_full_sha256.lower()
+        )
         crop_artifact = None
         if crop is not None and crop_pixels is not None:
             crop_artifact = _persist_png(
@@ -357,12 +379,19 @@ class TrustedCaptureEdge:
         )
 
 
-def _read_capture_artifact(root: Path, artifact: TrustedCaptureArtifact) -> tuple[int, int, bytes]:
+def _read_capture_artifact(
+    root: Path,
+    artifact: TrustedCaptureArtifact,
+) -> tuple[int, int, bytes]:
     if type(artifact) is not TrustedCaptureArtifact:
         raise CaptureEdgeError("CAPTURE_ARTIFACT_INTEGRITY_INVALID")
     path = Path(artifact.path)
     try:
-        if path.is_symlink() or path.parent.resolve(strict=True) != root or path.name != f"{artifact.sha256}.png":
+        if (
+            path.is_symlink()
+            or path.parent.resolve(strict=True) != root
+            or path.name != f"{artifact.sha256}.png"
+        ):
             raise CaptureEdgeError("CAPTURE_ARTIFACT_INTEGRITY_INVALID")
         payload = path.read_bytes()
     except OSError:
@@ -398,7 +427,10 @@ def validate_trusted_capture(
         raise CaptureEdgeError("CAPTURE_EVIDENCE_STALE")
     if evidence.secret_policy_ref != policy.policy_ref:
         raise CaptureEdgeError("CAPTURE_SECRET_POLICY_MISMATCH")
-    if (evidence.geometry.width, evidence.geometry.height) != (policy.expected_width, policy.expected_height):
+    if (evidence.geometry.width, evidence.geometry.height) != (
+        policy.expected_width,
+        policy.expected_height,
+    ):
         raise CaptureEdgeError("CAPTURE_SECRET_POLICY_GEOMETRY_MISMATCH")
     root = _prepare_capture_root(capture_parent)
     width, height, pixels = _read_capture_artifact(root, evidence.full_frame)
@@ -483,7 +515,10 @@ class _TrustedAgentEdgeBridge(AgentEdgeBridge):
             )
         authority = self._runtime_authorities.get(session_id)
         if authority is None:
-            raise ValidationError("RUNTIME_ADMISSION_REQUIRED", "current read-only runtime admission is required")
+            raise ValidationError(
+                "RUNTIME_ADMISSION_REQUIRED",
+                "current read-only runtime admission is required",
+            )
         return authority.admission
 
     def status(
@@ -568,11 +603,18 @@ def _load_replay_ledger(service: ControlDomainService, key: str) -> EdgeReplayLe
     try:
         value = json.loads(raw)
     except (TypeError, ValueError):
-        raise ValidationError("EDGE_REPLAY_STATE_INVALID", "persisted edge replay state is invalid") from None
+        raise ValidationError(
+            "EDGE_REPLAY_STATE_INVALID",
+            "persisted edge replay state is invalid",
+        ) from None
     return EdgeReplayLedger.from_snapshot(value)
 
 
-def _save_replay_ledger(service: ControlDomainService, key: str, ledger: EdgeReplayLedger) -> None:
+def _save_replay_ledger(
+    service: ControlDomainService,
+    key: str,
+    ledger: EdgeReplayLedger,
+) -> None:
     value = ledger.snapshot()
     EdgeReplayLedger.from_snapshot(value)
     encoded = jcs_dumps(value)
@@ -602,16 +644,29 @@ class DurableEdgeTransportVerifier:
         self._peer_id = validate_opaque_id(expected_peer_id, field_name="expected_peer_id")
         self._auth_key = bytes(expected_peer_auth_key)
         if len(self._auth_key) < 32:
-            raise ValidationError("EDGE_AUTH_KEY_INVALID", "edge authentication key is invalid")
-        self._connection_id = validate_opaque_id(expected_connection_id, field_name="expected_connection_id")
-        self._meta_key = _replay_meta_key(self._session_id, self._run_id, self._peer_id)
+            raise ValidationError(
+                "EDGE_AUTH_KEY_INVALID",
+                "edge authentication key is invalid",
+            )
+        self._connection_id = validate_opaque_id(
+            expected_connection_id,
+            field_name="expected_connection_id",
+        )
+        self._meta_key = _replay_meta_key(
+            self._session_id,
+            self._run_id,
+            self._peer_id,
+        )
         self._lock = threading.RLock()
         self._failed = False
 
     def verify(self, packet: bytes, *, now_epoch_ms: int) -> VerifiedEdgeFrame:
         with self._lock:
             if self._failed:
-                raise ValidationError("EDGE_REPLAY_PERSISTENCE_FAILED", "durable edge verifier is fail-closed")
+                raise ValidationError(
+                    "EDGE_REPLAY_PERSISTENCE_FAILED",
+                    "durable edge verifier is fail-closed",
+                )
             ledger = _load_replay_ledger(self._runtime.service, self._meta_key)
             verifier = EdgeTransportVerifier(
                 expected_peer_id=self._peer_id,
@@ -621,7 +676,10 @@ class DurableEdgeTransportVerifier:
             )
             frame = verifier.verify(packet, now_epoch_ms=now_epoch_ms)
             if frame.session_id != self._session_id or frame.run_id != self._run_id:
-                raise ValidationError("EDGE_SESSION_RUN_REJECTED", "edge frame belongs to another session or run")
+                raise ValidationError(
+                    "EDGE_SESSION_RUN_REJECTED",
+                    "edge frame belongs to another session or run",
+                )
             try:
                 _save_replay_ledger(self._runtime.service, self._meta_key, ledger)
             except Exception:
@@ -633,7 +691,11 @@ class DurableEdgeTransportVerifier:
 class TrustedVisionP2Runtime:
     """One application-owned adapter over the existing ControlDomain/session/store."""
 
-    def __init__(self, service: ControlDomainService, composition: VisionP2TrustedComposition) -> None:
+    def __init__(
+        self,
+        service: ControlDomainService,
+        composition: VisionP2TrustedComposition,
+    ) -> None:
         if type(service) is not ControlDomainService or type(composition) is not VisionP2TrustedComposition:
             raise TypeError("trusted vision P2 composition inputs invalid")
         if service.agent._tasks or service.agent._sessions:
@@ -714,13 +776,22 @@ class TrustedVisionP2Runtime:
             session = agent.ensure_session(session_id)
             task = agent._tasks.get(session_id)
             if task is None or task.runtime_access != "read_only":
-                raise ValidationError("EDGE_RUNTIME_NOT_ADMITTED", "validated capture requires a read-only task")
+                raise ValidationError(
+                    "EDGE_RUNTIME_NOT_ADMITTED",
+                    "validated capture requires a read-only task",
+                )
             if session.current_run_id != task.run_id or evidence.run_id != task.run_id:
-                raise ValidationError("EDGE_BINDING_MISMATCH", "validated capture belongs to another run")
+                raise ValidationError(
+                    "EDGE_BINDING_MISMATCH",
+                    "validated capture belongs to another run",
+                )
             now_epoch_ms = agent._now_epoch_ms()
             if now_epoch_ms >= task.deadline_epoch_ms:
                 agent.edge.disconnect(session_id)
-                raise ValidationError("EDGE_TASK_DEADLINE_EXPIRED", "expired task cannot ingest capture")
+                raise ValidationError(
+                    "EDGE_TASK_DEADLINE_EXPIRED",
+                    "expired task cannot ingest capture",
+                )
             edge = agent.snapshot(session_id)["edge"]
             if edge.get("current") is not True or not isinstance(edge.get("edge_instance_id"), str):
                 raise ValidationError(

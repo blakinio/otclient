@@ -1,7 +1,7 @@
 ---
 task_id: OTC-20260901-vision-p2-runtime-signals
-status: ready
-agent: unclaimed
+status: validating
+agent: ChatGPT
 session_role: phase2_worker
 worker_alias: OTC-VISION-P2-RUNTIME-SIGNALS
 programme_id: OTC-VISION-P2-READONLY
@@ -9,12 +9,12 @@ project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: implementation
-phase: dispatch_ready
+phase: repository_static_validation
 branch: feat/OTC-20260901-vision-p2-runtime-signals
 base_branch: main
 base_main: 0fe1ecb3569f1d8372209c857ab57f3b626c29ae
 created: 2026-09-01T16:27:39+02:00
-updated_at: 2026-09-01T16:31:41+02:00
+updated_at: 2026-09-01T17:50:02+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: isolated_worker_branch
@@ -66,11 +66,11 @@ depends_on:
 related_prs:
   - PR #828 Wave 1 worker Draft
 current_blocker: none
-next_action: launch OTC-VISION-P2-RUNTIME-SIGNALS in its isolated worker session, verify Draft PR #828 still matches this branch/worktree/ownership, read binding contracts, then write the first RED focused test at tests/tools/tibia_re_control_center/test_agent_runtime_signals.py with runtime_access none
-invocation_started_at: null
-last_progress_at: 2026-09-01T16:31:41+02:00
+next_action: publish the coherent runtime-signals implementation checkpoint to Draft PR #828, then inspect exact-head GitHub CI and return the worker result to OTC-VISION-P2-COORDINATOR
+invocation_started_at: 2026-09-01T17:02:17+02:00
+last_progress_at: 2026-09-01T17:50:02+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: pr-bound-bootstrap
+ci_check_generation: implementation-pending-publish
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -144,11 +144,11 @@ runtime_access: none
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T16:31:41+02:00
-head: 160f8d1d93e8f09a05c58cd2f3d0f388ac322035
+updated_at: 2026-09-01T17:50:02+02:00
+head: 11fc18820cc22303d6857361eb3404f5f1844ffa
 branch: feat/OTC-20260901-vision-p2-runtime-signals
 pr: 828
-status: ready
+status: validating
 context_routes:
   - phase-2-read-only-coordination
   - track-a-governance
@@ -159,35 +159,53 @@ owned_paths:
   - tools/tibia_re_control_center/agent_runtime_signals.py
   - tests/tools/tibia_re_control_center/test_agent_runtime_signals.py
 proven:
-  - branch and isolated worktree were created by the coordinator from exact main 0fe1ecb3569f1d8372209c857ab57f3b626c29ae.
-  - Draft PR 828 exists for this exact worker branch and was opened from bootstrap head 160f8d1d93e8f09a05c58cd2f3d0f388ac322035.
-  - PR 820 and PR 824 are merged prerequisites.
-  - coordinator pairwise and refreshed-main ownership scans found no overlap for this worker ownership set.
-  - bootstrap checkpoint, Track A runtime governance and git diff --check passed before PR binding.
-  - runtime_access is none; all mutation/runtime-effect authorities remain false and physical action budget/count are 0/0.
+  - Draft PR 828 remains open, Draft, mergeable and bound to feat/OTC-20260901-vision-p2-runtime-signals; PR 820 and PR 824 are merged prerequisites.
+  - refreshed origin/main ca1a71b5852f6e00ba144ed183af470555c51f56 changes none of this worker's owned paths.
+  - repository/static RED-to-GREEN implementation provides reviewed-source, session/run/runtime/runtime-instance, clock-domain, freshness, content-addressing, supersession and causal-conflict fail-closed behavior.
+  - semantic IN_GAME or WORLD_EXIT output is accepted only from REVIEWED_CAUSAL contract rules; STRUCTURAL_ONLY and UNKNOWN rules may emit only UNKNOWN.
+  - RuntimeSignalSample cannot supply runtime_state, evidence_class, producer_id or contract_id, so sample/model payload cannot self-select semantic authority through this interface.
+  - focused runtime-signals suite passes 20 tests and Ruff passes on both owned Python files.
+  - filtered Control Center regression passes 475 tests with 2 skips after excluding exactly three pre-existing failing test methods; frozen vision benchmark passes 34 tests.
+  - the three excluded methods reproduce with identical failure classes on clean branch head 11fc18820 before local implementation is restored.
+  - runtime_access remains none; no Official Tibia observation, process-memory read, packet/payload capture, model inference, GUI input, credentials, login, process control or physical action occurred.
 derived:
-  - the isolated worker may begin repository/static RED-to-GREEN work only after its own session revalidates this task, Draft PR, branch, worktree and ownership.
+  - no production REVIEWED_CAUSAL producer is hard-coded because current repository evidence does not safely qualify one under this task authority; later coordinator integration must bind only separately reviewed current producers.
+  - the local slice is coherent for publication and exact-head hosted validation; clean-head baseline failures are not owned by this worker and must not be repaired here.
 unknown:
-  - implementation, focused test, review and exact-head CI outcomes.
-  - any future real-runtime evidence; none is authorized or claimed at bootstrap.
+  - exact-head GitHub CI outcome after the implementation checkpoint is published.
+  - coordinator classification and any later serialized real read-only observation evidence.
 conflicts: []
 first_failure:
-  marker: none
-  evidence: no current failure; worker session has not yet claimed execution.
+  marker: EXACT_HEAD_CI_NOT_RUN
+  evidence: implementation is locally validated but has not yet been committed/pushed from parent head 11fc18820cc22303d6857361eb3404f5f1844ffa.
 rejected_hypotheses:
-  - fake or hosted evidence can satisfy real-runtime acceptance: rejected by the Phase 2 contract.
+  - the five full-suite errors were introduced by runtime-signals changes: rejected because the exact three failing test methods reproduce on clean head 11fc18820 with the local implementation stashed.
+  - structural/QMeta/window/model evidence may assert IN_GAME: rejected by the binding Phase 2 contract and enforced by contract validation.
+  - fake/hosted evidence can satisfy real-runtime acceptance: rejected; this report makes no real-runtime claim.
 changed_paths:
   - docs/agents/tasks/active/OTC-20260901-vision-p2-runtime-signals.md
+  - docs/agents/reports/OTC-20260901-vision-p2-runtime-signals.md
+  - tools/tibia_re_control_center/agent_runtime_signals.py
+  - tests/tools/tibia_re_control_center/test_agent_runtime_signals.py
 validation:
-  - command: coordinator refreshed-main and pairwise ownership scans
+  - command: python -m unittest tests.tools.tibia_re_control_center.test_agent_runtime_signals -q
     result: PASS
-    evidence: no worker-worker or active-main exact ownership conflicts.
-  - command: bootstrap Track A governance and checkpoint validation
+    evidence: 20 tests passed.
+  - command: filtered Control Center discovery excluding the three clean-head baseline-failing methods
     result: PASS
-    evidence: task was branch-bound and runtime_access none admission was valid before Draft PR binding.
-  - command: live Draft PR creation readback
+    evidence: 475 tests passed, 2 skipped; TOTAL_DISCOVERED=478, EXCLUDED=3.
+  - command: python -m unittest discover -s tools/tibia-re-vision-benchmark/tests -p test_*.py -q
     result: PASS
-    evidence: PR 828 opened Draft against main from feat/OTC-20260901-vision-p2-runtime-signals at 160f8d1d93e8f09a05c58cd2f3d0f388ac322035.
+    evidence: 34 tests passed.
+  - command: python -m ruff check tools/tibia_re_control_center/agent_runtime_signals.py tests/tools/tibia_re_control_center/test_agent_runtime_signals.py
+    result: PASS
+    evidence: All checks passed.
+  - command: clean-head reproduction with local implementation stashed
+    result: PASS
+    evidence: all three excluded baseline methods fail on clean 11fc18820 with the same ConnectionResetError / ModelSlotUnavailable classes.
+  - command: git diff 0fe1ecb..origin/main -- <owned paths>
+    result: PASS
+    evidence: no owned-path overlap on refreshed main ca1a71b5852f6e00ba144ed183af470555c51f56.
 blockers: []
-next_action: launch OTC-VISION-P2-RUNTIME-SIGNALS in its isolated worker session, verify Draft PR #828 still matches this branch/worktree/ownership, read binding contracts, then write the first RED focused test at tests/tools/tibia_re_control_center/test_agent_runtime_signals.py with runtime_access none.
+next_action: publish the coherent runtime-signals implementation checkpoint to Draft PR #828, then inspect exact-head GitHub CI and return the worker result to OTC-VISION-P2-COORDINATOR.
 ```

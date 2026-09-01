@@ -1,0 +1,132 @@
+# OTC-20260901 Vision P2 Runtime Admission Report
+
+## Result
+
+Status: **STATIC IMPLEMENTATION COMPLETE / LIVE ADMISSION WAITING**
+
+The worker implemented the repository/static Phase 2 read-only runtime-admission boundary in the existing Tibia RE Control Center. The implementation does not access, control, mutate, or claim a live Official Tibia runtime.
+
+Implementation commit:
+
+```text
+9d8233528bcf2dd1c4e214d2aee3a8677d3a07ad
+```
+
+Feature classification:
+
+```yaml
+feature_scope: contract_producer
+user_facing: false
+runtime_access_during_implementation: none
+mutation_authorized: false
+physical_action_budget: 0
+physical_action_count: 0
+```
+
+## Implemented contract
+
+`tools/tibia_re_control_center/agent_runtime_admission.py` now validates and produces an immutable machine-readable read-only admission/provenance snapshot for one exact target. It remains fail-closed unless all required facts are supplied freshly by a later authorized observer.
+Validated boundary includes:
+
+- accepted observation schema and `official-client-re` track discriminator;
+- explicit current-task ownership and non-conflicting runtime namespace;
+- caller-defined observation freshness with stale/future refusal;
+- freshly reachable host/container/display locator state;
+- credential-free HTTPS observer endpoint with valid port syntax;
+- boot identity, positive PID, process-start ticks, absolute client executable, DISPLAY and X11 window ownership consistency;
+- complete candidate inventory with exactly one exact target, zero mismatched/unverifiable candidates and `target_uniqueness: PROVEN`;
+- exact trusted-base client fence `15.32.75d4a0 / 52105824 / d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a`;
+- zero credentials, GUI input, anti-idle input, process control, process memory access, network payload capture and physical actions;
+- strict key sets so unknown fields cannot enter admission/provenance;
+- immutable typed snapshots and deterministic `runtime_binding_sha256`;
+- complete Track A `read_only` admission fields with all canonical authority fields/gates `NOT_APPLICABLE` and `mutation_authorized: false`.
+
+The existing Package C Surveyor constants are intentionally not reused as authority because they carry the historical fence `15.32 / 52109920 / ed5469...`, which does not match the current trusted-base fence.
+
+## TDD and verification
+
+Focused final test command covered `test_agent_runtime_admission.py`:
+
+```text
+Ran 14 tests
+OK
+```
+Exact-final static checks:
+
+```text
+ruff check: PASS
+compileall for implementation + focused test: PASS
+```
+
+Exact-final agent component run:
+
+```text
+Ran 219 tests
+215 PASS
+4 ERROR
+```
+
+All four errors are outside the owned implementation and belong to the already established current-main baseline set: Windows `ConnectionResetError [WinError 10054]` in `test_agent_api` and `ModelSlotUnavailable: MODEL_INFERENCE_FAILED` in `test_agent_vision`. Before finalization, the worker reproduced the same baseline error family on a detached clean `origin/main@ca1a71b5852f6e00ba144ed183af470555c51f56`; no new error signature was introduced by this worker.
+
+## Current-main revalidation
+
+After coordinator repair #833 and checkpoint #836 merged, the existing worker branch was restacked conflict-free onto trusted `main@54a20bbd8721e92d069974af14d6ebd2f4f5a55d` without changing any worker-owned implementation path from main. Fresh local verification on the restacked generation:
+
+```text
+focused runtime-admission: 14/14 PASS
+ruff: PASS
+py_compile: PASS
+Track A runtime governance: PASS
+checkpoint validator: PASS
+git diff --check: PASS
+changed paths: exact four worker-owned paths
+```
+
+This revalidation does not authorize live observation. Exact head `04577d654f7c1a78448abb096d3e4821a06d6b43` passed CI `33533952869`, Package A `33533952529`, Package B `33533952523` and Track A governance `33533952492`. Package B required one retry of an unchanged `agent_session` concurrency test outside worker ownership; the falsification audit and real browser+CLI E2E were green on the first attempt. The coordinator may now consider assigning the serialized read-only observation window, but none has been assigned or used yet.
+
+## Runtime / physical E2E
+
+```yaml
+live_runtime_observation: NOT_RUN
+runtime_access: none
+target_uniqueness: NOT_APPLICABLE
+current_exact_client_identity: UNKNOWN
+current_runtime_locators: UNKNOWN
+credentials_used: false
+gui_input_sent: false
+process_control_used: false
+process_memory_access_used: false
+network_payload_capture_used: false
+physical_action_count: 0
+```
+Real Synology/Kasm observation was not authorized by this task record. During the worker session the available Synology remote-device entries were also offline, but that is secondary to the authority boundary: even an online runtime would not be observed until the coordinator grants one serialized read-only observation window.
+
+No current display, PID, session, endpoint mapping or target uniqueness is claimed from historical evidence.
+
+## Blocker and next action
+
+Primary blocker at this checkpoint: the current-main restack must first obtain fresh exact-head hosted CI / Package A / Track A governance. The coordinator-assigned serialized read-only observation window remains a subsequent gate; no valid `read_only` live admission has been persisted yet.
+
+The next legal action is publication and hosted revalidation of this current-main restack. Only after those repository gates are green may the coordinator assign exactly one observation window. In that later window, a non-invasive observer must freshly obtain locator reachability, complete candidate inventory, exact process/build identity and X11 window ownership, then pass those facts through `admit_read_only_runtime(...)` and persist the resulting admission/provenance before any runtime observation continues.
+
+This transition must preserve:
+
+```yaml
+mutation_authorized: false
+credentials_allowed: false
+gui_input_authorized: false
+anti_idle_input_authorized: false
+process_control_authorized: false
+process_memory_access_allowed: false
+network_payload_capture_allowed: false
+physical_action_budget: 0
+```
+
+Draft PR `#826` remains the worker delivery vehicle. The worker must not self-merge or self-promote; classification returns to `OTC-VISION-P2-COORDINATOR`.
+
+## Checkpoint validation
+
+```text
+tools/agents/checkpoint.py docs/agents/tasks/active/OTC-20260901-vision-p2-runtime-admission.md --require-checkpoint
+Validated 1 checkpoint task(s).
+```

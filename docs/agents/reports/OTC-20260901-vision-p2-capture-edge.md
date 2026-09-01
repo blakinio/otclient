@@ -49,4 +49,4 @@ No Linux/Synology/Kasm runtime execution of the new backend has been performed o
 
 Historical implementation head `8685f7c6a8dae9e41d71f0acbe70a89a35a0ef38` and checkpoint head `cc957a25ddb4c40e1416bec60eff03c38fda3ad9` passed their earlier CI/governance, but that generation is superseded by coordinator secret-safety finding `5496909848`.
 
-Current repair implementation head before this docs checkpoint is `87dd4b914f471fd70e5e632fad69edbfce86f888`. Exact-head GitHub CI/governance is pending after publication; no success is claimed until those workflows complete.
+Current repaired checkpoint head `483c6eca24aeee35675c5ea6e1c0310b363be711` passed GitHub `CI` run `33533157584` and `Track A agent runtime governance` run `33533157282`. The PR remains Draft and is returned to the coordinator for independent re-review; no worker self-promotion or merge is authorized.

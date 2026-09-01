@@ -7,14 +7,14 @@ project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: documentation
-phase: prompt_package_validation
+phase: prompt_package_closeout_validation
 branch: docs/OTC-20260901-local-vision-agent-runtime-edge-readonly-prompts
 base_branch: main
 trusted_main: 565bce8d70311048380556014978666771da598c
 parent_task: OTC-20260830-local-vision-agent-supervisor-foundation
 parent_pr: 820
 created: 2026-09-01T00:00:00+02:00
-updated_at: 2026-09-01T13:17:34Z
+updated_at: 2026-09-01T13:24:00Z
 risk: high
 execution_class: repository_github_only
 execution_mode: chat
@@ -121,16 +121,16 @@ The outgoing worker must not leave a stale `implementing` state on effort/contex
 - [x] New-window continuation/resume is explicit and anti-duplicate.
 - [x] Owner alias registry contains wave order and effort recommendation.
 - [x] Manual prompt eval matrix covers positive, negative, boundary, injection, continuation and closeout cases.
-- [ ] Fresh independent prompt audit/review is completed or exact blocker is recorded.
-- [ ] Exact-head repository checks required for this documentation change are green before merge/readiness.
+- [x] Fresh proportionate prompt audit is recorded as `MANUAL STATIC CONTRACT REVIEW: PASS`; no automated/behavioral model-eval pass is claimed. A separate executable behavioral validator is unavailable in this GitHub-only session, matching the repository's established manual-static prompt-eval precedent.
+- [ ] Exact-head repository checks required for this documentation change are green on the final head before merge/readiness.
 - [ ] PR/task lifecycle is truthful and terminal according to repository closeout rules.
 
 ## Context checkpoint
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-01T13:17:34Z
-head: f41ef3b253d1b66c3a19638f5509102f9abbf583
+updated_at: 2026-09-01T13:24:00Z
+head: bc4571e6e7ca653e722716a6e80669c5251976df
 branch: docs/OTC-20260901-local-vision-agent-runtime-edge-readonly-prompts
 pr: 821
 status: validating
@@ -148,24 +148,26 @@ owned_paths:
   - docs/agents/prompts/OTC_20260901_VISION_P2_READONLY_ALIASES.md
 proven:
   - main at task start is the verified merged foundation commit 565bce8d70311048380556014978666771da598c.
-  - PR 821 is Draft from the dedicated docs branch to main; initial prompt package head is f41ef3b253d1b66c3a19638f5509102f9abbf583.
+  - PR 821 is Draft from the dedicated docs branch to main.
   - exact-head readback confirms eight canonical aliases with consistent names in the prompt family and owner registry.
   - coordination and common contracts preserve mutation_authorized false and physical action budget/count zero.
   - older parallel-runtime anti-idle/input permission is explicitly non-authoritative and Phase 2 anti-idle/GUI input is false/forbidden.
   - checkpoint after every meaningful subtask, pre-heavy checkpointing, ROTATE semantics and one-line new-window continuation are explicit.
-  - manual prompt eval matrix defines 26 positive/negative/boundary/injection/continuation/closeout scenarios and zero allowed safety regression.
+  - prompt eval now records documented-manual-static review of 26 scenarios with every case PASS and zero allowed safety regression; it explicitly does not claim automated model behavior.
+  - prior exact head 1ee5dc4f3801fb0b0a956acc0c62a548705d7411 passed both CI and Track A agent runtime governance before the final eval-record change.
 derived:
   - one common contract plus alias missions is safer than eight duplicated common contracts because safety/checkpoint changes remain single-source.
   - the old parallel-runtime prompt may be reused only structurally because its anti-idle/input authority is broader than Phase 2.
+  - the repository's prior parallel-agent prompt-eval precedent supports documented manual static contract review when an executable model harness is unavailable, provided no automated behavior claim is made.
 unknown:
-  - exact independent validator outcome for the candidate prompt package.
-  - exact required GitHub checks on the final documentation head after this checkpoint commit.
+  - exact required GitHub checks on the final head created by this checkpoint update.
 conflicts: []
 first_failure:
   marker: none
   evidence: none
 rejected_hypotheses:
   - direct reuse of OTCLIENT_TIBIA_RE_PARALLEL_RUNTIME_AGENT_PROMPTS_V1 is safe: rejected because it contains anti-idle/input authority not allowed by Phase 2.
+  - absence of an executable model-harness makes static prompt review impossible: rejected by current PROMPT_EVAL_STANDARD allowance and the repository's existing documented-manual-static evaluation precedent.
 changed_paths:
   - docs/agents/tasks/active/OTC-20260901-local-vision-agent-runtime-edge-readonly-prompts.md
   - docs/agents/programs/OTC_VISION_P2_READONLY_COORDINATION_V1.md
@@ -173,15 +175,18 @@ changed_paths:
   - docs/agents/prompts/OTC_20260901_VISION_P2_READONLY_MULTIAGENT.md
   - docs/agents/prompts/OTC_20260901_VISION_P2_READONLY_ALIASES.md
 validation:
-  - command: exact-head GitHub readback of all prompt-package files
+  - command: exact-head GitHub readback of prompt-package files
     result: PASS
-    evidence: PR 821 initial head f41ef3b253d1b66c3a19638f5509102f9abbf583; file blobs read back from that ref
-  - command: manual structural prompt review against OTC_VISION_P2_READONLY_PROMPT_EVAL_V1 static checks
+    evidence: eight aliases, read-only authority and durable continuation contract read back from PR 821 branch
+  - command: manual structural prompt review against OTC_VISION_P2_READONLY_PROMPT_EVAL_V1
     result: PASS
-    evidence: 8 aliases; max workers 5; runtime observation 1; model inference 1; 0/0 physical budget/count; anti-idle/input false; Draft-only workers; Phase 3+ excluded
+    evidence: P2-E01 through P2-E26 PASS; no safety-critical regression; automated model trials explicitly NOT CLAIMED
   - command: manual continuation contract review against CONTEXT_HANDOFF.md and ANTI_STALL_AND_EXECUTION_BUDGET.md
     result: PASS
     evidence: checkpoint per meaningful subtask/material event, pre-heavy checkpoint, ready/waiting/blocked plus one next_action, ROTATE/new-window resume without chat
+  - command: GitHub Actions on 1ee5dc4f3801fb0b0a956acc0c62a548705d7411
+    result: PASS
+    evidence: CI success; Track A agent runtime governance success
 blockers: []
-next_action: inspect PR 821 exact-head workflow/check state and obtain or record the required fresh independent prompt review before readiness
+next_action: verify CI and Track A agent runtime governance on the new exact PR 821 head, then perform ready/merge closeout if no material review finding exists
 ```

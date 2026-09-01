@@ -14,7 +14,7 @@ branch: docs/OTC-20260901-vision-p2-coordinator
 base_branch: main
 base_main: 21fedc04809f0f78a1ff673edb2804a83ab5fedb
 created: 2026-09-01T15:45:26+02:00
-updated_at: 2026-09-01T16:08:42+02:00
+updated_at: 2026-09-01T16:13:30+02:00
 risk: high
 execution_class: github_coordination
 execution_mode: chat_github
@@ -24,6 +24,21 @@ task_completion_policy: finalize_archive_and_continue
 prompting_standard_version: 2.1
 policy_version: 2
 runtime_access: none
+track_a_runtime_agent_admission_version: 1
+routing_contract: docs/agents/programs/OTCLIENT_TIBIA_RE_HYBRID_EXECUTION_ROUTING.md
+execution_class: github_hosted
+persistent_session_role: none
+physical_e2e_required: false
+runtime_owner_task: NOT_APPLICABLE
+runtime_namespace: NOT_APPLICABLE
+canonical_registration: NOT_APPLICABLE
+canonical_lease_generation: NOT_APPLICABLE
+registration_lease_generation: NOT_APPLICABLE
+gate_a: NOT_APPLICABLE
+generation_rebind: NOT_APPLICABLE
+gate_b: NOT_APPLICABLE
+bootstrap: NOT_APPLICABLE
+target_uniqueness: NOT_APPLICABLE
 mutation_authorized: false
 credentials_allowed: false
 login_allowed: false
@@ -53,14 +68,14 @@ related_prs:
 current_blocker: none
 next_action: publish the final Wave 0 checkpoint, refresh PR #824, run exact-head governance/CI plus proportional fresh docs audit, and merge only if every gate passes
 invocation_started_at: 2026-09-01T15:35:00+02:00
-last_progress_at: 2026-09-01T16:08:42+02:00
+last_progress_at: 2026-09-01T16:13:30+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: draft
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 0
+repair_cycles_for_current_gate: 1
 context_reconstruction_attempts: 0
 stall_warnings: 0
 ---
@@ -109,11 +124,11 @@ proven:
 derived:
   - Wave 1 can use disjoint lane-local modules after PR 824 merges, while any shared Control Center integration files remain exclusive to CONTROL-BRIDGE.
 unknown:
-  - final exact-head required CI and independent/proportional docs-audit result after this checkpoint is published.
+  - final exact-head required CI and independent/proportional docs-audit result after the admission-field remediation is published.
 conflicts: []
 first_failure:
-  marker: FINAL-EXACT-HEAD-GATES-PENDING
-  evidence: final checkpoint commit has not yet emitted its exact-head required checks.
+  marker: TRACK-A-ADMISSION-MISSING-FIELDS
+  evidence: exact head 313415e124941cac4c07599d6d4c94acadb950a1 failed governance run 33517851944 job 99889308745 because the coordinator task omitted ten mandatory runtime_access=none admission fields; local reproduction matched exactly.
 rejected_hypotheses:
   - direct Codex CLI dispatch is available on Molehill-PC: codex executable is not installed on the connected host.
   - the older 52109920 / ed5469... fence is current Phase 2 identity authority: superseded by current mandatory contracts and PR 754/CHANGELOG evidence.
@@ -138,7 +153,7 @@ validation:
     result: PASS
     evidence: no whitespace errors in Wave 0 lifecycle delta.
 blockers: []
-next_action: publish the final Wave 0 checkpoint, refresh PR #824, run exact-head governance/CI plus proportional fresh docs audit, and merge only if every gate passes.
+next_action: publish the admission-field remediation, rerun exact-head governance/CI plus proportional fresh docs audit, and merge PR #824 only if every gate passes.
 ```
 
 ## Planned Wave 1 ownership

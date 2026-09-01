@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "benchmark_id": "OTC-20260901-codex-model-effort-benchmark",
+  "recorded_at": "2026-09-01T22:22:39+02:00",
+  "repository": "blakinio/otclient",
+  "target": {
+    "pr": 827,
+    "worker_alias": "OTC-VISION-P2-CAPTURE-EDGE",
+    "head_sha": "53b6a7e515c0cd6820857f7910368cdbb0e1978d",
+    "frozen_base_sha": "fb0c489f2ed166e872c4f197c6a78375a8576685",
+    "snapshot_fetched_at": "2026-09-01T19:28:07.614737Z",
+    "role": "auditor",
+    "changed_files": 4,
+    "context_budget_primary_files": 5,
+    "checks": [
+      {"name": "CI", "run_id": 33546190410, "result": "SUCCESS"},
+      {"name": "Track A agent runtime governance", "run_id": 33546190253, "result": "SUCCESS"}
+    ],
+    "unresolved_review_threads": 0
+  },
+  "runs": [
+    {"model": "luna", "effort": "medium", "session": "01a05e72-e50f-7b51-a5cb-57835f87eb76", "tokens": 55832, "elapsed_s": 60.586, "confirmed_code_findings": ["CB-1"]},
+    {"model": "luna", "effort": "high", "session": "01a05e90-b6d1-7441-b20b-9f78ee1e2343", "tokens": 70595, "elapsed_s": 153.242, "confirmed_code_findings": ["CB-2"]},
+    {"model": "luna", "effort": "xhigh", "session": "01a05e93-57bb-78b2-9699-0f92f1b35404", "tokens": 118931, "elapsed_s": 272.649, "confirmed_code_findings": ["CB-1", "CB-2", "CB-3"], "other_confirmed_findings": ["LB-1"]},
+    {"model": "terra", "effort": "medium", "session": "01a05e73-fb1f-73e1-8a65-f81be423cc51", "tokens": 28893, "elapsed_s": 33.451, "confirmed_code_findings": []},
+    {"model": "terra", "effort": "high", "session": "01a05e97-b93b-78f2-b0f2-07fad9b35fd6", "tokens": 57039, "elapsed_s": 59.864, "confirmed_code_findings": ["CB-1"], "false_positives": ["FP-1"]},
+    {"model": "terra", "effort": "xhigh", "session": "01a05e99-14b9-7d90-8c25-b682105c9711", "tokens": 69124, "elapsed_s": 120.038, "confirmed_code_findings": ["CB-1"]},
+    {"model": "sol", "effort": "medium", "session": "01a05e74-ae95-7492-9b87-9b07dec6da1c", "tokens": 56921, "elapsed_s": 81.234, "confirmed_code_findings": ["CB-2", "CB-3"]}
+  ],
+  "adjudication": {
+    "CB-1": {
+      "result": "CONFIRMED",
+      "summary": "ReviewedSecretMaskPolicy is caller-constructible and does not itself prove authoritative review of the supplied regions.",
+      "reproduction_marker": "LUNA_POLICY_PUBLIC_CONSTRUCTION=PASS"
+    },
+    "CB-2": {
+      "result": "CONFIRMED",
+      "summary": "Directly constructed CaptureEvidence with secret_safe=true can become SecretSafeCapture when hash/binding/freshness checks pass, without proving reviewed producer issuance.",
+      "reproduction_marker": "SOL_FORGED_EVIDENCE_ACCEPTED=PASS"
+    },
+    "CB-3": {
+      "result": "CONFIRMED",
+      "summary": "source_monotonic_ns is assigned after capture/preprocessing/rechecks, allowing sufficiently old pixels to appear fresher than acquisition time.",
+      "reproduction_marker": "SOL_POST_CAPTURE_TIMESTAMP_ACCEPTED=PASS"
+    },
+    "LB-1": {
+      "result": "CONFIRMED_LIFECYCLE_HYGIENE",
+      "summary": "Task top-level base_main advanced to fb0c489f... while older depends_on/dispatch BASE_MAIN text retained 0fe1ecb...."
+    },
+    "FP-1": {
+      "result": "FALSE_POSITIVE",
+      "summary": "Terra/high claimed local uncommitted task/report modifications, but dispatcher preflight and postflight both reported clean=true."
+    },
+    "TERRA_MEDIUM_CHECKPOINT": {
+      "result": "PARTIAL_LIFECYCLE_ONLY",
+      "summary": "Checkpoint/head wording was not current-HEAD terminal evidence, but the verified parent snapshot proved current-head CI/governance and the task explicitly used implementation-head-before-checkpoint-docs semantics."
+    }
+  },
+  "efficiency": {
+    "confirmed_findings_per_100k_tokens": {
+      "sol_medium": 3.51,
+      "luna_xhigh": 2.52,
+      "luna_medium": 1.79,
+      "terra_high": 1.75,
+      "terra_xhigh": 1.45,
+      "luna_high": 1.42,
+      "terra_medium": 0.0
+    },
+    "pair_comparison": {
+      "sol_medium_plus_luna_medium_tokens": 112753,
+      "sol_medium_plus_luna_medium_elapsed_s_sequential": 141.82,
+      "sol_medium_plus_luna_medium_confirmed_coverage": "3/3",
+      "luna_xhigh_tokens": 118931,
+      "luna_xhigh_elapsed_s": 272.649,
+      "luna_xhigh_confirmed_coverage": "3/3"
+    }
+  },
+  "provisional_routing": [
+    "Use Luna low/medium or Terra medium for narrow docs/status/lifecycle work.",
+    "Use Terra medium for routine implementation/debugging; escalate to Terra high when justified.",
+    "Prefer Sol medium for safety/security/provenance/secret-boundary review on evidence similar to this benchmark.",
+    "For high-confidence safety review, consider independent Sol medium plus Luna medium before a single Luna xhigh pass.",
+    "Treat Luna xhigh as exceptional maximum-recall work, not a default.",
+    "Do not default Terra xhigh from this benchmark; Terra high had the same confirmed code recall more cheaply.",
+    "Do not default Luna high from this benchmark; it did not improve total confirmed recall over Luna medium.",
+    "Do not infer a universal model ordering from one safety-heavy benchmark."
+  ],
+  "limitations": [
+    "Single real task, safety-heavy rather than representative of all implementation/debugging/documentation work.",
+    "Model outputs are stochastic; one run per model/effort cell does not establish stable medians.",
+    "Sol high/xhigh were not tested in this benchmark.",
+    "Later effort runs reused the original verified GitHub snapshot to preserve prompt identity after live main advanced."
+  ]
+}

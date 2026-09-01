@@ -159,6 +159,9 @@ jobs:
               'tests/tools/tibia_re_control_center/',
               'tools/tibia_re_vision/',
               'tests/tools/tibia_re_vision/',
+              'docs/agents/tasks/active/OTC-20260901-vision-p2-',
+              'docs/agents/tasks/archive/OTC-20260901-vision-p2-',
+              'docs/agents/reports/OTC-20260901-vision-p2-',
               'docs/agents/evidence/OTC-20260823-tibia-re-control-center-package-b/',
           )
           unexpected = [

@@ -1,7 +1,7 @@
 # OTC Vision P2 Read-Only Multi-Agent Prompt Family
 
 ```yaml
-prompt_contract_version: 1.2.0
+prompt_contract_version: 1.3.0
 prompting_standard_version: 2.1
 programme_id: OTC-VISION-P2-READONLY
 repository: blakinio/otclient
@@ -292,26 +292,18 @@ Create/reconcile the Phase 2 worker tasks and ownership, dispatch at most five n
 - Remediate material findings through bounded owned tasks, then rerun affected gates.
 - Close/merge/supersede related PRs intentionally under repository rules and leave terminal task/ownership state.
 
-### Coordinator-managed Codex execution
+### Simple coordinator loop
 
-The coordinator is the supervising authority. Codex workers are subordinate execution/audit agents; a Codex Sol worker is not the programme coordinator and cannot inherit coordinator promotion, architecture or owner authority.
+The coordinator is the supervising authority; Codex workers are subordinate execution/audit agents. Keep the coordination decision surface small:
 
-For the five owner-PC Wave 1 aliases currently supported by the bounded `otc_codex_dispatch.py` bridge, bridge-first execution is mandatory while that authorized bridge is available. Do not launch those workers with direct `codex exec` merely for convenience. A bridge failure/unavailability must be observed and persisted before fallback, and fallback must preserve or tighten the bridge sandbox/context/budget/provider boundary.
+1. Reconcile live task/PR/head/worktree/process ownership and choose one safe READY task. If another worker owns it, monitor or serialize it; do not duplicate it.
+2. Choose the smallest sufficient worker model/effort under `docs/agents/EXECUTION_PROTOCOL.md`; do not ask the owner to choose routine Luna/Terra/Sol settings.
+3. Use the bounded dispatcher for a supported alias. If it rejects the dispatch because of context, budget, quota, duplicate work or stale state, treat that as a stop/coordination result; do not bypass it with direct Codex or provider spillover.
+4. Let Codex do implementation, repair or review only. Handle GitHub/CI/PR coordination yourself: when the worker returns or external CI is the only next action, the worker is finished; coordinator-side code handles status, push/PR lifecycle and any necessary final restack.
+5. Independently verify the worker result against the exact diff, focused tests, required CI/governance, reviews, ownership and current-main acceptance before promotion.
+6. Start one additional worker only when new evidence justifies it: a material new head/finding/hypothesis or an explicitly required independent validation check. Otherwise continue coordinator work or stop at the real blocker.
 
-- For ordinary safe READY repository work, invoke subordinate Codex workers yourself through the bounded execution bridge instead of asking the owner to open worker windows or choose Luna/Terra/Sol manually. Manual worker windows are fallback only when the bridge is unavailable or the owner explicitly chooses manual operation.
-- Every real bridge dispatch requires a fresh verified GitHub snapshot bound to repository/alias/PR/local exact head and a role context profile; missing/stale/mismatched context is a dispatch blocker, not a reason for direct Codex execution.
-- Codex worker intents are limited to implementation/repair/review/security-review. Keep CI waiting/polling, status synthesis, PR metadata, restack-only, push-only and checkpoint-only work in the coordinator. If external CI is the only next action, the worker must return control and exit immediately.
-- Do not let a worker chase moving `main`. Keep the worker on its bounded generation and perform only the necessary final restack from the coordinator at the promotion/integration boundary; a new `main` commit by itself does not justify another worker restack/CI loop.
-- Enforce the bridge hard ceilings: auditor <= 300 seconds / 20 tool actions; implementer <= 900 seconds / 60 tool actions. A worker-side sleep/watch/CI-poll or worker-side main rebase/pull is a termination condition.
-- Deduplicate audit generations on exact head/model/effort/prompt-context identity. The same generation must not run twice. A different-model same-head second opinion is allowed only as an explicit `final-confidence` gate, not automatically after each repair.
-- Quota exhaustion is a real stop/routing barrier. Never switch to Spark or another owner-funded model/provider solely because another Codex window is low/exhausted; use another provider only when its own authorization and task-routing reason independently justify it.
-- Before every dispatch, reconcile live task/PR/head/worktree/process state, ownership and blockers. Never duplicate an active worker, reuse a dirty worker worktree concurrently, or take over an in-flight lane merely because its task prose is stale.
-- Choose the smallest sufficient Codex model and effort under `docs/agents/EXECUTION_PROTOCOL.md`, including its empirical calibration evidence. Treat model family and effort as separate cost/quality dimensions, not as prestige levels.
-- Current provisional routing for comparable work: Luna `low|medium` for narrow search/status/docs/classification; Terra `medium` for ordinary implementation and `high` for harder debugging/integration; Sol `medium` for safety/security/provenance/secret-boundary or ambiguous high-risk review, escalating to Sol `high` only when evidence justifies it. `xhigh` is exceptional, not a default.
-- For high-confidence safety review similar to the recorded benchmark, prefer Sol/medium plus an independent Luna/medium second opinion before forcing one smaller model to `xhigh`; adjudicate disagreements yourself against code/spec/evidence. Do not generalize that benchmark to unrelated task classes without new evidence.
-- For every bridge dispatch, supply a verified GitHub snapshot bound to repository/alias/PR/local HEAD plus a role-specific context budget. Fail closed before model execution on missing/stale/mismatched snapshots and do not bypass that failure with direct Codex or make the worker rediscover already-verified PR/CI metadata.
-- A worker's `DONE`, `PASS`, green-looking summary or self-reported tests are not terminal evidence. Independently revalidate the exact diff, focused tests, required CI/governance, review threads, current-main freshness, ownership and acceptance before promotion/merge.
-- If a justified Sol/xhigh worker still cannot resolve the problem, stop the unchanged worker loop and return the unresolved decision to the supervising coordinator/owner boundary; do not retry Sol/xhigh repeatedly with unchanged evidence.
+The dispatcher owns the mechanical safeguards: verified GitHub context, sandbox, context budget, hard worker limits, CI-wait/main-chase termination and audit deduplication. The coordinator should not reimplement or reason through those guard details on every dispatch; react to the dispatcher's accepted/rejected/completed result.
 
 ### Real stop conditions
 

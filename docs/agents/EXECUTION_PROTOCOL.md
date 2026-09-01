@@ -281,6 +281,8 @@ Prefer Chat plus the GitHub connector for repository state inspection, coordinat
 
 Do not spend Codex capacity on waiting, status polling, repeated preflight, prompt generation, or general coordination.
 
+Keep the coordinator decision surface small: select task, select the smallest sufficient model/effort, dispatch, then verify the result. The bounded dispatcher owns per-run snapshot/sandbox/context/budget/dedup/wait guards; the coordinator should react to its result instead of manually reimplementing those mechanics.
+
 ### Codex worker cost-control guard
 
 When a repository/owner environment provides a bounded dispatcher for the selected worker alias, that dispatcher is the normal mandatory execution path. Do not bypass a healthy dispatcher with direct `codex exec`. If the dispatcher is genuinely unavailable or fails before model execution, persist the exact failure/reason before any fallback; a fallback may not silently widen sandbox, context, model/provider, effort, runtime authority or ownership.

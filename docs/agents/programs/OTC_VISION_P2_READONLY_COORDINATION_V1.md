@@ -7,7 +7,7 @@ repository: blakinio/otclient
 project_lane: otclient
 track_id: official-client-re
 phase: phase_2_runtime_edge_read_only
-prompt_contract_version: 1.2.0
+prompt_contract_version: 1.3.0
 prompting_standard_version: 2.1
 policy_version: 2
 promotion_authority: coordinator_only
@@ -56,32 +56,20 @@ The older `OTCLIENT_TIBIA_RE_PARALLEL_RUNTIME_AGENT_PROMPTS_V1.md` is a structur
 
 ## Worker set
 
-| Alias | Mission | Default task shape | Recommended agent | Effort |
-|---|---|---|---|---|
-| `OTC-VISION-P2-COORDINATOR` | programme control, Codex worker dispatch, review, integration, barriers and closeout | autonomous programme | Chat/GitHub supervising coordinator; invokes subordinate Codex workers for execution/audit | xhigh coordinator reasoning; worker model/effort dynamic |
-| `OTC-VISION-P2-RUNTIME-ADMISSION` | exact Synology/Kasm/runtime/client identity and read-only admission | discovery-first -> validation | Codex | xhigh |
-| `OTC-VISION-P2-CAPTURE-EDGE` | secret-safe read-only screenshot/crop/hash producer | phased implementation | Codex | high |
-| `OTC-VISION-P2-RUNTIME-SIGNALS` | reviewed current runtime-signal provenance/freshness adapters | discovery-first -> implementation | Codex | xhigh |
-| `OTC-VISION-P2-EDGE-TRANSPORT` | authenticated bounded runtime-edge transport with no authority expansion | phased implementation | Codex | high |
-| `OTC-VISION-P2-CONTROL-BRIDGE` | connect edge state/capture/heartbeat to existing Control Center/session backend | phased implementation | Codex | high |
-| `OTC-VISION-P2-VISION-RECONCILIATION` | real capture -> Qwen VisualEvidence -> deterministic runtime reconciliation | integration | Codex | xhigh |
-| `OTC-VISION-P2-E2E-AUDIT` | fresh independent falsification and Phase 2 E2E/audit | audit/e2e | fresh Codex validator | xhigh |
+The programme still has exactly eight aliases: one supervising coordinator, five Wave 1 bounded producers, one reconciliation worker and one fresh E2E/audit validator. Exact missions remain defined in the canonical prompt family and alias registry.
 
-Effort is a quality recommendation, not an authority field. Model/provider use remains governed by current trusted-base owner-funded-AI rules. Do not infer direct Spark authorization from this document.
+Worker model/effort is dynamic and comes from `EXECUTION_PROTOCOL.md`; this coordination overview intentionally carries no per-alias effort table.
 
-### Coordinator-managed Codex dispatch
+### Simple coordinator dispatch
 
-The coordinator owns worker dispatch as part of the same owner invocation. When an authorized bounded Codex bridge/tool is available for an alias, it MUST select and invoke the subordinate worker through that bridge rather than direct `codex exec` or asking the owner to choose a model/effort. Manual worker windows/direct fallback are allowed only after a real bridge unavailability/failure is persisted or when the owner explicitly requests manual operation.
+1. Reconcile live ownership/state and select one safe task.
+2. Choose the smallest sufficient model/effort from `EXECUTION_PROTOCOL.md`.
+3. Dispatch supported aliases through the bounded bridge and accept its guard result; do not reproduce bridge internals in coordinator reasoning.
+4. Keep CI/status/PR lifecycle and final restack on the coordinator side; a worker ends when external waiting begins.
+5. Verify the returned worker result independently before promotion.
+6. Dispatch another worker only for materially new evidence/head/hypothesis or an explicitly required independent final-confidence check.
 
-Before dispatch, reconcile live task/PR/head/worktree/process state and ownership; do not duplicate an active worker or concurrently reuse a dirty worktree. Choose the smallest sufficient Codex model/effort using `EXECUTION_PROTOCOL.md` and its empirical benchmark evidence, provide verified bounded PR/CI context when supported, and independently verify worker results before classification/promotion. Codex workers never inherit coordinator authority merely because the selected family is Sol.
-
-For safety/security/provenance/secret-boundary work similar to the recorded benchmark, Sol/medium is a preferred first high-quality audit route and an independent Luna/medium may be added for higher confidence before expensive single-worker `xhigh`. These are provisional benchmark tie-breakers, not a global ranking. Terra/high remains a justified harder implementation/debug route; Terra/xhigh and Luna/xhigh are not automatic escalation steps.
-
-### Cost-control invariants
-
-For a bridge-supported Wave 1 alias, the coordinator uses the bounded owner-PC dispatcher while it is available and records any genuine bridge failure before fallback. Direct Codex execution may not widen sandbox/context/budget or bypass the required verified GitHub snapshot.
-
-Codex is never a CI/status/restack/checkpoint poller. External waiting releases the worker immediately. Moving `main` is reconciled by the coordinator, with one necessary final promotion-boundary restack rather than worker-side restack loops. The same exact-head audit generation is not repeated; a different-model same-head second opinion is reserved for explicit final confidence. Bridge hard ceilings are auditor 300s/20 tool actions and implementer 900s/60 tool actions. Quota exhaustion is a stop/routing barrier, not permission to consume Spark or another provider.
+The bounded dispatcher owns verified-context validation, sandbox/context limits, hard worker budgets, wait/main-chase termination and exact-generation audit deduplication. Quota/provider limits remain stop/routing barriers and do not create provider authority.
 
 ## Dependency graph and waves
 

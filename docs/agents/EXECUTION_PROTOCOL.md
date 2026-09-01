@@ -299,6 +299,15 @@ When supported by the task/executor schema, persist `worker_model_family`, `work
 
 If a justified `Sol/xhigh` attempt still cannot resolve the task safely, or the remaining decision requires architecture, governance, safety or owner authority, stop the worker loop and escalate to the supervising Chat/owner. Do not invent an effort above `xhigh`, repeatedly retry Sol/xhigh with unchanged evidence, or let an implementation worker silently make the supervisory decision.
 
+
+#### Empirical calibration evidence
+
+Repository benchmark evidence may refine the model/effort choice when it is genuinely comparable to the current task, but it does not replace the smallest-sufficient-model rule above. The current benchmark record is docs/agents/reports/OTC-20260901-codex-model-effort-benchmark.md with machine-readable results under docs/agents/evidence/OTC-20260901-codex-model-effort-benchmark/results.json.
+
+The first recorded benchmark is one safety-heavy audit target, so treat its conclusions as provisional tie-breakers rather than a global ranking. On that target, Sol/medium produced the best confirmed-finding/token ratio; Luna/xhigh achieved the highest single-run recall at much higher token/time cost; Terra/high improved materially over Terra/medium while Terra/xhigh added cost without recall gain; and independent Sol/medium plus Luna/medium covered all confirmed code findings with lower token/time cost than Luna/xhigh.
+
+For safety/security/provenance/secret-boundary review similar to that benchmark, a coordinator may prefer Sol/medium and, when higher confidence is required, an independent Luna/medium second opinion before escalating one worker to very high effort. Do not generalize this to ordinary implementation/debugging/docs until additional representative benchmarks exist.
+
 ## Failure and takeover
 
 Before any operation that may run for a long time or fail silently, checkpoint first and use a bounded timeout when the tool supports it.

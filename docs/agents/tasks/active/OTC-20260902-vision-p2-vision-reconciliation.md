@@ -12,9 +12,9 @@ task_kind: implementation
 phase: wave_2_trusted_reconciliation
 branch: feat/OTC-20260902-vision-p2-vision-reconciliation
 base_branch: main
-base_main: 27f9bdd5f003c596529e7571343ae8bb053d5cff
+base_main: a7c7eb8aa2cc69d70442578401d88be9262055e4
 created: 2026-09-02T10:46:00+02:00
-updated_at: 2026-09-02T14:26:00+02:00
+updated_at: 2026-09-02T17:05:30+02:00
 risk: high
 feature_scope:
   type: infrastructure
@@ -83,12 +83,12 @@ depends_on:
   - lifecycle closeout PR #855 merged as main 8441fc1cce1600033b505d68ebc5c0141b337394
 blocks:
   - OTC-VISION-P2-E2E-AUDIT
-current_blocker: post_qwen_repair_sync_exact_head_actions_pending
-next_action: push the post-Qwen-repair synchronized generation, require fully terminal exact-head GitHub Actions, then issue a fresh coordinator classification before Wave 3 restack
+current_blocker: post_admission_only_sync_exact_head_actions_pending
+next_action: push the post-admission-only synchronized generation, require terminal exact-head Actions, then issue a fresh coordinator classification before Wave 3 restack
 invocation_started_at: 2026-09-02T10:46:00+02:00
 last_progress_at: 2026-09-02T14:26:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: post_qwen_repair_sync_pending
+ci_check_generation: post_admission_only_sync_pending
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -174,15 +174,15 @@ Fresh synchronized validation passes the Wave 2 matrix `90/90`, runtime admissio
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-02T12:26:00Z
-head: 4ed086bd77f2b07559ca0a29d3e653d96f263985
+updated_at: 2026-09-02T15:05:30Z
+head: 1768fac6b3f17634aa9c0bbbb02c9d475e5bf7f9
 branch: feat/OTC-20260902-vision-p2-vision-reconciliation
 pr: 856
 status: waiting
 context_routes:
-  - docs/agents/programs/OTC_VISION_P2_READONLY_COORDINATION_V1.md
   - tools/tibia_re_control_center/vision_p2_trusted_composition.py
-  - tools/tibia_re_control_center/agent_vision.py
+  - tools/tibia_re_control_center/agent_edge_bridge.py
+  - tests/tools/tibia_re_control_center/test_vision_p2_trusted_composition.py
   - docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
 owned_paths:
   - docs/agents/tasks/active/OTC-20260902-vision-p2-vision-reconciliation.md
@@ -191,37 +191,34 @@ owned_paths:
   - tests/tools/tibia_re_control_center/test_vision_p2_trusted_composition.py
   - .github/workflows/tibia-re-control-center-core.yml
 proven:
-  - original Wave 2 implementation remains 811b2d458c49806da2fa177911e6110318d28f96 with TDD RED 04c26ab3dc13851d1e1a789a8378e10324669ce6
-  - refreshed pre-Qwen generation a746dbfaa60a129fc3fa2f91e1b1e48038837a4a was coordinator-accepted under review 5089081225 with all five associated workflows SUCCESS
-  - Qwen schema repair PR 859 merged to trusted main 27f9bdd5f003c596529e7571343ae8bb053d5cff
-  - trusted main 27f9bdd5f003c596529e7571343ae8bb053d5cff merged into Wave 2 with one workflow conflict only; resolution preserves both exact one-time exceptions and broadens no prefix
-  - Wave 2 one-time Package A exception is rebound only to exact branch repo and new base 27f9bdd5f003c596529e7571343ae8bb053d5cff while the merged Qwen exception retains its historical base
-  - committed post-Qwen sync head 4ed086bd77f2b07559ca0a29d3e653d96f263985 has merge-base exactly 27f9bdd5f003c596529e7571343ae8bb053d5cff
-  - PR diff versus new main is exactly five paths: Wave 2 seam test task report and Package A workflow boundary
-  - post-sync Wave 2 reconciliation edge-bridge session trusted-composition matrix passes 90 of 90 tests
-  - current runtime-admission suite passes 14 of 14 and current-client fence test passes
-  - Qwen static prompt/schema contract tests pass 3 of 3 on the synchronized generation
-  - frozen vision benchmark passes 34 of 34 after the sync
-  - changed modules compile Ruff I/F passes YAML parses and git diff check passes
-  - exact Package A boundary simulation passes for branch repo base and rejects wrong base wrong branch and fork
-  - deterministic Track A runtime governance and task checkpoint validator pass
-  - direct Codex worker or reviewer invocations remain zero
-  - runtime_access remains none and physical action budget/count remain zero
+  - original Wave 2 implementation remains 811b2d458c49806da2fa177911e6110318d28f96 with RED 04c26ab3dc13851d1e1a789a8378e10324669ce6
+  - prior accepted Wave 2 generation is 34fbf6e2d693058ce03a583087816b25639e9cb3 under coordinator review 5090102633
+  - admission-only repair PR 860 merged to trusted main a7c7eb8aa2cc69d70442578401d88be9262055e4
+  - main a7c7eb8aa2cc69d70442578401d88be9262055e4 merged into Wave 2 with one test-only conflict
+  - test conflict resolution preserves Wave 2 reconciliation imports and both admission-only guards
+  - Wave 2 Package A exception is rebound only to exact new base a7c7eb8aa2cc69d70442578401d88be9262055e4
+  - historical Qwen and admission-only one-time exceptions retain their original exact bases
+  - post-sync merge-base is exactly a7c7eb8aa2cc69d70442578401d88be9262055e4
+  - PR diff versus current main remains exactly five Wave 2 integration paths
+  - post-sync Wave 2 reconciliation edge-bridge session trusted-composition matrix passes 92 of 92
+  - current runtime-admission suite passes 14 of 14
+  - admission-only focused guards pass 2 of 2 and current-client fence passes
+  - changed production/test modules compile and Ruff I/F plus git diff check pass
+  - runtime_access remains none physical action count zero and direct Codex usage zero
 derived:
-  - Qwen prompt repair changes the sensor contract but does not alter Wave 2 reconciliation authority semantics
-  - Wave 3 must audit the post-Qwen synchronized Wave 2 generation rather than a746dbfaa or earlier generations
+  - admission-only authority repair changes the trusted bridge boundary but not Wave 2 reconciliation semantics
+  - Wave 3 must audit the synchronized post-860 Wave 2 generation
 unknown:
-  - exact-head GitHub Actions result for the final post-Qwen synchronization checkpoint
-  - fresh Wave 3 read-only physical E2E and independent audit result
+  - exact-head GitHub Actions result for this synchronized generation
+  - fresh remaining Wave 3 live reconcile_vision result
 conflicts:
   - none
 first_failure:
-  marker: merging main after PR 859 produced a content conflict only between two one-time Package A boundary blocks
-  evidence: conflict was confined to tibia-re-control-center-core.yml and resolved by preserving both exact exceptions with the Wave 2 base rebound to 27f9bdd5f003c596529e7571343ae8bb053d5cff
+  marker: merging main after PR 860 produced one content conflict in trusted-composition tests
+  evidence: conflict was import-only and resolved by retaining Wave 2 reconciliation imports plus new admission-only imports
 rejected_hypotheses:
-  - Qwen repair requires Wave 2 reconciliation production changes: rejected by 90 of 90 Wave 2 tests plus 3 of 3 Qwen contract tests and frozen benchmark 34 of 34
-  - Package A must gain a broad 20260902 prefix: rejected because exact task/report branch repo base fencing passes positive and negative controls
-  - old a746dbfaa generation remains sufficient for Wave 3: rejected because trusted main changed the production Qwen sensor contract that Wave 3 must retest
+  - reconciliation production repair required: rejected by 92 of 92 Wave 2 matrix
+  - broad Package A documentation prefix required: rejected by exact branch repo base exception design
 changed_paths:
   - docs/agents/tasks/active/OTC-20260902-vision-p2-vision-reconciliation.md
   - docs/agents/reports/OTC-20260902-vision-p2-vision-reconciliation.md
@@ -231,23 +228,14 @@ changed_paths:
 validation:
   - command: Wave 2 reconciliation edge bridge session trusted composition matrix
     result: PASS
-    evidence: 90 tests OK on post-Qwen sync tree
-  - command: runtime admission plus current-client fence
+    evidence: 92 tests OK on post-860 sync tree
+  - command: runtime admission plus admission-only guards and current-client fence
     result: PASS
-    evidence: 14 tests OK and TRACK_A_CANONICAL_CURRENT_CLIENT_FENCE=PASS
-  - command: Qwen focused schema contract plus frozen vision benchmark
-    result: PASS
-    evidence: 3 focused tests and 34 benchmark tests OK
-  - command: py_compile Ruff I/F YAML parse and git diff check
+    evidence: 14 admission tests and 2 focused guards OK; current-client fence PASS
+  - command: py_compile Ruff I/F and git diff check
     result: PASS
     evidence: all returned zero
-  - command: exact Package A boundary positive and negative controls
-    result: PASS
-    evidence: exact branch repo new base returns RC 0; wrong base wrong branch and fork each return RC 1
-  - command: Track A runtime governance plus checkpoint validator
-    result: PASS
-    evidence: TRACK_A_AGENT_RUNTIME_GOVERNANCE_PASS=true and checkpoint validated
 blockers:
-  - final exact-head GitHub Actions for the post-Qwen synchronized generation are pending
-next_action: push the post-Qwen synchronization checkpoint and require terminal exact-head GitHub Actions before fresh coordinator ACCEPT and Wave 3 restack
+  - final exact-head GitHub Actions for this synchronized generation are pending
+next_action: push this checkpoint and require terminal exact-head Actions before fresh coordinator ACCEPT and Wave 3 restack
 ```

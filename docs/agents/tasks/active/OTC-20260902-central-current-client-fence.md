@@ -14,7 +14,7 @@ branch: feat/OTC-20260902-central-current-client-fence
 base_branch: main
 base_main: 30fc46ce4dbff96d2484e624a58fcd85f2a9ecad
 created: 2026-09-02T21:16:00+02:00
-updated_at: 2026-09-02T22:35:33+02:00
+updated_at: 2026-09-02T22:41:57+02:00
 risk: medium
 execution_class: repository_only
 execution_mode: chat
@@ -29,14 +29,14 @@ continuation_policy: continue_until_real_stop
 task_completion_policy: return_to_coordinator_for_classification
 policy_version: 2
 invocation_started_at: 2026-09-02T22:18:00+02:00
-last_progress_at: 2026-09-02T22:35:33+02:00
-ci_checks_for_current_head: 0
-ci_check_generation: draft
+last_progress_at: 2026-09-02T22:41:57+02:00
+ci_checks_for_current_head: 1
+ci_check_generation: 7284ecb6c5db4e382c50d1761eb5b5c5f6a1e7e5
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 1
+repair_cycles_for_current_gate: 2
 context_reconstruction_attempts: 0
 stall_warnings: 0
 package_a_exception_head: 5bc0b88152ccdd5d2ab32f2a65f0dca688880567
@@ -70,8 +70,8 @@ physical_action_count: 0
 owner_funded_ai_api_authorized: false
 red_head: 8d0bccbdc57e1d34f164eaa48a734be7fe47d2f6
 implementation_head: 30879f705cfeaf84567356b8f90e35cb886af822
-current_blocker: pr_862_exact_head_ci_after_canonical_governance_gate_repair_pending
-next_action: validate and publish the narrow canonical-live governance gate repair, then require a new terminal exact-head GitHub Actions generation and independent exact-diff scope audit before Ready/merge
+current_blocker: pr_862_exact_head_ci_after_single_ruff_typeerror_repair_pending
+next_action: publish the TDD Ruff TRY004 repair, then require one new terminal exact-head GitHub Actions generation plus fresh independent validator jobs before Ready/merge
 owned_paths:
   - docs/agents/contracts/TRACK_A_CURRENT_CLIENT_FENCE_V1.json
   - tools/tibia_re_control_center/current_client_fence.py
@@ -118,14 +118,14 @@ Replace duplicated active current-client identity constants with one strict cano
 - `approved_history` is reconciliation-source-only; it never admits a historical build as current.
 - Build-specific semantic/offset/QMeta workflows stay pinned until separately revalidated.
 - No runtime observation, login, GUI input, process control, memory read or client mutation occurs in this repository-only task.
-- Direct Codex usage remains zero.
+- One direct read-only Codex Spark audit was attempted only because the bounded dispatcher has no central-fence alias; it exceeded the fixed 300-second budget, produced no result, was terminated, and was not retried.
 
 ## Context checkpoint
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-02T22:26:35+02:00
-head: 5bc0b88152ccdd5d2ab32f2a65f0dca688880567
+updated_at: 2026-09-02T22:41:57+02:00
+head: 7284ecb6c5db4e382c50d1761eb5b5c5f6a1e7e5
 branch: feat/OTC-20260902-central-current-client-fence
 pr: 862
 status: validating
@@ -184,7 +184,7 @@ derived:
   - future ordinary client promotions should update the central manifest instead of each identity consumer
 unknown:
   - centralization Package A exact exception is committed at 5bc0b88152ccdd5d2ab32f2a65f0dca688880567 and exact/wrong-branch/wrong-base/fork controls are proven
-  - Draft PR #862 exists on the exact task branch; exact-head GitHub Actions and independent final audit have not yet completed
+  - Draft PR #862 exact head 7284ecb6c5db4e382c50d1761eb5b5c5f6a1e7e5 passed all inspected Track A gates; Package A/B independent falsification jobs passed, while both full regressions exposed the same single Ruff TRY004 type-classification defect
   - canonical runtime registration remains stale until post-merge metadata reconciliation
   - final Vision P2 live capture Qwen reconcile gate has not run
 conflicts:
@@ -230,11 +230,20 @@ changed_paths:
   - docs/agents/prompts/OTC_20260902_VISION_P2_CENTRAL_FENCE_FINALIZATION_HANDOFF_ALIAS.md
   - docs/agents/prompts/OTC_20260901_VISION_P2_READONLY_ALIASES.md
 validation:
+  - command: GitHub Actions Package A run 33680217924 and Package B run 33680217391 at 7284ecb6c5db4e382c50d1761eb5b5c5f6a1e7e5
+    result: FAIL
+    evidence: both independent falsification jobs passed; Package B browser+CLI E2E passed; both full regressions ran 576 tests successfully (3 skipped), Package A mandatory 65/65 and Package B mandatory 39/39 passed, then both stopped on the same Ruff 0.16.1 TRY004 at tools/tibia_re_control_center/current_client_fence.py:70
+  - command: TDD regression for non-string current_provenance plus exact Ruff 0.16.1 commands
+    result: PASS
+    evidence: new type-error test first failed against ValueError, then passed after the one-line TypeError repair; all 11 current-fence tests pass and both Package A and Package B Ruff command surfaces pass locally with ruff 0.16.1
+  - command: bounded independent Codex Spark exact-diff audit attempt
+    result: BLOCKED
+    evidence: bounded dispatcher does not support the central-fence alias; direct read-only Spark was owner-authorized, exceeded 300 seconds, wrote no result file, was force-terminated, and was not retried
   - command: repaired Track A canonical-live governance inline audit plus central-fence/governance/Package A controls
     result: PASS
     evidence: native-Linux-equivalent inline audit now validates the canonical manifest source instead of copied current literals; central current-fence and agent-runtime governance PASS; Package A exact case PASS and wrong branch/base/fork reject; YAML and diff-check PASS
   - command: GitHub Actions Track A canonical live governance run 33679786551 / job 100413307605
-    result: FAIL_ISOLATED
+    result: FAIL
     evidence: the only failing step required the exact manifest.current tuple to be copied into tracks/ADR/bootstrap/changelog; failure was "tracks: exact client fence missing", contradicting the accepted central-source design while the existing-runtime adoption job passed
   - command: Package A exact branch/base/repository boundary simulation
     result: PASS
@@ -248,12 +257,6 @@ validation:
   - command: exact committed-head Linux/WSL transition/bootstrap/adoption/reconciliation/session/workflow matrix
     result: PASS
     evidence: detached native-LF worktree at 9e049dca821885e2173b9888ccd80345a965a6b4 ran 58 + 11 + 10 + 17 + 14 + 7 = 117 tests, all OK; cleanup refusal was only generated test artifacts in the disposable worktree and it was force-removed afterward
-  - command: Windows Control Center Vision Surveyor focused matrix
-    result: PASS
-    evidence: 66 tests OK
-  - command: Linux transition bootstrap adoption reconciliation canonical-session and Kasm workflow matrix
-    result: PASS
-    evidence: 117 tests OK
   - command: Track A central current-fence and runtime governance
     result: PASS
     evidence: both deterministic gates returned PASS
@@ -264,6 +267,6 @@ validation:
     result: PASS
     evidence: zero active executable copies outside canonical manifest
 blockers:
-  - Draft PR #862 exact-head GitHub Actions and independent final scope audit are pending
-next_action: finish only the exact Package A scope and checkpoint, open one Draft PR, require terminal exact-head CI and merge if accepted; then run existing canonical metadata reconciliation, one fresh Surveyor admission, and the final Vision P2 live E2E
+  - Draft PR #862 needs one new exact-head GitHub Actions generation after the isolated Ruff repair; fresh independent validator jobs on that exact head must remain green
+next_action: push the isolated Ruff repair, require terminal exact-head CI and review hygiene, merge #862 if accepted; then use only existing canonical metadata reconciliation, one fresh Surveyor admission, and the final Vision P2 live E2E
 ```

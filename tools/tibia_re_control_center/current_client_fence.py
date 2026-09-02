@@ -67,7 +67,7 @@ def load_current_client_fence_manifest(
         raise ValueError("manifest schema version invalid")
     current_provenance = raw.get("current_provenance")
     if not isinstance(current_provenance, str):
-        raise ValueError("current provenance invalid")
+        raise TypeError("current provenance invalid")
     provenance_path = PurePosixPath(current_provenance)
     if (
         provenance_path.is_absolute()

@@ -128,6 +128,12 @@ class CurrentClientFenceTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "current provenance"):
                     load_current_client_fence_manifest(self._write(document))
 
+    def test_rejects_non_string_current_provenance_as_type_error(self):
+        document = self._valid()
+        document["current_provenance"] = 123
+        with self.assertRaisesRegex(TypeError, "current provenance"):
+            load_current_client_fence_manifest(self._write(document))
+
     def test_rejects_extra_root_field(self):
         document = self._valid()
         document["unexpected"] = True

@@ -11,11 +11,11 @@ track_id: official-client-re
 task_kind: audit
 phase: wave_3_fresh_audit_e2e
 branch: test/OTC-20260902-vision-p2-e2e-audit
-base_branch: main
+base_branch: feat/OTC-20260902-vision-p2-vision-reconciliation
 base_main: c16d180d336ba8aa9e1656807c79a44e81c15c66
 audited_integration_head: a746dbfaa60a129fc3fa2f91e1b1e48038837a4a
 created: 2026-09-02T11:28:36+02:00
-updated_at: 2026-09-02T13:44:00+02:00
+updated_at: 2026-09-02T13:47:00+02:00
 risk: high
 feature_scope:
   type: infrastructure
@@ -76,9 +76,9 @@ depends_on:
 blocks:
   - Phase 2 completion and merge of PR #856
 current_blocker: fresh_read_only_runtime_admission_pending
-next_action: after committing the refreshed Wave 3 restack, freshly prove the designated Synology container display and exact singleton current-fenced client across all running containers, then persist read_only admission before any screenshot capture model inference or physical E2E observation
+next_action: push the refreshed audit branch and retarget PR 857 onto the accepted Wave 2 branch so the PR diff is audit-only, then freshly prove the designated Synology container display and exact singleton current-fenced client across all running containers before persisting read_only admission
 invocation_started_at: 2026-09-02T11:28:36+02:00
-last_progress_at: 2026-09-02T13:44:00+02:00
+last_progress_at: 2026-09-02T13:47:00+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: refreshed_wave3_restack_pre_admission
 terminal_ci_wait_started_at: null
@@ -140,8 +140,8 @@ A clean result requires exact-head evidence, zero open material findings, a real
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-02T11:44:00Z
-head: 91a6b70a9ce5c64f8e42669b0b641afd8ef4dea8
+updated_at: 2026-09-02T11:47:00Z
+head: 3c8f4f04ad8feea155caa62e9d7b5aab12434e43
 branch: test/OTC-20260902-vision-p2-e2e-audit
 pr: 857
 status: validating
@@ -167,11 +167,15 @@ proven:
   - reviewed trusted fence now matches official client version 15.32.be4f48 size 52105824 sha256 552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1
   - Wave 3 itself has sent no GUI input login credential process-control memory-access packet-capture or mutation command and physical action count remains zero
   - direct Codex worker or reviewer invocations remain zero
+  - committed restack merge-base with accepted Wave 2 is exactly a746dbfaa60a129fc3fa2f91e1b1e48038837a4a
+  - diff from accepted Wave 2 to the committed audit restack is exactly three audit-owned documentation/evidence paths and no implementation path
+  - Package A boundary RED against a main-based stacked diff reports only five documentation paths and no code path
 
 derived:
   - the previous live-client fence mismatch blocker is resolved by merged PR 858 and is no longer a valid reason to refuse a fresh preflight
   - all historical PID window registration and runtime observations must still be treated as stale discovery evidence and revalidated before read_only admission
   - independent model audit remains deferred until complete current-generation physical E2E evidence exists so the constrained quota is not spent twice
+  - changing Package A workflow from this audit would violate implementation_authorized false; retargeting PR 857 onto accepted Wave 2 preserves a truthful audit-only diff instead
 unknown:
   - fresh current Synology container display window client PID and all-running-container uniqueness after this restack
   - fresh read_only runtime-admission result
@@ -186,6 +190,7 @@ rejected_hypotheses:
   - refreshed Wave 2 generation introduces a static Vision P2 regression: security and provenance subset passes 184 of 184 on the restacked tree
   - historical client PID or window evidence can satisfy current admission: trusted runtime contracts require a fresh exact-process and uniqueness proof for every physical session
   - previous fence mismatch remains current: merged PR 858 advances the trusted exact-client fence to the live 15.32.be4f48 tuple
+  - Wave 3 must repair Package A workflow to proceed: rejected; exact diff versus accepted Wave 2 is only three audit-owned paths and a stacked PR base represents that dependency without implementation scope expansion
 changed_paths:
   - docs/agents/reports/OTC-20260902-vision-p2-e2e-audit.md
   - docs/agents/tasks/active/OTC-20260902-vision-p2-e2e-audit.md
@@ -203,7 +208,13 @@ validation:
   - command: initial post-restack Track A governance precheck
     result: FAIL
     evidence: only the ten newly mandatory Wave 3 task admission fields were missing; no production code failure was reported
+  - command: git diff --name-status a746dbfaa60a129fc3fa2f91e1b1e48038837a4a...3c8f4f04ad8feea155caa62e9d7b5aab12434e43
+    result: PASS
+    evidence: exactly three paths are present and all are Wave 3 task report or evidence paths
+  - command: extracted Package A boundary against main-based stacked audit branch
+    result: FAIL
+    evidence: exactly five documentation paths are rejected and no implementation path is outside its declared boundary; this supports retargeting rather than workflow repair by the auditor
 blockers:
-  - fresh physical target proof and read_only admission are required before any screenshot capture model inference or physical E2E observation
-next_action: commit the refreshed restack checkpoint, then freshly prove container display exact client fence and target uniqueness before persisting read_only admission
+  - PR 857 must be retargeted to the accepted Wave 2 branch and fresh physical target proof plus read_only admission are required before any screenshot capture model inference or physical E2E observation
+next_action: push this audit-only stacked checkpoint, retarget PR 857 onto accepted Wave 2, confirm the live three-path audit diff, then freshly prove container display exact client fence and target uniqueness before persisting read_only admission
 ```

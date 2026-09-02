@@ -75,3 +75,8 @@ A fresh static security/provenance matrix on the restacked tree passes **184/184
 The earlier `client fence mismatch` section above is historical and no longer current. The trusted fence now matches `15.32.be4f48 / 52105824 / 552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1`. No historical PID/window observation is reused as current admission evidence. The next step is a fresh non-invasive Synology target proof, followed by explicit `read_only` admission only if ownership/namespace/uniqueness all prove clean.
 
 Direct Codex usage remains `0`; Wave 3 physical action count remains `0`.
+## Audit-only stacked PR representation
+
+After the clean restack commit, `git diff a746dbfaa...3c8f4f04a` contains exactly three Wave 3-owned paths: the audit task, report and `static-preaudit.md`. Running the actual Package A boundary against a main-based stacked diff produced a RED consisting only of five documentation paths (the two inherited Wave 2 docs plus the three Wave 3 docs); no implementation path violated the boundary.
+
+Wave 3 is explicitly `implementation_authorized:false`, so it will not modify Package A workflow to whitelist itself. PR #857 is instead retargeted onto the accepted Wave 2 branch, making the GitHub PR diff match the task's real ownership and dependency. This is representation/lifecycle correction, not a safety-gate bypass; physical E2E still requires fresh Track A `read_only` admission.

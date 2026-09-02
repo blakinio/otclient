@@ -229,16 +229,24 @@ class _RuntimeAuthorityRegistry:
         max_age_ms: int,
     ) -> _IssuedRuntimeAuthority:
         configuration = self._configuration
-        if (
+        resolver_is_typed = type(resolver) is RuntimeSignalResolver
+        admission_only = (
             configuration is None
-            or self._configuration_signature is None
-            or type(resolver) is not RuntimeSignalResolver
-            or resolver._clock_domain_id != configuration.clock_domain_id
-            or resolver._max_age_ns != configuration.max_age_ns
-            or _contract_signature(tuple(resolver._contracts.values()))
-            != self._configuration_signature
-            or resolver._current_binding != binding
-        ):
+            and resolver_is_typed
+            and not resolver._contracts
+            and resolver._current_binding == binding
+        )
+        configured_runtime = (
+            configuration is not None
+            and self._configuration_signature is not None
+            and resolver_is_typed
+            and resolver._clock_domain_id == configuration.clock_domain_id
+            and resolver._max_age_ns == configuration.max_age_ns
+            and _contract_signature(tuple(resolver._contracts.values()))
+            == self._configuration_signature
+            and resolver._current_binding == binding
+        )
+        if not admission_only and not configured_runtime:
             raise ValidationError(
                 "EDGE_RUNTIME_COMPOSITION_MISMATCH",
                 "runtime authority does not use the composition-owned reviewed resolver configuration",

@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260902-vision-p2-e2e-audit
-status: waiting
+status: investigating
 agent: ChatGPT
 session_role: phase2_auditor
 worker_alias: OTC-VISION-P2-E2E-AUDIT
@@ -30,17 +30,17 @@ continuation_policy: continue_until_real_stop
 task_completion_policy: return_to_coordinator_for_classification
 policy_version: 2
 implementation_authorized: false
-runtime_access: none
-runtime_owner_task: NOT_APPLICABLE
-runtime_namespace: NOT_APPLICABLE
-canonical_registration: NOT_APPLICABLE
+runtime_access: read_only
+runtime_owner_task: OTC-20260902-vision-p2-e2e-audit
+runtime_namespace: 'Synology/otclient-track-a-kasmvnc/display-1/client-28379/start-36180734'
+canonical_registration: ABSENT
 canonical_lease_generation: NOT_APPLICABLE
 registration_lease_generation: NOT_APPLICABLE
 gate_a: NOT_APPLICABLE
 generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
-target_uniqueness: NOT_APPLICABLE
+target_uniqueness: PROVEN
 persistent_session_role: none
 physical_e2e_required: true
 mutation_authorized: false
@@ -67,9 +67,9 @@ depends_on:
   - coordinator review #5090102633 ACCEPT
 blocks:
   - Phase 2 completion and merge of PR #856
-current_blocker: real_edge_transport_e2e_not_exercised
-next_action: when the Molehill-PC execution endpoint is available, freshly re-admit read_only and run one real authenticated outbound Synology-to-Molehill edge transport E2E using the existing production transport/verifier/bridge/composition; accept UNKNOWN if stronger reviewed runtime evidence is unavailable
-last_progress_at: 2026-09-02T15:43:00+02:00
+current_blocker: real_edge_transport_e2e_in_progress
+next_action: commit and push this fresh read_only admission, then run one authenticated Synology-to-Molehill edge handshake with real observation/artifact traffic through existing production transport/verifier/bridge/composition and accept UNKNOWN if stronger runtime evidence is unavailable
+last_progress_at: 2026-09-02T16:14:44+02:00
 physical_action_count: 0
 ---
 
@@ -108,70 +108,63 @@ At this checkpoint Molehill-PC's execution endpoint is offline, so the cross-hos
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-02T13:43:00Z
-head: 497ef7d226ce9d4fc4944b06a51785346f731cc6
+updated_at: 2026-09-02T14:14:44Z
+head: c4fb3a9d00715b357c9ae194ff21c702e15c74ab
 branch: test/OTC-20260902-vision-p2-e2e-audit
 pr: 857
-status: waiting
+status: investigating
 context_routes:
   - docs/agents/programs/OTC_VISION_P2_READONLY_COORDINATION_V1.md
-  - docs/agents/prompts/OTC_20260901_VISION_P2_READONLY_MULTIAGENT.md
   - tools/tibia_re_control_center/agent_edge_transport.py
   - tools/tibia_re_control_center/vision_p2_trusted_composition.py
+  - docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
 owned_paths:
   - docs/agents/tasks/active/OTC-20260902-vision-p2-e2e-audit.md
   - docs/agents/reports/OTC-20260902-vision-p2-e2e-audit.md
   - docs/agents/evidence/OTC-20260902-vision-p2-e2e-audit/**
 proven:
   - trusted main is 27f9bdd5f003c596529e7571343ae8bb053d5cff and accepted Wave 2 is 34fbf6e2d693058ce03a583087816b25639e9cb3
+  - corrected audit head c4fb3a9d00715b357c9ae194ff21c702e15c74ab passes checkpoint and Track A runtime governance
   - static security and provenance subset passes 184 of 184
-  - fresh exact-target admission and singleton client fence passed before post-Qwen observation
-  - post-Qwen production Kasm capture passed in 8733 ms with deterministic full-frame mask before persistence and zero physical actions
-  - repaired production AgentVisionSensor passed on byte-identical masked physical evidence with visual state UNKNOWN and correct provenance bindings
-  - Qwen residency was empty before and after and task-owned provider cleanup returned the host to API down with zero model processes
-  - edge transport already has production outbound authenticated private-LAN client/channel primitives
-  - trusted composition already has verifier bridge and reconciliation consumers
-  - Phase 2 edge-transport acceptance requires carrying the read-only observation contract end-to-end but does not require a persistent daemon
-  - stronger reviewed runtime evidence is necessary for semantic promotion but its absence may legitimately leave reconciliation UNKNOWN
-  - Molehill-PC Remote Desktop Commander execution endpoint is currently offline
-  - runtime_access is released to none and physical action count remains zero
-  - direct Codex worker or reviewer invocations remain zero
+  - physical secret-safe capture and repaired exact-Qwen AgentVisionSensor already pass with zero physical actions
+  - Molehill-PC is online at private LAN address 192.168.1.154
+  - fresh Synology preflight proves exactly one client across all containers
+  - fresh target is PID 28379 start 36180734 DISPLAY :1.0 XID 0x01e00017 geometry 810 263 1020 650
+  - fresh package is 15.32.be4f48 size 52105824 SHA 552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1
+  - exact trusted client fence passes and canonical registration remains absent
+  - existing edge transport supports authenticated outbound private-LAN connection and authority-neutral observation/artifact traffic
+  - persistent daemon and new runtime-signal producer are not required for this remaining gate
+  - lack of stronger runtime evidence may legitimately reconcile UNKNOWN
+  - physical action count remains zero and direct Codex usage remains zero
 derived:
-  - prior BLOCKED_REAL_DEPLOYMENT_MISSING classification was too broad and is superseded
-  - no new runtime-signal producer should be invented merely to avoid an UNKNOWN reconciliation result
-  - the next safe work is the one missing real authenticated cross-host edge transport E2E using existing production primitives
+  - fresh read_only admission may be granted for the one missing cross-host edge transport observation window
+  - the only current physical gate is real authenticated Synology-to-Molehill transport plus existing trusted consumer path
 unknown:
-  - real Synology-to-Molehill authenticated edge transport E2E result on the current accepted generation
-  - final reconciliation result after that edge path; UNKNOWN is acceptable without stronger reviewed runtime evidence
-  - final independent audit/closeout result
+  - real cross-host handshake observation/artifact receipt result
+  - final reconciliation result after the edge path; UNKNOWN is acceptable without stronger reviewed runtime evidence
+  - final independent closeout result
 conflicts:
   - none
 first_failure:
-  marker: actual authenticated Synology-to-Molehill edge transport path has not yet been exercised in the physical E2E
-  evidence: repository transport tests are green and physical capture/Qwen are green, but no current cross-host edge handshake plus observation/artifact receipt has been recorded
+  marker: authenticated Synology-to-Molehill edge path not yet exercised on this fresh admission
+  evidence: all prerequisites are current but no cross-host frame has yet been accepted in this observation window
 rejected_hypotheses:
-  - a new persistent edge daemon is required before Phase 2 can continue: rejected; acceptance requires end-to-end transport behavior, not daemon lifetime
-  - a new STRUCTURAL_ONLY or REVIEWED_CAUSAL runtime producer is required to complete the transport gate: rejected; lack of stronger runtime evidence may correctly reconcile UNKNOWN
-  - previous Qwen schema failure remains open: rejected by the fresh production AgentVisionSensor physical PASS
+  - new persistent daemon required: rejected by programme acceptance and existing outbound transport primitives
+  - new runtime producer required to avoid UNKNOWN: rejected because stronger evidence is only needed for semantic promotion
 changed_paths:
-  - docs/agents/evidence/OTC-20260902-vision-p2-e2e-audit/post-qwen-live-e2e.md
-  - docs/agents/reports/OTC-20260902-vision-p2-e2e-audit.md
   - docs/agents/tasks/active/OTC-20260902-vision-p2-e2e-audit.md
+  - docs/agents/evidence/OTC-20260902-vision-p2-e2e-audit/fresh-edge-transport-read-only-preflight.md
 validation:
-  - command: post-Qwen physical Kasm full-mask capture and exact-Qwen production sensor
+  - command: fresh exact-target Synology preflight
     result: PASS
-    evidence: capture and AgentVisionSensor both pass with zero physical actions and secret-safe provenance
-  - command: trusted Phase 2 programme and alias acceptance re-read
+    evidence: singleton exact fence PID start XID display window and all-container uniqueness are current
+  - command: current Molehill endpoint and LAN check
     result: PASS
-    evidence: edge transport must carry the read-only observation contract end-to-end; persistent daemon or forced semantic promotion is not specified
-  - command: current device availability check
+    evidence: Molehill-PC is online and private LAN address is 192.168.1.154
+  - command: real authenticated cross-host edge E2E
     result: BLOCKED
-    evidence: Synology is online but Molehill-PC execution endpoint is offline at the correction checkpoint
-  - command: real authenticated Synology-to-Molehill edge transport E2E
-    result: BLOCKED
-    evidence: receiving host execution endpoint is unavailable in the current session; no fake local substitute is accepted
+    evidence: admission must be durably committed and pushed before observation frames are sent
 blockers:
-  - Molehill-PC execution endpoint currently offline
-  - real authenticated cross-host edge transport E2E not yet exercised
-next_action: when Molehill-PC is available, freshly re-admit read_only and run only the missing authenticated Synology-to-Molehill edge transport plus trusted reconciliation path using existing production primitives
+  - durable push of this fresh read_only admission precedes cross-host observation
+next_action: commit and push the fresh read_only admission then run only the missing authenticated Synology-to-Molehill edge transport and trusted reconciliation path
 ```

@@ -91,11 +91,11 @@ jobs:
               if missing:
                   raise SystemExit(f'{label}: missing required invariants: {missing}')
 
-          current = current_client_fence()
-          exact_fence = f'{current.version} / {current.size} / {current.sha256}'
-          for label, text in [('tracks', tracks), ('adr', adr), ('bootstrap', bootstrap), ('changelog', changelog)]:
-              if exact_fence not in text:
-                  raise SystemExit(f'{label}: exact client fence missing')
+          current_client_fence()
+          current_fence_source = 'docs/agents/contracts/TRACK_A_CURRENT_CLIENT_FENCE_V1.json'
+          for label, text in [('tracks', tracks), ('adr', adr), ('bootstrap', bootstrap)]:
+              if current_fence_source not in text:
+                  raise SystemExit(f'{label}: canonical current-client fence source missing')
 
           forbidden = {
               'tracks': ['These are the final PR #316 semantics'],

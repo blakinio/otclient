@@ -14,7 +14,7 @@ branch: feat/OTC-20260902-central-current-client-fence
 base_branch: main
 base_main: 30fc46ce4dbff96d2484e624a58fcd85f2a9ecad
 created: 2026-09-02T21:16:00+02:00
-updated_at: 2026-09-02T22:31:23+02:00
+updated_at: 2026-09-02T22:35:33+02:00
 risk: medium
 execution_class: repository_only
 execution_mode: chat
@@ -29,14 +29,14 @@ continuation_policy: continue_until_real_stop
 task_completion_policy: return_to_coordinator_for_classification
 policy_version: 2
 invocation_started_at: 2026-09-02T22:18:00+02:00
-last_progress_at: 2026-09-02T22:31:23+02:00
+last_progress_at: 2026-09-02T22:35:33+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: draft
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 0
+repair_cycles_for_current_gate: 1
 context_reconstruction_attempts: 0
 stall_warnings: 0
 package_a_exception_head: 5bc0b88152ccdd5d2ab32f2a65f0dca688880567
@@ -70,8 +70,8 @@ physical_action_count: 0
 owner_funded_ai_api_authorized: false
 red_head: 8d0bccbdc57e1d34f164eaa48a734be7fe47d2f6
 implementation_head: 30879f705cfeaf84567356b8f90e35cb886af822
-current_blocker: pr_862_exact_head_ci_and_independent_audit_pending
-next_action: require terminal exact-head GitHub Actions and an independent exact-diff scope audit for Draft PR #862, then inspect review hygiene and promote only if ACCEPT
+current_blocker: pr_862_exact_head_ci_after_canonical_governance_gate_repair_pending
+next_action: validate and publish the narrow canonical-live governance gate repair, then require a new terminal exact-head GitHub Actions generation and independent exact-diff scope audit before Ready/merge
 owned_paths:
   - docs/agents/contracts/TRACK_A_CURRENT_CLIENT_FENCE_V1.json
   - tools/tibia_re_control_center/current_client_fence.py
@@ -230,6 +230,12 @@ changed_paths:
   - docs/agents/prompts/OTC_20260902_VISION_P2_CENTRAL_FENCE_FINALIZATION_HANDOFF_ALIAS.md
   - docs/agents/prompts/OTC_20260901_VISION_P2_READONLY_ALIASES.md
 validation:
+  - command: repaired Track A canonical-live governance inline audit plus central-fence/governance/Package A controls
+    result: PASS
+    evidence: native-Linux-equivalent inline audit now validates the canonical manifest source instead of copied current literals; central current-fence and agent-runtime governance PASS; Package A exact case PASS and wrong branch/base/fork reject; YAML and diff-check PASS
+  - command: GitHub Actions Track A canonical live governance run 33679786551 / job 100413307605
+    result: FAIL_ISOLATED
+    evidence: the only failing step required the exact manifest.current tuple to be copied into tracks/ADR/bootstrap/changelog; failure was "tracks: exact client fence missing", contradicting the accepted central-source design while the existing-runtime adoption job passed
   - command: Package A exact branch/base/repository boundary simulation
     result: PASS
     evidence: exact base 30fc46ce4dbff96d2484e624a58fcd85f2a9ecad plus exact branch/repo accepted 32 branch paths; wrong branch, wrong base and fork each failed closed

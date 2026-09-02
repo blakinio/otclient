@@ -16,7 +16,10 @@ from tests.tools.tibia_re_control_center.test_agent_edge_bridge import (
 )
 from tools.tibia_re_control_center.agent_edge_transport import EdgeFrameKind, EdgeTransportSigner
 from tools.tibia_re_control_center.agent_runtime_admission import admit_read_only_runtime
-from tools.tibia_re_control_center.agent_runtime_signals import RuntimeSignalBinding
+from tools.tibia_re_control_center.agent_runtime_signals import (
+    RuntimeSignalBinding,
+    RuntimeSignalResolver,
+)
 from tools.tibia_re_control_center.control_domain import ControlDomainService
 from tools.tibia_re_control_center.model import ValidationError
 from tools.tibia_re_control_center.vision_p2_trusted_composition import (
@@ -100,6 +103,56 @@ class TrustedCompositionTests(unittest.TestCase):
                 self.assertEqual("VISION_P2_COMPOSITION_LATE_ATTACH", late.exception.code)
             finally:
                 service.store.close()
+
+    def test_default_composition_allows_admission_only_zero_contract_resolver(self) -> None:
+        composition = VisionP2TrustedComposition()
+        with tempfile.TemporaryDirectory() as raw:
+            with _service(raw, composition) as (service, runtime):
+                agent = service.agent
+                now_ms = 1_000_000
+                agent._now_epoch_ms = lambda: now_ms
+                agent.submit_task(read_only_task())
+                admission = admit_read_only_runtime(
+                    _admission_observation(now_ms),
+                    now_epoch_ms=now_ms,
+                    max_age_ms=15_000,
+                )
+                binding = RuntimeSignalBinding(
+                    session_id="session-edge-1",
+                    run_id="run-edge-1",
+                    runtime_id=admission.runtime_namespace,
+                    runtime_instance_id="runtime-instance-admission-only",
+                    runtime_binding_sha256=admission.runtime_binding_sha256,
+                )
+                resolver = RuntimeSignalResolver(
+                    current_binding=binding,
+                    reviewed_contracts=(),
+                    monotonic_ns=lambda: 1_000,
+                    max_age_ns=100,
+                    clock_domain_id="clock:control-center",
+                )
+                authority = agent._issue_read_only_runtime_authority(
+                    "session-edge-1", admission,
+                    runtime_signal_resolver=resolver,
+                    runtime_signal_binding=binding,
+                )
+                agent.bind_read_only_runtime("session-edge-1", authority)
+                runtime.ingest_edge_observation({
+                    "schema": "otclient.local-agent.edge-observation.v1",
+                    "session_id": "session-edge-1",
+                    "run_id": "run-edge-1",
+                    "edge_instance_id": "edge-admission-only",
+                    "observed_epoch_ms": now_ms,
+                    "heartbeat_epoch_ms": now_ms,
+                    "capture": None,
+                    "runtime": None,
+                })
+                snapshot = agent.snapshot("session-edge-1")
+                self.assertTrue(snapshot["edge"]["current"])
+                self.assertEqual("UNKNOWN", snapshot["edge"]["runtime"]["status"])
+                self.assertFalse(snapshot["edge"]["runtime"]["current"])
+                with self.assertRaises(ValueError):
+                    resolver.bind_reviewed_source(producer_id="unreviewed", contract_id="unreviewed")
 
     def test_capture_policy_and_root_are_composition_owned_and_secret_safety_is_recomputed(self) -> None:
         current = _binding()

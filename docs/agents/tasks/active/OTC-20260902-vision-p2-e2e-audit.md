@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260902-vision-p2-e2e-audit
-status: investigating
+status: waiting
 agent: ChatGPT
 session_role: phase2_auditor
 worker_alias: OTC-VISION-P2-E2E-AUDIT
@@ -15,7 +15,7 @@ base_branch: feat/OTC-20260902-vision-p2-vision-reconciliation
 base_main: a7c7eb8aa2cc69d70442578401d88be9262055e4
 audited_integration_head: 2346ffb704c213f2e3050f87fc80aaa611454cd3
 created: 2026-09-02T11:28:36+02:00
-updated_at: 2026-09-02T17:17:06+02:00
+updated_at: 2026-09-02T19:07:04+02:00
 risk: high
 execution_class: hybrid
 execution_mode: github_plus_remote_read_only
@@ -30,17 +30,17 @@ continuation_policy: continue_until_real_stop
 task_completion_policy: return_to_coordinator_for_classification
 policy_version: 2
 implementation_authorized: false
-runtime_access: read_only
-runtime_owner_task: OTC-20260902-vision-p2-e2e-audit
-runtime_namespace: 'Synology/otclient-track-a-kasmvnc/display-1/client-28379/start-36180734'
-canonical_registration: ABSENT
+runtime_access: none
+runtime_owner_task: NOT_APPLICABLE
+runtime_namespace: NOT_APPLICABLE
+canonical_registration: NOT_APPLICABLE
 canonical_lease_generation: NOT_APPLICABLE
 registration_lease_generation: NOT_APPLICABLE
 gate_a: NOT_APPLICABLE
 generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
-target_uniqueness: PROVEN
+target_uniqueness: NOT_APPLICABLE
 persistent_session_role: none
 physical_e2e_required: true
 mutation_authorized: false
@@ -67,8 +67,8 @@ depends_on:
   - coordinator review #5090102633 ACCEPT
 blocks:
   - Phase 2 completion and merge of PR #856
-current_blocker: final_live_reconcile_vision_in_progress
-next_action: push this final fresh read_only admission, then run one full authenticated trusted capture to exact-Qwen to reconcile_vision path and require UNKNOWN with runtime_current false
+current_blocker: final_live_reconcile_waiting_synology_execution_endpoint
+next_action: when Synology execution endpoint returns, take a new exact-target preflight, durably re-admit read_only, then run exactly one trusted capture to exact-Qwen to reconcile_vision path expecting UNKNOWN with runtime_current false
 last_progress_at: 2026-09-02T16:42:26+02:00
 physical_action_count: 0
 ---
@@ -108,14 +108,13 @@ At this checkpoint Molehill-PC's execution endpoint is offline, so the cross-hos
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-02T15:17:06Z
-head: dfbfd85a296317dd6786a5382dfac64787bc8eb1
+updated_at: 2026-09-02T17:07:04Z
+head: 568748c0617b1cea54d3c43b24ad9de9418ecd4d
 branch: test/OTC-20260902-vision-p2-e2e-audit
 pr: 857
-status: investigating
+status: waiting
 context_routes:
   - tools/tibia_re_control_center/vision_p2_trusted_composition.py
-  - tools/tibia_re_control_center/agent_edge_bridge.py
   - tools/tibia_re_control_center/agent_vision.py
   - docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
 owned_paths:
@@ -124,43 +123,44 @@ owned_paths:
   - docs/agents/evidence/OTC-20260902-vision-p2-e2e-audit/**
 proven:
   - trusted main is a7c7eb8aa2cc69d70442578401d88be9262055e4 and accepted Wave 2 is 2346ffb704c213f2e3050f87fc80aaa611454cd3
-  - post-repair restack security/provenance passes 186 of 186 and admission-only guards pass 2 of 2
-  - prior secret-safe capture exact-Qwen and real authenticated cross-host edge transport gates are PASS
-  - Molehill-PC is online and available for the final local-model/control-side run
-  - fresh Synology observation epoch ms is 1788362116363 and monotonic ns is 379102135365434
-  - Kasm container is current and display 1 is reachable
-  - exactly one official client exists across all running containers
-  - current client PID 28379 start 36180734 display :1.0 maps to XID 0x01e00017 geometry 810 263 1020 650
-  - package 15.32.be4f48 size 52105824 SHA 552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1 matches trusted fence
-  - canonical registration is absent and target uniqueness is PROVEN
-  - runtime admission-only zero-contract authority is now trusted-main behavior after PR 860
+  - post-repair security and provenance matrix passes and admission-only guards are green
+  - real secret-safe capture exact-Qwen and authenticated Synology to Molehill edge transport gates are PASS historical evidence
+  - admission-only zero-contract authority repair is merged and permits UNKNOWN without semantic runtime evidence
+  - Molehill execution endpoint is online and task-owned Ollama process count is zero
+  - Synology NAS is LAN-reachable but its authorized Remote Desktop execution endpoint is offline
+  - existing self-hosted read-only Surveyor workflow is pinned to an obsolete client fence and is not a valid substitute
+  - existing current-fence Kasm workflow_dispatch is mutating bootstrap and is outside this auditor authority
+  - no password cookie key or secret was extracted to bypass the missing execution endpoint
+  - final post-admission capture model reconciliation run did not start after endpoint loss
   - physical action count remains zero and direct Codex usage remains zero
 derived:
-  - final read_only observation window may open for the exact current target
-  - exactly one physical gate remains: full trusted capture visual reconciliation with no semantic runtime evidence
+  - the previous read_only observation window is closed fail-closed and runtime_access is none
+  - a new fresh Synology preflight and durable read_only admission are mandatory before final observation
 unknown:
-  - fresh capture and exact-Qwen result for this final window
-  - final reconcile_vision state/runtime_current/event persistence
-  - final closeout classification
+  - next fresh exact-target identity after Synology execution endpoint reconnects
+  - final capture and exact-Qwen observation for that new window
+  - final reconcile_vision state runtime_current event persistence and closeout classification
 conflicts:
   - none
 first_failure:
-  marker: none before final physical observation
-  evidence: all admission prerequisites pass but no final-window capture has been taken yet
+  marker: WAITING_EXECUTION_ENDPOINT
+  evidence: authorized Synology Remote Desktop execution endpoint is offline while the NAS remains network-reachable
 rejected_hypotheses:
-  - stronger runtime producer is required for UNKNOWN: rejected by deterministic reconciliation contract
-  - prior PID or capture can substitute for fresh admission: rejected; this checkpoint uses a new live preflight
+  - stale read_only admission may remain current across execution endpoint loss: rejected fail-closed
+  - obsolete Surveyor workflow may substitute for current client evidence: rejected because its embedded client fence is stale
+  - mutating Kasm bootstrap should be used merely to regain read-only access: rejected as outside audit authority
 changed_paths:
   - docs/agents/tasks/active/OTC-20260902-vision-p2-e2e-audit.md
-  - docs/agents/evidence/OTC-20260902-vision-p2-e2e-audit/final-live-read-only-preflight.md
+  - docs/agents/reports/OTC-20260902-vision-p2-e2e-audit.md
+  - docs/agents/evidence/OTC-20260902-vision-p2-e2e-audit/final-live-access-interruption.md
 validation:
-  - command: fresh exact-target Synology final preflight
+  - command: Molehill model-host cleanup and process census
     result: PASS
-    evidence: singleton exact fence PID start XID display and all-container uniqueness are current
+    evidence: zero Ollama or llama-server processes and task-only stale PID/log files removed
   - command: final full trusted reconcile_vision E2E
     result: BLOCKED
-    evidence: admission must be durably pushed before capture/model observation
+    evidence: Synology authorized execution endpoint is offline; no final capture was started
 blockers:
-  - durable push of this final fresh read_only admission precedes physical observation
-next_action: push this final admission then run one full authenticated trusted capture to exact-Qwen to reconcile_vision path expecting UNKNOWN with runtime_current false
+  - authorized Synology execution endpoint must reconnect before a new fresh read_only observation window can open
+next_action: on Synology endpoint reconnect perform one new exact-target preflight then durable read_only admission then exactly one full trusted capture exact-Qwen reconcile_vision run expecting UNKNOWN and runtime_current false
 ```

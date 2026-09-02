@@ -14,7 +14,7 @@ branch: feat/OTC-20260902-central-current-client-fence
 base_branch: main
 base_main: 30fc46ce4dbff96d2484e624a58fcd85f2a9ecad
 created: 2026-09-02T21:16:00+02:00
-updated_at: 2026-09-02T21:16:00+02:00
+updated_at: 2026-09-02T22:26:35+02:00
 risk: medium
 execution_class: repository_only
 execution_mode: chat
@@ -28,6 +28,18 @@ decomposition_reason: one shared exact-fence source plus existing identity consu
 continuation_policy: continue_until_real_stop
 task_completion_policy: return_to_coordinator_for_classification
 policy_version: 2
+invocation_started_at: 2026-09-02T22:18:00+02:00
+last_progress_at: 2026-09-02T22:26:35+02:00
+ci_checks_for_current_head: 0
+ci_check_generation: draft
+terminal_ci_wait_started_at: null
+terminal_ci_checks_for_current_generation: 0
+unchanged_state_checks: 0
+identical_failure_retries: 0
+repair_cycles_for_current_gate: 0
+context_reconstruction_attempts: 0
+stall_warnings: 0
+package_a_exception_head: 5bc0b88152ccdd5d2ab32f2a65f0dca688880567
 runtime_access: none
 persistent_session_role: none
 physical_e2e_required: false
@@ -58,8 +70,8 @@ physical_action_count: 0
 owner_funded_ai_api_authorized: false
 red_head: 8d0bccbdc57e1d34f164eaa48a734be7fe47d2f6
 implementation_head: 30879f705cfeaf84567356b8f90e35cb886af822
-current_blocker: package_a_scope_and_exact_head_ci_pending
-next_action: bind one exact Package A exception, validate checkpoint and full regression, then open Draft PR
+current_blocker: exact_head_linux_validation_and_github_ci_pending
+next_action: finish exact-head Linux validation, commit this checkpoint, push and open the existing branch as one Draft PR
 owned_paths:
   - docs/agents/contracts/TRACK_A_CURRENT_CLIENT_FENCE_V1.json
   - tools/tibia_re_control_center/current_client_fence.py
@@ -112,8 +124,8 @@ Replace duplicated active current-client identity constants with one strict cano
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-02T21:16:00+02:00
-head: 30879f705cfeaf84567356b8f90e35cb886af822
+updated_at: 2026-09-02T22:26:35+02:00
+head: 5bc0b88152ccdd5d2ab32f2a65f0dca688880567
 branch: feat/OTC-20260902-central-current-client-fence
 pr: NOT_CREATED
 status: validating
@@ -171,7 +183,7 @@ proven:
 derived:
   - future ordinary client promotions should update the central manifest instead of each identity consumer
 unknown:
-  - centralization Package A exact exception and falsification have not run
+  - centralization Package A exact exception is committed at 5bc0b88152ccdd5d2ab32f2a65f0dca688880567 and exact/wrong-branch/wrong-base/fork controls are proven
   - centralization PR does not exist and exact-head GitHub Actions have not run
   - canonical runtime registration remains stale until post-merge metadata reconciliation
   - final Vision P2 live capture Qwen reconcile gate has not run
@@ -217,6 +229,15 @@ changed_paths:
   - docs/agents/prompts/OTC_20260902_VISION_P2_CENTRAL_FENCE_FINALIZATION_HANDOFF_ALIAS.md
   - docs/agents/prompts/OTC_20260901_VISION_P2_READONLY_ALIASES.md
 validation:
+  - command: Package A exact branch/base/repository boundary simulation
+    result: PASS
+    evidence: exact base 30fc46ce4dbff96d2484e624a58fcd85f2a9ecad plus exact branch/repo accepted 32 branch paths; wrong branch, wrong base and fork each failed closed
+  - command: Package A fresh and P1 falsification audits
+    result: PASS
+    evidence: PACKAGE_A_FRESH_AUDIT=PASS, MATERIAL_FINDINGS_OPEN=0, RUNTIME_ACCESS_NONE=PASS, FAKE_ONE_STEP_E2E=PASS and all P1 guards PASS
+  - command: refreshed focused Windows current-fence/admission/bridge/composition/Surveyor subset
+    result: PASS
+    evidence: 57 tests OK; canonical current-client fence and Track A runtime governance PASS; Ruff I/F, py_compile, YAML parse and diff-check PASS
   - command: Windows Control Center Vision Surveyor focused matrix
     result: PASS
     evidence: 66 tests OK
@@ -233,7 +254,7 @@ validation:
     result: PASS
     evidence: zero active executable copies outside canonical manifest
 blockers:
-  - Package A exact branch/base/repository scope exception is not yet implemented or falsified
+  - exact-head LF Linux/WSL validation still needs a native-LF worktree because the Windows worktree converted shell shebangs to CRLF
   - centralization PR and exact-head GitHub Actions are not yet created
 next_action: finish only the exact Package A scope and checkpoint, open one Draft PR, require terminal exact-head CI and merge if accepted; then run existing canonical metadata reconciliation, one fresh Surveyor admission, and the final Vision P2 live E2E
 ```

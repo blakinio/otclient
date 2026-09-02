@@ -121,8 +121,8 @@ next_action: after exact-head GREEN and merge, issue one new `RECONCILE_CANONICA
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-02T20:58:00Z
-head: a86aa01212ab127bbf1faea8c280cacdc42a5ab6
+updated_at: 2026-09-02T21:02:50Z
+head: 8ea990c74b41256eeeeaa028062cd6fcd873672e
 branch: fix/OTC-20260902-canonical-reconcile-auth
 pr: 863
 status: validating
@@ -145,7 +145,6 @@ proven:
 derived:
   - retaining checkout credentials only for the live reconciliation job is the minimal repair for the existing live-main movement guards
 unknown:
-  - native-LF exact-commit transition and adoption regression has not yet been rerun for this repair
   - exact-head GitHub Actions and PR classification are pending on the post-checkpoint final head
 conflicts:
   - none
@@ -169,9 +168,9 @@ validation:
   - command: scoped Ruff I/F and git diff --check
     result: PASS
     evidence: both returned zero
-  - command: Windows-worktree WSL transition suite
-    result: BLOCKED
-    evidence: known CRLF shebang artifact env bash CR prevented real transition execution; native-LF rerun is next
+  - command: native-LF exact implementation head 8ea990c74b41256eeeeaa028062cd6fcd873672e regression
+    result: PASS
+    evidence: reconciliation 18/18, transition 58/58, adoption 10/10, current-fence 11/11, runtime governance PASS, canonical fence guard PASS, checkpoint PASS, YAML PASS
 blockers:
   - none
 next_action: push this PR-bound checkpoint commit, require terminal exact-head GitHub Actions for PR 863, then Ready and merge only if review hygiene and scope remain clean

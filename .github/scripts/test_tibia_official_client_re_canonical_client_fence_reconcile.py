@@ -243,6 +243,15 @@ class Tests(unittest.TestCase):
         self.assertIn("RECONCILE|RECONCILE_CURRENT_IDENTITY", text)
         self.assertIn("steps.decision.outputs.decision == 'RECONCILE_CURRENT_IDENTITY'", text)
 
+    def test_live_reconciliation_retains_read_only_checkout_auth_for_live_main_guard(self):
+        text = WORKFLOW.read_text(encoding="utf-8")
+        live = text.split("  live-reconciliation:", 1)[1]
+        checkout = live.split("      - name: Deterministic pre-runtime verification", 1)[0]
+        self.assertIn("persist-credentials: true", checkout)
+        self.assertGreaterEqual(
+            live.count("git ls-remote origin refs/heads/main"),
+            3,
+        )
     def test_reconciles_stale_identity_when_source_fence_is_already_current(self):
         current = dict(
             self.old,

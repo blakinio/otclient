@@ -14,7 +14,7 @@ branch: feat/OTC-20260902-vision-p2-vision-reconciliation
 base_branch: main
 base_main: 8441fc1cce1600033b505d68ebc5c0141b337394
 created: 2026-09-02T10:46:00+02:00
-updated_at: 2026-09-02T11:15:33+02:00
+updated_at: 2026-09-02T13:34:00+02:00
 risk: high
 feature_scope:
   type: infrastructure
@@ -36,6 +36,16 @@ continuation_policy: continue_until_real_stop
 task_completion_policy: return_to_coordinator_for_classification
 policy_version: 2
 runtime_access: none
+runtime_owner_task: NOT_APPLICABLE
+runtime_namespace: NOT_APPLICABLE
+canonical_registration: NOT_APPLICABLE
+canonical_lease_generation: NOT_APPLICABLE
+registration_lease_generation: NOT_APPLICABLE
+gate_a: NOT_APPLICABLE
+generation_rebind: NOT_APPLICABLE
+gate_b: NOT_APPLICABLE
+bootstrap: NOT_APPLICABLE
+target_uniqueness: NOT_APPLICABLE
 persistent_session_role: none
 physical_e2e_required: true
 mutation_authorized: false
@@ -58,6 +68,7 @@ owned_paths:
   - docs/agents/reports/OTC-20260902-vision-p2-vision-reconciliation.md
   - tools/tibia_re_control_center/vision_p2_trusted_composition.py
   - tests/tools/tibia_re_control_center/test_vision_p2_trusted_composition.py
+  - .github/workflows/tibia-re-control-center-core.yml
 modules_touched:
   - Vision P2 trusted composition
 reuses:
@@ -72,12 +83,12 @@ depends_on:
   - lifecycle closeout PR #855 merged as main 8441fc1cce1600033b505d68ebc5c0141b337394
 blocks:
   - OTC-VISION-P2-E2E-AUDIT
-current_blocker: exact_head_actions_pending
-next_action: refresh GitHub Actions once for the live final branch head; if all required checks pass, classify PR #856 as ACCEPT or ACCEPT_WITH_EDITS for coordinator promotion, otherwise repair the exact failing check
+current_blocker: post_fence_sync_exact_head_actions_pending
+next_action: validate the post-fence-sync exact branch head in GitHub Actions, then preserve coordinator ACCEPT only if the refreshed generation remains clean before Wave 3 restack
 invocation_started_at: 2026-09-02T10:46:00+02:00
-last_progress_at: 2026-09-02T11:15:33+02:00
+last_progress_at: 2026-09-02T13:34:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: final_checkpoint_pending
+ci_check_generation: post_fence_sync_boundary_repair_pending
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -156,66 +167,79 @@ These are deterministic repository validations only. They do not satisfy the lat
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-02T09:21:05Z
-head: f2dcbd9fb8d923808068dea36e74d94774b409e3
+updated_at: 2026-09-02T11:34:00Z
+head: 33c10813c86060e39c170965d72e3cc63c40ebb5
 branch: feat/OTC-20260902-vision-p2-vision-reconciliation
 pr: 856
 status: validating
 context_routes:
   - docs/agents/programs/OTC_VISION_P2_READONLY_COORDINATION_V1.md
-  - docs/agents/prompts/OTC_20260901_VISION_P2_READONLY_MULTIAGENT.md
   - tools/tibia_re_control_center/vision_p2_trusted_composition.py
   - tests/tools/tibia_re_control_center/test_vision_p2_trusted_composition.py
+  - docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
 owned_paths:
   - docs/agents/tasks/active/OTC-20260902-vision-p2-vision-reconciliation.md
   - docs/agents/reports/OTC-20260902-vision-p2-vision-reconciliation.md
   - tools/tibia_re_control_center/vision_p2_trusted_composition.py
   - tests/tools/tibia_re_control_center/test_vision_p2_trusted_composition.py
+  - .github/workflows/tibia-re-control-center-core.yml
 proven:
-  - main base remained 8441fc1cce1600033b505d68ebc5c0141b337394 through implementation publication
-  - implementation commit 811b2d458c49806da2fa177911e6110318d28f96 adds only the trusted reconciliation seam and focused tests
-  - combined reconciliation edge-bridge session and trusted-composition matrix passed 90 of 90 tests on implementation head 811b2d458c49806da2fa177911e6110318d28f96
-  - restart test preserves reconciliation history while live edge and runtime authority return non-current
-  - direct Codex worker or reviewer invocations for this task remain zero
+  - original Wave 2 implementation remains 811b2d458c49806da2fa177911e6110318d28f96 with TDD RED 04c26ab3dc13851d1e1a789a8378e10324669ce6
+  - coordinator previously accepted repository integration generation 7d4bae503030a00a51fad409d46bc43a39ad2314 under review 5087863607
+  - trusted main advanced through merged client-fence PR 858 to c16d180d336ba8aa9e1656807c79a44e81c15c66
+  - main c16d180d336ba8aa9e1656807c79a44e81c15c66 merged cleanly into the Wave 2 branch without textual conflicts
+  - post-fence-sync Wave 2 reconciliation edge-bridge session trusted-composition matrix passes 90 of 90 tests
+  - current runtime-admission suite passes 14 of 14 and current-client fence test passes after the sync
+  - changed Wave 2 production and test modules compile Ruff I/F passes and git diff check passes after the sync
+  - direct Codex worker or reviewer invocations remain zero
+  - runtime_access remains none with physical action budget and count zero
+  - first refreshed Actions generation on ed2b61b1d2590bbf0d27aed4ff85df3cc008458d failed only deterministic Track A governance because the Wave 2 runtime_access none record lacked ten newly mandatory explicit NOT_APPLICABLE admission fields; fresh admission-behavior audit itself passed
+  - head 33c10813c86060e39c170965d72e3cc63c40ebb5 adds those admission fields and local governance now prints TRACK_A_AGENT_RUNTIME_GOVERNANCE_PASS=true
+  - the next Package A generation rejected only the exact Wave 2 task/report paths; extracted real workflow boundary RED reproduces those two paths exactly
+  - one-time Package A repair admits only those two docs for exact branch feat/OTC-20260902-vision-p2-vision-reconciliation, same repo blakinio/otclient and base c16d180d336ba8aa9e1656807c79a44e81c15c66; exact case passes while fork and wrong-base controls fail
+
 derived:
-  - Wave 2 repository implementation is coherent enough for exact-head CI and coordinator classification but is not Phase 2 completion
-  - physical read-only E2E and fresh independent audit remain Wave 3 coordinator-serialized work
+  - fence advance changed trusted admission identity but did not alter the Wave 2 reconciliation semantics or authority boundary
+  - Wave 3 must audit the refreshed Wave 2 generation rather than the superseded 7d4bae503 generation
 unknown:
-  - exact-head GitHub Actions result for the checkpoint commit that contains this context block
-  - fresh Wave 3 audit findings and physical read-only E2E result
+  - exact-head GitHub Actions result after committing the one-time Package A boundary repair
+  - fresh Wave 3 physical read-only E2E and independent audit result
 conflicts:
   - none
 first_failure:
-  marker: missing TrustedVisionP2Runtime.reconcile_vision seam
-  evidence: focused RED on 04c26ab3dc13851d1e1a789a8378e10324669ce6 failed exactly at missing reconciliation seam
+  marker: refreshed Wave 2 generation initially failed new governance/task-schema and Package A documentation-boundary integration gates after PR 858
+  evidence: governance log reported ten missing explicit admission fields; Package A log reported only the 20260902 Wave 2 task/report as unexpected paths
 rejected_hypotheses:
-  - new runtime resolver or session store required: existing reviewed resolver edge currentness and persistent event store were sufficient and are reused
-  - WORLD_VISUAL can confirm world alone: focused fail-closed test returns UNKNOWN without current reviewed causal runtime evidence
+  - fence sync requires reconciliation code repair: clean merge plus 90 of 90 Wave 2 tests and 14 of 14 admission tests reject this
+  - old accepted generation can remain the physical E2E target: trusted main changed the admission fence so Wave 3 must use the refreshed generation
+  - post-fence failures imply Wave 2 reconciliation code regression: rejected; 90 of 90 Wave 2 tests and 14 of 14 admission tests remain green and CI failures are task-schema/path-boundary only
+  - broadening the Package A vision-doc prefix is required: rejected; exact task/report exception with branch repo base fences passes positive/negative controls
 changed_paths:
   - docs/agents/tasks/active/OTC-20260902-vision-p2-vision-reconciliation.md
   - docs/agents/reports/OTC-20260902-vision-p2-vision-reconciliation.md
   - tools/tibia_re_control_center/vision_p2_trusted_composition.py
   - tests/tools/tibia_re_control_center/test_vision_p2_trusted_composition.py
+  - .github/workflows/tibia-re-control-center-core.yml
 validation:
-  - command: python -m unittest tests.tools.tibia_re_control_center.test_vision_p2_trusted_composition
-    result: PASS
-    evidence: 14 tests OK on 811b2d458c49806da2fa177911e6110318d28f96
   - command: python -m unittest tests.tools.tibia_re_control_center.test_agent_reconcile tests.tools.tibia_re_control_center.test_agent_edge_bridge tests.tools.tibia_re_control_center.test_agent_session tests.tools.tibia_re_control_center.test_vision_p2_trusted_composition
     result: PASS
-    evidence: 90 tests OK on 811b2d458c49806da2fa177911e6110318d28f96
-  - command: python -m py_compile changed production and test modules
+    evidence: 90 tests OK after merging trusted main c16d180d336ba8aa9e1656807c79a44e81c15c66 into Wave 2
+  - command: python -m unittest tests.tools.tibia_re_control_center.test_agent_runtime_admission
     result: PASS
-    evidence: local deterministic validation before checkpoint
-  - command: python -m ruff check --select I,F changed production and test modules
+    evidence: 14 tests OK on the post-fence-sync working generation
+  - command: python .github/scripts/test_track_a_canonical_current_client_fence.py
     result: PASS
-    evidence: local deterministic validation before checkpoint
-  - command: git diff --check
+    evidence: TRACK_A_CANONICAL_CURRENT_CLIENT_FENCE=PASS after the sync
+  - command: python -m py_compile plus Ruff --select I,F on Wave 2 changed modules and git diff --check
     result: PASS
-    evidence: clean implementation and checkpoint diffs before publication
-  - command: GitHub Actions required checks
-    result: NOT_RUN
-    evidence: exact checkpoint commit does not exist until this checkpoint is committed and pushed
+    evidence: all returned zero after the sync
+  - command: python .github/scripts/test_track_a_agent_runtime_governance.py --changed-from refs/remotes/origin/main --expected-branch feat/OTC-20260902-vision-p2-vision-reconciliation
+    result: PASS
+    evidence: after explicit NOT_APPLICABLE admission fields the validator prints TRACK_A_AGENT_RUNTIME_GOVERNANCE_PASS=true
+  - command: extracted Package A boundary positive and negative controls
+    result: PASS
+    evidence: exact branch repo base returns RC 0 and PACKAGE_A_CHANGED_PATHS=4_DECLARED_ONLY before workflow commit; attacker repo and wrong base each return RC 1
 blockers:
-  - none
-next_action: refresh GitHub Actions once for the live final branch head; if all required checks pass, classify PR #856 as ACCEPT or ACCEPT_WITH_EDITS for coordinator promotion, otherwise repair the exact failing check
+  - one-time Package A boundary repair must be committed and its exact-head GitHub Actions generation must become fully terminal
+next_action: commit and push the bounded Package A documentation-boundary repair, then preserve coordinator ACCEPT only if the new exact-head generation is fully green before Wave 3 restack
 ```

@@ -12,9 +12,9 @@ from typing import Any, Callable, Sequence
 
 TARGET_CONTAINER = "otclient-track-a-kasmvnc"
 TARGET_DISPLAY = ":1"
-VER = "15.32.75d4a0"
+VER = "15.32.be4f48"
 SIZE = 52105824
-SHA = "d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a"
+SHA = "552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1"
 PROOF_KIND = "existing_runtime_adoption_v1"
 WINDOW_RE = re.compile(r'^\s*(0x[0-9a-fA-F]+)\s+"(Tibia(?: - .+)?)":')
 BRIDGE_SOCKET = "/tmp/otclient-native-login-current-sha/bridge.sock"

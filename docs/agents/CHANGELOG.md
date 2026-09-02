@@ -1,5 +1,6 @@
 # Agent-Facing Change Log
 
+- 2026-09-02: Track A canonical exact-client fence advances to `15.32.be4f48` / `52105824` / `552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1` from owner-authorized official-launcher manifest + exact installed-ELF agreement. Canonical session/transition/adoption/bootstrap identity, Kasm bootstrap and Phase 2 read-only admission are synchronized to the new tuple. Raw CDN refetch was blocked by Cloudflare challenge/HTTP 403 and is not counted as proof. Historical offsets, serializers, QMeta addresses and prior build-specific RE evidence remain fenced to their source builds; this repository-only advance grants no login, credentials, gameplay, GUI input, process-control, memory-access or semantic-promotion authority.
 Curated behavior/architecture log for discovery; not a replacement for Git history/release notes.
 
 ## Unreleased

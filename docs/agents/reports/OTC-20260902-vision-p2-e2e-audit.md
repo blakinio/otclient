@@ -66,3 +66,12 @@ A fresh exact-target recheck then observed exactly one live `client` process: PI
 This does **not** satisfy current trusted-base admission. `TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md` still fences the official client to `15.32.75d4a0`, size `52105824`, SHA-256 `d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a`. The audit therefore fails closed and keeps `runtime_access:none`; no screenshot/model inference or E2E observation is admitted. A separately reviewed trusted-base client-fence advance is required.
 
 Direct Codex usage remains `0`.
+## Refreshed generation restack ? supersedes earlier blockers
+
+Trusted `main` is now `c16d180d336ba8aa9e1656807c79a44e81c15c66` after reviewed client-fence PR #858. Refreshed Wave 2 integration head `a746dbfaa60a129fc3fa2f91e1b1e48038837a4a` has coordinator ACCEPT review `5089081225` and fully terminal green associated CI. Wave 3 was therefore restacked from its superseded `7d4bae503...` generation onto `a746dbfaa...`; the merge produced no textual conflicts.
+
+A fresh static security/provenance matrix on the restacked tree passes **184/184** and the trusted current-client fence test passes. The only governance precheck failure was task-schema compatibility: this Wave 3 task still lacked the ten explicit admission fields introduced by #858. They are now persisted as `NOT_APPLICABLE` while `runtime_access:none` remains in force.
+
+The earlier `client fence mismatch` section above is historical and no longer current. The trusted fence now matches `15.32.be4f48 / 52105824 / 552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1`. No historical PID/window observation is reused as current admission evidence. The next step is a fresh non-invasive Synology target proof, followed by explicit `read_only` admission only if ownership/namespace/uniqueness all prove clean.
+
+Direct Codex usage remains `0`; Wave 3 physical action count remains `0`.

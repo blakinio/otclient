@@ -207,6 +207,17 @@ jobs:
               and os.environ.get('HEAD_REPO') == qwen_schema_repo
           ):
               allowed_exact.add(qwen_schema_task)
+          admission_only_task = 'docs/agents/tasks/active/OTC-20260902-vision-p2-admission-only-authority.md'
+          admission_only_branch = 'fix/OTC-20260902-vision-p2-admission-only-authority'
+          admission_only_base = '27f9bdd5f003c596529e7571343ae8bb053d5cff'
+          admission_only_repo = 'blakinio/otclient'
+          if (
+              admission_only_task in changed
+              and base == admission_only_base
+              and os.environ.get('HEAD_REF') == admission_only_branch
+              and os.environ.get('HEAD_REPO') == admission_only_repo
+          ):
+              allowed_exact.add(admission_only_task)
           unexpected = [
               path for path in changed
               if path not in allowed_exact and not path.startswith(allowed_prefixes)

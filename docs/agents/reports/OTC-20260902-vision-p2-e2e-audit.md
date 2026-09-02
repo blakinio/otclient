@@ -102,3 +102,9 @@ Bounded repair PR #859 is merged to trusted `main@27f9bdd5f003c596529e7571343ae8
 Fresh repository audit on the restacked tree passes the security/provenance matrix `184/184`, repaired Qwen schema contract `3/3`, current-client fence and Track A runtime governance. The previous real-Qwen schema failure remains historical evidence of the pre-repair generation; it is no longer an open code-repair blocker, but it is not considered physically resolved until a new admitted capture/model run succeeds.
 
 The previous read-only window is released. All prior PID/XID/timestamps/capture/model residency are stale for current authority. The next physical step therefore begins from `runtime_access:none` with a fresh exact-target/uniqueness preflight. Direct Codex usage remains `0`; physical action count remains `0`.
+
+## Fresh post-repair read-only admission
+
+A new non-invasive Synology preflight was performed after the Qwen repair/restack. It freshly proves one exact official client across all running containers: PID `28379`, start ticks `36180734`, DISPLAY `:1.0`, package `15.32.be4f48`, size `52105824`, SHA-256 `552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1`. Exactly one PID-bound X11 window is present at XID `0x01e00017`, geometry `810,263,1020,650`; canonical registration remains `ABSENT`.
+
+This is a new measurement even though numeric identity currently matches the prior run. Prior capture/model evidence is not reused. The task may enter `runtime_access:read_only` for the next serialized observation window only. No screenshot, model inference, input, login, credentials, memory access, payload capture or mutation occurred during preflight; physical action count remains `0`.

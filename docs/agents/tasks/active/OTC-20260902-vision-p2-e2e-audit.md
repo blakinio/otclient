@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260902-vision-p2-e2e-audit
-status: waiting
+status: investigating
 agent: ChatGPT
 session_role: phase2_auditor
 worker_alias: OTC-VISION-P2-E2E-AUDIT
@@ -15,7 +15,7 @@ base_branch: feat/OTC-20260902-vision-p2-vision-reconciliation
 base_main: 27f9bdd5f003c596529e7571343ae8bb053d5cff
 audited_integration_head: 34fbf6e2d693058ce03a583087816b25639e9cb3
 created: 2026-09-02T11:28:36+02:00
-updated_at: 2026-09-02T15:16:00+02:00
+updated_at: 2026-09-02T15:24:00+02:00
 risk: high
 feature_scope:
   type: infrastructure
@@ -37,17 +37,17 @@ continuation_policy: continue_until_real_stop
 task_completion_policy: return_to_coordinator_for_classification
 policy_version: 2
 implementation_authorized: false
-runtime_access: none
-runtime_owner_task: NOT_APPLICABLE
-runtime_namespace: NOT_APPLICABLE
-canonical_registration: NOT_APPLICABLE
+runtime_access: read_only
+runtime_owner_task: OTC-20260902-vision-p2-e2e-audit
+runtime_namespace: 'Synology/otclient-track-a-kasmvnc/display-1/client-28379/start-36180734'
+canonical_registration: ABSENT
 canonical_lease_generation: NOT_APPLICABLE
 registration_lease_generation: NOT_APPLICABLE
 gate_a: NOT_APPLICABLE
 generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
-target_uniqueness: NOT_APPLICABLE
+target_uniqueness: PROVEN
 persistent_session_role: none
 physical_e2e_required: true
 mutation_authorized: false
@@ -75,10 +75,10 @@ depends_on:
   - coordinator refreshed classification review #5090102633 ACCEPT for post-Qwen Wave 2 repository/integration scope
 blocks:
   - Phase 2 completion and merge of PR #856
-current_blocker: fresh_read_only_re_admission_for_post_qwen_live_retest
-next_action: persist this post-repair restack, then freshly prove the current Synology Kasm/client target and re-admit read_only before a new full-masked production capture and exact-Qwen schema re-test; do not reuse old PID capture timestamps or model state
+current_blocker: post_qwen_live_capture_and_model_retest_pending
+next_action: commit and push this fresh read_only admission, then produce one new full-masked production capture and run the exact repaired Qwen sensor with serialized model residency and zero physical actions
 invocation_started_at: 2026-09-02T11:28:36+02:00
-last_progress_at: 2026-09-02T15:16:00+02:00
+last_progress_at: 2026-09-02T15:24:00+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: post_qwen_repair_restack
 terminal_ci_wait_started_at: null
@@ -140,14 +140,14 @@ A clean result requires exact-head evidence, zero open material findings, a real
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-02T13:16:00Z
-head: 67190008286a729e8ebc118d1e3d2bf44669243f
+updated_at: 2026-09-02T13:24:00Z
+head: c840571c0fea0afcdf7d438688395723b26e8b89
 branch: test/OTC-20260902-vision-p2-e2e-audit
 pr: 857
-status: waiting
+status: investigating
 context_routes:
-  - docs/agents/programs/OTC_VISION_P2_READONLY_COORDINATION_V1.md
   - docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
+  - docs/agents/contracts/TRACK_A_KASMVNC_RUNTIME_ACCESS_V1.md
   - tools/tibia_re_control_center/agent_vision.py
   - tools/tibia_re_control_center/vision_p2_trusted_composition.py
 owned_paths:
@@ -155,61 +155,55 @@ owned_paths:
   - docs/agents/reports/OTC-20260902-vision-p2-e2e-audit.md
   - docs/agents/evidence/OTC-20260902-vision-p2-e2e-audit/**
 proven:
-  - trusted main is 27f9bdd5f003c596529e7571343ae8bb053d5cff with merged Qwen schema repair PR 859
-  - refreshed Wave 2 exact accepted integration is 34fbf6e2d693058ce03a583087816b25639e9cb3 under coordinator review 5090102633
-  - Wave 2 exact head has five of five associated workflows terminal SUCCESS and remains Draft unmerged pending Wave 3
-  - audit restack merge-base with accepted Wave 2 is exactly 34fbf6e2d693058ce03a583087816b25639e9cb3
-  - post-repair restacked security and provenance subset passes 184 of 184 tests
-  - repaired Qwen static schema contract tests pass 3 of 3 and current-client fence passes
-  - Track A runtime governance and git diff check pass on the restacked tree
-  - prior physical capture proved the real Kasm full-mask pre-persist path can produce secret-safe content-addressed evidence with zero physical actions
-  - prior live Qwen failure is durably recorded in live-qwen-schema-finding.md and its bounded prompt repair is now promoted in trusted main
-  - the prior read_only observation window was released to runtime_access none after the finding; its PID XID capture timestamps and model state are historical only
-  - no real reviewed causal runtime producer is currently promoted by the accepted runtime-signals slice
-  - no deployed real Vision P2 edge peer process was observed during the prior live attempt
-  - physical action count remains zero and no GUI input login credentials character selection gameplay memory access or packet capture occurred
-  - direct Codex worker or reviewer usage remains zero
+  - trusted main is 27f9bdd5f003c596529e7571343ae8bb053d5cff and accepted Wave 2 is 34fbf6e2d693058ce03a583087816b25639e9cb3 under review 5090102633
+  - post-repair static security/provenance subset passes 184 of 184 and repaired Qwen schema contract passes 3 of 3
+  - fresh Synology preflight proves designated container otclient-track-a-kasmvnc running and DISPLAY :1 reachable at 3440x1229
+  - fresh target scan proves exactly one client in the designated container and exactly one client across all running containers
+  - fresh exact process is PID 28379 start ticks 36180734 executable package client on DISPLAY :1.0 owned by kasm-user
+  - fresh client tuple 15.32.be4f48 size 52105824 sha256 552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1 matches trusted fence
+  - fresh X11 proof binds exactly one Tibia-class window XID 0x01e00017 geometry 810 263 1020 650 to PID 28379
+  - canonical runtime registration is ABSENT and boot-id sha256 is a6b053cc7bf4d6fffa302419b4a1d6fe5ae336c6de92abefeae27e8aa61c624a
+  - fresh target_uniqueness is PROVEN and read_only admission creates no canonical or mutation authority
+  - prior physical Qwen evidence is historical only; no old capture timestamp or model residency is reused as current
+  - no screenshot model inference GUI input login credentials process memory packet capture or mutation occurred during this admission preflight
+  - physical action count remains zero and direct Codex usage remains zero
 derived:
-  - the schema finding may be called repaired only at repository level until a fresh real-model inference confirms strict VisualEvidence on new physical evidence
-  - every post-repair physical observation requires a new read_only admission; prior runtime and model evidence cannot be reused as current
-  - even with Qwen fixed, missing real edge peer or reviewed causal runtime producer may remain honest downstream E2E blockers and must not be faked
+  - current task may enter runtime_access read_only for one serialized observation window because all mandatory exact-target facts are fresh and fail-closed checks pass
+  - any PID start XID display candidate-count fence or boot change invalidates this admission before further observation
+  - Qwen repair remains unproven physically until a new capture and real-model inference succeeds
 unknown:
-  - fresh current Synology client PID start XID and target-uniqueness state
-  - fresh post-repair production Qwen result on a newly captured full-masked frame
-  - full trusted edge/runtime-signal/reconciliation physical E2E result
-  - fresh independent final audit result after complete physical evidence exists
+  - fresh full-masked capture SHA and source monotonic timestamp
+  - fresh repaired production Qwen observation result
+  - whether a real deployed Vision P2 edge peer exists for the full trusted composition path
+  - whether any reviewed causal runtime producer is available for semantic confirmation
+  - final independent audit result
 conflicts:
   - none
 first_failure:
-  marker: previous physical E2E stopped because exact Qwen output did not satisfy the strict six-field model-observation schema
-  evidence: historical Wave 3 evidence records MODEL_INFERENCE_FAILED and direct provider schema errors; PR 859 repairs only the static prompt contract and now requires physical revalidation
+  marker: previous pre-repair physical Qwen output failed the strict model-observation schema
+  evidence: historical live-qwen-schema-finding.md; repository repair PR 859 is merged but physical revalidation is pending
 rejected_hypotheses:
-  - old physical evidence can close the post-repair gate: rejected because the trusted production prompt changed and current runtime admission must be fresh
-  - Qwen repair changed reconciliation authority: rejected by Wave 2 90 of 90 and post-restack 184 of 184 security/provenance tests
-  - auditor should deploy or invent a missing edge peer or causal producer: rejected by implementation_authorized false and fail-closed programme rules
+  - prior admission can simply be resumed: rejected because every physical observation requires fresh target proof
+  - canonical registration is required for read_only observation: rejected by current Phase 2 admission contract; ABSENT does not grant or imply control authority
+  - unchanged PID means evidence is stale: rejected only as identity inference; freshness comes from this new process/window/all-container measurement, not numeric equality with history
 changed_paths:
   - docs/agents/tasks/active/OTC-20260902-vision-p2-e2e-audit.md
   - docs/agents/reports/OTC-20260902-vision-p2-e2e-audit.md
-  - docs/agents/evidence/OTC-20260902-vision-p2-e2e-audit/static-preaudit.md
-  - docs/agents/evidence/OTC-20260902-vision-p2-e2e-audit/live-read-only-preflight.md
-  - docs/agents/evidence/OTC-20260902-vision-p2-e2e-audit/live-qwen-schema-finding.md
+  - docs/agents/evidence/OTC-20260902-vision-p2-e2e-audit/post-qwen-live-read-only-preflight.md
 validation:
-  - command: refreshed security and provenance subset on the post-repair restack
+  - command: fresh non-invasive Synology Kasm/client preflight
     result: PASS
-    evidence: 184 tests OK
-  - command: repaired Qwen focused schema contract
+    evidence: container/display exact process fence PID-bound single X11 window and all-container singleton all pass
+  - command: current exact client fence comparison
     result: PASS
-    evidence: 3 tests OK
-  - command: current-client fence plus Track A runtime governance
+    evidence: version size SHA and display match trusted tuple
+  - command: target uniqueness scan
     result: PASS
-    evidence: current fence PASS and TRACK_A_AGENT_RUNTIME_GOVERNANCE_PASS=true
-  - command: git diff check
-    result: PASS
-    evidence: zero whitespace errors on the restacked tree
-  - command: required post-repair physical read-only E2E
+    evidence: exactly one client candidate across all running containers
+  - command: required post-repair capture and exact-Qwen inference
     result: BLOCKED
-    evidence: a fresh runtime admission and new physical capture/model evidence have not yet been produced after PR 859
+    evidence: admission must be durably committed and pushed before screenshot/model observation
 blockers:
-  - fresh read_only admission is required before the post-Qwen physical re-test
-next_action: push this restack checkpoint, freshly revalidate the Synology Kasm/client target, persist read_only admission, and then run one new full-masked production capture plus exact-Qwen re-test with zero physical actions
+  - durable read_only admission must be pushed before the first post-repair capture/model observation
+next_action: push this admission checkpoint, then run one new full-masked production capture and exact repaired Qwen inference with no GUI input or physical action
 ```

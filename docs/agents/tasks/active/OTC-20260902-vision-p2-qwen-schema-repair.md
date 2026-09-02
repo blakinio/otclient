@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260902-vision-p2-qwen-schema-repair
-status: validating
+status: waiting
 agent: ChatGPT
 session_role: implementer
 worker_alias: OTC-VISION-P2-QWEN-SCHEMA-REPAIR
@@ -13,8 +13,9 @@ phase: wave_3_finding_repair
 branch: fix/OTC-20260902-vision-p2-qwen-schema-contract
 base_branch: main
 base_main: c16d180d336ba8aa9e1656807c79a44e81c15c66
+pr: 859
 created: 2026-09-02T14:44:00+02:00
-updated_at: 2026-09-02T14:49:00+02:00
+updated_at: 2026-09-02T15:03:00+02:00
 risk: medium
 execution_class: repository_only
 execution_mode: chat
@@ -60,8 +61,10 @@ owned_paths:
   - docs/agents/tasks/active/OTC-20260902-vision-p2-qwen-schema-repair.md
 red_head: c4c21863dbd36f602e413ae108bd337b02cf8631
 implementation_head: 5e0cd8c44ed136f6aca5ceaa458de2ee2dc39926
-current_blocker: exact_head_github_actions_pending
-next_action: checkpoint and publish the exact GREEN head, then evaluate GitHub Actions without weakening schema validation or the Package A boundary
+ci_boundary_head: 8e4ef537816e25db58b0c2d942c317f527b380da
+repair_cycles_for_current_gate: 1
+current_blocker: exact_head_ci_after_one_time_package_a_boundary_repair
+next_action: publish the one-time Package A repair plus final checkpoint and require fully terminal exact-head CI before classification
 ---
 
 # Objective
@@ -85,11 +88,11 @@ Change only the static production vision prompt so it explicitly requires exactl
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-02T12:49:00Z
-head: 5e0cd8c44ed136f6aca5ceaa458de2ee2dc39926
+updated_at: 2026-09-02T13:03:00Z
+head: 8e4ef537816e25db58b0c2d942c317f527b380da
 branch: fix/OTC-20260902-vision-p2-qwen-schema-contract
-pr: null
-status: validating
+pr: 859
+status: waiting
 context_routes:
   - tools/tibia_re_control_center/agent_vision.py
   - tools/tibia_re_vision/evidence.py
@@ -99,6 +102,7 @@ owned_paths:
   - tools/tibia_re_control_center/agent_vision.py
   - tests/tools/tibia_re_control_center/test_agent_vision.py
   - docs/agents/tasks/active/OTC-20260902-vision-p2-qwen-schema-repair.md
+  - .github/workflows/tibia-re-control-center-core.yml
 proven:
   - Wave 3 live audit head 53df76bfa7f33926b388a4a3158df7ede2c47fbb records a real exact-Qwen failure because model observation JSON did not satisfy the strict six-field schema
   - repair trusted base is main c16d180d336ba8aa9e1656807c79a44e81c15c66
@@ -109,12 +113,14 @@ proven:
   - AgentVision suite excluding the one previously clean-main reproduced Windows baseline method passes 56 of 56
   - frozen vision benchmark passes 34 of 34 and py_compile Ruff I/F plus git diff check pass
   - direct Codex worker or reviewer invocations remain zero and runtime_access remains none
+  - first exact-head GitHub Package A falsification audit on 0d9f0d429918733a1976e48382164aedc845bbc8 failed only at declared path boundary for the mandatory repair task record; code and test paths were accepted
+  - one-time boundary repair 8e4ef537816e25db58b0c2d942c317f527b380da admits only the exact repair task on exact branch base and head repo; exact simulation passes while wrong branch fork and wrong base all fail
 
 derived:
   - the smallest repair is prompt-side schema specification rather than parser fallback or validator relaxation
   - a new live Qwen inference belongs to the fresh Wave 3 audit after this repair is promoted, not to this repository-only implementer
 unknown:
-  - exact-head GitHub Actions result
+  - exact-head GitHub Actions result after one-time Package A boundary repair
   - fresh post-promotion Wave 3 live Qwen result
 conflicts:
   - none
@@ -126,6 +132,7 @@ rejected_hypotheses:
   - model or digest must change: rejected because live admission proved the exact required model and digest before the schema failure
   - fallback coercion should repair malformed output: rejected because it would weaken fail-closed model-output handling
 changed_paths:
+  - .github/workflows/tibia-re-control-center-core.yml
   - tools/tibia_re_control_center/agent_vision.py
   - tests/tools/tibia_re_control_center/test_agent_vision.py
   - docs/agents/tasks/active/OTC-20260902-vision-p2-qwen-schema-repair.md
@@ -142,7 +149,10 @@ validation:
   - command: py_compile Ruff I/F and git diff check
     result: PASS
     evidence: all returned zero
+  - command: exact Package A boundary logic with frozen changed paths
+    result: PASS
+    evidence: exact branch repo and base returns zero while wrong branch fork and wrong base each return nonzero
 blockers:
-  - exact-head GitHub Actions are not yet available because the branch is not published
-next_action: publish the exact repair head and require terminal CI before coordinator classification and Wave 3 restack
+  - final exact-head GitHub Actions after the one-time Package A boundary repair are pending
+next_action: push the checkpoint head and require terminal exact-head CI before coordinator classification and Wave 3 restack
 ```

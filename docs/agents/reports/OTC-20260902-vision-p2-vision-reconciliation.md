@@ -71,3 +71,11 @@ No reconciliation production repair was required. The refreshed generation must 
 ## Post-fence Package A boundary repair
 
 The refreshed exact-head CI passed the Track A admission behavior audit after the #858 schema alignment, but Package A rejected only the Wave 2 task/report paths because its declared documentation boundary still covered `OTC-20260901-vision-p2-*` rather than this exact `20260902` Wave 2 generation. The repair is intentionally one-time: the two exact documentation paths are admitted only for branch `feat/OTC-20260902-vision-p2-vision-reconciliation`, same repo `blakinio/otclient`, and base `c16d180d336ba8aa9e1656807c79a44e81c15c66`. Production/control-center prefixes are unchanged.
+
+## Post-Qwen schema-repair synchronization
+
+Trusted `main` advanced through merged PR #859 to `27f9bdd5f003c596529e7571343ae8bb053d5cff`. Synchronizing that base into PR #856 produced one workflow-only conflict between the Wave 2 and Qwen one-time Package A exceptions. The resolution preserves both exact exceptions and rebinds only the Wave 2 task/report exception to the new exact base; no general `20260902` allowlist was introduced.
+
+The synchronized generation retains the original reconciliation implementation unchanged. Fresh local verification passes Wave 2 `90/90`, runtime admission `14/14`, Qwen schema contract `3/3`, frozen vision benchmark `34/34`, current-client fence, Track A runtime governance, `py_compile`, Ruff I/F, YAML parse and diff check. Package A exact simulation accepts the real five-path PR diff only for the exact Wave 2 branch/repo/base and rejects wrong base, wrong branch and fork.
+
+This synchronization does not satisfy Wave 3 physical E2E. It only makes the repository integration generation coherent with the trusted Qwen sensor repair that Wave 3 must freshly retest. Direct Codex usage remains `0`; Wave 2 runtime access remains `none`.

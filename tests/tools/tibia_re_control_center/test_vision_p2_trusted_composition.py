@@ -6,7 +6,6 @@ import tempfile
 import unittest
 from contextlib import contextmanager
 from dataclasses import replace
-from pathlib import Path
 
 from tests.tools.tibia_re_control_center.test_agent_edge_bridge import (
     _admission_observation,
@@ -14,8 +13,13 @@ from tests.tools.tibia_re_control_center.test_agent_edge_bridge import (
     _signal_resolver,
     read_only_task,
 )
-from tools.tibia_re_control_center.agent_edge_transport import EdgeFrameKind, EdgeTransportSigner
-from tools.tibia_re_control_center.agent_runtime_admission import admit_read_only_runtime
+from tools.tibia_re_control_center.agent_edge_transport import (
+    EdgeFrameKind,
+    EdgeTransportSigner,
+)
+from tools.tibia_re_control_center.agent_runtime_admission import (
+    admit_read_only_runtime,
+)
 from tools.tibia_re_control_center.agent_runtime_signals import (
     RuntimeSignalBinding,
     RuntimeSignalResolver,
@@ -153,6 +157,21 @@ class TrustedCompositionTests(unittest.TestCase):
                 self.assertFalse(snapshot["edge"]["runtime"]["current"])
                 with self.assertRaises(ValueError):
                     resolver.bind_reviewed_source(producer_id="unreviewed", contract_id="unreviewed")
+
+    def test_default_composition_rejects_nonempty_runtime_resolver(self) -> None:
+        composition = VisionP2TrustedComposition()
+        with tempfile.TemporaryDirectory() as raw:
+            with _service(raw, composition) as (service, _runtime):
+                agent = service.agent
+                now_ms = 1_000_000
+                agent._now_epoch_ms = lambda: now_ms
+                agent.submit_task(read_only_task())
+                admission = admit_read_only_runtime(_admission_observation(now_ms), now_epoch_ms=now_ms, max_age_ms=15_000)
+                binding = RuntimeSignalBinding(session_id="session-edge-1", run_id="run-edge-1", runtime_id=admission.runtime_namespace, runtime_instance_id="runtime-instance-nonempty", runtime_binding_sha256=admission.runtime_binding_sha256)
+                resolver = _signal_resolver(binding)
+                with self.assertRaises(ValidationError) as mismatch:
+                    agent._issue_read_only_runtime_authority("session-edge-1", admission, runtime_signal_resolver=resolver, runtime_signal_binding=binding)
+                self.assertEqual("EDGE_RUNTIME_COMPOSITION_MISMATCH", mismatch.exception.code)
 
     def test_capture_policy_and_root_are_composition_owned_and_secret_safety_is_recomputed(self) -> None:
         current = _binding()

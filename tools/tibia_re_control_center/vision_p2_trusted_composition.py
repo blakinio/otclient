@@ -27,7 +27,11 @@ from tools.tibia_re_vision.capture_edge import (
 )
 
 from .agent_edge_bridge import AgentEdgeBridge, ReviewedRuntimeAuthorityConfiguration
-from .agent_edge_transport import EdgeReplayLedger, EdgeTransportVerifier, VerifiedEdgeFrame
+from .agent_edge_transport import (
+    EdgeReplayLedger,
+    EdgeTransportVerifier,
+    VerifiedEdgeFrame,
+)
 from .agent_protocol import AgentProvenance
 from .agent_vision import SecretSafeCapture
 from .canonical import jcs_dumps
@@ -592,7 +596,7 @@ def _replay_meta_key(session_id: str, run_id: str, peer_id: str) -> str:
     session_id = validate_opaque_id(session_id, field_name="session_id")
     run_id = validate_opaque_id(run_id, field_name="run_id")
     peer_id = validate_opaque_id(peer_id, field_name="peer_id")
-    digest = hashlib.sha256(f"{session_id}\0{run_id}\0{peer_id}".encode("utf-8")).hexdigest()
+    digest = hashlib.sha256(f"{session_id}\0{run_id}\0{peer_id}".encode()).hexdigest()
     return f"{_REPLAY_META_PREFIX}{digest}"
 
 
@@ -667,25 +671,27 @@ class DurableEdgeTransportVerifier:
                     "EDGE_REPLAY_PERSISTENCE_FAILED",
                     "durable edge verifier is fail-closed",
                 )
-            ledger = _load_replay_ledger(self._runtime.service, self._meta_key)
-            verifier = EdgeTransportVerifier(
-                expected_peer_id=self._peer_id,
-                expected_peer_auth_key=self._auth_key,
-                replay_ledger=ledger,
-                expected_connection_id=self._connection_id,
-            )
-            frame = verifier.verify(packet, now_epoch_ms=now_epoch_ms)
-            if frame.session_id != self._session_id or frame.run_id != self._run_id:
-                raise ValidationError(
-                    "EDGE_SESSION_RUN_REJECTED",
-                    "edge frame belongs to another session or run",
+            service = self._runtime.service
+            with service.store._transaction("vision_p2_edge_replay_verify"):
+                ledger = _load_replay_ledger(service, self._meta_key)
+                verifier = EdgeTransportVerifier(
+                    expected_peer_id=self._peer_id,
+                    expected_peer_auth_key=self._auth_key,
+                    replay_ledger=ledger,
+                    expected_connection_id=self._connection_id,
                 )
-            try:
-                _save_replay_ledger(self._runtime.service, self._meta_key, ledger)
-            except Exception:
-                self._failed = True
-                raise
-            return frame
+                frame = verifier.verify(packet, now_epoch_ms=now_epoch_ms)
+                if frame.session_id != self._session_id or frame.run_id != self._run_id:
+                    raise ValidationError(
+                        "EDGE_SESSION_RUN_REJECTED",
+                        "edge frame belongs to another session or run",
+                    )
+                try:
+                    _save_replay_ledger(service, self._meta_key, ledger)
+                except Exception:
+                    self._failed = True
+                    raise
+                return frame
 
 
 class TrustedVisionP2Runtime:

@@ -494,9 +494,9 @@ def static_policy_audit() -> None:
     admission = read("docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md")
     canonical = read("docs/agents/prompts/OTCLIENT_TIBIA_RE_CANONICAL.md")
 
-    exact_fence = "d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a"
+    exact_fence = "552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1"
     exact_size = "52105824"
-    exact_version = "15.32.75d4a0"
+    exact_version = "15.32.be4f48"
     historical_fence = "e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe"
     registration = "/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime/runtime-registration.json"
 
@@ -645,8 +645,8 @@ def static_policy_audit() -> None:
 
     transition = read(BOOTSTRAP_TRANSITION)
     session = read(".github/scripts/tibia-official-client-re-canonical-live-session.sh")
-    require("current canonical transition fence", transition, ("VER = '15.32.75d4a0'", "SIZE = 52105824", "SHA = 'd1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a'"))
-    require("current canonical live-session fence", session, ("SIZE=52105824", "SHA=d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a"))
+    require("current canonical transition fence", transition, ("VER = '15.32.be4f48'", "SIZE = 52105824", "SHA = '552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1'"))
+    require("current canonical live-session fence", session, ("SIZE=52105824", "SHA=552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1"))
     forbid("current canonical enforcement", transition + session, (historical_fence, "SIZE=51965216", "SIZE = 51965216"))
 
     forbid(

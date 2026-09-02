@@ -1,0 +1,33 @@
+{
+  "schema": "otclient.track-a.current-client-fence.promotion.v1",
+  "decision": "PASS_EXACT_OFFICIAL_LAUNCHER_CURRENT_BUILD_PROVEN",
+  "observed_at": "2026-09-02T10:29:00Z",
+  "exact_client": {
+    "version": "15.32.be4f48",
+    "size": 52105824,
+    "sha256": "552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1",
+    "packed_size": 10205435,
+    "packed_sha256": "7a036fb52621badb8b53f34359c49220451940164962ea08fce674c97abbc114"
+  },
+  "source": {
+    "kind": "official_launcher_verified_install",
+    "package_manifest_version": "15.32.be4f48",
+    "package_manifest_sha256": "e6dc81180a618624287076cf7d739902239b82174f08389cdc4d24ca6f740c12",
+    "manifest_client_unpacked_sha256": "552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1",
+    "live_client_sha256": "552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1",
+    "live_client_pid_at_observation": 28379,
+    "display": ":1.0"
+  },
+  "limitations": {
+    "raw_cdn_refetch_independently_completed": false,
+    "reason": "static.tibia.com returned Cloudflare challenge/HTTP 403 on direct Synology, Molehill-PC and runner WARP fetch attempts; those attempts are not used as authority"
+  },
+  "safety": {
+    "login_performed": false,
+    "credentials_accessed": false,
+    "character_selected": false,
+    "gameplay_input_sent": false,
+    "process_memory_access": false,
+    "packet_capture": false
+  }
+}

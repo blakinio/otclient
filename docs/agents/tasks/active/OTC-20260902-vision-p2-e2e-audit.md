@@ -15,7 +15,7 @@ base_branch: main
 base_main: 8441fc1cce1600033b505d68ebc5c0141b337394
 audited_integration_head: 7d4bae503030a00a51fad409d46bc43a39ad2314
 created: 2026-09-02T11:28:36+02:00
-updated_at: 2026-09-02T11:35:49+02:00
+updated_at: 2026-09-02T12:14:09+02:00
 risk: high
 feature_scope:
   type: infrastructure
@@ -65,10 +65,10 @@ depends_on:
   - coordinator classification review #5087863607 ACCEPT for Wave 2 repository/integration scope
 blocks:
   - Phase 2 completion and merge of PR #856
-current_blocker: synology_remote_desktop_commander_offline
-next_action: when an authorized Synology Remote Desktop Commander device is online, perform the required non-invasive container display window and official-client identity preflight before requesting fresh read-only admission
+current_blocker: exact_official_client_target_absent
+next_action: when an exact official client is already running in the designated KasmVNC container under authorized runtime ownership, repeat the non-invasive target preflight and only then request fresh read-only admission; this Phase 2 audit must not launch the client
 invocation_started_at: 2026-09-02T11:28:36+02:00
-last_progress_at: 2026-09-02T11:35:49+02:00
+last_progress_at: 2026-09-02T12:14:09+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: audit_setup
 terminal_ci_wait_started_at: null
@@ -130,8 +130,8 @@ A clean result requires exact-head evidence, zero open material findings, a real
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-02T09:35:49Z
-head: 204dae4fc104db779e13f54df0774aca876d282d
+updated_at: 2026-09-02T10:14:09Z
+head: 47842c0a40f0d4fc46702b519b3115978e0cd8cf
 branch: test/OTC-20260902-vision-p2-e2e-audit
 pr: 857
 status: waiting
@@ -150,27 +150,31 @@ proven:
   - only the audit task and report differ above the accepted integration generation before this checkpoint
   - security and provenance subset passed 184 of 184 tests on the fresh audit checkout
   - broad Control Center discovery ran 569 tests with 5 errors and 2 skips; all 5 errors reproduce identically on clean main 8441fc1cce1600033b505d68ebc5c0141b337394
-  - the two authorized Remote Desktop Commander devices named Synology are offline; last_seen values are 2026-08-30T19:44:23.642Z and 2026-08-23T00:01:32.904Z
-  - no physical runtime command and no Codex worker or reviewer invocation has occurred in Wave 3
+  - authorized Synology Remote Desktop Commander device c47a502e-1b72-4611-b2cd-0b92952ea3a4 is online and responded to read-only preflight
+  - designated container otclient-track-a-kasmvnc is running, DISPLAY=:1 is reachable at 1024x768, but no Tibia/client window is present
+  - pgrep -x client returned no PID in the designated container and no running container exposed a client candidate
+  - canonical runtime-registration.json is absent
+  - no screenshot, model inference, GUI input, login, credentials, process control, memory access, packet capture or mutation occurred; direct Codex worker/reviewer invocations remain zero
   - PR 857 is the live Draft audit checkpoint
 
 derived:
   - the 5 broad-suite errors are baseline or local-environment limitations rather than Wave 2 regressions
   - independent model audit is intentionally deferred until physical E2E evidence is available so one bounded invocation can review the complete exact-generation evidence set
-  - physical E2E cannot truthfully start while the required authorized Synology Remote Desktop Commander path is offline
+  - physical E2E cannot truthfully start because no exact official-client target exists to admit; Phase 2 is not authorized to launch or bootstrap the client
 unknown:
-  - current Synology container display window and official-client identity
-  - fresh read-only runtime admission result
+  - when the exact official client will next be started by an authorized runtime owner
+  - fresh read-only runtime admission result after an exact target exists
   - real admitted read-only E2E result
   - fresh independent audit findings after complete static and live evidence are available
 conflicts:
   - none
 first_failure:
-  marker: required Synology Remote Desktop Commander device is offline
-  evidence: Remote_Desktop_Commander.list_devices at 2026-09-02T09:30Z returned both Synology devices offline
+  marker: exact official-client runtime target is absent
+  evidence: fresh Synology preflight found target container/display healthy but CLIENT_PIDS empty, no Tibia/client window, no client candidate in any running container, and canonical registration ABSENT
 rejected_hypotheses:
   - broad-suite failures are introduced by Wave 2: the same isolated API and vision errors reproduce on clean main 8441fc1ce1600033b505d68ebc5c0141b337394
   - hosted tests can replace the real runtime gate: Phase 2 programme requires a freshly admitted physical read-only E2E
+  - Synology online is sufficient to start E2E: fresh preflight proved the host/display only; there is no exact client target to admit
 changed_paths:
   - docs/agents/reports/OTC-20260902-vision-p2-e2e-audit.md
   - docs/agents/tasks/active/OTC-20260902-vision-p2-e2e-audit.md
@@ -188,10 +192,13 @@ validation:
   - command: security and provenance subset covering foundation authority admission signals transport bridge reconciliation session trusted composition replay capture evidence and Ollama
     result: PASS
     evidence: 184 tests OK on fresh audit checkout
+  - command: fresh Synology non-invasive runtime preflight
+    result: PASS
+    evidence: device online; otclient-track-a-kasmvnc running; DISPLAY=:1 reachable at 1024x768; no Tibia window/client PID/client candidate; canonical registration absent
   - command: required physical read-only E2E
     result: BLOCKED
-    evidence: both authorized Synology Remote Desktop Commander devices are offline
+    evidence: no exact official-client target exists for read-only admission and Phase 2 has no process-control/bootstrap authority
 blockers:
-  - authorized Synology Remote Desktop Commander runtime path is offline
-next_action: when an authorized Synology Remote Desktop Commander device is online, perform the required non-invasive container display window and official-client identity preflight before requesting fresh read-only admission
+  - exact official-client target is absent; canonical registration is absent; Phase 2 audit is forbidden to launch/bootstrap the client
+next_action: when an exact official client is already running in the designated KasmVNC container under authorized runtime ownership, repeat the non-invasive target preflight and only then request fresh read-only admission; this Phase 2 audit must not launch the client
 ```

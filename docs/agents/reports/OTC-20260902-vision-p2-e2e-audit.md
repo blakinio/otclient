@@ -37,8 +37,9 @@ Attempt to falsify at minimum:
 - Security/provenance subset: `184/184 PASS`.
 - Broad Control Center discovery: `569 tests`, `5 errors`, `2 skipped`; all five errors reproduce identically on clean `main@8441fc1...`, so they are not Wave 2 regressions.
 - Fresh independent model audit: `DEFERRED` until the physical E2E evidence exists, to avoid consuming the constrained Codex quota twice.
-- Fresh runtime preflight/admission: `BLOCKED` because both authorized Remote Desktop Commander devices named `Synology` are offline.
-- Real admitted read-only E2E: `BLOCKED` by the same runtime availability condition.
+- Fresh runtime preflight: `PASS` for host/container/display reachability, but `NO_TARGET` for the official client: no `client` PID, no Tibia/client window, no client candidate in any running container, and canonical registration is absent.
+- Fresh read-only admission: `BLOCKED` because there is no exact official-client target to admit.
+- Real admitted read-only E2E: `BLOCKED` by target absence; this Phase 2 audit is not authorized to launch/bootstrap the client.
 - Material Wave 2 finding from deterministic pre-audit: `NONE`.
 - Direct Codex worker/reviewer invocations for Wave 3 so far: `0`.
 
@@ -53,4 +54,4 @@ The fresh checkout merge-base with the accepted Wave 2 generation is exactly `7d
 
 The five broad-suite errors are outside Wave 2 changed paths and reproduce individually on clean `main@8441fc1cce1600033b505d68ebc5c0141b337394`: four Windows-local API connection resets and one vision test ending in `MODEL_INFERENCE_FAILED`. They are retained as baseline/environment evidence and are not silently counted as passing.
 
-The required runtime contract was read from trusted base before attempting physical observation. Device discovery found both authorized `Synology` Remote Desktop Commander registrations offline, so no container, display, window, PID, screenshot, admission, model inference, or official-client access was attempted.
+The required runtime contract was read from trusted base before physical observation. The authorized `Synology` device is now online. Non-invasive preflight proved `otclient-track-a-kasmvnc` running and `DISPLAY=:1` reachable at `1024x768`, but no Tibia/client window or `client` process exists; an all-running-container candidate scan found none and the canonical runtime registration is absent. No screenshot, admission, model inference, input, login, credential access, process control, memory access, packet capture, or mutation was attempted.

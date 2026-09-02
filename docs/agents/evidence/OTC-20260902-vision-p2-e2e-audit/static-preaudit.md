@@ -28,3 +28,16 @@ Classification: baseline/local-environment limitations, not Wave 2 regressions. 
 At device discovery on 2026-09-02, both authorized Remote Desktop Commander registrations named `Synology` were offline. No physical runtime command was executed. Runtime access therefore remains `none`, physical action count remains `0`, and the mandatory real read-only E2E is blocked pending device availability.
 
 Direct Codex worker/reviewer invocations used by Wave 3 through this evidence point: `0`.
+
+
+## Fresh Synology preflight (2026-09-02T10:14:09Z)
+
+- Remote Desktop Commander device `Synology` / `c47a502e-1b72-4611-b2cd-0b92952ea3a4`: online.
+- `otclient-track-a-kasmvnc`: running (`container id 1af4af4d67f5`; started `2026-08-29T06:26:42.111997309Z`).
+- `DISPLAY=:1`: `DISPLAY_CONNECT=PASS`; dimensions `1024x768`.
+- Tibia/client window grep: no match; root tree showed ordinary XFCE desktop/windows only.
+- `pgrep -x client` in the designated container: no PID.
+- scan of all running containers for `pgrep -x client`: no candidates.
+- canonical `/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime/runtime-registration.json`: `ABSENT`.
+
+Admission consequence: `runtime_access` remains `none`; target uniqueness cannot be `PROVEN` for a non-existent official-client target. Phase 2 audit has no authority to launch/bootstrap/process-control the client, so the real read-only E2E remains blocked until an authorized runtime owner has an exact client already running. No screenshot/model inference/input/login/credential/process-control/memory/network-payload/mutation action occurred.

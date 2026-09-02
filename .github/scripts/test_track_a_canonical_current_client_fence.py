@@ -1,112 +1,125 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import argparse
 import json
-import re
+import subprocess
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
-CURRENT_VERSION = '15.32.be4f48'
-CURRENT_SIZE = 52_105_824
-CURRENT_SHA = '552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1'
-PREVIOUS_VERSION = '15.32.75d4a0'
-PREVIOUS_SHA = 'd1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a'
-LEGACY_SIZE = 52_109_920
-LEGACY_SHA = 'ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8'
-STALE_CURRENT_SENTENCE = (
-    f'The current public native-Linux package is fenced exactly as `{PREVIOUS_VERSION} / '
-    f'{CURRENT_SIZE} / {PREVIOUS_SHA}`.'
+from tools.tibia_re_control_center.current_client_fence import (  # noqa: E402
+    CURRENT_CLIENT_FENCE_MANIFEST,
+    approved_historical_fences,
+    current_client_fence,
+    load_current_client_fence_manifest,
 )
 
-PROMOTION = ROOT / 'docs/agents/evidence/OTC-20260902-canonical-current-client-fence-be4f48/result.json'
-WORKER = ROOT / '.github/scripts/tibia-official-client-re-canonical-live-session.sh'
-TRANSITION = ROOT / '.github/scripts/tibia-official-client-re-canonical-live-transition.py'
-ADOPTION = ROOT / '.github/scripts/tibia-official-client-re-kasm-existing-runtime-probe.py'
-BOOTSTRAP_WORKER = ROOT / '.github/scripts/tibia-official-client-re-kasm-bootstrap-worker.py'
-CONTROL_CENTER_ADMISSION = ROOT / 'tools/tibia_re_control_center/agent_runtime_admission.py'
-TRACKS = ROOT / 'docs/agents/TIBIA_RESEARCH_TRACKS.md'
-ADR = ROOT / 'docs/agents/decisions/ADR-0001-track-a-canonical-live-runtime.md'
-BOOTSTRAP = ROOT / 'docs/agents/contracts/TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md'
-RUNTIME_ADMISSION = ROOT / 'docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md'
-GOVERNANCE = ROOT / '.github/workflows/track-a-canonical-live-governance.yml'
-KASM_BOOTSTRAP_WORKFLOW = ROOT / '.github/workflows/track-a-kasm-canonical-bootstrap.yml'
-PACKAGE_A_WORKFLOW = ROOT / '.github/workflows/tibia-re-control-center-core.yml'
-CHANGELOG = ROOT / 'docs/agents/CHANGELOG.md'
+MANIFEST_REL = CURRENT_CLIENT_FENCE_MANIFEST.relative_to(ROOT).as_posix()
+MANIFEST_REF = f"docs/agents/contracts/{CURRENT_CLIENT_FENCE_MANIFEST.name}"
+MIGRATED_CONSUMERS = (
+    ROOT / "tools/tibia_re_control_center/agent_runtime_admission.py",
+    ROOT / ".github/scripts/tibia-official-client-re-canonical-live-session.sh",
+    ROOT / ".github/scripts/tibia-official-client-re-canonical-live-transition.py",
+    ROOT / ".github/scripts/tibia-official-client-re-kasm-bootstrap-worker.py",
+    ROOT / ".github/scripts/tibia-official-client-re-kasm-existing-runtime-probe.py",
+    ROOT / ".github/scripts/tibia-official-client-re-canonical-client-fence-reconcile.py",
+    ROOT / ".github/scripts/test_track_a_agent_runtime_governance.py",
+    ROOT / ".github/workflows/track-a-canonical-live-governance.yml",
+    ROOT / ".github/workflows/track-a-canonical-current-client-fence.yml",
+    ROOT / ".github/workflows/track-a-kasm-canonical-bootstrap.yml",
+    ROOT / ".github/workflows/track-a-surveyor-v2-readonly.yml",
+    ROOT / ".github/workflows/track-a-canonical-client-fence-reconciliation.yml",
+)
+
+CURRENT_CONTRACT_DOCS = (
+    ROOT / "docs/agents/TIBIA_RESEARCH_TRACKS.md",
+    ROOT / "docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md",
+    ROOT / "docs/agents/contracts/TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md",
+    ROOT / "docs/agents/decisions/ADR-0001-track-a-canonical-live-runtime.md",
+)
+
+def _provenance_matches_current() -> None:
+    manifest = load_current_client_fence_manifest()
+    path = ROOT / manifest.current_provenance
+    document = json.loads(path.read_text(encoding="utf-8"))
+    exact = document.get("exact_client")
+    if not isinstance(exact, dict):
+        raise SystemExit("CURRENT_FENCE_PROVENANCE_EXACT_CLIENT_MISSING")
+    observed = (exact.get("version"), exact.get("size"), exact.get("sha256"))
+    if observed != manifest.current.as_tuple():
+        raise SystemExit("CURRENT_FENCE_PROVENANCE_MISMATCH")
+    if not str(document.get("decision", "")).startswith("PASS_"):
+        raise SystemExit("CURRENT_FENCE_PROVENANCE_NOT_PASS")
 
 
-def read(path: Path) -> str:
-    return path.read_text(encoding='utf-8')
+def _consumers_are_manifest_driven() -> None:
+    current = current_client_fence()
+    historical = tuple(item.sha256 for item in approved_historical_fences())
+    for path in MIGRATED_CONSUMERS:
+        text = path.read_text(encoding="utf-8")
+        if "current_client_fence" not in text:
+            raise SystemExit(f"CURRENT_FENCE_LOADER_MISSING:{path}")
+        if current.version in text or current.sha256 in text:
+            raise SystemExit(f"CURRENT_FENCE_LITERAL_REINTRODUCED:{path}")
+        if any(sha in text for sha in historical):
+            raise SystemExit(f"HISTORICAL_FENCE_ACTIVE_IN_CONSUMER:{path}")
+
+def _contracts_reference_manifest() -> None:
+    for path in CURRENT_CONTRACT_DOCS:
+        text = path.read_text(encoding="utf-8")
+        if MANIFEST_REF not in text:
+            raise SystemExit(f"CURRENT_FENCE_MANIFEST_REF_MISSING:{path}")
 
 
-def assert_python_constants(text: str, label: str) -> None:
-    expected = (
-        (r"^VER\s*=\s*['\"]([^'\"]+)['\"]", CURRENT_VERSION),
-        (r'^SIZE\s*=\s*([0-9_]+)', str(CURRENT_SIZE)),
-        (r"^SHA\s*=\s*['\"]([0-9a-f]+)['\"]", CURRENT_SHA),
+def _base_current(base_ref: str) -> tuple[str, int, str] | None:
+    completed = subprocess.run(
+        ["git", "show", f"{base_ref}:{MANIFEST_REL}"],
+        check=False,
+        text=True,
+        capture_output=True,
     )
-    for pattern, value in expected:
-        match = re.search(pattern, text, flags=re.MULTILINE)
-        assert match is not None, f'{label}: missing {pattern}'
-        actual = match.group(1).replace('_', '')
-        assert actual == value.replace('_', ''), f'{label}: {actual} != {value}'
+    if completed.returncode != 0:
+        return None
+    raw = json.loads(completed.stdout)
+    current = raw.get("current")
+    if not isinstance(current, dict):
+        raise SystemExit("BASE_CURRENT_FENCE_INVALID")
+    value = (current.get("version"), current.get("size"), current.get("sha256"))
+    if not isinstance(value[0], str) or not isinstance(value[1], int) or not isinstance(value[2], str):
+        raise SystemExit("BASE_CURRENT_FENCE_INVALID")
+    return value
+
+def _promotion_retains_previous_current(base_ref: str | None) -> None:
+    if not base_ref:
+        return
+    previous = _base_current(base_ref)
+    if previous is None:
+        print("TRACK_A_CURRENT_FENCE_BASE_MANIFEST=ABSENT_INITIAL_INTRODUCTION")
+        return
+    manifest = load_current_client_fence_manifest()
+    if previous == manifest.current.as_tuple():
+        return
+    history = {item.as_tuple() for item in manifest.approved_history}
+    if previous not in history:
+        raise SystemExit("PREVIOUS_CURRENT_FENCE_MISSING_FROM_HISTORY")
 
 
-def assert_current_governance_fence(text: str, label: str) -> None:
-    assert CURRENT_VERSION in text, f'{label}: current build version missing'
-    assert str(CURRENT_SIZE) in text.replace('_', ''), f'{label}: current client size missing'
-    assert CURRENT_SHA in text, f'{label}: current client SHA missing'
-    assert STALE_CURRENT_SENTENCE not in text, f'{label}: previous build still described as current'
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--base-ref")
+    args = parser.parse_args()
+    load_current_client_fence_manifest()
+    _provenance_matches_current()
+    _consumers_are_manifest_driven()
+    _contracts_reference_manifest()
+    _promotion_retains_previous_current(args.base_ref)
+    print("TRACK_A_CANONICAL_CURRENT_CLIENT_FENCE=PASS")
+    return 0
 
 
-def main() -> None:
-    promoted = json.loads(read(PROMOTION))
-    exact = promoted['exact_client']
-    assert exact['version'] == CURRENT_VERSION
-    assert exact['size'] == CURRENT_SIZE
-    assert exact['sha256'] == CURRENT_SHA
-    assert promoted['decision'] == 'PASS_EXACT_OFFICIAL_LAUNCHER_CURRENT_BUILD_PROVEN'
-
-    assert_current_governance_fence(read(RUNTIME_ADMISSION), 'runtime admission contract')
-    assert_current_governance_fence(read(CONTROL_CENTER_ADMISSION), 'Control Center runtime admission')
-
-    worker = read(WORKER)
-    assert re.search(rf'^SIZE={CURRENT_SIZE}$', worker, flags=re.MULTILINE), 'canonical session worker: stale client size'
-    assert re.search(rf'^SHA={CURRENT_SHA}$', worker, flags=re.MULTILINE), 'canonical session worker: stale client SHA'
-    assert LEGACY_SHA not in worker, 'canonical session worker: legacy SHA remains authoritative'
-
-    for label, path in (
-        ('canonical transition', TRANSITION),
-        ('existing-runtime adoption probe', ADOPTION),
-        ('Kasm bootstrap worker', BOOTSTRAP_WORKER),
-    ):
-        assert_python_constants(read(path), label)
-
-    for label, path in (
-        ('Track A research contract', TRACKS),
-        ('canonical runtime ADR', ADR),
-        ('canonical bootstrap contract', BOOTSTRAP),
-    ):
-        assert_current_governance_fence(read(path), label)
-
-    governance = read(GOVERNANCE)
-    assert f"fence = '{CURRENT_SHA}'" in governance, 'canonical-live governance: stale exact-fence audit'
-
-    kasm_workflow = read(KASM_BOOTSTRAP_WORKFLOW)
-    assert f'EXPECTED_VERSION: {CURRENT_VERSION}' in kasm_workflow, 'Kasm bootstrap workflow: stale version'
-    assert f'EXPECTED_SHA: {CURRENT_SHA}' in kasm_workflow, 'Kasm bootstrap workflow: stale SHA'
-
-    changelog = read(CHANGELOG)
-    assert f'Track A canonical exact-client fence advances to `{CURRENT_VERSION}`' in changelog, 'changelog: current canonical fence entry missing'
-
-    package_a = read(PACKAGE_A_WORKFLOW)
-    assert 'HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}' in package_a, 'Package A fence exception: head repository fence missing'
-    assert "fence_base = '8441fc1cce1600033b505d68ebc5c0141b337394'" in package_a, 'Package A fence exception: one-time base SHA missing'
-    assert "fence_repo = 'blakinio/otclient'" in package_a, 'Package A fence exception: same-repository fence missing'
-    assert "base == fence_base" in package_a and "os.environ.get('HEAD_REPO') == fence_repo" in package_a, 'Package A fence exception: one-time predicate incomplete'
-
-    print('TRACK_A_CANONICAL_CURRENT_CLIENT_FENCE=PASS')
-
-
-if __name__ == '__main__':
-    main()
+if __name__ == "__main__":
+    raise SystemExit(main())

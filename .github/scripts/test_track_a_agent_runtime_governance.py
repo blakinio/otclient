@@ -2,12 +2,20 @@
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
 import re
 import subprocess
+import sys
 import tempfile
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from tools.tibia_re_control_center.current_client_fence import (  # noqa: E402
+    approved_historical_fences,
+)
+
 TRACK_A = "official-client-re"
 CANONICAL_NAMESPACE = "canonical-live-runtime"
 CANONICAL_STATE_ROOT = "/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime"
@@ -494,10 +502,8 @@ def static_policy_audit() -> None:
     admission = read("docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md")
     canonical = read("docs/agents/prompts/OTCLIENT_TIBIA_RE_CANONICAL.md")
 
-    exact_fence = "552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1"
-    exact_size = "52105824"
-    exact_version = "15.32.be4f48"
-    historical_fence = "e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe"
+    manifest_ref = "docs/agents/contracts/TRACK_A_CURRENT_CLIENT_FENCE_V1.json"
+    historical_fences = tuple(item.sha256 for item in approved_historical_fences())
     registration = "/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime/runtime-registration.json"
 
     require(
@@ -540,7 +546,7 @@ def static_policy_audit() -> None:
             "rfb_6082_current_backend_mapping: UNKNOWN",
             "current_exact_client_pid: NOT_REGISTERED",
             "current_exact_client_session: NOT_REGISTERED",
-            exact_fence,
+            manifest_ref,
         ),
     )
     require(
@@ -576,7 +582,7 @@ def static_policy_audit() -> None:
             "PR #303",
             "Track B never shares Track A's canonical lease",
             registration,
-            exact_fence,
+            manifest_ref,
             "### PASS — static P2 worker",
             "### PASS — isolated startup experiment",
             "### PASS — bounded read-only live observation",
@@ -636,18 +642,18 @@ def static_policy_audit() -> None:
         raise SystemExit("trusted bootstrap implementation/archive proof is incomplete")
 
     for label, text in (
-        ("tracks current fence", tracks),
-        ("admission current fence", admission),
-        ("bootstrap current fence", read("docs/agents/contracts/TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md")),
-        ("ADR current fence", read("docs/agents/decisions/ADR-0001-track-a-canonical-live-runtime.md")),
+        ("tracks current fence source", tracks),
+        ("admission current fence source", admission),
+        ("bootstrap current fence source", read("docs/agents/contracts/TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md")),
+        ("ADR current fence source", read("docs/agents/decisions/ADR-0001-track-a-canonical-live-runtime.md")),
     ):
-        require(label, text, (exact_fence, exact_size, exact_version))
+        require(label, text, (manifest_ref,))
 
     transition = read(BOOTSTRAP_TRANSITION)
     session = read(".github/scripts/tibia-official-client-re-canonical-live-session.sh")
-    require("current canonical transition fence", transition, ("VER = '15.32.be4f48'", "SIZE = 52105824", "SHA = '552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1'"))
-    require("current canonical live-session fence", session, ("SIZE=52105824", "SHA=552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1"))
-    forbid("current canonical enforcement", transition + session, (historical_fence, "SIZE=51965216", "SIZE = 51965216"))
+    require("current canonical transition fence", transition, ("current_client_fence", "_CURRENT_CLIENT_FENCE"))
+    require("current canonical live-session fence", session, ("current_client_fence", "TRACK_A_CURRENT_CLIENT_SIZE", "TRACK_A_CURRENT_CLIENT_SHA"))
+    forbid("current canonical enforcement", transition + session, historical_fences)
 
     forbid(
         "OTCLIENT_TIBIA_RE_CANONICAL.md",

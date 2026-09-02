@@ -56,13 +56,10 @@ jobs:
             .github/scripts/test_tibia_official_client_re_canonical_client_fence_reconcile.py \
             .github/scripts/test_track_a_agent_runtime_governance.py
           git diff --check "$BASE_SHA"...HEAD
+          python3 -m unittest tests.tools.tibia_re_control_center.test_current_client_fence
           contract='docs/agents/contracts/TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_V1.md'
-          grep -Fq 'client_version: 15.32' "$contract"
-          grep -Fq 'client_size: 52109920' "$contract"
-          grep -Fq 'client_sha256: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8' "$contract"
-          grep -Fq 'client_version: 15.32.75d4a0' "$contract"
-          grep -Fq 'client_size: 52105824' "$contract"
-          grep -Fq 'client_sha256: d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a' "$contract"
+          grep -Fq 'TRACK_A_CURRENT_CLIENT_FENCE_V1.json' "$contract"
+          grep -Fq 'approved_history' "$contract"
           echo 'TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_CONTRACT=PASS'
 
   live-reconciliation:
@@ -149,6 +146,7 @@ jobs:
           reg='/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime/runtime-registration.json'
           decision="$(python3 - "$reg" <<'PY'
           import json,os,pathlib,stat,sys
+          from tools.tibia_re_control_center.current_client_fence import approved_reconciliation_sources,current_client_fence
           path=pathlib.Path(sys.argv[1])
           try:
               st=path.lstat()
@@ -162,12 +160,12 @@ jobs:
           except Exception:
               print('BLOCK:REGISTRATION_INVALID_JSON'); raise SystemExit(0)
           fence=(data.get('client_version'),data.get('client_size'),data.get('client_sha256'))
-          old=('15.32',52109920,'ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8')
-          current=('15.32.75d4a0',52105824,'d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a')
-          if fence==old:
-              print('RECONCILE')
-          elif fence==current:
+          current=current_client_fence().as_tuple()
+          approved={item.as_tuple() for item in approved_reconciliation_sources()}
+          if fence==current:
               print('RECONCILE_CURRENT_IDENTITY')
+          elif fence in approved:
+              print('RECONCILE')
           else:
               print('BLOCK:UNAPPROVED_REGISTRATION_FENCE')
           PY
@@ -258,15 +256,14 @@ jobs:
           set -Eeuo pipefail
           python3 - <<'PY'
           import json,os,pathlib,stat
+          from tools.tibia_re_control_center.current_client_fence import current_client_fence
           path=pathlib.Path('/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime/runtime-registration.json')
           st=path.lstat()
           owner=(not hasattr(os,'getuid')) or st.st_uid==os.getuid()
           assert stat.S_ISREG(st.st_mode) and not path.is_symlink()
           assert stat.S_IMODE(st.st_mode)==0o600 and owner
           data=json.loads(path.read_text())
-          assert (data.get('client_version'),data.get('client_size'),data.get('client_sha256')) == (
-              '15.32.75d4a0',52105824,'d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a'
-          )
+          assert (data.get('client_version'),data.get('client_size'),data.get('client_sha256')) == current_client_fence().as_tuple()
           assert data.get('state') == 'UNKNOWN'
           print('TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_REGISTRATION_CURRENT=PASS')
           print('TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_CLIENT_PROCESS_MUTATION=false')

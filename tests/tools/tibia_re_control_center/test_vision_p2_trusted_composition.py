@@ -25,12 +25,16 @@ from tools.tibia_re_control_center.agent_runtime_signals import (
     RuntimeSignalResolver,
 )
 from tools.tibia_re_control_center.control_domain import ControlDomainService
+from tools.tibia_re_control_center.current_client_fence import current_client_fence
 from tools.tibia_re_control_center.model import ValidationError
 from tools.tibia_re_control_center.vision_p2_trusted_composition import (
     ReviewedCapturePolicy,
     TrustedCaptureArtifact,
     VisionP2TrustedComposition,
 )
+
+_CURRENT_CLIENT_FENCE = current_client_fence()
+
 from tools.tibia_re_vision.capture_edge import (
     CaptureEdgeError,
     PixelRegion,
@@ -51,9 +55,9 @@ def _binding(*, xid: int = 321) -> RuntimeBinding:
         pid=123,
         process_start_ticks=456,
         xid=xid,
-        client_version="15.32.be4f48",
-        client_size=52_105_824,
-        client_sha256="552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1",
+        client_version=_CURRENT_CLIENT_FENCE.version,
+        client_size=_CURRENT_CLIENT_FENCE.size,
+        client_sha256=_CURRENT_CLIENT_FENCE.sha256,
         observed_monotonic_ns=1_000,
         runtime_access="read_only",
         target_uniqueness="PROVEN",

@@ -79,3 +79,9 @@ Trusted `main` advanced through merged PR #859 to `27f9bdd5f003c596529e7571343ae
 The synchronized generation retains the original reconciliation implementation unchanged. Fresh local verification passes Wave 2 `90/90`, runtime admission `14/14`, Qwen schema contract `3/3`, frozen vision benchmark `34/34`, current-client fence, Track A runtime governance, `py_compile`, Ruff I/F, YAML parse and diff check. Package A exact simulation accepts the real five-path PR diff only for the exact Wave 2 branch/repo/base and rejects wrong base, wrong branch and fork.
 
 This synchronization does not satisfy Wave 3 physical E2E. It only makes the repository integration generation coherent with the trusted Qwen sensor repair that Wave 3 must freshly retest. Direct Codex usage remains `0`; Wave 2 runtime access remains `none`.
+
+## Post-admission-only trusted-base synchronization
+
+PR #860 merged the bounded admission-only authority repair to trusted `main@a7c7eb8aa2cc69d70442578401d88be9262055e4`. Synchronizing that base into Wave 2 produced one test-only conflict. The final union preserves Wave 2 reconciliation imports and both new admission-only guards; bridge repair code entered from trusted main unchanged.
+
+Fresh local validation passes the reconciliation/edge/session/trusted-composition matrix `92/92`, runtime admission `14/14`, admission-only focused guards `2/2`, current-client fence, compile/Ruff and diff check. The Wave 2 Package A one-time exception is rebound only to the new exact base; historical Qwen and admission-only exceptions keep their original bases. The PR diff versus current main remains the same five Wave 2 integration paths. No reconciliation code repair was required. Runtime access remains `none`, physical action count `0`, direct Codex usage `0`.

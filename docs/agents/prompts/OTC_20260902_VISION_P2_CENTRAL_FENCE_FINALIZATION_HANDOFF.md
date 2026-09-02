@@ -43,7 +43,7 @@ commit sequence:
   30879f705  feat(track-a): centralize current-client fence
 ```
 
-At handoff time the only local uncommitted repository file is the centralization task card plus this handoff documentation. No PR for the centralization branch exists yet.
+The handoff task/prompt documentation is committed and the branch is pushed. Treat `30879f705...` as the GREEN implementation head, not as a promise about the latest remote branch head; resolve the current remote branch head before work. No centralization PR existed when this handoff was prepared.
 ## What is already implemented — do not redo
 
 Central manifest:

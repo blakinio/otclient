@@ -57,3 +57,15 @@ The official launcher updated the package to `15.32.be4f48`. Fresh read-only pro
 - visible top-level Tibia window bound to PID `28379`.
 
 Trusted-base fence is still `15.32.75d4a0` / `d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a`. Therefore read-only admission is refused fail-closed and physical Vision P2 E2E remains blocked pending a separate reviewed fence advance.
+
+## Post-Qwen repair static revalidation
+
+- Trusted main: `27f9bdd5f003c596529e7571343ae8bb053d5cff` (merged PR #859).
+- Accepted Wave 2 integration under audit: `34fbf6e2d693058ce03a583087816b25639e9cb3`, review `5090102633`.
+- Audit restack merge-base with Wave 2: exact `34fbf6e2d693058ce03a583087816b25639e9cb3`.
+- Security/provenance subset: `184/184 PASS`.
+- Repaired Qwen schema contract: `3/3 PASS`.
+- Current-client fence: PASS.
+- Track A runtime governance and `git diff --check`: PASS.
+
+No previous physical target or model observation is reused as current evidence. Runtime access is `none` until the next fresh Synology admission.

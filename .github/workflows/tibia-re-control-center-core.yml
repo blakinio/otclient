@@ -110,9 +110,12 @@ jobs:
         shell: bash
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_REF: ${{ github.head_ref }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
         run: |
           set -Eeuo pipefail
           python3 - "$BASE_SHA" <<'PY'
+          import os
           import subprocess
           import sys
 
@@ -164,6 +167,35 @@ jobs:
               'docs/agents/reports/OTC-20260901-vision-p2-',
               'docs/agents/evidence/OTC-20260823-tibia-re-control-center-package-b/',
           )
+          fence_task = 'docs/agents/tasks/active/OTC-20260902-canonical-current-client-fence-be4f48.md'
+          fence_branch = 'fix/OTC-20260902-canonical-current-client-fence-be4f48'
+          fence_base = '8441fc1cce1600033b505d68ebc5c0141b337394'
+          fence_repo = 'blakinio/otclient'
+          if (
+              fence_task in changed
+              and base == fence_base
+              and os.environ.get('HEAD_REF') == fence_branch
+              and os.environ.get('HEAD_REPO') == fence_repo
+          ):
+              allowed_exact |= {
+                  fence_task,
+                  '.github/scripts/test_track_a_agent_runtime_governance.py',
+                  '.github/scripts/test_track_a_canonical_current_client_fence.py',
+                  '.github/scripts/tibia-official-client-re-canonical-live-session.sh',
+                  '.github/scripts/tibia-official-client-re-canonical-live-transition.py',
+                  '.github/scripts/tibia-official-client-re-kasm-bootstrap-worker.py',
+                  '.github/scripts/tibia-official-client-re-kasm-existing-runtime-probe.py',
+                  '.github/workflows/track-a-canonical-current-client-fence.yml',
+                  '.github/workflows/track-a-canonical-live-governance.yml',
+                  '.github/workflows/track-a-kasm-canonical-bootstrap.yml',
+                  'docs/agents/TIBIA_RESEARCH_TRACKS.md',
+                  'docs/agents/contracts/TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md',
+                  'docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md',
+                  'docs/agents/decisions/ADR-0001-track-a-canonical-live-runtime.md',
+                  'docs/agents/evidence/OTC-20260902-canonical-current-client-fence-be4f48/provenance.md',
+                  'docs/agents/evidence/OTC-20260902-canonical-current-client-fence-be4f48/result.json',
+                  'docs/agents/evidence/OTC-20260902-canonical-current-client-fence-be4f48/validation.md',
+              }
           unexpected = [
               path for path in changed
               if path not in allowed_exact and not path.startswith(allowed_prefixes)

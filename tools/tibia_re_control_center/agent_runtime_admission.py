@@ -21,9 +21,9 @@ from .model import (
 OBSERVATION_SCHEMA = "otclient.local-agent.runtime-observation.v1"
 ADMISSION_SCHEMA = "otclient.local-agent.runtime-admission.v1"
 PROVENANCE_SCHEMA = "otclient.local-agent.runtime-provenance.v1"
-CURRENT_CLIENT_VERSION = "15.32.75d4a0"
+CURRENT_CLIENT_VERSION = "15.32.be4f48"
 CURRENT_CLIENT_SIZE = 52_105_824
-CURRENT_CLIENT_SHA256 = "d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a"
+CURRENT_CLIENT_SHA256 = "552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1"
 RUNTIME_PLATFORM = "official_native_linux_only"
 
 _OBSERVATION_KEYS = (

@@ -95,9 +95,9 @@ def _admission_observation(now_ms: int) -> dict[str, object]:
             "process_start_ticks": 456,
             "exe_path": "/home/kasm-user/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client",
             "display": ":1",
-            "client_version": "15.32.75d4a0",
+            "client_version": "15.32.be4f48",
             "client_size": 52_105_824,
-            "client_sha256": "d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a",
+            "client_sha256": "552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1",
         },
         "window": {"xid": 321, "pid": 123, "display": ":1", "ownership_proven": True},
         "inventory": {
@@ -127,7 +127,7 @@ def read_only_task() -> TaskEnvelope:
         run_id="run-edge-1",
         idempotency_key="idem-edge-1",
         trusted_main_sha="a" * 40,
-        client_identity=ClientIdentity("15.32.75d4a0", 52_105_824, "d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a"),
+        client_identity=ClientIdentity("15.32.be4f48", 52_105_824, "552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1"),
         objective="observe the admitted runtime edge without physical effects",
         allowed_actions=(NamedAgentAction.SCREENSHOT,),
         physical_action_budget=0,
@@ -607,7 +607,7 @@ class AgentEdgeBridgeTests(unittest.TestCase):
     def test_admission_must_match_task_client_identity(self) -> None:
         mismatched_task = replace(
             read_only_task(),
-            client_identity=ClientIdentity("15.32.75d4a0", 52_105_824, "e" * 64),
+            client_identity=ClientIdentity("15.32.be4f48", 52_105_824, "e" * 64),
         )
         self.agent.submit_task(mismatched_task)
         admission = admit_read_only_runtime(

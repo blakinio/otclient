@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260902-vision-p2-e2e-audit
-status: investigating
+status: waiting
 agent: ChatGPT
 session_role: phase2_auditor
 worker_alias: OTC-VISION-P2-E2E-AUDIT
@@ -15,7 +15,7 @@ base_branch: feat/OTC-20260902-vision-p2-vision-reconciliation
 base_main: 27f9bdd5f003c596529e7571343ae8bb053d5cff
 audited_integration_head: 34fbf6e2d693058ce03a583087816b25639e9cb3
 created: 2026-09-02T11:28:36+02:00
-updated_at: 2026-09-02T15:24:00+02:00
+updated_at: 2026-09-02T15:34:55+02:00
 risk: high
 feature_scope:
   type: infrastructure
@@ -37,17 +37,17 @@ continuation_policy: continue_until_real_stop
 task_completion_policy: return_to_coordinator_for_classification
 policy_version: 2
 implementation_authorized: false
-runtime_access: read_only
-runtime_owner_task: OTC-20260902-vision-p2-e2e-audit
-runtime_namespace: 'Synology/otclient-track-a-kasmvnc/display-1/client-28379/start-36180734'
-canonical_registration: ABSENT
+runtime_access: none
+runtime_owner_task: NOT_APPLICABLE
+runtime_namespace: NOT_APPLICABLE
+canonical_registration: NOT_APPLICABLE
 canonical_lease_generation: NOT_APPLICABLE
 registration_lease_generation: NOT_APPLICABLE
 gate_a: NOT_APPLICABLE
 generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
-target_uniqueness: PROVEN
+target_uniqueness: NOT_APPLICABLE
 persistent_session_role: none
 physical_e2e_required: true
 mutation_authorized: false
@@ -75,10 +75,10 @@ depends_on:
   - coordinator refreshed classification review #5090102633 ACCEPT for post-Qwen Wave 2 repository/integration scope
 blocks:
   - Phase 2 completion and merge of PR #856
-current_blocker: post_qwen_live_capture_and_model_retest_pending
-next_action: commit and push this fresh read_only admission, then produce one new full-masked production capture and run the exact repaired Qwen sensor with serialized model residency and zero physical actions
+current_blocker: real_edge_peer_and_runtime_signal_producer_not_deployed
+next_action: return the material deployment/composition gap to the coordinator; Wave 3 remains waiting until a separately approved task provides a real authenticated edge peer plus reviewed live runtime-signal producer/composition, after which the auditor must freshly re-admit runtime and rerun only the missing full composition path
 invocation_started_at: 2026-09-02T11:28:36+02:00
-last_progress_at: 2026-09-02T15:24:00+02:00
+last_progress_at: 2026-09-02T15:34:55+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: post_qwen_repair_restack
 terminal_ci_wait_started_at: null
@@ -140,15 +140,15 @@ A clean result requires exact-head evidence, zero open material findings, a real
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-02T13:24:00Z
-head: c840571c0fea0afcdf7d438688395723b26e8b89
+updated_at: 2026-09-02T13:34:55Z
+head: 6f2c12f6ad49e6ce8b68cf067c18141b9c534328
 branch: test/OTC-20260902-vision-p2-e2e-audit
 pr: 857
-status: investigating
+status: waiting
 context_routes:
-  - docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
-  - docs/agents/contracts/TRACK_A_KASMVNC_RUNTIME_ACCESS_V1.md
-  - tools/tibia_re_control_center/agent_vision.py
+  - docs/agents/programs/OTC_VISION_P2_READONLY_COORDINATION_V1.md
+  - tools/tibia_re_control_center/agent_edge_transport.py
+  - tools/tibia_re_control_center/agent_runtime_signals.py
   - tools/tibia_re_control_center/vision_p2_trusted_composition.py
 owned_paths:
   - docs/agents/tasks/active/OTC-20260902-vision-p2-e2e-audit.md
@@ -156,54 +156,65 @@ owned_paths:
   - docs/agents/evidence/OTC-20260902-vision-p2-e2e-audit/**
 proven:
   - trusted main is 27f9bdd5f003c596529e7571343ae8bb053d5cff and accepted Wave 2 is 34fbf6e2d693058ce03a583087816b25639e9cb3 under review 5090102633
-  - post-repair static security/provenance subset passes 184 of 184 and repaired Qwen schema contract passes 3 of 3
-  - fresh Synology preflight proves designated container otclient-track-a-kasmvnc running and DISPLAY :1 reachable at 3440x1229
-  - fresh target scan proves exactly one client in the designated container and exactly one client across all running containers
-  - fresh exact process is PID 28379 start ticks 36180734 executable package client on DISPLAY :1.0 owned by kasm-user
-  - fresh client tuple 15.32.be4f48 size 52105824 sha256 552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1 matches trusted fence
-  - fresh X11 proof binds exactly one Tibia-class window XID 0x01e00017 geometry 810 263 1020 650 to PID 28379
-  - canonical runtime registration is ABSENT and boot-id sha256 is a6b053cc7bf4d6fffa302419b4a1d6fe5ae336c6de92abefeae27e8aa61c624a
-  - fresh target_uniqueness is PROVEN and read_only admission creates no canonical or mutation authority
-  - prior physical Qwen evidence is historical only; no old capture timestamp or model residency is reused as current
-  - no screenshot model inference GUI input login credentials process memory packet capture or mutation occurred during this admission preflight
-  - physical action count remains zero and direct Codex usage remains zero
+  - fresh post-repair runtime admission proved exact singleton official client PID 28379 start 36180734 XID 0x01e00017 and trusted client fence before observation
+  - new production Kasm capture completed in 8733 ms on geometry 810 263 1020 650 with stable post-capture PID start SHA XID and all-container singleton
+  - capture used full-frame zero mask before persistence; raw frame was not persisted; secret-safe capture SHA is ebbcca421d8e9a727af1143849547450b36e120e2f540cee0262de417125d97c
+  - fresh capture source monotonic ns is 372661727635814 and acquisition completed ns is 372669258682289
+  - exact Qwen digest matched and reconstructed model input bytes exactly matched the new physical masked capture SHA
+  - repaired production AgentVisionSensor now passes on real physical evidence with screen class UNKNOWN visible-text count zero correct model profile evidence ref capture SHA visual_only true and structural_authority false
+  - model residency was empty before and after inference; task-owned Vulkan Ollama lifecycle ended with API down zero model processes and no task PID file
+  - fresh Synology deployed-state inventory finds zero Vision P2 edge process matches in Kasm runner or host
+  - fresh Molehill deployed-state inventory excluding the diagnostic process finds zero Vision P2 edge process matches
+  - production edge transport module exposes outbound client/channel but no production listener or daemon entrypoint; listeners in tests are test-thread fixtures
+  - production tools instantiate no ReviewedRuntimeSignalContract RuntimeSignalSample bind_reviewed_source or ReviewedRuntimeAuthorityConfiguration outside the resolver implementation itself
+  - accepted runtime-signals report explicitly withholds a production REVIEWED_CAUSAL producer and requires a later separately reviewed live producer
+  - no GUI input login credentials character selection gameplay process memory packet capture or client mutation occurred; physical action count remains zero
+  - direct Codex worker or reviewer usage remains zero
 derived:
-  - current task may enter runtime_access read_only for one serialized observation window because all mandatory exact-target facts are fresh and fail-closed checks pass
-  - any PID start XID display candidate-count fence or boot change invalidates this admission before further observation
-  - Qwen repair remains unproven physically until a new capture and real-model inference succeeds
+  - the previous Qwen schema finding is physically resolved on the repaired generation and is no longer an open material finding
+  - full trusted composition E2E cannot truthfully proceed because there is no real authenticated edge peer/session producer to supply a current edge instance and no production reviewed live runtime-signal composition
+  - inventing an edge_instance_id test listener or runtime signal would convert the required physical E2E into fake evidence and is forbidden
+  - runtime_access is released back to none at this real stop; any later physical continuation requires fresh admission
 unknown:
-  - fresh full-masked capture SHA and source monotonic timestamp
-  - fresh repaired production Qwen observation result
-  - whether a real deployed Vision P2 edge peer exists for the full trusted composition path
-  - whether any reviewed causal runtime producer is available for semantic confirmation
-  - final independent audit result
+  - architecture and deployment contract for the missing real edge peer/server side
+  - exact reviewed live runtime-signal producer to bind at the composition root; semantic reviewed-causal IN_GAME may legitimately remain unavailable until separately proven
+  - full post-deployment edge capture runtime-signal reconciliation result
+  - fresh independent final audit result after the full composition evidence exists
 conflicts:
   - none
 first_failure:
-  marker: previous pre-repair physical Qwen output failed the strict model-observation schema
-  evidence: historical live-qwen-schema-finding.md; repository repair PR 859 is merged but physical revalidation is pending
+  marker: post-Qwen physical E2E reaches a valid visual observation but cannot enter the real trusted edge/runtime-signal composition because no deployed production peer or live producer exists
+  evidence: live inventories show zero deployed edge processes on Synology and Molehill; production source has no server daemon entrypoint and no runtime-signal contract/config instantiations
 rejected_hypotheses:
-  - prior admission can simply be resumed: rejected because every physical observation requires fresh target proof
-  - canonical registration is required for read_only observation: rejected by current Phase 2 admission contract; ABSENT does not grant or imply control authority
-  - unchanged PID means evidence is stale: rejected only as identity inference; freshness comes from this new process/window/all-container measurement, not numeric equality with history
+  - Qwen repair remains broken: rejected by new production sensor PASS on byte-identical fresh physical masked evidence
+  - generic localhost listeners prove a Vision P2 peer: rejected because no process/source provenance binds them to the edge protocol
+  - test listener can satisfy physical E2E: rejected because agent_edge_transport tests create their own listener thread and the programme requires the actual deployed path
+  - visual UNKNOWN can be manually injected into reconciliation without edge deployment: rejected because reconciliation requires a current trusted edge/capture session and caller-minted runtime/edge authority is forbidden
 changed_paths:
   - docs/agents/tasks/active/OTC-20260902-vision-p2-e2e-audit.md
   - docs/agents/reports/OTC-20260902-vision-p2-e2e-audit.md
-  - docs/agents/evidence/OTC-20260902-vision-p2-e2e-audit/post-qwen-live-read-only-preflight.md
+  - docs/agents/evidence/OTC-20260902-vision-p2-e2e-audit/post-qwen-live-e2e.md
 validation:
-  - command: fresh non-invasive Synology Kasm/client preflight
+  - command: fresh post-Qwen production Kasm full-mask capture
     result: PASS
-    evidence: container/display exact process fence PID-bound single X11 window and all-container singleton all pass
-  - command: current exact client fence comparison
+    evidence: 8733 ms secret-safe capture; raw frame false; post-capture identity and singleton remain current; action count zero
+  - command: repaired production AgentVisionSensor exact-Qwen inference with serialized Vulkan provider
     result: PASS
-    evidence: version size SHA and display match trusted tuple
-  - command: target uniqueness scan
+    evidence: strict UNKNOWN observation; visible-text count zero; profile evidence SHA and visual-only authority flags all match; residency empty after inference
+  - command: local model lifecycle cleanup
     result: PASS
-    evidence: exactly one client candidate across all running containers
-  - command: required post-repair capture and exact-Qwen inference
+    evidence: API down zero ollama or llama-server processes and task PID file absent
+  - command: fresh deployed edge process and production-entrypoint inventory
     result: BLOCKED
-    evidence: admission must be durably committed and pushed before screenshot/model observation
+    evidence: zero real edge processes on both hosts; outbound-only library has no production listener daemon entrypoint
+  - command: production runtime-signal composition inventory
+    result: BLOCKED
+    evidence: no production reviewed contract sample source or authority configuration instantiation exists outside resolver implementation
+  - command: required full trusted composition physical E2E
+    result: BLOCKED
+    evidence: a real current edge instance and reviewed live runtime-signal producer cannot be manufactured by the auditor
 blockers:
-  - durable read_only admission must be pushed before the first post-repair capture/model observation
-next_action: push this admission checkpoint, then run one new full-masked production capture and exact repaired Qwen inference with no GUI input or physical action
+  - real authenticated Vision P2 edge peer/server deployment is absent
+  - reviewed live runtime-signal producer/composition is absent; reviewed-causal semantic producer remains explicitly unpromoted
+next_action: coordinator must route the missing deployment/composition boundary to a separately approved design/implementation task; after promotion Wave 3 resumes from runtime_access none with fresh admission and only the remaining full composition E2E
 ```

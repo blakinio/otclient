@@ -13,7 +13,7 @@ phase: wave_3_finding_repair
 branch: fix/OTC-20260902-vision-p2-admission-only-authority
 base_branch: main
 base_main: 27f9bdd5f003c596529e7571343ae8bb053d5cff
-pr: null
+pr: 860
 created: 2026-09-02T16:47:00+02:00
 updated_at: 2026-09-02T16:54:26+02:00
 risk: medium
@@ -65,7 +65,7 @@ owned_paths:
   - docs/agents/tasks/active/OTC-20260902-vision-p2-admission-only-authority.md
   - .github/workflows/tibia-re-control-center-core.yml
 current_blocker: exact_head_ci_pending
-next_action: commit and push the one-time Package A boundary plus final checkpoint, open a Draft PR, and require fully terminal exact-head CI before coordinator classification
+next_action: push this PR-bound checkpoint and require fully terminal exact-head GitHub Actions before coordinator classification
 ---
 
 # Objective
@@ -95,7 +95,7 @@ checkpoint_version: 1
 updated_at: 2026-09-02T14:54:26Z
 head: c06f323f825935eca9887957cecaeb6e086e1818
 branch: fix/OTC-20260902-vision-p2-admission-only-authority
-pr: null
+pr: 860
 status: validating
 context_routes:
   - tools/tibia_re_control_center/agent_edge_bridge.py

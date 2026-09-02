@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260902-vision-p2-vision-reconciliation
-status: implementing
+status: validating
 agent: ChatGPT
 session_role: phase2_worker
 worker_alias: OTC-VISION-P2-VISION-RECONCILIATION
@@ -72,8 +72,8 @@ depends_on:
   - lifecycle closeout PR #855 merged as main 8441fc1cce1600033b505d68ebc5c0141b337394
 blocks:
   - OTC-VISION-P2-E2E-AUDIT
-current_blocker: exact_head_actions_and_independent_review_pending
-next_action: validate the final checkpoint head in GitHub Actions, resolve any exact-head failure, then obtain the required independent review before classifying Wave 2 for integration; physical read-only E2E remains a later coordinator-serialized Wave 3 gate
+current_blocker: exact_head_actions_pending
+next_action: refresh GitHub Actions once for the live final branch head; if all required checks pass, classify PR #856 as ACCEPT or ACCEPT_WITH_EDITS for coordinator promotion, otherwise repair the exact failing check
 invocation_started_at: 2026-09-02T10:46:00+02:00
 last_progress_at: 2026-09-02T11:15:33+02:00
 ci_checks_for_current_head: 0
@@ -151,3 +151,71 @@ On exact implementation commit `811b2d458c49806da2fa177911e6110318d28f96` before
 - `git diff --check` -> PASS.
 
 These are deterministic repository validations only. They do not satisfy the later physical read-only E2E gate.
+
+## Context checkpoint
+
+```yaml
+checkpoint_version: 1
+updated_at: 2026-09-02T09:21:05Z
+head: f2dcbd9fb8d923808068dea36e74d94774b409e3
+branch: feat/OTC-20260902-vision-p2-vision-reconciliation
+pr: 856
+status: validating
+context_routes:
+  - docs/agents/programs/OTC_VISION_P2_READONLY_COORDINATION_V1.md
+  - docs/agents/prompts/OTC_20260901_VISION_P2_READONLY_MULTIAGENT.md
+  - tools/tibia_re_control_center/vision_p2_trusted_composition.py
+  - tests/tools/tibia_re_control_center/test_vision_p2_trusted_composition.py
+owned_paths:
+  - docs/agents/tasks/active/OTC-20260902-vision-p2-vision-reconciliation.md
+  - docs/agents/reports/OTC-20260902-vision-p2-vision-reconciliation.md
+  - tools/tibia_re_control_center/vision_p2_trusted_composition.py
+  - tests/tools/tibia_re_control_center/test_vision_p2_trusted_composition.py
+proven:
+  - main base remained 8441fc1cce1600033b505d68ebc5c0141b337394 through implementation publication
+  - implementation commit 811b2d458c49806da2fa177911e6110318d28f96 adds only the trusted reconciliation seam and focused tests
+  - combined reconciliation edge-bridge session and trusted-composition matrix passed 90 of 90 tests on implementation head 811b2d458c49806da2fa177911e6110318d28f96
+  - restart test preserves reconciliation history while live edge and runtime authority return non-current
+  - direct Codex worker or reviewer invocations for this task remain zero
+derived:
+  - Wave 2 repository implementation is coherent enough for exact-head CI and coordinator classification but is not Phase 2 completion
+  - physical read-only E2E and fresh independent audit remain Wave 3 coordinator-serialized work
+unknown:
+  - exact-head GitHub Actions result for the checkpoint commit that contains this context block
+  - fresh Wave 3 audit findings and physical read-only E2E result
+conflicts:
+  - none
+first_failure:
+  marker: missing TrustedVisionP2Runtime.reconcile_vision seam
+  evidence: focused RED on 04c26ab3dc13851d1e1a789a8378e10324669ce6 failed exactly at missing reconciliation seam
+rejected_hypotheses:
+  - new runtime resolver or session store required: existing reviewed resolver edge currentness and persistent event store were sufficient and are reused
+  - WORLD_VISUAL can confirm world alone: focused fail-closed test returns UNKNOWN without current reviewed causal runtime evidence
+changed_paths:
+  - docs/agents/tasks/active/OTC-20260902-vision-p2-vision-reconciliation.md
+  - docs/agents/reports/OTC-20260902-vision-p2-vision-reconciliation.md
+  - tools/tibia_re_control_center/vision_p2_trusted_composition.py
+  - tests/tools/tibia_re_control_center/test_vision_p2_trusted_composition.py
+validation:
+  - command: python -m unittest tests.tools.tibia_re_control_center.test_vision_p2_trusted_composition
+    result: PASS
+    evidence: 14 tests OK on 811b2d458c49806da2fa177911e6110318d28f96
+  - command: python -m unittest tests.tools.tibia_re_control_center.test_agent_reconcile tests.tools.tibia_re_control_center.test_agent_edge_bridge tests.tools.tibia_re_control_center.test_agent_session tests.tools.tibia_re_control_center.test_vision_p2_trusted_composition
+    result: PASS
+    evidence: 90 tests OK on 811b2d458c49806da2fa177911e6110318d28f96
+  - command: python -m py_compile changed production and test modules
+    result: PASS
+    evidence: local deterministic validation before checkpoint
+  - command: python -m ruff check --select I,F changed production and test modules
+    result: PASS
+    evidence: local deterministic validation before checkpoint
+  - command: git diff --check
+    result: PASS
+    evidence: clean implementation and checkpoint diffs before publication
+  - command: GitHub Actions required checks
+    result: NOT_RUN
+    evidence: exact checkpoint commit does not exist until this checkpoint is committed and pushed
+blockers:
+  - none
+next_action: refresh GitHub Actions once for the live final branch head; if all required checks pass, classify PR #856 as ACCEPT or ACCEPT_WITH_EDITS for coordinator promotion, otherwise repair the exact failing check
+```

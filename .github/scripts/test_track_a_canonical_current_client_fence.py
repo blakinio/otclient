@@ -31,6 +31,7 @@ BOOTSTRAP = ROOT / 'docs/agents/contracts/TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md
 RUNTIME_ADMISSION = ROOT / 'docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md'
 GOVERNANCE = ROOT / '.github/workflows/track-a-canonical-live-governance.yml'
 KASM_BOOTSTRAP_WORKFLOW = ROOT / '.github/workflows/track-a-kasm-canonical-bootstrap.yml'
+PACKAGE_A_WORKFLOW = ROOT / '.github/workflows/tibia-re-control-center-core.yml'
 CHANGELOG = ROOT / 'docs/agents/CHANGELOG.md'
 
 
@@ -97,6 +98,12 @@ def main() -> None:
 
     changelog = read(CHANGELOG)
     assert f'Track A canonical exact-client fence advances to `{CURRENT_VERSION}`' in changelog, 'changelog: current canonical fence entry missing'
+
+    package_a = read(PACKAGE_A_WORKFLOW)
+    assert 'HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}' in package_a, 'Package A fence exception: head repository fence missing'
+    assert "fence_base = '8441fc1cce1600033b505d68ebc5c0141b337394'" in package_a, 'Package A fence exception: one-time base SHA missing'
+    assert "fence_repo = 'blakinio/otclient'" in package_a, 'Package A fence exception: same-repository fence missing'
+    assert "base == fence_base" in package_a and "os.environ.get('HEAD_REPO') == fence_repo" in package_a, 'Package A fence exception: one-time predicate incomplete'
 
     print('TRACK_A_CANONICAL_CURRENT_CLIENT_FENCE=PASS')
 

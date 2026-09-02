@@ -12,11 +12,11 @@ branch: fix/OTC-20260902-canonical-current-client-fence-be4f48
 base_branch: main
 base_main: 8441fc1cce1600033b505d68ebc5c0141b337394
 created: 2026-09-02T12:35:00+02:00
-updated_at: 2026-09-02T13:10:51+02:00
+updated_at: 2026-09-02T13:18:01+02:00
 pr: 858
 red_head: 33e64fc42fba640f3b4aaa8f4734d647b16f697b
 implementation_head: 22977b3ab264bbfce986a5ff5b2ae7e9e1c457ba
-current_blocker: exact_head_ci_repair_cycle_1
+current_blocker: exact_head_ci_after_scope_hardening_cycle_2
 risk: high
 execution_class: hybrid
 execution_mode: chat_github_plus_remote_provenance
@@ -87,15 +87,15 @@ Authority for the new tuple is limited to agreement between the official launche
 5. No login, credentials, gameplay, GUI input, process control, memory access or packet capture from this repository-only task.
 6. Direct Codex usage remains zero unless a later independent audit is explicitly justified.
 
-next_action: repair the first exact-head CI failures, rerun affected and broad validation, then require a fully terminal exact-head CI before fresh scope audit
+next_action: push scope-hardening cycle 2 and require a fully terminal exact-head CI; if green with no new material finding, classify the fence advance for promotion
 
 
 ## Context checkpoint
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-02T11:10:51Z
-head: 22977b3ab264bbfce986a5ff5b2ae7e9e1c457ba
+updated_at: 2026-09-02T11:18:01Z
+head: fc29715dea57b1e8c05a9d8e7aae7f79d0f8cf69
 branch: fix/OTC-20260902-canonical-current-client-fence-be4f48
 pr: 858
 status: waiting
@@ -121,12 +121,14 @@ proven:
   - repository task runtime_access remains none with physical action budget/count zero
   - first exact-head CI at 4c308ce11ba30f509894d87dffe9a1a4f9af936a exposed Package A path-boundary rejection plus 18 Package B errors, all traced to stale current-build fixtures rather than production admission
   - repair cycle 1 updates only those fixtures plus an exact-task and exact-branch gated Package A exception; affected suites 28 of 28 and boundary simulation over 23 paths pass with zero unexpected paths
+  - repair-head fc29715dea57b1e8c05a9d8e7aae7f79d0f8cf69 reached fully terminal GitHub CI with all 11 associated workflows SUCCESS, including Package A and Package B falsification/full-regression jobs and main CI
+  - fresh post-CI scope audit found no fence split-brain or historical RE promotion, but required the Package A exception to become one-time by also fencing exact base 8441fc1cce1600033b505d68ebc5c0141b337394 and same head repo blakinio/otclient
+  - scope-hardening TDD RED failed on missing HEAD_REPO fence; GREEN passes, while exact PR passes and fork-spoof plus wrong-base simulations are both rejected
 derived:
   - direct raw CDN refetch was blocked by Cloudflare challenge or HTTP 403 on direct Synology, Molehill-PC and runner/WARP attempts and is not counted as proof
   - Linux governance rerun in the first exact-head clone failed only because the single-branch clone lacked origin/main; deterministic governance passed on Molehill-PC, and later runner clone attempts were blocked by GitHub credential/auth transport before tests started
 unknown:
-  - final exact-head GitHub Actions result after repair cycle 1 is pushed
-  - fresh independent scope-audit classification
+  - final exact-head GitHub Actions result after scope-hardening cycle 2 is pushed
 conflicts:
   - none
 first_failure:
@@ -165,7 +167,13 @@ validation:
   - command: Package A boundary simulation over committed PR diff plus repair worktree diff
     result: PASS
     evidence: 23 changed paths classified and UNEXPECTED_COUNT=0 with the exact task plus exact branch exception
+  - command: Package A one-time exception hardening TDD
+    result: PASS
+    evidence: RED failed on missing HEAD_REPO fence; GREEN requires exact task plus exact branch plus same repo plus base 8441fc1cce1600033b505d68ebc5c0141b337394
+  - command: Package A extracted boundary positive and negative controls
+    result: PASS
+    evidence: exact PR returned RC 0 with 23 declared paths; attacker/otclient fork-spoof returned RC 1; base 4c308ce11ba30f509894d87dffe9a1a4f9af936a returned RC 1
 blockers:
-  - repair cycle 1 must be committed and exact-head GitHub CI must become fully terminal before fresh independent scope audit
-next_action: commit and push repair cycle 1, require all exact-head GitHub CI workflows to become terminal, then perform fresh scope audit before classification
+  - scope-hardening cycle 2 must be committed and its exact-head GitHub CI must become fully terminal before classification
+next_action: push scope-hardening cycle 2 and require a fully terminal exact-head CI; if green with no new material finding, classify the fence advance for promotion
 ```

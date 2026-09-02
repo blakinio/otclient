@@ -50,3 +50,17 @@ Pre-commit repair validation:
 - affected Python compile: PASS
 - `git diff --check`: PASS
 - Package A boundary simulation across the complete 23-path PR+repair diff: `UNEXPECTED_COUNT=0` / PASS
+## Fully terminal repair-head CI and post-CI scope audit
+
+Exact head `fc29715dea57b1e8c05a9d8e7aae7f79d0f8cf69` reached fully terminal GitHub Actions with **11/11 associated workflows SUCCESS**, including Package A fresh falsification + deterministic core, Package B fresh falsification + real browser/CLI E2E + full regression, main CI, and all Track A fence/governance/Kasm/self-hosted checks.
+
+A fresh post-CI GitHub diff audit confirmed the 23 changed files are limited to current exact-client authority, Phase 2 admission fixtures, task/evidence, and the Package A boundary integration required by the atomic fence update. Remaining `15.32.75d4a0` references were inspected: canonical fence reconciliation and Field6/QMeta/worldEntered/materializer surfaces are historical/build-specific and deliberately stay pinned to their source ELF.
+
+The audit found one hardening issue: `github.head_ref` alone can be spoofed by a fork PR. TDD RED therefore required an explicit head-repository fence and one-time base SHA. GREEN now admits the special Package A exact-path set only when all of these are true:
+
+- exact fence task is changed;
+- `github.head_ref` is `fix/OTC-20260902-canonical-current-client-fence-be4f48`;
+- head repository is `blakinio/otclient`;
+- PR base SHA is exactly `8441fc1cce1600033b505d68ebc5c0141b337394`.
+
+Extracted workflow-script controls: exact PR = PASS; same branch from `attacker/otclient` = FAIL; same repo/branch against base `4c308ce11...` = FAIL. This makes the exception generation-specific rather than reusable after merge.

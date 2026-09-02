@@ -111,6 +111,7 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_REF: ${{ github.head_ref }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
         run: |
           set -Eeuo pipefail
           python3 - "$BASE_SHA" <<'PY'
@@ -168,7 +169,14 @@ jobs:
           )
           fence_task = 'docs/agents/tasks/active/OTC-20260902-canonical-current-client-fence-be4f48.md'
           fence_branch = 'fix/OTC-20260902-canonical-current-client-fence-be4f48'
-          if fence_task in changed and os.environ.get('HEAD_REF') == fence_branch:
+          fence_base = '8441fc1cce1600033b505d68ebc5c0141b337394'
+          fence_repo = 'blakinio/otclient'
+          if (
+              fence_task in changed
+              and base == fence_base
+              and os.environ.get('HEAD_REF') == fence_branch
+              and os.environ.get('HEAD_REPO') == fence_repo
+          ):
               allowed_exact |= {
                   fence_task,
                   '.github/scripts/test_track_a_agent_runtime_governance.py',

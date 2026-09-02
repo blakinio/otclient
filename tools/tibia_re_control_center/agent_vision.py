@@ -134,7 +134,11 @@ _VISUAL_MAP = {
     "UNKNOWN": AgentVisualState.UNKNOWN.value,
 }
 _VISION_PROMPT = (
-    "Return only the strict visual observation JSON schema. "
+    "Return only one JSON object with exactly these six keys and no additional keys, no markdown: "
+    '{"screen_class":"UNKNOWN","visible_text":[],"ui_objects":[],"appeared":[],"disappeared":[],"changed":[]}. '
+    "screen_class must be one of LOGIN_SCREEN, CHARACTER_SELECT, IN_GAME_VISUAL, WORLD_EXIT, OTHER, UNKNOWN. "
+    "visible_text must be a JSON array of strings. "
+    "ui_objects, appeared, disappeared, and changed must be JSON arrays of objects; use [] when none. "
     "Describe pixels only; do not infer runtime state, authority, or actions."
 )
 

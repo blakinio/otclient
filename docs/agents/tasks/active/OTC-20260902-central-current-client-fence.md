@@ -14,7 +14,7 @@ branch: feat/OTC-20260902-central-current-client-fence
 base_branch: main
 base_main: 30fc46ce4dbff96d2484e624a58fcd85f2a9ecad
 created: 2026-09-02T21:16:00+02:00
-updated_at: 2026-09-02T22:26:35+02:00
+updated_at: 2026-09-02T22:30:12+02:00
 risk: medium
 execution_class: repository_only
 execution_mode: chat
@@ -29,7 +29,7 @@ continuation_policy: continue_until_real_stop
 task_completion_policy: return_to_coordinator_for_classification
 policy_version: 2
 invocation_started_at: 2026-09-02T22:18:00+02:00
-last_progress_at: 2026-09-02T22:26:35+02:00
+last_progress_at: 2026-09-02T22:30:12+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: draft
 terminal_ci_wait_started_at: null
@@ -70,8 +70,8 @@ physical_action_count: 0
 owner_funded_ai_api_authorized: false
 red_head: 8d0bccbdc57e1d34f164eaa48a734be7fe47d2f6
 implementation_head: 30879f705cfeaf84567356b8f90e35cb886af822
-current_blocker: exact_head_linux_validation_and_github_ci_pending
-next_action: finish exact-head Linux validation, commit this checkpoint, push and open the existing branch as one Draft PR
+current_blocker: draft_pr_and_exact_head_github_ci_pending
+next_action: push the existing branch, open one Draft PR to main, and require terminal exact-head GitHub Actions plus independent scope audit before Ready/merge
 owned_paths:
   - docs/agents/contracts/TRACK_A_CURRENT_CLIENT_FENCE_V1.json
   - tools/tibia_re_control_center/current_client_fence.py
@@ -193,6 +193,7 @@ first_failure:
   marker: weekly current-client updates required duplicated active fence edits
   evidence: Surveyor needed PR 861 and canonical reconciliation still retained an older hardcoded source/current pair
 rejected_hypotheses:
+  - Windows-worktree WSL transition failure was product regression: rejected after a native-LF detached exact-head worktree passed all 117 Linux/workflow tests; the failure signature was env bash CRLF shebang only
   - centralize build-specific semantic offsets and ABI evidence: rejected because those lanes require separate build revalidation
   - manually edit runtime-registration.json: rejected by canonical recovery contract
 changed_paths:
@@ -238,6 +239,9 @@ validation:
   - command: refreshed focused Windows current-fence/admission/bridge/composition/Surveyor subset
     result: PASS
     evidence: 57 tests OK; canonical current-client fence and Track A runtime governance PASS; Ruff I/F, py_compile, YAML parse and diff-check PASS
+  - command: exact committed-head Linux/WSL transition/bootstrap/adoption/reconciliation/session/workflow matrix
+    result: PASS
+    evidence: detached native-LF worktree at 9e049dca821885e2173b9888ccd80345a965a6b4 ran 58 + 11 + 10 + 17 + 14 + 7 = 117 tests, all OK; cleanup refusal was only generated test artifacts in the disposable worktree and it was force-removed afterward
   - command: Windows Control Center Vision Surveyor focused matrix
     result: PASS
     evidence: 66 tests OK
@@ -254,7 +258,6 @@ validation:
     result: PASS
     evidence: zero active executable copies outside canonical manifest
 blockers:
-  - exact-head LF Linux/WSL validation still needs a native-LF worktree because the Windows worktree converted shell shebangs to CRLF
   - centralization PR and exact-head GitHub Actions are not yet created
 next_action: finish only the exact Package A scope and checkpoint, open one Draft PR, require terminal exact-head CI and merge if accepted; then run existing canonical metadata reconciliation, one fresh Surveyor admission, and the final Vision P2 live E2E
 ```

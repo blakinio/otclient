@@ -14,8 +14,15 @@ branch: feat/OTC-20260902-vision-p2-vision-reconciliation
 base_branch: main
 base_main: 8441fc1cce1600033b505d68ebc5c0141b337394
 created: 2026-09-02T10:46:00+02:00
-updated_at: 2026-09-02T10:46:00+02:00
+updated_at: 2026-09-02T11:15:33+02:00
 risk: high
+feature_scope:
+  type: infrastructure
+  user_facing: false
+  backend_required: true
+  frontend_required: false
+  integration_required: true
+  e2e_required: true
 execution_class: github_hosted
 execution_mode: github_only
 execution_reason: preserve owner Codex quota; use GitHub plus existing Actions unless a concrete proving gap requires one explicitly justified worker invocation
@@ -49,16 +56,10 @@ worktree: NOT_APPLICABLE_GITHUB_ONLY
 owned_paths:
   - docs/agents/tasks/active/OTC-20260902-vision-p2-vision-reconciliation.md
   - docs/agents/reports/OTC-20260902-vision-p2-vision-reconciliation.md
-  - tools/tibia_re_control_center/agent_reconcile.py
-  - tools/tibia_re_control_center/agent_session.py
   - tools/tibia_re_control_center/vision_p2_trusted_composition.py
-  - tests/tools/tibia_re_control_center/test_agent_reconcile.py
-  - tests/tools/tibia_re_control_center/test_agent_session.py
   - tests/tools/tibia_re_control_center/test_vision_p2_trusted_composition.py
 modules_touched:
-  - TIBIA RE Control Center agent reconciliation
   - Vision P2 trusted composition
-  - persistent agent-session evidence
 reuses:
   - tools/tibia_re_control_center/agent_vision.py
   - tools/tibia_re_control_center/agent_runtime_signals.py
@@ -71,12 +72,12 @@ depends_on:
   - lifecycle closeout PR #855 merged as main 8441fc1cce1600033b505d68ebc5c0141b337394
 blocks:
   - OTC-VISION-P2-E2E-AUDIT
-current_blocker: none
-next_action: implement the production trusted reconciliation seam by consuming accepted capture and reviewed runtime-signal interfaces, persist auditable agreement/conflict provenance, and prove fail-closed behavior without granting runtime or mutation authority
+current_blocker: exact_head_actions_and_independent_review_pending
+next_action: validate the final checkpoint head in GitHub Actions, resolve any exact-head failure, then obtain the required independent review before classifying Wave 2 for integration; physical read-only E2E remains a later coordinator-serialized Wave 3 gate
 invocation_started_at: 2026-09-02T10:46:00+02:00
-last_progress_at: 2026-09-02T10:46:00+02:00
+last_progress_at: 2026-09-02T11:15:33+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: draft
+ci_check_generation: final_checkpoint_pending
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -127,3 +128,26 @@ Repository/static validation must prove the trusted production composition can c
 ## Validation plan
 
 Use RED-to-GREEN focused tests first, then the smallest relevant Control Center/Vision P2 workflow on the exact final head. Preserve the canonical frozen vision benchmark where applicable. Do not spend Codex quota on coordination, status polling or CI waiting. If GitHub-only execution proves insufficient for an implementation/test loop, persist the exact missing operation before any separately justified worker invocation.
+
+## Implementation checkpoint
+
+- TDD RED commit: `04c26ab3dc13851d1e1a789a8378e10324669ce6`; the focused test failed only because `TrustedVisionP2Runtime.reconcile_vision` did not exist.
+- GREEN implementation commit: `811b2d458c49806da2fa177911e6110318d28f96`.
+- Production changes are limited to `vision_p2_trusted_composition.py`; existing reconciliation, runtime-signal, edge/session and persistence implementations are consumed rather than duplicated.
+- The trusted seam accepts only a typed visual observation tied to the current validated secret-safe capture and obtains runtime evidence only from the composition-owned live authority/resolver. No caller runtime/resolver input exists.
+- `WORLD_VISUAL` without current reviewed causal runtime evidence remains `UNKNOWN`; stale runtime evidence cannot promote it; visual/runtime disagreement persists `CONFLICT`; mismatched capture identity is rejected before persistence.
+- `VISION_RECONCILED` persists typed state and evidence provenance without visible/OCR text and with `physical_effect:false`. After store restart the historical event remains auditable, while edge/runtime current authority is not restored.
+- Direct Codex worker/reviewer invocations consumed by this task so far: `0`.
+
+## Hosted/local deterministic validation
+
+On exact implementation commit `811b2d458c49806da2fa177911e6110318d28f96` before the documentation checkpoint:
+
+- focused RED was observed first on `04c26ab3...`;
+- `python -m unittest tests.tools.tibia_re_control_center.test_vision_p2_trusted_composition` -> `14 tests`, `OK`;
+- `python -m unittest tests.tools.tibia_re_control_center.test_agent_reconcile tests.tools.tibia_re_control_center.test_agent_edge_bridge tests.tools.tibia_re_control_center.test_agent_session tests.tools.tibia_re_control_center.test_vision_p2_trusted_composition` -> `90 tests`, `OK`;
+- `python -m py_compile` for the changed production/test modules -> PASS;
+- `python -m ruff check --select I,F` for both changed modules -> PASS after import-only cleanup;
+- `git diff --check` -> PASS.
+
+These are deterministic repository validations only. They do not satisfy the later physical read-only E2E gate.

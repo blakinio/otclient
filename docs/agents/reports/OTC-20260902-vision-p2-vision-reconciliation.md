@@ -5,26 +5,59 @@
 - Trusted base `main`: `8441fc1cce1600033b505d68ebc5c0141b337394`.
 - Wave 1 trusted composition is integrated through PR #854 and lifecycle closeout #855.
 - Wave 2 alias: `OTC-VISION-P2-VISION-RECONCILIATION`.
-- Runtime authority at task start: `runtime_access:none`; mutation/login/gameplay/process/input authority all false; physical action budget/count `0/0`.
-- Codex usage for coordination/task setup: `0`.
+- Runtime authority at task start and throughout repository implementation: `runtime_access:none`; mutation/login/gameplay/process/input authority all false; physical action budget/count `0/0`.
+- Direct Codex worker/reviewer invocations through this checkpoint: `0`.
 
 ## Verified integration gap
 
-`tools/tibia_re_control_center/agent_reconcile.py` contains the deterministic reconciliation matrix and a resolver-bound trusted composition seam. The default public compatibility entry point deliberately has no resolver, so reviewed-causal runtime claims fail closed. `tools/tibia_re_control_center/vision_p2_trusted_composition.py` is the application-owned trusted Phase 2 composition for capture/runtime transport but does not yet compose or invoke the reconciliation seam. `ControlDomainService.observe_agent_vision()` returns the bounded visual observation, and the session edge path already persists accepted read-only edge/runtime evidence.
+`tools/tibia_re_control_center/agent_reconcile.py` already contained the deterministic reconciliation matrix and resolver-bound trusted composition seam. `tools/tibia_re_control_center/vision_p2_trusted_composition.py` owned the accepted trusted capture/runtime composition but did not expose a production reconciliation path. The existing edge/session path already owned reviewed runtime authority, currentness and persistence. Wave 2 therefore needed only the producer-consumer binding, not replacement capture, transport, resolver or state machinery.
 
-Therefore Wave 2 should connect these accepted producer/consumer interfaces and persist reconciliation provenance; it should not build replacement capture, transport, runtime-signal or state-storage implementations.
+## Implemented seam
 
-## Required evidence
+Implementation commit: `811b2d458c49806da2fa177911e6110318d28f96`.
 
-Pending implementation and validation:
+`TrustedVisionP2Runtime.reconcile_vision()` now:
 
-- focused RED/GREEN reconciliation tests;
-- trusted-composition integration tests for current reviewed runtime evidence;
-- stale/forged/mismatched runtime evidence fail-closed tests;
-- restart/persistence evidence proving historical data does not regain current authority;
-- exact-head GitHub Actions result;
-- later coordinator-serialized physical read-only E2E (cannot be substituted by hosted/fake evidence).
+- requires the active read-only task/run and current trusted edge;
+- binds the visual observation to the exact current validated secret-safe capture reference and SHA-256;
+- reads semantic runtime state only from the existing owner-visible edge snapshot and composition-owned live runtime authority/resolver;
+- delegates semantic decisions to the existing deterministic resolver-bound reconciler;
+- fails closed to visual-only reconciliation when reviewed runtime evidence is absent, stale or unusable;
+- persists `VISION_RECONCILED` with typed visual/runtime provenance and `physical_effect:false`;
+- does not persist visible/OCR text and exposes no caller-supplied runtime or resolver parameter.
+
+No change was made to the Qwen model slot/profile, action executor, runtime admission, capture producer, transport, signal resolver, session store or physical authority model.
+
+## Deterministic evidence
+
+TDD was observed explicitly:
+
+- RED `04c26ab3dc13851d1e1a789a8378e10324669ce6`: one focused test failed because the Wave 2 seam did not exist.
+- GREEN `811b2d458c49806da2fa177911e6110318d28f96`: the focused positive path passed.
+
+Expanded deterministic validation on the same implementation head:
+
+- trusted composition suite: `14/14 PASS`;
+- combined reconciliation + edge bridge + session + trusted composition suite: `90/90 PASS`;
+- `python -m py_compile` for the changed production/test modules: PASS;
+- Ruff import/undefined-name check (`--select I,F`) for the changed modules: PASS;
+- `git diff --check`: PASS.
+
+Behavior proven by tests:
+
+- matching current `WORLD_VISUAL` + current reviewed-causal `IN_GAME` -> `WORLD_CONFIRMED`;
+- `WORLD_VISUAL` without current runtime evidence -> `UNKNOWN`;
+- reviewed runtime evidence that becomes stale -> cannot promote the visual state;
+- visual login + current reviewed runtime in-game -> `CONFLICT`;
+- capture reference/SHA mismatch -> rejected before reconciliation persistence;
+- persisted reconciliation survives store restart for audit, while live edge/runtime authority does not survive and cannot be reused as current authority.
+
+## Remaining gates
+
+- final documentation/checkpoint commit must receive exact-head GitHub Actions validation;
+- required independent review must be reconciled before integration;
+- the programme's physical read-only E2E remains a later coordinator-serialized Wave 3 gate and is not satisfied by hosted/fake tests.
 
 ## Current result
 
-`IMPLEMENTING` — task claimed and branch opened; no runtime access used and no owner-funded Codex invocation performed.
+`VALIDATING` - implementation and deterministic tests are complete on the code head; exact-head CI/review remain. Runtime access was not used, physical action count remains `0`, and direct Codex worker/reviewer invocations remain `0`.

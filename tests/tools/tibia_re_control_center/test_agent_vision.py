@@ -1382,6 +1382,40 @@ class AgentVisionSensorTests(unittest.TestCase):
         self.assertEqual(0, QWEN_TEMPERATURE)
         self.assertNotIn("caller secret", calls[0]["prompt"])
 
+    def test_static_prompt_declares_exact_model_observation_schema(self):
+        with tempfile.TemporaryDirectory() as raw:
+            capture = self._capture(Path(raw))
+
+            def provider(call):
+                prompt = call["prompt"]
+                for field in (
+                    "screen_class",
+                    "visible_text",
+                    "ui_objects",
+                    "appeared",
+                    "disappeared",
+                    "changed",
+                ):
+                    self.assertIn(f'"{field}"', prompt)
+                for screen_class in (
+                    "LOGIN_SCREEN",
+                    "CHARACTER_SELECT",
+                    "IN_GAME_VISUAL",
+                    "WORLD_EXIT",
+                    "OTHER",
+                    "UNKNOWN",
+                ):
+                    self.assertIn(screen_class, prompt)
+                self.assertIn("JSON array of strings", prompt)
+                self.assertIn("JSON arrays of objects", prompt)
+                self.assertIn("exactly these six keys", prompt)
+                self.assertIn("no additional keys", prompt)
+                self.assertIn("no markdown", prompt)
+                return _visual_evidence(capture, screen_class="UNKNOWN")
+
+            observation = self._sensor(provider).observe(capture)
+        self.assertEqual(AgentVisualState.UNKNOWN.value, observation.screen_class)
+
     def test_constructor_has_no_free_form_prompt_channel(self):
         scheduler = ModelSlotScheduler(
             ps=list, digest=lambda model: QWEN_VISION_DIGEST,

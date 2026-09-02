@@ -196,6 +196,17 @@ jobs:
                   'docs/agents/evidence/OTC-20260902-canonical-current-client-fence-be4f48/result.json',
                   'docs/agents/evidence/OTC-20260902-canonical-current-client-fence-be4f48/validation.md',
               }
+          qwen_schema_task = 'docs/agents/tasks/active/OTC-20260902-vision-p2-qwen-schema-repair.md'
+          qwen_schema_branch = 'fix/OTC-20260902-vision-p2-qwen-schema-contract'
+          qwen_schema_base = 'c16d180d336ba8aa9e1656807c79a44e81c15c66'
+          qwen_schema_repo = 'blakinio/otclient'
+          if (
+              qwen_schema_task in changed
+              and base == qwen_schema_base
+              and os.environ.get('HEAD_REF') == qwen_schema_branch
+              and os.environ.get('HEAD_REPO') == qwen_schema_repo
+          ):
+              allowed_exact.add(qwen_schema_task)
           unexpected = [
               path for path in changed
               if path not in allowed_exact and not path.startswith(allowed_prefixes)

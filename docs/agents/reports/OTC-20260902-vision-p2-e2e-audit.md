@@ -33,12 +33,24 @@ Attempt to falsify at minimum:
 
 ## Evidence status
 
-- Static fresh audit: `NOT_RUN`.
-- Fresh runtime preflight/admission: `NOT_RUN`.
-- Real admitted read-only E2E: `NOT_RUN`.
-- Material findings: `UNKNOWN`.
+- Coordinator deterministic pre-audit: `COMPLETE` on a fresh checkout stacked exactly from `7d4bae503...`.
+- Security/provenance subset: `184/184 PASS`.
+- Broad Control Center discovery: `569 tests`, `5 errors`, `2 skipped`; all five errors reproduce identically on clean `main@8441fc1...`, so they are not Wave 2 regressions.
+- Fresh independent model audit: `DEFERRED` until the physical E2E evidence exists, to avoid consuming the constrained Codex quota twice.
+- Fresh runtime preflight/admission: `BLOCKED` because both authorized Remote Desktop Commander devices named `Synology` are offline.
+- Real admitted read-only E2E: `BLOCKED` by the same runtime availability condition.
+- Material Wave 2 finding from deterministic pre-audit: `NONE`.
 - Direct Codex worker/reviewer invocations for Wave 3 so far: `0`.
 
 ## Completion rule
 
 `PASS` requires exact-head evidence, fresh independent audit with zero open material findings, a real admitted read-only E2E on the canonical official-client runtime, physical action count `0`, no forbidden side effects, and truthful lifecycle state. Hosted/fake evidence cannot substitute for the physical read-only E2E.
+
+
+## Deterministic pre-audit notes
+
+The fresh checkout merge-base with the accepted Wave 2 generation is exactly `7d4bae503030a00a51fad409d46bc43a39ad2314`. Before this checkpoint, only the Wave 3 task/report existed above that generation.
+
+The five broad-suite errors are outside Wave 2 changed paths and reproduce individually on clean `main@8441fc1cce1600033b505d68ebc5c0141b337394`: four Windows-local API connection resets and one vision test ending in `MODEL_INFERENCE_FAILED`. They are retained as baseline/environment evidence and are not silently counted as passing.
+
+The required runtime contract was read from trusted base before attempting physical observation. Device discovery found both authorized `Synology` Remote Desktop Commander registrations offline, so no container, display, window, PID, screenshot, admission, model inference, or official-client access was attempted.

@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260902-vision-p2-e2e-audit
-status: investigating
+status: waiting
 agent: ChatGPT
 session_role: phase2_auditor
 worker_alias: OTC-VISION-P2-E2E-AUDIT
@@ -15,7 +15,7 @@ base_branch: main
 base_main: 8441fc1cce1600033b505d68ebc5c0141b337394
 audited_integration_head: 7d4bae503030a00a51fad409d46bc43a39ad2314
 created: 2026-09-02T11:28:36+02:00
-updated_at: 2026-09-02T11:28:36+02:00
+updated_at: 2026-09-02T11:35:49+02:00
 risk: high
 feature_scope:
   type: infrastructure
@@ -54,7 +54,7 @@ process_memory_access_allowed: false
 physical_action_budget: 0
 physical_action_count: 0
 owner_funded_ai_api_authorized: false
-worktree: NOT_APPLICABLE_UNTIL_AUDIT_EXECUTION_REQUIRES_ONE
+worktree: Molehill-PC:C:\Users\barte\AppData\Local\Temp\otclient-vision-p2-e2e-audit-pr857
 owned_paths:
   - docs/agents/tasks/active/OTC-20260902-vision-p2-e2e-audit.md
   - docs/agents/reports/OTC-20260902-vision-p2-e2e-audit.md
@@ -65,10 +65,10 @@ depends_on:
   - coordinator classification review #5087863607 ACCEPT for Wave 2 repository/integration scope
 blocks:
   - Phase 2 completion and merge of PR #856
-current_blocker: none
-next_action: perform a fresh static falsification audit of exact integration head 7d4bae503030a00a51fad409d46bc43a39ad2314 against the Wave 3 attack inventory before any physical runtime observation
+current_blocker: synology_remote_desktop_commander_offline
+next_action: when an authorized Synology Remote Desktop Commander device is online, perform the required non-invasive container display window and official-client identity preflight before requesting fresh read-only admission
 invocation_started_at: 2026-09-02T11:28:36+02:00
-last_progress_at: 2026-09-02T11:28:36+02:00
+last_progress_at: 2026-09-02T11:35:49+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: audit_setup
 terminal_ci_wait_started_at: null
@@ -130,11 +130,11 @@ A clean result requires exact-head evidence, zero open material findings, a real
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-02T09:28:36Z
-head: c602649a1c04ae6a0ee0acbaa39b0a938338699c
+updated_at: 2026-09-02T09:35:49Z
+head: 204dae4fc104db779e13f54df0774aca876d282d
 branch: test/OTC-20260902-vision-p2-e2e-audit
-pr: none
-status: investigating
+pr: 857
+status: waiting
 context_routes:
   - docs/agents/programs/OTC_VISION_P2_READONLY_COORDINATION_V1.md
   - docs/agents/prompts/OTC_20260901_VISION_P2_READONLY_MULTIAGENT.md
@@ -145,42 +145,53 @@ owned_paths:
   - docs/agents/reports/OTC-20260902-vision-p2-e2e-audit.md
   - docs/agents/evidence/OTC-20260902-vision-p2-e2e-audit/**
 proven:
-  - trusted main is 8441fc1cce1600033b505d68ebc5c0141b337394 at audit dispatch
-  - Wave 2 exact accepted integration head is 7d4bae503030a00a51fad409d46bc43a39ad2314
-  - coordinator review 5087863607 classified Wave 2 ACCEPT for repository/integration scope only
-  - Wave 2 exact-head CI is terminal with CI Required success and no failed or pending conclusions
-  - Wave 3 has not used Codex or any physical runtime access at setup
-  - Track A KasmVNC contract requires fresh non-invasive container display window and client identity proof before physical observation
+  - trusted main remained 8441fc1cce1600033b505d68ebc5c0141b337394 during audit setup
+  - audit branch merge-base with the accepted Wave 2 integration is exactly 7d4bae503030a00a51fad409d46bc43a39ad2314
+  - only the audit task and report differ above the accepted integration generation before this checkpoint
+  - security and provenance subset passed 184 of 184 tests on the fresh audit checkout
+  - broad Control Center discovery ran 569 tests with 5 errors and 2 skips; all 5 errors reproduce identically on clean main 8441fc1cce1600033b505d68ebc5c0141b337394
+  - the two authorized Remote Desktop Commander devices named Synology are offline; last_seen values are 2026-08-30T19:44:23.642Z and 2026-08-23T00:01:32.904Z
+  - no physical runtime command and no Codex worker or reviewer invocation has occurred in Wave 3
+  - PR 857 is the live Draft audit checkpoint
+
 derived:
-  - the audit branch is intentionally stacked from the exact accepted integration head so the fresh validator sees the generation that was classified
-  - PR 856 must remain unmerged until this independent audit and real read-only E2E are reconciled
+  - the 5 broad-suite errors are baseline or local-environment limitations rather than Wave 2 regressions
+  - independent model audit is intentionally deferred until physical E2E evidence is available so one bounded invocation can review the complete exact-generation evidence set
+  - physical E2E cannot truthfully start while the required authorized Synology Remote Desktop Commander path is offline
 unknown:
-  - fresh static audit findings on exact integration head
-  - current Synology runtime container display window and official-client identity
-  - fresh read-only admission result
-  - real E2E result
+  - current Synology container display window and official-client identity
+  - fresh read-only runtime admission result
+  - real admitted read-only E2E result
+  - fresh independent audit findings after complete static and live evidence are available
 conflicts:
   - none
 first_failure:
-  marker: none
-  evidence: none
+  marker: required Synology Remote Desktop Commander device is offline
+  evidence: Remote_Desktop_Commander.list_devices at 2026-09-02T09:30Z returned both Synology devices offline
 rejected_hypotheses:
-  - hosted Wave 2 tests satisfy real E2E: programme contract explicitly requires real admitted read-only observation
-  - visible KasmVNC desktop grants runtime authority: runtime-access contract defines it as discovery evidence only
+  - broad-suite failures are introduced by Wave 2: the same isolated API and vision errors reproduce on clean main 8441fc1ce1600033b505d68ebc5c0141b337394
+  - hosted tests can replace the real runtime gate: Phase 2 programme requires a freshly admitted physical read-only E2E
 changed_paths:
   - docs/agents/reports/OTC-20260902-vision-p2-e2e-audit.md
   - docs/agents/tasks/active/OTC-20260902-vision-p2-e2e-audit.md
+  - docs/agents/evidence/OTC-20260902-vision-p2-e2e-audit/static-preaudit.md
 validation:
-  - command: Wave 2 exact-head GitHub CI for 7d4bae503030a00a51fad409d46bc43a39ad2314
+  - command: python tools/agents/checkpoint.py docs/agents/tasks/active/OTC-20260902-vision-p2-e2e-audit.md --require-checkpoint
     result: PASS
-    evidence: CI Required success; no queued in-progress null or failure conclusions in terminal generation
-  - command: Wave 3 static fresh audit
-    result: NOT_RUN
-    evidence: pending first audit action
-  - command: Wave 3 physical read-only E2E
-    result: NOT_RUN
-    evidence: runtime has not been touched by this audit
+    evidence: initial audit checkpoint validated before pre-audit
+  - command: python -m unittest discover -s tests/tools/tibia_re_control_center -p test_*.py
+    result: FAIL
+    evidence: 569 tests; 5 errors and 2 skips; each error isolated and reproduced on clean main, so not a Wave 2 regression
+  - command: targeted baseline reproduction on main 8441fc1cce1600033b505d68ebc5c0141b337394
+    result: PASS
+    evidence: all 5 audit-head errors reproduced identically on the trusted base
+  - command: security and provenance subset covering foundation authority admission signals transport bridge reconciliation session trusted composition replay capture evidence and Ollama
+    result: PASS
+    evidence: 184 tests OK on fresh audit checkout
+  - command: required physical read-only E2E
+    result: BLOCKED
+    evidence: both authorized Synology Remote Desktop Commander devices are offline
 blockers:
-  - none
-next_action: perform a fresh static falsification audit of exact integration head 7d4bae503030a00a51fad409d46bc43a39ad2314 against the Wave 3 attack inventory before any physical runtime observation
+  - authorized Synology Remote Desktop Commander runtime path is offline
+next_action: when an authorized Synology Remote Desktop Commander device is online, perform the required non-invasive container display window and official-client identity preflight before requesting fresh read-only admission
 ```

@@ -199,7 +199,7 @@ jobs:
           vision_p2_reconcile_task = 'docs/agents/tasks/active/OTC-20260902-vision-p2-vision-reconciliation.md'
           vision_p2_reconcile_report = 'docs/agents/reports/OTC-20260902-vision-p2-vision-reconciliation.md'
           vision_p2_reconcile_branch = 'feat/OTC-20260902-vision-p2-vision-reconciliation'
-          vision_p2_reconcile_base = 'c16d180d336ba8aa9e1656807c79a44e81c15c66'
+          vision_p2_reconcile_base = '27f9bdd5f003c596529e7571343ae8bb053d5cff'
           vision_p2_reconcile_repo = 'blakinio/otclient'
           if (
               vision_p2_reconcile_task in changed
@@ -212,6 +212,17 @@ jobs:
                   vision_p2_reconcile_report,
               }
 
+          qwen_schema_task = 'docs/agents/tasks/active/OTC-20260902-vision-p2-qwen-schema-repair.md'
+          qwen_schema_branch = 'fix/OTC-20260902-vision-p2-qwen-schema-contract'
+          qwen_schema_base = 'c16d180d336ba8aa9e1656807c79a44e81c15c66'
+          qwen_schema_repo = 'blakinio/otclient'
+          if (
+              qwen_schema_task in changed
+              and base == qwen_schema_base
+              and os.environ.get('HEAD_REF') == qwen_schema_branch
+              and os.environ.get('HEAD_REPO') == qwen_schema_repo
+          ):
+              allowed_exact.add(qwen_schema_task)
           unexpected = [
               path for path in changed
               if path not in allowed_exact and not path.startswith(allowed_prefixes)

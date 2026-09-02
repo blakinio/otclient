@@ -41,3 +41,19 @@ Direct Codex worker/reviewer invocations used by Wave 3 through this evidence po
 - canonical `/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime/runtime-registration.json`: `ABSENT`.
 
 Admission consequence: `runtime_access` remains `none`; target uniqueness cannot be `PROVEN` for a non-existent official-client target. Phase 2 audit has no authority to launch/bootstrap/process-control the client, so the real read-only E2E remains blocked until an authorized runtime owner has an exact client already running. No screenshot/model inference/input/login/credential/process-control/memory/network-payload/mutation action occurred.
+
+
+## Owner-authorized runtime setup and exact-fence recheck
+
+The owner explicitly authorized starting the client and creating a desktop shortcut. The coordinator performed that setup outside the Wave 3 audit boundary. `/home/kasm-user/Desktop/Tibia.desktop` now launches a duplicate-safe wrapper for the current package client; no login/credential/character/gameplay input was performed.
+
+The official launcher updated the package to `15.32.be4f48`. Fresh read-only process evidence after the temporary duplicate self-resolved:
+
+- `CLIENT_PIDS=28379` (exactly one);
+- executable: `/home/kasm-user/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client`;
+- size: `52105824`;
+- SHA-256: `552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1`;
+- display: `:1.0`;
+- visible top-level Tibia window bound to PID `28379`.
+
+Trusted-base fence is still `15.32.75d4a0` / `d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a`. Therefore read-only admission is refused fail-closed and physical Vision P2 E2E remains blocked pending a separate reviewed fence advance.

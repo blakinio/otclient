@@ -15,7 +15,7 @@ base_branch: main
 base_main: 8441fc1cce1600033b505d68ebc5c0141b337394
 audited_integration_head: 7d4bae503030a00a51fad409d46bc43a39ad2314
 created: 2026-09-02T11:28:36+02:00
-updated_at: 2026-09-02T12:14:09+02:00
+updated_at: 2026-09-02T12:29:00+02:00
 risk: high
 feature_scope:
   type: infrastructure
@@ -65,10 +65,10 @@ depends_on:
   - coordinator classification review #5087863607 ACCEPT for Wave 2 repository/integration scope
 blocks:
   - Phase 2 completion and merge of PR #856
-current_blocker: exact_official_client_target_absent
-next_action: when an exact official client is already running in the designated KasmVNC container under authorized runtime ownership, repeat the non-invasive target preflight and only then request fresh read-only admission; this Phase 2 audit must not launch the client
+current_blocker: exact_client_fence_mismatch_after_owner_authorized_update
+next_action: route the newly observed official client build through a separate reviewed trusted-base client-fence advance; do not weaken the Wave 3 audit fence in place
 invocation_started_at: 2026-09-02T11:28:36+02:00
-last_progress_at: 2026-09-02T12:14:09+02:00
+last_progress_at: 2026-09-02T12:29:00+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: audit_setup
 terminal_ci_wait_started_at: null
@@ -130,8 +130,8 @@ A clean result requires exact-head evidence, zero open material findings, a real
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-02T10:14:09Z
-head: 47842c0a40f0d4fc46702b519b3115978e0cd8cf
+updated_at: 2026-09-02T10:29:00Z
+head: d8dd87e40115aad92a71efdd1a206ed83cf6152a
 branch: test/OTC-20260902-vision-p2-e2e-audit
 pr: 857
 status: waiting
@@ -151,30 +151,33 @@ proven:
   - security and provenance subset passed 184 of 184 tests on the fresh audit checkout
   - broad Control Center discovery ran 569 tests with 5 errors and 2 skips; all 5 errors reproduce identically on clean main 8441fc1cce1600033b505d68ebc5c0141b337394
   - authorized Synology Remote Desktop Commander device c47a502e-1b72-4611-b2cd-0b92952ea3a4 is online and responded to read-only preflight
-  - designated container otclient-track-a-kasmvnc is running, DISPLAY=:1 is reachable at 1024x768, but no Tibia/client window is present
-  - pgrep -x client returned no PID in the designated container and no running container exposed a client candidate
-  - canonical runtime-registration.json is absent
-  - no screenshot, model inference, GUI input, login, credentials, process control, memory access, packet capture or mutation occurred; direct Codex worker/reviewer invocations remain zero
+  - designated container otclient-track-a-kasmvnc is running and DISPLAY=:1 is reachable
+  - owner-authorized coordinator setup outside the Wave 3 audit started the official launcher and created /home/kasm-user/Desktop/Tibia.desktop; no login, credentials, character selection or gameplay input was performed
+  - the launcher updated the installed package to Tibia 15.32.be4f48 and the live package client is /home/kasm-user/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client
+  - fresh uniqueness recheck observed exactly one live client PID 28379 on DISPLAY=:1.0 with size 52105824 and sha256 552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1
+  - trusted-base admission fence still requires client_version 15.32.75d4a0, size 52105824 and sha256 d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a
+  - canonical runtime-registration.json remains absent
+  - Wave 3 itself still performed no screenshot, model inference, GUI input, login, credentials, process control, memory access, packet capture or mutation; direct Codex worker/reviewer invocations remain zero
   - PR 857 is the live Draft audit checkpoint
 
 derived:
   - the 5 broad-suite errors are baseline or local-environment limitations rather than Wave 2 regressions
   - independent model audit is intentionally deferred until physical E2E evidence is available so one bounded invocation can review the complete exact-generation evidence set
-  - physical E2E cannot truthfully start because no exact official-client target exists to admit; Phase 2 is not authorized to launch or bootstrap the client
+  - physical E2E cannot truthfully start because the live official client no longer matches the trusted-base exact client fence; the audit must fail closed until a separately reviewed trusted-base fence advance is promoted
 unknown:
-  - when the exact official client will next be started by an authorized runtime owner
-  - fresh read-only runtime admission result after an exact target exists
+  - separately reviewed trusted-base client-fence advance result for the new official build
+  - fresh read-only runtime admission result after the trusted fence matches the live build
   - real admitted read-only E2E result
   - fresh independent audit findings after complete static and live evidence are available
 conflicts:
   - none
 first_failure:
-  marker: exact official-client runtime target is absent
-  evidence: fresh Synology preflight found target container/display healthy but CLIENT_PIDS empty, no Tibia/client window, no client candidate in any running container, and canonical registration ABSENT
+  marker: live official client build does not match trusted-base exact client fence
+  evidence: exactly one live client PID 28379 is present at size 52105824 and sha256 552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1, while trusted base requires 15.32.75d4a0 / d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a
 rejected_hypotheses:
   - broad-suite failures are introduced by Wave 2: the same isolated API and vision errors reproduce on clean main 8441fc1ce1600033b505d68ebc5c0141b337394
   - hosted tests can replace the real runtime gate: Phase 2 programme requires a freshly admitted physical read-only E2E
-  - Synology online is sufficient to start E2E: fresh preflight proved the host/display only; there is no exact client target to admit
+  - Synology online and a visible singleton client are sufficient to start E2E: the current singleton fails the trusted exact-client SHA/version fence
 changed_paths:
   - docs/agents/reports/OTC-20260902-vision-p2-e2e-audit.md
   - docs/agents/tasks/active/OTC-20260902-vision-p2-e2e-audit.md
@@ -197,8 +200,8 @@ validation:
     evidence: device online; otclient-track-a-kasmvnc running; DISPLAY=:1 reachable at 1024x768; no Tibia window/client PID/client candidate; canonical registration absent
   - command: required physical read-only E2E
     result: BLOCKED
-    evidence: no exact official-client target exists for read-only admission and Phase 2 has no process-control/bootstrap authority
+    evidence: current singleton client fails the trusted exact client fence, so runtime_access remains none
 blockers:
-  - exact official-client target is absent; canonical registration is absent; Phase 2 audit is forbidden to launch/bootstrap the client
-next_action: when an exact official client is already running in the designated KasmVNC container under authorized runtime ownership, repeat the non-invasive target preflight and only then request fresh read-only admission; this Phase 2 audit must not launch the client
+  - live official client build 15.32.be4f48 / 552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1 does not match trusted-base fence 15.32.75d4a0 / d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a
+next_action: route the newly observed official client build through a separate reviewed trusted-base client-fence advance; do not weaken the Wave 3 audit fence in place
 ```

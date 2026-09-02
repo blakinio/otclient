@@ -55,3 +55,14 @@ The fresh checkout merge-base with the accepted Wave 2 generation is exactly `7d
 The five broad-suite errors are outside Wave 2 changed paths and reproduce individually on clean `main@8441fc1cce1600033b505d68ebc5c0141b337394`: four Windows-local API connection resets and one vision test ending in `MODEL_INFERENCE_FAILED`. They are retained as baseline/environment evidence and are not silently counted as passing.
 
 The required runtime contract was read from trusted base before physical observation. The authorized `Synology` device is now online. Non-invasive preflight proved `otclient-track-a-kasmvnc` running and `DISPLAY=:1` reachable at `1024x768`, but no Tibia/client window or `client` process exists; an all-running-container candidate scan found none and the canonical runtime registration is absent. No screenshot, admission, model inference, input, login, credential access, process control, memory access, packet capture, or mutation was attempted.
+
+
+## Owner-authorized runtime setup and new fence blocker
+
+At the owner's explicit instruction, the coordinator (outside the Wave 3 auditor authority) created `/home/kasm-user/Desktop/Tibia.desktop` and started the official Tibia launcher without login, credential access, character selection or gameplay input. The launcher updated the installed official Linux package to `15.32.be4f48`.
+
+A fresh exact-target recheck then observed exactly one live `client` process: PID `28379`, executable `/home/kasm-user/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client`, size `52105824`, SHA-256 `552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1`, display `:1.0`, with a visible Tibia window.
+
+This does **not** satisfy current trusted-base admission. `TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md` still fences the official client to `15.32.75d4a0`, size `52105824`, SHA-256 `d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a`. The audit therefore fails closed and keeps `runtime_access:none`; no screenshot/model inference or E2E observation is admitted. A separately reviewed trusted-base client-fence advance is required.
+
+Direct Codex usage remains `0`.

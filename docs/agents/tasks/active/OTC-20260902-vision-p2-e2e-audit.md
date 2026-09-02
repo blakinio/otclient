@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260902-vision-p2-e2e-audit
-status: waiting
+status: investigating
 agent: ChatGPT
 session_role: phase2_auditor
 worker_alias: OTC-VISION-P2-E2E-AUDIT
@@ -15,7 +15,7 @@ base_branch: feat/OTC-20260902-vision-p2-vision-reconciliation
 base_main: a7c7eb8aa2cc69d70442578401d88be9262055e4
 audited_integration_head: 2346ffb704c213f2e3050f87fc80aaa611454cd3
 created: 2026-09-02T11:28:36+02:00
-updated_at: 2026-09-02T17:14:30+02:00
+updated_at: 2026-09-02T17:17:06+02:00
 risk: high
 execution_class: hybrid
 execution_mode: github_plus_remote_read_only
@@ -30,17 +30,17 @@ continuation_policy: continue_until_real_stop
 task_completion_policy: return_to_coordinator_for_classification
 policy_version: 2
 implementation_authorized: false
-runtime_access: none
-runtime_owner_task: NOT_APPLICABLE
-runtime_namespace: NOT_APPLICABLE
-canonical_registration: NOT_APPLICABLE
+runtime_access: read_only
+runtime_owner_task: OTC-20260902-vision-p2-e2e-audit
+runtime_namespace: 'Synology/otclient-track-a-kasmvnc/display-1/client-28379/start-36180734'
+canonical_registration: ABSENT
 canonical_lease_generation: NOT_APPLICABLE
 registration_lease_generation: NOT_APPLICABLE
 gate_a: NOT_APPLICABLE
 generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
-target_uniqueness: NOT_APPLICABLE
+target_uniqueness: PROVEN
 persistent_session_role: none
 physical_e2e_required: true
 mutation_authorized: false
@@ -67,8 +67,8 @@ depends_on:
   - coordinator review #5090102633 ACCEPT
 blocks:
   - Phase 2 completion and merge of PR #856
-current_blocker: fresh_live_reconcile_vision_pending
-next_action: push this restack checkpoint, freshly admit read_only on the exact client, then run one full trusted capture to Qwen to reconcile_vision path with zero-contract runtime resolver and require final UNKNOWN with runtime_current false
+current_blocker: final_live_reconcile_vision_in_progress
+next_action: push this final fresh read_only admission, then run one full authenticated trusted capture to exact-Qwen to reconcile_vision path and require UNKNOWN with runtime_current false
 last_progress_at: 2026-09-02T16:42:26+02:00
 physical_action_count: 0
 ---
@@ -108,11 +108,11 @@ At this checkpoint Molehill-PC's execution endpoint is offline, so the cross-hos
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-02T15:14:30Z
-head: b1d550fc34f5fc9470f91d192f04572e687fa822
+updated_at: 2026-09-02T15:17:06Z
+head: dfbfd85a296317dd6786a5382dfac64787bc8eb1
 branch: test/OTC-20260902-vision-p2-e2e-audit
 pr: 857
-status: waiting
+status: investigating
 context_routes:
   - tools/tibia_re_control_center/vision_p2_trusted_composition.py
   - tools/tibia_re_control_center/agent_edge_bridge.py
@@ -123,48 +123,44 @@ owned_paths:
   - docs/agents/reports/OTC-20260902-vision-p2-e2e-audit.md
   - docs/agents/evidence/OTC-20260902-vision-p2-e2e-audit/**
 proven:
-  - trusted main is a7c7eb8aa2cc69d70442578401d88be9262055e4 with admission-only repair 860 merged
-  - accepted Wave 2 under audit is 2346ffb704c213f2e3050f87fc80aaa611454cd3 under coordinator review 5091459576
-  - Wave 2 exact-head associated workflows are all terminal SUCCESS
-  - Wave 3 restack merge-base is exactly 2346ffb704c213f2e3050f87fc80aaa611454cd3
-  - audit diff versus Wave 2 remains only audit task report and evidence files
-  - restacked security/provenance matrix passes 186 of 186
-  - admission-only focused guards pass 2 of 2 and current-client fence passes
-  - prior secret-safe physical capture and repaired exact-Qwen production sensor pass
-  - real authenticated Synology-to-Molehill edge transport passes with durable verifier artifact integrity and bridge acceptance
-  - admission-only authority repair now permits exact zero-contract resolver while nonempty unconfigured resolver remains rejected
-  - no reviewed runtime semantic producer is required for final UNKNOWN reconciliation
-  - runtime_access remains none until a fresh exact-target admission is durably pushed
+  - trusted main is a7c7eb8aa2cc69d70442578401d88be9262055e4 and accepted Wave 2 is 2346ffb704c213f2e3050f87fc80aaa611454cd3
+  - post-repair restack security/provenance passes 186 of 186 and admission-only guards pass 2 of 2
+  - prior secret-safe capture exact-Qwen and real authenticated cross-host edge transport gates are PASS
+  - Molehill-PC is online and available for the final local-model/control-side run
+  - fresh Synology observation epoch ms is 1788362116363 and monotonic ns is 379102135365434
+  - Kasm container is current and display 1 is reachable
+  - exactly one official client exists across all running containers
+  - current client PID 28379 start 36180734 display :1.0 maps to XID 0x01e00017 geometry 810 263 1020 650
+  - package 15.32.be4f48 size 52105824 SHA 552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1 matches trusted fence
+  - canonical registration is absent and target uniqueness is PROVEN
+  - runtime admission-only zero-contract authority is now trusted-main behavior after PR 860
   - physical action count remains zero and direct Codex usage remains zero
 derived:
-  - all previously discovered repository/transport/model blockers are closed on the synchronized generation
-  - exactly one physical gate remains: fresh trusted capture and visual observation through reconcile_vision with runtime_current false
+  - final read_only observation window may open for the exact current target
+  - exactly one physical gate remains: full trusted capture visual reconciliation with no semantic runtime evidence
 unknown:
-  - fresh exact-target admission result for the final observation window
-  - final live reconcile_vision result and event persistence
-  - final closeout audit/lifecycle result
+  - fresh capture and exact-Qwen result for this final window
+  - final reconcile_vision state/runtime_current/event persistence
+  - final closeout classification
 conflicts:
   - none
 first_failure:
-  marker: none on the restacked static generation; live reconcile not yet rerun
-  evidence: repository and transport prerequisites are green but runtime_access is intentionally none
+  marker: none before final physical observation
+  evidence: all admission prerequisites pass but no final-window capture has been taken yet
 rejected_hypotheses:
-  - another daemon or runtime producer is required: rejected by successful transport E2E and admission-only repair
-  - stronger semantic runtime evidence is required for completion: rejected for safe UNKNOWN reconciliation
+  - stronger runtime producer is required for UNKNOWN: rejected by deterministic reconciliation contract
+  - prior PID or capture can substitute for fresh admission: rejected; this checkpoint uses a new live preflight
 changed_paths:
   - docs/agents/tasks/active/OTC-20260902-vision-p2-e2e-audit.md
-  - docs/agents/reports/OTC-20260902-vision-p2-e2e-audit.md
+  - docs/agents/evidence/OTC-20260902-vision-p2-e2e-audit/final-live-read-only-preflight.md
 validation:
-  - command: post-860 security/provenance matrix
+  - command: fresh exact-target Synology final preflight
     result: PASS
-    evidence: 186 tests OK
-  - command: admission-only guards plus current-client fence
-    result: PASS
-    evidence: 2 focused tests OK and fence PASS
-  - command: required final live reconcile_vision
+    evidence: singleton exact fence PID start XID display and all-container uniqueness are current
+  - command: final full trusted reconcile_vision E2E
     result: BLOCKED
-    evidence: must freshly admit read_only after this restack checkpoint is pushed
+    evidence: admission must be durably pushed before capture/model observation
 blockers:
-  - durable restack checkpoint and fresh read_only admission precede the final physical observation
-next_action: push this restack checkpoint, freshly admit read_only, then run one full trusted capture to Qwen to reconcile_vision path expecting UNKNOWN with runtime_current false
+  - durable push of this final fresh read_only admission precedes physical observation
+next_action: push this final admission then run one full authenticated trusted capture to exact-Qwen to reconcile_vision path expecting UNKNOWN with runtime_current false
 ```

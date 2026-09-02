@@ -61,3 +61,10 @@ Behavior proven by tests:
 ## Current result
 
 `VALIDATING` - implementation and deterministic tests are complete on the code head; exact-head CI/review remain. Runtime access was not used, physical action count remains `0`, and direct Codex worker/reviewer invocations remain `0`.
+## Post-fence trusted-base synchronization ? 2026-09-02
+
+PR #858 advanced trusted `main` to `c16d180d336ba8aa9e1656807c79a44e81c15c66` and changed the exact official-client admission fence to `15.32.be4f48 / 52105824 / 552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1`. That made the previously accepted Wave 2 branch non-mergeable against `main`.
+
+The new trusted base merged into the Wave 2 branch without textual conflicts. The auto-merge in `test_vision_p2_trusted_composition.py` retained both the Wave 2 reconciliation coverage and the new current-client fixture. Fresh deterministic validation after the sync passed: Wave 2 matrix `90/90`, runtime admission `14/14`, current-client fence PASS, changed-module `py_compile`, Ruff `--select I,F`, and `git diff --check`.
+
+No reconciliation production repair was required. The refreshed generation must receive its own exact-head GitHub Actions validation before Wave 3 is restacked onto it. Direct Codex usage remains `0`; runtime access and physical action count for Wave 2 remain `none` and `0`.

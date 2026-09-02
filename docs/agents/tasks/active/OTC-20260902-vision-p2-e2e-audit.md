@@ -15,7 +15,7 @@ base_branch: feat/OTC-20260902-vision-p2-vision-reconciliation
 base_main: c16d180d336ba8aa9e1656807c79a44e81c15c66
 audited_integration_head: a746dbfaa60a129fc3fa2f91e1b1e48038837a4a
 created: 2026-09-02T11:28:36+02:00
-updated_at: 2026-09-02T13:47:00+02:00
+updated_at: 2026-09-02T13:51:00+02:00
 risk: high
 feature_scope:
   type: infrastructure
@@ -37,17 +37,17 @@ continuation_policy: continue_until_real_stop
 task_completion_policy: return_to_coordinator_for_classification
 policy_version: 2
 implementation_authorized: false
-runtime_access: none
-runtime_owner_task: NOT_APPLICABLE
-runtime_namespace: NOT_APPLICABLE
-canonical_registration: NOT_APPLICABLE
+runtime_access: read_only
+runtime_owner_task: OTC-20260902-vision-p2-e2e-audit
+runtime_namespace: 'Synology/otclient-track-a-kasmvnc/display-1/client-28379/start-36180734'
+canonical_registration: ABSENT
 canonical_lease_generation: NOT_APPLICABLE
 registration_lease_generation: NOT_APPLICABLE
 gate_a: NOT_APPLICABLE
 generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
-target_uniqueness: NOT_APPLICABLE
+target_uniqueness: PROVEN
 persistent_session_role: none
 physical_e2e_required: true
 mutation_authorized: false
@@ -75,12 +75,12 @@ depends_on:
   - coordinator refreshed classification review #5089081225 ACCEPT for Wave 2 repository/integration scope
 blocks:
   - Phase 2 completion and merge of PR #856
-current_blocker: fresh_read_only_runtime_admission_pending
-next_action: push the refreshed audit branch and retarget PR 857 onto the accepted Wave 2 branch so the PR diff is audit-only, then freshly prove the designated Synology container display and exact singleton current-fenced client across all running containers before persisting read_only admission
+current_blocker: physical_read_only_e2e_pending
+next_action: after this durable read_only admission is committed and pushed, perform the real Vision P2 observation through the accepted secret-safe capture runtime-signal and trusted reconciliation path without GUI input login credentials process control memory access packet capture or physical action
 invocation_started_at: 2026-09-02T11:28:36+02:00
-last_progress_at: 2026-09-02T13:47:00+02:00
+last_progress_at: 2026-09-02T13:51:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: refreshed_wave3_restack_pre_admission
+ci_check_generation: refreshed_wave3_read_only_admission
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -140,8 +140,8 @@ A clean result requires exact-head evidence, zero open material findings, a real
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-02T11:47:00Z
-head: 3c8f4f04ad8feea155caa62e9d7b5aab12434e43
+updated_at: 2026-09-02T11:51:00Z
+head: 4b9c2f6b200d32a1496831aaa51ad3e3ada3e29c
 branch: test/OTC-20260902-vision-p2-e2e-audit
 pr: 857
 status: validating
@@ -170,16 +170,19 @@ proven:
   - committed restack merge-base with accepted Wave 2 is exactly a746dbfaa60a129fc3fa2f91e1b1e48038837a4a
   - diff from accepted Wave 2 to the committed audit restack is exactly three audit-owned documentation/evidence paths and no implementation path
   - Package A boundary RED against a main-based stacked diff reports only five documentation paths and no code path
+  - fresh Synology preflight proves the designated Kasm container/display current at 3440x1229 and exactly one all-container client candidate PID 28379/start 36180734/display :1.0 with a PID-bound Tibia window
+  - fresh client version 15.32.be4f48 size 52105824 sha256 552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1 matches trusted fence; canonical registration is ABSENT and read_only target uniqueness is PROVEN with mutation false
 
 derived:
   - the previous live-client fence mismatch blocker is resolved by merged PR 858 and is no longer a valid reason to refuse a fresh preflight
   - all historical PID window registration and runtime observations must still be treated as stale discovery evidence and revalidated before read_only admission
   - independent model audit remains deferred until complete current-generation physical E2E evidence exists so the constrained quota is not spent twice
   - changing Package A workflow from this audit would violate implementation_authorized false; retargeting PR 857 onto accepted Wave 2 preserves a truthful audit-only diff instead
+  - fresh process/window/fence/namespace proof satisfies the read_only admission class without creating canonical identity or mutation authority
+  - any PID start-tick display window candidate-count or fence change invalidates this admission and requires fresh preflight before further observation
 unknown:
-  - fresh current Synology container display window client PID and all-running-container uniqueness after this restack
-  - fresh read_only runtime-admission result
   - real admitted read-only Vision P2 E2E result
+  - whether the actual reviewed runtime-signal path has current causal evidence strong enough to reconcile a secret-safe visual observation beyond UNKNOWN
   - fresh independent audit findings after complete static and live evidence are available
 conflicts:
   - none
@@ -191,10 +194,12 @@ rejected_hypotheses:
   - historical client PID or window evidence can satisfy current admission: trusted runtime contracts require a fresh exact-process and uniqueness proof for every physical session
   - previous fence mismatch remains current: merged PR 858 advances the trusted exact-client fence to the live 15.32.be4f48 tuple
   - Wave 3 must repair Package A workflow to proceed: rejected; exact diff versus accepted Wave 2 is only three audit-owned paths and a stacked PR base represents that dependency without implementation scope expansion
+  - current target cannot be admitted read_only because canonical registration is absent: rejected; read_only observation does not create or require canonical control identity and current task ownership namespace uniqueness and mutation false are freshly proven
 changed_paths:
   - docs/agents/reports/OTC-20260902-vision-p2-e2e-audit.md
   - docs/agents/tasks/active/OTC-20260902-vision-p2-e2e-audit.md
   - docs/agents/evidence/OTC-20260902-vision-p2-e2e-audit/static-preaudit.md
+  - docs/agents/evidence/OTC-20260902-vision-p2-e2e-audit/live-read-only-preflight.md
 validation:
   - command: python -m unittest refreshed security and provenance subset
     result: PASS
@@ -214,7 +219,10 @@ validation:
   - command: extracted Package A boundary against main-based stacked audit branch
     result: FAIL
     evidence: exactly five documentation paths are rejected and no implementation path is outside its declared boundary; this supports retargeting rather than workflow repair by the auditor
+  - command: fresh non-invasive Synology KasmVNC client admission preflight
+    result: PASS
+    evidence: target container and display are alive; exactly one all-container client candidate exists at PID 28379/start 36180734; exact current version size SHA display and PID-bound Tibia window pass; canonical registration is ABSENT
 blockers:
-  - PR 857 must be retargeted to the accepted Wave 2 branch and fresh physical target proof plus read_only admission are required before any screenshot capture model inference or physical E2E observation
-next_action: push this audit-only stacked checkpoint, retarget PR 857 onto accepted Wave 2, confirm the live three-path audit diff, then freshly prove container display exact client fence and target uniqueness before persisting read_only admission
+  - durable read_only admission must be committed and pushed before the first screenshot capture model inference or physical E2E observation
+next_action: commit and push this read_only admission record, then perform one real secret-safe Vision P2 capture plus current runtime-signal reconciliation without any physical action
 ```

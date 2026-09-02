@@ -193,6 +193,27 @@ class AgentMcpTests(unittest.TestCase):
         self.assert_tool_payload(response, {"status": "OK"})
         self.assertEqual([("GET", "/v1/agent/session?session_id=session+1")], self.client.calls)
 
+    def test_status_preserves_edge_read_only_fields_from_control_api(self) -> None:
+        self.client.response = {
+            "session_id": "session-1",
+            "runtime_access": "read_only",
+            "official_client_access": "READ_ONLY",
+            "edge": {
+                "availability": "CONNECTED",
+                "current": True,
+                "reason": "CURRENT",
+                "capture": {"status": "AVAILABLE", "current": True, "artifact_ref": "capture-1"},
+                "runtime": {"status": "IN_GAME", "current": True, "evidence_refs": ["runtime-1"]},
+            },
+            "executor": "NULL",
+            "mutation_authority": "NONE",
+            "physical_action_budget": 0,
+            "physical_action_count": 0,
+        }
+        response = self.server.handle(call("agent_session_status", {"session_id": "session-1"}))
+        self.assert_tool_payload(response, self.client.response)
+        self.assertEqual([("GET", "/v1/agent/session?session_id=session-1")], self.client.calls)
+
     def test_submit_dispatches_exact_task_body_and_request_id(self) -> None:
         task = json.loads(json.dumps(TASK))
         response = self.server.handle(call("agent_submit_task", {

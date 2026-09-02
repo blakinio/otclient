@@ -47,7 +47,7 @@ section[data-tab]{display:none}section[data-tab].active{display:block}.toolbar{d
 </section>
 <section data-tab="Agent">
 <h2>Local vision agent</h2>
-<p class="warn">Secret-safe local views only. Runtime access: <strong>none</strong>. Mutation authority: <strong>NONE</strong>.</p>
+<p class="warn">Secret-safe local views only. Runtime access is session-scoped and may be read-only when separately admitted. Mutation authority: <strong>NONE</strong>.</p>
 <div class="toolbar"><input id="agentSessionId" placeholder="session id"><input id="agentRunId" placeholder="run id"><button id="loadAgent">Load safe agent views</button></div>
 <div class="grid">
 <div class="card"><h3>Session heartbeat</h3><div id="agentHeartbeat" class="state">UNKNOWN</div></div>
@@ -106,11 +106,12 @@ function agentSessionId(){return document.getElementById('agentSessionId').value
 function agentRunId(){return document.getElementById('agentRunId').value.trim()}
 function applyAgentSession(session){
   const dashboard=session.dashboard||{};
-  document.getElementById('agentHeartbeat').textContent=json({state:session.operational_state,heartbeat_epoch_ms:session.heartbeat_epoch_ms,pause_latched:session.pause_latched,stop_latched:session.stop_latched});
-  document.getElementById('agentTaskRun').textContent=json({task_id:session.task_id,run_id:session.current_run_id,trusted_main_sha:session.trusted_main_sha,runtime_access:session.runtime_access});
-  document.getElementById('agentCapture').textContent=json(dashboard.latest_secret_safe_capture||{status:'UNAVAILABLE',secret_safe:true});
+  const edge=session.edge||{availability:'DISCONNECTED',current:false,reason:'NO_EDGE_OBSERVATION',admission:{bound:false,current:false,reason:'RUNTIME_ADMISSION_REQUIRED'},capture:null,runtime:null};
+  document.getElementById('agentHeartbeat').textContent=json({state:session.operational_state,heartbeat_epoch_ms:session.heartbeat_epoch_ms,edge:{availability:edge.availability,current:edge.current,reason:edge.reason,edge_instance_id:edge.edge_instance_id,admission:edge.admission||{bound:false,current:false,reason:'RUNTIME_ADMISSION_REQUIRED'}},pause_latched:session.pause_latched,stop_latched:session.stop_latched});
+  document.getElementById('agentTaskRun').textContent=json({task_id:session.task_id,run_id:session.current_run_id,trusted_main_sha:session.trusted_main_sha,runtime_access:session.runtime_access,official_client_access:session.official_client_access});
+  document.getElementById('agentCapture').textContent=json(edge.capture||dashboard.latest_secret_safe_capture||{status:'UNAVAILABLE',secret_safe:true,current:false});
   document.getElementById('agentVisual').textContent=json(dashboard.visual||{label:'UNKNOWN',ocr:[],visual_only:true,structural_authority:false});
-  document.getElementById('agentRuntimeEvidence').textContent=json(dashboard.runtime_evidence_class||'UNKNOWN');
+  document.getElementById('agentRuntimeEvidence').textContent=json(edge.runtime||dashboard.runtime_evidence_class||'UNKNOWN');
   document.getElementById('agentReconciliation').textContent=json(dashboard.reconciliation_state||'UNKNOWN');
   document.getElementById('agentActionBudget').textContent=json({latest_action:dashboard.latest_action||null,physical_action_budget:session.physical_action_budget,physical_action_count:session.physical_action_count,remaining_physical_action_budget:session.remaining_physical_action_budget,mutation_authority:session.mutation_authority});
   document.getElementById('agentTimeline').textContent=json(dashboard.provenance_timeline||session.events||[]);

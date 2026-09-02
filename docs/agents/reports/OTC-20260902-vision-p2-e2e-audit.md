@@ -50,3 +50,9 @@ Current classification:
 At the correction checkpoint the Molehill-PC Remote Desktop Commander execution endpoint is offline, so the one-shot receiver cannot be started from this session. This is an external availability gate, not proof of a missing architecture or a need to implement a new subsystem.
 
 When Molehill is available, the audit must start again from `runtime_access:none`, freshly prove/admit the exact target, then run only the missing authenticated edge path using existing production transport/verifier/bridge/composition. No GUI input, credentials, login, gameplay, process-memory access, packet capture or client mutation is permitted.
+
+## Corrected real edge transport E2E and narrow composition finding
+
+A fresh full-mask Kasm capture was sent for real from Synology to Molehill through the accepted production `EdgeOutboundClient`. Mutual authentication, durable replay verification, heartbeat, signed artifact transfer, observation verification, artifact SHA/size validation, production PNG decode and authority-neutral `AgentEdgeBridge.accept()` all passed. Physical action count remained `0`; the transport is no longer a blocker.
+
+The remaining failure is narrower. A production-only composition probe used the exact current client identity, successfully admitted read-only runtime and constructed a `RuntimeSignalResolver` with zero reviewed contracts. Issuing the composition-owned read-only authority then failed closed with `EDGE_RUNTIME_COMPOSITION_MISMATCH`. Concrete reviewed-contract instantiations in the checkout are test fixtures only, so the auditor did not import one merely to make `edge.current`. This exposes coupling between basic read-only admission currentness and semantic runtime-contract configuration. A bounded repair should allow admission-only currentness only with a zero-contract resolver; semantic runtime evidence must remain unavailable and reconciliation should safely remain `UNKNOWN` without stronger evidence.

@@ -15,7 +15,7 @@ base_branch: main
 base_main: a7c7eb8aa2cc69d70442578401d88be9262055e4
 pr: null
 created: 2026-09-02T20:16:06+02:00
-updated_at: 2026-09-02T20:16:06+02:00
+updated_at: 2026-09-02T20:17:13+02:00
 risk: medium
 execution_class: repository_only
 execution_mode: chat
@@ -87,3 +87,62 @@ Advance the existing owner-gated `Track A Surveyor v2 read-only` workflow to the
 3. Track A governance, YAML parse, compile and diff-check pass.
 4. Package A exact case passes while wrong branch, wrong base and fork cases fail closed.
 5. No runtime observation occurs in this repair task; direct Codex usage remains zero.
+## Context checkpoint
+
+```yaml
+checkpoint_version: 1
+updated_at: 2026-09-02T18:17:13Z
+head: 6def14af109ed51e6ee15cc799cbae9fb18cc93e
+branch: fix/OTC-20260902-surveyor-current-fence
+pr: null
+status: validating
+context_routes:
+  - .github/workflows/track-a-surveyor-v2-readonly.yml
+  - tests/tools/tibia_re_surveyor/test_operator_semantics.py
+  - .github/workflows/tibia-re-control-center-core.yml
+owned_paths:
+  - .github/workflows/track-a-surveyor-v2-readonly.yml
+  - tests/tools/tibia_re_surveyor/test_operator_semantics.py
+  - docs/agents/tasks/active/OTC-20260902-surveyor-current-fence.md
+  - .github/workflows/tibia-re-control-center-core.yml
+proven:
+  - TDD RED e0d3379e9 fails because Surveyor retains superseded size and SHA
+  - minimal GREEN cc4b09307 changes only the two Surveyor expected-fence values
+  - Surveyor suite passes 62 of 62
+  - canonical current-client fence and Track A governance pass before integration checkpoint
+  - Package A pre-exception RED identifies only Surveyor workflow and focused test as unexpected
+  - direct Codex usage remains zero and runtime_access remains none
+derived:
+  - no Surveyor runtime logic or authority semantics need modification
+unknown:
+  - exact Package A positive and negative result on committed integration head
+  - exact-head GitHub Actions result
+  - fresh live Surveyor and final Vision P2 reconciliation result
+conflicts:
+  - none
+first_failure:
+  marker: Surveyor workflow retained superseded canonical client fence
+  evidence: focused RED e0d3379e9
+rejected_hypotheses:
+  - globally replace historical ed5469 evidence: rejected; only current Surveyor authority is in scope
+  - run mutating Kasm bootstrap as a preflight substitute: rejected
+changed_paths:
+  - .github/workflows/track-a-surveyor-v2-readonly.yml
+  - tests/tools/tibia_re_surveyor/test_operator_semantics.py
+  - docs/agents/tasks/active/OTC-20260902-surveyor-current-fence.md
+  - .github/workflows/tibia-re-control-center-core.yml
+validation:
+  - command: python -m unittest discover -s tests/tools/tibia_re_surveyor -p test_*.py
+    result: PASS
+    evidence: 62 tests OK
+  - command: python .github/scripts/test_track_a_canonical_current_client_fence.py
+    result: PASS
+    evidence: TRACK_A_CANONICAL_CURRENT_CLIENT_FENCE=PASS
+  - command: Python PyYAML parse plus py_compile and git diff --check
+    result: PASS
+    evidence: local validation returned zero
+blockers:
+  - exact Package A boundary and exact-head GitHub Actions pending
+next_action: validate exact branch/base/repo boundary, push Draft PR, and require terminal exact-head CI
+```
+

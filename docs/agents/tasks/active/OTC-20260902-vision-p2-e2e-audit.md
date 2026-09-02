@@ -12,10 +12,10 @@ task_kind: audit
 phase: wave_3_fresh_audit_e2e
 branch: test/OTC-20260902-vision-p2-e2e-audit
 base_branch: feat/OTC-20260902-vision-p2-vision-reconciliation
-base_main: 27f9bdd5f003c596529e7571343ae8bb053d5cff
-audited_integration_head: 34fbf6e2d693058ce03a583087816b25639e9cb3
+base_main: a7c7eb8aa2cc69d70442578401d88be9262055e4
+audited_integration_head: 2346ffb704c213f2e3050f87fc80aaa611454cd3
 created: 2026-09-02T11:28:36+02:00
-updated_at: 2026-09-02T15:43:00+02:00
+updated_at: 2026-09-02T17:14:30+02:00
 risk: high
 execution_class: hybrid
 execution_mode: github_plus_remote_read_only
@@ -67,8 +67,8 @@ depends_on:
   - coordinator review #5090102633 ACCEPT
 blocks:
   - Phase 2 completion and merge of PR #856
-current_blocker: admission_only_runtime_authority_requires_reviewed_contract_config
-next_action: route one bounded bridge/composition repair allowing admission-only read_only authority only with a zero-contract resolver while keeping semantic runtime evidence unavailable, then rerun only the remaining live reconcile_vision gate
+current_blocker: fresh_live_reconcile_vision_pending
+next_action: push this restack checkpoint, freshly admit read_only on the exact client, then run one full trusted capture to Qwen to reconcile_vision path with zero-contract runtime resolver and require final UNKNOWN with runtime_current false
 last_progress_at: 2026-09-02T16:42:26+02:00
 physical_action_count: 0
 ---
@@ -108,74 +108,63 @@ At this checkpoint Molehill-PC's execution endpoint is offline, so the cross-hos
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-02T14:42:26Z
-head: 40c8ec7b9f4799cc723dba391d8dfc72a259645f
+updated_at: 2026-09-02T15:14:30Z
+head: b1d550fc34f5fc9470f91d192f04572e687fa822
 branch: test/OTC-20260902-vision-p2-e2e-audit
 pr: 857
 status: waiting
 context_routes:
-  - tools/tibia_re_control_center/agent_edge_transport.py
-  - tools/tibia_re_control_center/agent_edge_bridge.py
   - tools/tibia_re_control_center/vision_p2_trusted_composition.py
-  - tools/tibia_re_control_center/agent_runtime_signals.py
+  - tools/tibia_re_control_center/agent_edge_bridge.py
+  - tools/tibia_re_control_center/agent_vision.py
+  - docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
 owned_paths:
   - docs/agents/tasks/active/OTC-20260902-vision-p2-e2e-audit.md
   - docs/agents/reports/OTC-20260902-vision-p2-e2e-audit.md
   - docs/agents/evidence/OTC-20260902-vision-p2-e2e-audit/**
 proven:
-  - accepted Wave 2 is 34fbf6e2d693058ce03a583087816b25639e9cb3 on trusted main 27f9bdd5f003c596529e7571343ae8bb053d5cff
-  - static security/provenance subset passes 184 of 184
-  - physical secret-safe capture and repaired exact-Qwen sensor pass with action count zero
-  - fresh edge admission head 40c8ec7b9f4799cc723dba391d8dfc72a259645f passed checkpoint and Track A governance
-  - fresh transport capture completed in 6630 ms and persisted only a full-frame-zero PNG
-  - transport artifact SHA is ebbcca421d8e9a727af1143849547450b36e120e2f540cee0262de417125d97c and raw frame persistence is false
-  - post-capture PID start SHA and XID stayed exact
-  - real Synology EdgeOutboundClient sent heartbeat artifact observation as sequences 2 3 4
-  - Molehill authenticated the private peer and verified all frames through durable trusted replay state
-  - received PNG passed signed size SHA and production decode with all pixels zero
-  - normalized authority-neutral edge observation passed AgentEdgeBridge.accept with runtime null
-  - transport temporaries and pairing material were deleted after the run
-  - exact read_only admission and zero-contract RuntimeSignalResolver both construct successfully
-  - composition authority issuance then fails closed with EDGE_RUNTIME_COMPOSITION_MISMATCH
-  - concrete ReviewedRuntimeSignalContract instantiations are found only in tests
-  - direct Codex usage remains zero
+  - trusted main is a7c7eb8aa2cc69d70442578401d88be9262055e4 with admission-only repair 860 merged
+  - accepted Wave 2 under audit is 2346ffb704c213f2e3050f87fc80aaa611454cd3 under coordinator review 5091459576
+  - Wave 2 exact-head associated workflows are all terminal SUCCESS
+  - Wave 3 restack merge-base is exactly 2346ffb704c213f2e3050f87fc80aaa611454cd3
+  - audit diff versus Wave 2 remains only audit task report and evidence files
+  - restacked security/provenance matrix passes 186 of 186
+  - admission-only focused guards pass 2 of 2 and current-client fence passes
+  - prior secret-safe physical capture and repaired exact-Qwen production sensor pass
+  - real authenticated Synology-to-Molehill edge transport passes with durable verifier artifact integrity and bridge acceptance
+  - admission-only authority repair now permits exact zero-contract resolver while nonempty unconfigured resolver remains rejected
+  - no reviewed runtime semantic producer is required for final UNKNOWN reconciliation
+  - runtime_access remains none until a fresh exact-target admission is durably pushed
+  - physical action count remains zero and direct Codex usage remains zero
 derived:
-  - real authenticated cross-host edge transport is now physically PASS
-  - no daemon or new runtime producer is required for transport acceptance
-  - remaining blocker is read_only admission currentness coupled to nonempty semantic contract configuration
-  - a test fixture contract would be fake live evidence and is not used
-  - runtime_access is released back to none
+  - all previously discovered repository/transport/model blockers are closed on the synchronized generation
+  - exactly one physical gate remains: fresh trusted capture and visual observation through reconcile_vision with runtime_current false
 unknown:
-  - minimal admission-only authority repair
-  - live reconcile_vision result after repair; UNKNOWN is expected without reviewed runtime evidence
-  - final closeout result
+  - fresh exact-target admission result for the final observation window
+  - final live reconcile_vision result and event persistence
+  - final closeout audit/lifecycle result
 conflicts:
   - none
 first_failure:
-  marker: admission-only authority cannot be issued for a zero-contract resolver
-  evidence: production-only probe returns EDGE_RUNTIME_COMPOSITION_MISMATCH after exact admission and empty resolver succeed
+  marker: none on the restacked static generation; live reconcile not yet rerun
+  evidence: repository and transport prerequisites are green but runtime_access is intentionally none
 rejected_hypotheses:
-  - cross-host transport is still missing: rejected by real authenticated traffic and durable verification
-  - persistent daemon is required: rejected by successful one-shot production transport E2E
-  - semantic runtime signal is required for UNKNOWN: rejected; failure occurs before reconciliation at authority binding
+  - another daemon or runtime producer is required: rejected by successful transport E2E and admission-only repair
+  - stronger semantic runtime evidence is required for completion: rejected for safe UNKNOWN reconciliation
 changed_paths:
   - docs/agents/tasks/active/OTC-20260902-vision-p2-e2e-audit.md
   - docs/agents/reports/OTC-20260902-vision-p2-e2e-audit.md
-  - docs/agents/evidence/OTC-20260902-vision-p2-e2e-audit/real-edge-transport-e2e.md
 validation:
-  - command: real production EdgeOutboundClient Synology to Molehill
+  - command: post-860 security/provenance matrix
     result: PASS
-    evidence: mutual auth plus heartbeat artifact observation sequences 2 3 4
-  - command: Molehill durable verifier artifact receive decode and AgentEdgeBridge.accept
+    evidence: 186 tests OK
+  - command: admission-only guards plus current-client fence
     result: PASS
-    evidence: private peer exact SHA 2007 bytes all-black decode and normalized bridge acceptance
-  - command: zero-contract admission-only composition probe
-    result: FAIL
-    evidence: EDGE_RUNTIME_COMPOSITION_MISMATCH after admission and empty resolver pass
-  - command: ephemeral transport cleanup
-    result: PASS
-    evidence: pairing material scripts port files safe PNG and runner checkout removed
+    evidence: 2 focused tests OK and fence PASS
+  - command: required final live reconcile_vision
+    result: BLOCKED
+    evidence: must freshly admit read_only after this restack checkpoint is pushed
 blockers:
-  - admission-only read_only authority cannot bind without a nonempty reviewed runtime contract configuration
-next_action: route one bounded bridge/composition repair allowing admission-only authority only for an empty resolver and preserving semantic runtime unavailable, then rerun only live reconcile_vision
+  - durable restack checkpoint and fresh read_only admission precede the final physical observation
+next_action: push this restack checkpoint, freshly admit read_only, then run one full trusted capture to Qwen to reconcile_vision path expecting UNKNOWN with runtime_current false
 ```

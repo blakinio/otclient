@@ -15,7 +15,7 @@ base_branch: main
 base_main: a7c7eb8aa2cc69d70442578401d88be9262055e4
 pr: null
 created: 2026-09-02T20:16:06+02:00
-updated_at: 2026-09-02T20:17:13+02:00
+updated_at: 2026-09-02T20:20:17+02:00
 risk: medium
 execution_class: repository_only
 execution_mode: chat
@@ -64,8 +64,8 @@ owned_paths:
   - tests/tools/tibia_re_surveyor/test_operator_semantics.py
   - docs/agents/tasks/active/OTC-20260902-surveyor-current-fence.md
   - .github/workflows/tibia-re-control-center-core.yml
-current_blocker: package_a_exact_exception_pending
-next_action: validate the exact PR-bound Package A exception and all Surveyor/current-fence/governance tests
+current_blocker: draft_pr_and_exact_head_ci_pending
+next_action: push the validated repair, open a Draft PR, bind its number into this checkpoint, and require terminal exact-head CI
 ---
 
 # Objective
@@ -92,7 +92,7 @@ Advance the existing owner-gated `Track A Surveyor v2 read-only` workflow to the
 ```yaml
 checkpoint_version: 1
 updated_at: 2026-09-02T18:17:13Z
-head: 6def14af109ed51e6ee15cc799cbae9fb18cc93e
+head: 5c5e41031db882573656c49bef5e2e638175ac2f
 branch: fix/OTC-20260902-surveyor-current-fence
 pr: null
 status: validating
@@ -111,11 +111,13 @@ proven:
   - Surveyor suite passes 62 of 62
   - canonical current-client fence and Track A governance pass before integration checkpoint
   - Package A pre-exception RED identifies only Surveyor workflow and focused test as unexpected
+  - exact Package A boundary passes with 4 declared paths; wrong branch, wrong base and fork fail closed
+  - self-hosted PR boundary independent audit passes
+  - Ruff formatting guard now passes after test-only import-order cleanup
   - direct Codex usage remains zero and runtime_access remains none
 derived:
   - no Surveyor runtime logic or authority semantics need modification
 unknown:
-  - exact Package A positive and negative result on committed integration head
   - exact-head GitHub Actions result
   - fresh live Surveyor and final Vision P2 reconciliation result
 conflicts:
@@ -142,6 +144,6 @@ validation:
     result: PASS
     evidence: local validation returned zero
 blockers:
-  - exact Package A boundary and exact-head GitHub Actions pending
-next_action: validate exact branch/base/repo boundary, push Draft PR, and require terminal exact-head CI
+  - Draft PR and exact-head GitHub Actions pending
+next_action: push Draft PR, bind PR metadata, and require terminal exact-head CI
 ```

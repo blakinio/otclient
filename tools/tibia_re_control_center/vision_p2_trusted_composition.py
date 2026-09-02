@@ -33,7 +33,14 @@ from .agent_edge_transport import (
     VerifiedEdgeFrame,
 )
 from .agent_protocol import AgentProvenance
-from .agent_vision import SecretSafeCapture
+from .agent_reconcile import (
+    ReconciliationResult,
+    RuntimeEvidenceClass,
+    RuntimeObservation,
+    _compose_trusted_reconciler,
+    reconcile_state,
+)
+from .agent_vision import SecretSafeCapture, VisionObservation
 from .canonical import jcs_dumps
 from .control_domain import ControlDomainService
 from .model import ValidationError, validate_opaque_id
@@ -841,6 +848,136 @@ class TrustedVisionP2Runtime:
             if safe.evidence_ref not in retained:
                 retained.append(safe.evidence_ref)
             return agent.snapshot(session_id)
+
+    def reconcile_vision(
+        self,
+        session_id: str,
+        visual: VisionObservation,
+    ) -> ReconciliationResult:
+        """Reconcile one current trusted capture against current reviewed runtime evidence."""
+        validate_opaque_id(session_id, field_name="session_id")
+        if type(visual) is not VisionObservation:
+            raise ValidationError("VISION_OBSERVATION_INVALID", "typed visual observation is required")
+
+        agent = self.service.agent
+        with agent._lock:
+            session = agent.ensure_session(session_id)
+            task = agent._tasks.get(session_id)
+            if task is None or session.current_run_id is None or session.current_run_id != task.run_id:
+                raise ValidationError(
+                    "VISION_RECONCILIATION_TASK_REQUIRED",
+                    "an active task/run is required for trusted reconciliation",
+                )
+            if task.runtime_access != "read_only":
+                raise ValidationError(
+                    "VISION_RECONCILIATION_RUNTIME_REQUIRED",
+                    "trusted reconciliation requires the admitted read-only runtime",
+                )
+            now_epoch_ms = agent._now_epoch_ms()
+            if now_epoch_ms >= task.deadline_epoch_ms:
+                raise ValidationError("EDGE_TASK_DEADLINE_EXPIRED", "task deadline expired")
+
+            snapshot = agent.snapshot(session_id)
+            edge = snapshot.get("edge")
+            if not isinstance(edge, Mapping) or edge.get("current") is not True:
+                raise ValidationError(
+                    "VISION_EDGE_CURRENT_REQUIRED",
+                    "current trusted edge evidence is required for reconciliation",
+                )
+            capture = edge.get("capture")
+            if (
+                not isinstance(capture, Mapping)
+                or capture.get("current") is not True
+                or capture.get("status") != "AVAILABLE"
+                or capture.get("secret_safe") is not True
+            ):
+                raise ValidationError(
+                    "VISION_CAPTURE_CURRENT_REQUIRED",
+                    "current trusted capture evidence is required for reconciliation",
+                )
+            capture_ref = capture.get("artifact_ref")
+            capture_sha256 = capture.get("sha256")
+            if (
+                type(capture_ref) is not str
+                or not capture_ref
+                or type(capture_sha256) is not str
+                or _SHA256.fullmatch(capture_sha256) is None
+                or visual.evidence_ref != capture_ref
+                or visual.capture_sha256 != capture_sha256
+            ):
+                raise ValidationError(
+                    "VISION_CAPTURE_BINDING_MISMATCH",
+                    "visual observation does not belong to the current trusted capture",
+                )
+
+            runtime = RuntimeObservation("UNKNOWN", RuntimeEvidenceClass.UNKNOWN, ())
+            runtime_current = False
+            runtime_value = edge.get("runtime")
+            reconciler = None
+            if isinstance(runtime_value, Mapping) and runtime_value.get("current") is True:
+                try:
+                    refs_value = runtime_value.get("evidence_refs")
+                    if not isinstance(refs_value, list) or any(
+                        type(ref) is not str or not ref for ref in refs_value
+                    ):
+                        raise ValueError("runtime evidence references invalid")
+                    candidate = RuntimeObservation(
+                        state=str(runtime_value.get("status", "UNKNOWN")),
+                        evidence_class=RuntimeEvidenceClass(
+                            str(runtime_value.get("evidence_class", "UNKNOWN"))
+                        ),
+                        evidence_refs=tuple(refs_value),
+                    )
+                    authority = agent.edge._runtime_authorities.get(session_id)
+                    if authority is not None:
+                        runtime = candidate
+                        reconciler = _compose_trusted_reconciler(authority.resolver)
+                        runtime_current = True
+                except (ValueError, TypeError, AttributeError):
+                    runtime = RuntimeObservation("UNKNOWN", RuntimeEvidenceClass.UNKNOWN, ())
+                    reconciler = None
+                    runtime_current = False
+
+            result = (
+                reconcile_state(visual, runtime)
+                if reconciler is None
+                else reconciler.reconcile_state(visual, runtime)
+            )
+            if (
+                runtime_current
+                and runtime.evidence_refs
+                and result.runtime_evidence_refs != runtime.evidence_refs
+            ):
+                runtime_current = False
+
+            artifact_refs = tuple(
+                dict.fromkeys((*result.visual_evidence_refs, *result.runtime_evidence_refs))
+            )
+            payload = {
+                "state": result.state.value,
+                "screen_class": visual.screen_class,
+                "model_profile_id": visual.model_profile_id,
+                "capture_sha256": visual.capture_sha256,
+                "visual_evidence_refs": list(result.visual_evidence_refs),
+                "runtime_state": runtime.state,
+                "runtime_evidence_class": runtime.evidence_class.value,
+                "runtime_evidence_refs": list(result.runtime_evidence_refs),
+                "runtime_current": runtime_current,
+                "physical_effect": False,
+            }
+            agent._persist_event(
+                session_id,
+                provenance=AgentProvenance.SYSTEM,
+                kind="VISION_RECONCILED",
+                artifact_refs=artifact_refs,
+                payload=payload,
+                operation="vision_p2_reconciled",
+            )
+            retained = agent._evidence_refs.setdefault(session_id, [])
+            for ref in artifact_refs:
+                if ref not in retained:
+                    retained.append(ref)
+            return result
 
     def durable_edge_verifier(
         self,

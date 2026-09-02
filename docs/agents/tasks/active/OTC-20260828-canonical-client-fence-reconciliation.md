@@ -124,7 +124,7 @@ checkpoint_version: 1
 updated_at: 2026-09-02T20:58:00Z
 head: a86aa01212ab127bbf1faea8c280cacdc42a5ab6
 branch: fix/OTC-20260902-canonical-reconcile-auth
-pr: none
+pr: 863
 status: validating
 context_routes:
   - .github/workflows/track-a-canonical-client-fence-reconciliation.yml
@@ -141,12 +141,12 @@ proven:
   - new workflow-auth regression failed before the one-line checkout fix and passes after it
   - canonical reconciliation unit contract passes 18 of 18 on Linux
   - runtime mutation, process memory observation and semantic promotion remain unauthorized
-  - scoped Ruff I/F and git diff check pass
+  - scoped Ruff I/F and git diff check pass`r`n  - native-LF exact implementation head 8ea990c74b41256eeeeaa028062cd6fcd873672e passed reconciliation 18/18, transition 58/58, adoption 10/10, current-fence 11/11, runtime governance, canonical fence guard, checkpoint validation and YAML parse
 derived:
   - retaining checkout credentials only for the live reconciliation job is the minimal repair for the existing live-main movement guards
 unknown:
   - native-LF exact-commit transition and adoption regression has not yet been rerun for this repair
-  - exact-head GitHub Actions and PR classification are pending
+  - exact-head GitHub Actions and PR classification are pending on the post-checkpoint final head
 conflicts:
   - none
 first_failure:
@@ -174,7 +174,7 @@ validation:
     evidence: known CRLF shebang artifact env bash CR prevented real transition execution; native-LF rerun is next
 blockers:
   - none
-next_action: run the exact committed repair in a native-LF Linux clone, then push a PR only if focused governance and exact scope remain green
+next_action: push this PR-bound checkpoint commit, require terminal exact-head GitHub Actions for PR 863, then Ready and merge only if review hygiene and scope remain clean
 ```
 # Historical release boundary
 

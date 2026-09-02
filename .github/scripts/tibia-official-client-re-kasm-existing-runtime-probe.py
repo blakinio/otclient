@@ -4,17 +4,27 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib
 import json
 import re
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any, Callable, Sequence
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+_CURRENT_FENCE_MODULE = importlib.import_module(
+    "tools.tibia_re_control_center.current_client_fence"
+)
+_CURRENT_CLIENT_FENCE = _CURRENT_FENCE_MODULE.current_client_fence()
+
 TARGET_CONTAINER = "otclient-track-a-kasmvnc"
 TARGET_DISPLAY = ":1"
-VER = "15.32.be4f48"
-SIZE = 52105824
-SHA = "552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1"
+VER = _CURRENT_CLIENT_FENCE.version
+SIZE = _CURRENT_CLIENT_FENCE.size
+SHA = _CURRENT_CLIENT_FENCE.sha256
 PROOF_KIND = "existing_runtime_adoption_v1"
 WINDOW_RE = re.compile(r'^\s*(0x[0-9a-fA-F]+)\s+"(Tibia(?: - .+)?)":')
 BRIDGE_SOCKET = "/tmp/otclient-native-login-current-sha/bridge.sock"

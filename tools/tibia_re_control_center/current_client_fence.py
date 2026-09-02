@@ -6,13 +6,11 @@ import re
 import shlex
 from collections.abc import Sequence
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
-CURRENT_CLIENT_FENCE_MANIFEST = (
-    Path(__file__).resolve().parents[2]
-    / "docs/agents/contracts/TRACK_A_CURRENT_CLIENT_FENCE_V1.json"
-)
+REPO_ROOT = Path(__file__).resolve().parents[2]
+CURRENT_CLIENT_FENCE_MANIFEST = REPO_ROOT / "docs/agents/contracts/TRACK_A_CURRENT_CLIENT_FENCE_V1.json"
 _VERSION_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$")
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _PREFIX_RE = re.compile(r"^[A-Z][A-Z0-9_]*$")
@@ -31,6 +29,7 @@ class ClientFence:
 class CurrentClientFenceManifest:
     schema_version: int
     current: ClientFence
+    current_provenance: str
     approved_history: tuple[ClientFence, ...]
 
 
@@ -60,11 +59,26 @@ def load_current_client_fence_manifest(
     if not isinstance(raw, dict) or set(raw) != {
         "schema_version",
         "current",
+        "current_provenance",
         "approved_history",
     }:
         raise ValueError("manifest fields invalid")
     if raw.get("schema_version") != 1:
         raise ValueError("manifest schema version invalid")
+    current_provenance = raw.get("current_provenance")
+    if not isinstance(current_provenance, str):
+        raise ValueError("current provenance invalid")
+    provenance_path = PurePosixPath(current_provenance)
+    if (
+        provenance_path.is_absolute()
+        or ".." in provenance_path.parts
+        or provenance_path.parts[:3] != ("docs", "agents", "evidence")
+        or provenance_path.suffix != ".json"
+    ):
+        raise ValueError("current provenance invalid")
+    provenance_file = REPO_ROOT.joinpath(*provenance_path.parts)
+    if provenance_file.is_symlink() or not provenance_file.is_file():
+        raise ValueError("current provenance invalid")
     history_raw = raw.get("approved_history")
     if not isinstance(history_raw, list):
         raise TypeError("approved history invalid")
@@ -80,6 +94,7 @@ def load_current_client_fence_manifest(
     return CurrentClientFenceManifest(
         schema_version=1,
         current=current,
+        current_provenance=current_provenance,
         approved_history=history,
     )
 

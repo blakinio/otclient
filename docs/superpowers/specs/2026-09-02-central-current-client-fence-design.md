@@ -42,7 +42,7 @@ Public interfaces:
 - CLI `github-env <path> [--prefix NAME]` for workflows
 - CLI `shell [--prefix NAME]` for shell consumers
 
-Malformed/missing/extra fields, invalid size, invalid SHA, duplicate history, or current-in-history fail closed.
+Malformed/missing/extra fields, invalid size, invalid SHA, unsafe or missing current provenance, duplicate history, or current-in-history fail closed.
 ## Consumers
 
 Migrate only identity/admission consumers that are expected to follow the official current client:

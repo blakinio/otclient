@@ -10,8 +10,11 @@ WARP="$ROOT/warp"
 TOOL=''
 TOOLROOT_HOME="$BASE/toolroot"
 TOOLROOT_WORK=/work/_otclient_tibia_re_state/toolroot
-SIZE=52105824
-SHA=552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
+FENCE_ENV="$(PYTHONPATH="$REPO_ROOT" python3 -m tools.tibia_re_control_center.current_client_fence shell --prefix TRACK_A_CURRENT_CLIENT)" || { echo TRACK_A_CANONICAL_SESSION_ERROR=current_client_fence_unavailable >&2; exit 1; }
+eval "$FENCE_ENV"
+SIZE="$TRACK_A_CURRENT_CLIENT_SIZE"
+SHA="$TRACK_A_CURRENT_CLIENT_SHA"
 MARK='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
 RMARK='OTCLIENT_TIBIA_RE_CANONICAL_RUNTIME=1'
 WGCF_VER=2.2.32

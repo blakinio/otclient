@@ -141,7 +141,8 @@ proven:
   - new workflow-auth regression failed before the one-line checkout fix and passes after it
   - canonical reconciliation unit contract passes 18 of 18 on Linux
   - runtime mutation, process memory observation and semantic promotion remain unauthorized
-  - scoped Ruff I/F and git diff check pass`r`n  - native-LF exact implementation head 8ea990c74b41256eeeeaa028062cd6fcd873672e passed reconciliation 18/18, transition 58/58, adoption 10/10, current-fence 11/11, runtime governance, canonical fence guard, checkpoint validation and YAML parse
+  - scoped Ruff I/F and git diff check pass
+  - native-LF exact implementation head 8ea990c74b41256eeeeaa028062cd6fcd873672e passed reconciliation 18/18, transition 58/58, adoption 10/10, current-fence 11/11, runtime governance, canonical fence guard, checkpoint validation and YAML parse
 derived:
   - retaining checkout credentials only for the live reconciliation job is the minimal repair for the existing live-main movement guards
 unknown:

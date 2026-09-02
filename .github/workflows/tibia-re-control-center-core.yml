@@ -218,6 +218,21 @@ jobs:
               and os.environ.get('HEAD_REPO') == admission_only_repo
           ):
               allowed_exact.add(admission_only_task)
+          surveyor_fence_task = 'docs/agents/tasks/active/OTC-20260902-surveyor-current-fence.md'
+          surveyor_fence_branch = 'fix/OTC-20260902-surveyor-current-fence'
+          surveyor_fence_base = 'a7c7eb8aa2cc69d70442578401d88be9262055e4'
+          surveyor_fence_repo = 'blakinio/otclient'
+          if (
+              surveyor_fence_task in changed
+              and base == surveyor_fence_base
+              and os.environ.get('HEAD_REF') == surveyor_fence_branch
+              and os.environ.get('HEAD_REPO') == surveyor_fence_repo
+          ):
+              allowed_exact |= {
+                  surveyor_fence_task,
+                  '.github/workflows/track-a-surveyor-v2-readonly.yml',
+                  'tests/tools/tibia_re_surveyor/test_operator_semantics.py',
+              }
           unexpected = [
               path for path in changed
               if path not in allowed_exact and not path.startswith(allowed_prefixes)

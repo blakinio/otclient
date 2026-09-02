@@ -16,7 +16,7 @@ branch: docs/OTC-20260902-vision-p2-trusted-composition-closeout
 base_branch: main
 base_sha: 2e57cb1f0b57d44b1adf553d06b18e22e145c77e
 created: 2026-09-01T23:28:41+02:00
-updated_at: 2026-09-02T09:24:42+02:00
+updated_at: 2026-09-02T09:27:25+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: github_only_closeout
@@ -53,6 +53,7 @@ depends_on:
   - frozen edge-transport source PR #829
   - frozen control-bridge source PR #830
 implementation_pr: 854
+archive_pr: 855
 superseded_draft_pr: 846
 implementation_final_head: 700e1d5481368b3ef3ebc0501477b566042c55b8
 implementation_merge: 2e57cb1f0b57d44b1adf553d06b18e22e145c77e
@@ -65,7 +66,7 @@ e2e_result: PASS
 e2e_evidence: Package B real browser + CLI E2E passed on replacement PR #854 exact head 700e1d5481368b3ef3ebc0501477b566042c55b8
 ownership_released: true
 current_blocker: none
-next_action: merge the lifecycle closeout PR after its exact-head CI/governance and review-hygiene pass; no trusted-composition implementation work remains
+next_action: merge lifecycle closeout PR #855 after its exact-head CI/governance and review-hygiene pass; no trusted-composition implementation work remains
 ---
 
 # OTC Vision P2 trusted composition repair — terminal archive
@@ -77,6 +78,7 @@ The Phase 2 repository/static trusted-composition integration is merged. `Vision
 ## Final evidence
 
 - implementation replacement PR #854 exact head `700e1d5481368b3ef3ebc0501477b566042c55b8`;
+- lifecycle closeout PR #855;
 - superseded Draft PR #846 was closed unmerged only because the connector Draft→Ready mutation failed on `Repository.fullDatabaseId`;
 - Package A run `33600382566`: SUCCESS;
 - Package B run `33600382549`: SUCCESS, including fresh falsification audit, full regression and real browser/CLI E2E;

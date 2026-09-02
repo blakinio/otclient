@@ -56,23 +56,23 @@ physical_action_count: 0
 owner_funded_ai_api_authorized: false
 worktree: unavailable_remote_host_offline_github_mcp_fallback
 owned_paths:
-  - docs/agents/tasks/active/OTC-20260901-vision-p2-trusted-composition-repair.md
-  - docs/agents/reports/OTC-20260901-vision-p2-trusted-composition-repair.md
-  - docs/agents/MODULE_CATALOG.md
   - docs/agents/CHANGELOG.md
-  - tools/tibia_re_vision/capture_edge.py
+  - docs/agents/MODULE_CATALOG.md
+  - docs/agents/reports/OTC-20260901-vision-p2-trusted-composition-repair.md
+  - docs/agents/tasks/active/OTC-20260901-vision-p2-trusted-composition-repair.md
+  - tests/tools/tibia_re_control_center/test_agent_api.py
+  - tests/tools/tibia_re_control_center/test_agent_edge_bridge.py
+  - tests/tools/tibia_re_control_center/test_agent_edge_transport.py
+  - tests/tools/tibia_re_control_center/test_agent_mcp.py
+  - tests/tools/tibia_re_control_center/test_vision_p2_trusted_composition.py
+  - tests/tools/tibia_re_control_center/test_vision_p2_trusted_replay_atomicity.py
   - tests/tools/tibia_re_vision/test_capture_edge.py
   - tools/tibia_re_control_center/agent_edge_bridge.py
   - tools/tibia_re_control_center/agent_edge_transport.py
   - tools/tibia_re_control_center/agent_session.py
-  - tools/tibia_re_control_center/control_domain.py
-  - tools/tibia_re_control_center/persistent_store.py
+  - tools/tibia_re_control_center/control_ui.py
   - tools/tibia_re_control_center/vision_p2_trusted_composition.py
-  - tests/tools/tibia_re_control_center/test_agent_edge_bridge.py
-  - tests/tools/tibia_re_control_center/test_agent_edge_transport.py
-  - tests/tools/tibia_re_control_center/test_agent_session.py
-  - tests/tools/tibia_re_control_center/test_vision_p2_trusted_composition.py
-  - tests/tools/tibia_re_control_center/test_vision_p2_trusted_replay_atomicity.py
+  - tools/tibia_re_vision/capture_edge.py
 depends_on:
   - PR #838 merged runtime-admission producer
   - PR #839 merged runtime-signals producer
@@ -85,11 +85,11 @@ related_prs:
   - PR #830 control-bridge source closed unmerged
   - PR #846 trusted-composition integration and promotion vehicle
 current_blocker: NONE
-next_action: run final exact-head CI and governance after closeout metadata, review full diff and changed-file list, resolve review hygiene, mark PR ready, and squash-merge
+next_action: run final exact-head CI and governance after ownership alignment, verify review hygiene, mark PR ready, and squash-merge
 invocation_started_at: 2026-09-02T06:20:00+02:00
 last_progress_at: 2026-09-02T08:31:16+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: final_closeout_metadata_pending
+ci_check_generation: final_ownership_alignment_pending
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -134,6 +134,8 @@ Exact code-generation validation for `062a5c173b3410ec8fc2e5efaaefa1c4e34d15d6`:
 
 The Package B full regression includes the new atomicity test and all prior Control Center tests. No Official Tibia, Synology or Kasm live observation was used to satisfy repository/static gates.
 
+A later closeout head `5b5ed7686b4e7b566df8f26b6e876ad2791e7751` also passed Package A, Package B, Track A agent governance, repository CI and the triggered Track A canonical fence/governance checks before this metadata-only ownership alignment.
+
 ## Safety invariants
 
 ```yaml
@@ -155,4 +157,4 @@ physical_action_count: 0
 
 ## Final completion gate
 
-This task is `ready` for its final closeout generation. After MODULE_CATALOG/CHANGELOG/report/PR metadata are current, run exact-head Package A, Package B, Track A and CI, review the complete changed-file list/diff, verify zero unresolved review threads/requested changes, mark #846 ready and squash-merge without bypassing protection or weakening any test.
+The full 17-file PR change list was reviewed and the task ownership list now matches it exactly. Run Package A, Package B, Track A governance and repository CI on this exact metadata-only final head, verify zero unresolved review threads/requested changes, mark #846 ready and squash-merge without bypassing protection or weakening any test.

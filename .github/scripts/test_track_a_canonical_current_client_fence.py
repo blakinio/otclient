@@ -53,7 +53,7 @@ def assert_python_constants(text: str, label: str) -> None:
 
 def assert_current_governance_fence(text: str, label: str) -> None:
     assert CURRENT_VERSION in text, f'{label}: current build version missing'
-    assert str(CURRENT_SIZE) in text, f'{label}: current client size missing'
+    assert str(CURRENT_SIZE) in text.replace('_', ''), f'{label}: current client size missing'
     assert CURRENT_SHA in text, f'{label}: current client SHA missing'
     assert STALE_CURRENT_SENTENCE not in text, f'{label}: previous build still described as current'
 

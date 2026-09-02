@@ -84,9 +84,9 @@ jobs:
     runs-on: [otclient, synology]
     timeout-minutes: 15
     env:
-      EXPECTED_VERSION: 15.32.75d4a0
+      EXPECTED_VERSION: 15.32.be4f48
       EXPECTED_SIZE: '52105824'
-      EXPECTED_SHA: d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a
+      EXPECTED_SHA: 552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1
       CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime
       RECOVERY_TASK: OTC-20260829-track-a-kasm-canonical-bootstrap-invalidation-live
       BOOTSTRAP_TASK: OTC-20260829-track-a-kasm-canonical-bootstrap-live

@@ -90,7 +90,7 @@ jobs:
               if missing:
                   raise SystemExit(f'{label}: missing required invariants: {missing}')
 
-          fence = 'd1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a'
+          fence = '552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1'
           for label, text in [('tracks', tracks), ('adr', adr), ('bootstrap', bootstrap), ('changelog', changelog)]:
               if fence not in text:
                   raise SystemExit(f'{label}: exact client fence missing')

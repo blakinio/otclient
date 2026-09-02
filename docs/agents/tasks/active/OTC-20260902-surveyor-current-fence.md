@@ -13,9 +13,9 @@ phase: wave_3_execution_path_repair
 branch: fix/OTC-20260902-surveyor-current-fence
 base_branch: main
 base_main: a7c7eb8aa2cc69d70442578401d88be9262055e4
-pr: null
+pr: 861
 created: 2026-09-02T20:16:06+02:00
-updated_at: 2026-09-02T20:20:17+02:00
+updated_at: 2026-09-02T20:21:35+02:00
 risk: medium
 execution_class: repository_only
 execution_mode: chat
@@ -64,8 +64,8 @@ owned_paths:
   - tests/tools/tibia_re_surveyor/test_operator_semantics.py
   - docs/agents/tasks/active/OTC-20260902-surveyor-current-fence.md
   - .github/workflows/tibia-re-control-center-core.yml
-current_blocker: draft_pr_and_exact_head_ci_pending
-next_action: push the validated repair, open a Draft PR, bind its number into this checkpoint, and require terminal exact-head CI
+current_blocker: exact_head_ci_pending
+next_action: require terminal exact-head GitHub Actions and fresh coordinator scope review before merge
 ---
 
 # Objective
@@ -94,7 +94,7 @@ checkpoint_version: 1
 updated_at: 2026-09-02T18:17:13Z
 head: 5c5e41031db882573656c49bef5e2e638175ac2f
 branch: fix/OTC-20260902-surveyor-current-fence
-pr: null
+pr: 861
 status: validating
 context_routes:
   - .github/workflows/track-a-surveyor-v2-readonly.yml
@@ -144,6 +144,6 @@ validation:
     result: PASS
     evidence: local validation returned zero
 blockers:
-  - Draft PR and exact-head GitHub Actions pending
-next_action: push Draft PR, bind PR metadata, and require terminal exact-head CI
+  - exact-head GitHub Actions pending
+next_action: require terminal exact-head GitHub Actions and fresh coordinator scope review before merge
 ```

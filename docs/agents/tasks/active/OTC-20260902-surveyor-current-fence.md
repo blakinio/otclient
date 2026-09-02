@@ -145,4 +145,3 @@ blockers:
   - exact Package A boundary and exact-head GitHub Actions pending
 next_action: validate exact branch/base/repo boundary, push Draft PR, and require terminal exact-head CI
 ```
-

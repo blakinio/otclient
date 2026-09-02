@@ -15,8 +15,10 @@ from tests.tools.tibia_re_control_center.test_agent_edge_bridge import (
     read_only_task,
 )
 from tools.tibia_re_control_center.agent_edge_transport import EdgeFrameKind, EdgeTransportSigner
+from tools.tibia_re_control_center.agent_reconcile import ReconciledState
 from tools.tibia_re_control_center.agent_runtime_admission import admit_read_only_runtime
-from tools.tibia_re_control_center.agent_runtime_signals import RuntimeSignalBinding
+from tools.tibia_re_control_center.agent_runtime_signals import RuntimeSignalBinding, RuntimeSignalSample
+from tools.tibia_re_control_center.agent_vision import QWEN_VISION_PROFILE_ID, VisionObservation
 from tools.tibia_re_control_center.control_domain import ControlDomainService
 from tools.tibia_re_control_center.model import ValidationError
 from tools.tibia_re_control_center.vision_p2_trusted_composition import (
@@ -59,6 +61,17 @@ def _policy() -> ReviewedCapturePolicy:
         expected_width=2,
         expected_height=1,
         secret_regions=(PixelRegion(0, 0, 1, 1),),
+    )
+
+
+def _visual(capture: dict[str, object], *, screen_class: str = "WORLD_VISUAL") -> VisionObservation:
+    return VisionObservation(
+        screen_class=screen_class,
+        visible_text=(),
+        confidence=None,
+        model_profile_id=QWEN_VISION_PROFILE_ID,
+        evidence_ref=str(capture["artifact_ref"]),
+        capture_sha256=str(capture["sha256"]),
     )
 
 
@@ -266,6 +279,104 @@ class TrustedCompositionTests(unittest.TestCase):
                         max_age_ns=500,
                     )
                 self.assertEqual("CAPTURE_RUNTIME_ADMISSION_MISMATCH", mismatch.exception.code)
+
+    def test_current_reviewed_runtime_and_matching_visual_persist_world_confirmation(self) -> None:
+        composition = VisionP2TrustedComposition(
+            runtime_authority_configuration=_authority_configuration(),
+            capture_policy=_policy(),
+        )
+        now_ms = 1_000_000
+        with tempfile.TemporaryDirectory() as raw:
+            with _service(raw, composition) as (service, runtime):
+                agent = service.agent
+                agent._now_epoch_ms = lambda: now_ms
+                agent.submit_task(read_only_task())
+                admission = admit_read_only_runtime(
+                    _admission_observation(now_ms),
+                    now_epoch_ms=now_ms,
+                    max_age_ms=15_000,
+                )
+                signal_binding = RuntimeSignalBinding(
+                    session_id="session-edge-1",
+                    run_id="run-edge-1",
+                    runtime_id=admission.runtime_namespace,
+                    runtime_instance_id="runtime-instance-1",
+                    runtime_binding_sha256=admission.runtime_binding_sha256,
+                )
+                resolver = _signal_resolver(signal_binding)
+                authority = agent._issue_read_only_runtime_authority(
+                    "session-edge-1",
+                    admission,
+                    runtime_signal_resolver=resolver,
+                    runtime_signal_binding=signal_binding,
+                )
+                agent.bind_read_only_runtime("session-edge-1", authority)
+                runtime.ingest_edge_observation(
+                    {
+                        "schema": "otclient.local-agent.edge-observation.v1",
+                        "session_id": "session-edge-1",
+                        "run_id": "run-edge-1",
+                        "edge_instance_id": "edge-instance-1",
+                        "observed_epoch_ms": now_ms,
+                        "heartbeat_epoch_ms": now_ms,
+                        "capture": None,
+                        "runtime": None,
+                    }
+                )
+
+                current = _binding()
+                capture_edge = runtime.build_capture_edge(
+                    binding_reader=lambda: current,
+                    frame_source=_FrameSource(current),
+                    monotonic_ns=iter((1_100, 1_200, 1_300, 1_400)).__next__,
+                )
+                capture_evidence = capture_edge.capture(run_id="run-edge-1", max_binding_age_ns=500)
+                snapshot = runtime.ingest_capture(
+                    "session-edge-1",
+                    capture_evidence,
+                    current_binding=current,
+                    now_ns=1_450,
+                    max_age_ns=500,
+                )
+                capture = snapshot["edge"]["capture"]
+                self.assertTrue(capture["current"])
+
+                source = resolver.bind_reviewed_source(
+                    producer_id="fixture-causal-producer",
+                    contract_id="fixture-causal-v1",
+                )
+                signal = resolver.ingest(
+                    source,
+                    RuntimeSignalSample(
+                        binding=signal_binding,
+                        clock_domain_id="clock:control-center",
+                        observed_monotonic_ns=950,
+                        source_state="WORLD_ENTERED",
+                        evidence_refs=("producer:evidence-current",),
+                    ),
+                )
+                self.assertIsNotNone(signal)
+                updated = agent.ingest_runtime_signal("session-edge-1", signal)
+                self.assertTrue(updated["edge"]["runtime"]["current"])
+
+                self.assertTrue(
+                    hasattr(runtime, "reconcile_vision"),
+                    "trusted composition must expose the Wave 2 reconciliation seam",
+                )
+                result = runtime.reconcile_vision("session-edge-1", _visual(capture))
+                self.assertEqual(ReconciledState.WORLD_CONFIRMED, result.state)
+                self.assertEqual(tuple(capture["artifact_ref"] for _ in range(1)), result.visual_evidence_refs)
+                self.assertEqual((signal.signal_ref,), result.runtime_evidence_refs)
+
+                event = next(
+                    item
+                    for item in reversed(agent._events_for("session-edge-1"))
+                    if item["kind"] == "VISION_RECONCILED"
+                )
+                self.assertEqual("WORLD_CONFIRMED", event["payload"]["state"])
+                self.assertEqual([signal.signal_ref], event["payload"]["runtime_evidence_refs"])
+                self.assertFalse(event["payload"]["physical_effect"])
+                self.assertEqual(0, agent.snapshot("session-edge-1")["physical_action_count"])
 
     def test_replay_ledger_survives_store_restart_and_rejects_a_b_a(self) -> None:
         composition = VisionP2TrustedComposition()

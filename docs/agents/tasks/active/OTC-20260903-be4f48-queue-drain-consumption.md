@@ -1,19 +1,19 @@
 ---
 task_id: OTC-20260903-be4f48-queue-drain-consumption
-status: implementing
+status: ready
 agent: ChatGPT
 session_role: researcher
 project_lane: otclient
 lane: P2-NETWORK
 track_id: official-client-re
 task_kind: implementation
-phase: red_verified
+phase: source_terminal
 branch: research/OTC-20260903-be4f48-queue-drain-consumption
 base_branch: main
 base_main: 446eb643d6ef24dc996a410df812393e19800973
 pr: 874
 created: 2026-09-03T19:02:00+02:00
-updated_at: 2026-09-03T19:22:00+02:00
+updated_at: 2026-09-03T19:25:00+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: chat_github
@@ -38,11 +38,11 @@ policy_version: 2
 context_pressure: medium
 decomposition_decision: phased
 validation_level: focused
-heavy_validation_runs: 0
+heavy_validation_runs: 1
 invocation_started_at: 2026-09-03T19:02:00+02:00
-last_progress_at: 2026-09-03T19:22:00+02:00
-ci_checks_for_current_head: 1
-ci_check_generation: implementation
+last_progress_at: 2026-09-03T19:25:00+02:00
+ci_checks_for_current_head: 0
+ci_check_generation: source_terminal_checkpoint
 unchanged_state_checks: 0
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 1
@@ -69,7 +69,7 @@ depends_on:
   - PR #871 merged promotion
   - PR #873 merged alias registration
 blocks:
-  - later clean coordinator promotion of this source result before any Track B decision
+  - clean coordinator promotion of this source result before any Track B decision
 ---
 
 # Objective
@@ -83,7 +83,7 @@ proved exact queued GameclientMessage 16-byte identity
 -> at most the next uniquely bound writer edge while identity remains intact
 ```
 
-Exact current official Linux client fence:
+Exact client fence:
 
 ```text
 version=15.32.be4f48
@@ -91,118 +91,135 @@ size=52105824
 sha256=552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1
 ```
 
-# Safety
+# Source terminal result
+
+```text
+EXACT_CLIENT_FENCE_PROVEN=true
+SERIALIZED_QUEUE_OBJECT_IDENTITY_PROVEN=true
+OWNED_DRAIN_CALLBACK=0xbd2190
+QUEUED_GAMECLIENTMESSAGE_CAUSAL_CONSUMPTION=true
+NEXT_UNIQUE_WRITER_EDGE=UNKNOWN
+FINAL_QUEUE_WRITER_IDENTIFIED=false
+FINAL_TCP_WRITER_IDENTIFIED=false
+FINAL_WRITER_CONTRACT=UNKNOWN
+TRACK_B_PR_284_MODIFIED=false
+RUNTIME_ACCESS=none
+OFFICIAL_SERVICE_E2E_COUNT=0
+TERMINAL_RESULT=QUEUE_DRAIN_CONSUMPTION_PROVEN
+FIRST_MISSING_BOUNDARY=TProtocolMessageQueue signal 0xbf carrying the exact queued GameclientMessage shared_ptr -> unique connected receiver/writer edge
+NEXT_ACTION=clean coordinator promotion from fresh trusted main; do not broaden source PR #874 into global Qt/writer discovery
+```
+
+## Evidence
+
+Repository-only TDD RED:
+
+```text
+head=2136730313912c7e025f0bc063cf42f18aa836c9
+workflow_run=33783273236
+job=100741848377
+error=AssertionError: drain_consumption.py is missing: expected RED before client materialization
+client metadata step=skipped
+client materialization step=skipped
+artifact upload step=skipped
+```
+
+Exact-current source proof:
+
+```text
+source_head=4471ccf1e396794ae0d2ce3de97d0474284e6fee
+workflow_run=33783945122
+job=100744062650
+artifact_id=9904688934
+artifact_digest=sha256:7d707d2820a891c6d91f974b305d657227587c65aeac2d7ba8557dd04cab4778
+result_json_sha256=47ac0c9f8dc79d024a8eaa484474bd8e33bf9cf2407458c2a2bc8256211ddb70
+PUBLIC_CURRENT_EXACT_FENCE=PASS
+CURRENT_CLIENT_EXACT_FENCE=PASS
+BE4F48_QUEUE_DRAIN_CONSUMPTION_CONTRACT=PASS
+BE4F48_QUEUE_DRAIN_CONSUMPTION_ANALYSIS=PASS
+RAW_CLIENT_RETAINED=false
+```
+
+Durable sanitized evidence:
+
+- `docs/agents/evidence/OTC-20260903-be4f48-queue-drain-consumption/result.json`
+- `docs/agents/evidence/OTC-20260903-be4f48-queue-drain-consumption/20260903-source-result.md`
+
+## Causal proof summary
+
+The new analyzer independently re-proved the producer identity and queue insertion, then restricted new analysis to the owned callback FDE:
+
+1. adapter builds `{object=allocation+0x10, owner=allocation}` and queue vslot `+0x68` resolves to `0xbd24a0`;
+2. insertion copies all 16 bytes into queue storage and advances queue end by `0x10`;
+3. callback `0xbd2190` loads queue begin `this+0x70`, copies exactly one 16-byte element to `rsp+0x10`, and separately refcounts the copied owner;
+4. it retires the original queue entry and advances queue begin by exactly `0x10`;
+5. it passes `rsp+0x10` as Qt `argv[1]` to direct call `0xbd22c2 -> 0x4d7dc0`, promoted as `QMetaObject::activate`, with `TProtocolMessageQueue this`, metaobject `0x30b73e0` and signal index `0xbf`;
+6. it reloads the copied owner after dispatch, so the owner lifetime independently spans the semantic consumer call.
+
+This proves causal queue consumption of the exact shared-pointer identity. The next receiver/writer remains deliberately withheld because `QMetaObject::activate` does not statically bind a unique connected receiver in this FDE and this task forbids a broad Qt/socket/TCP search.
+
+## Safety
 
 ```text
 runtime_access=none
 official_client_execution=false
-login=false
-credentials=false
-process_memory=false
+login_performed=false
+credential_access=false
+process_memory_access=false
 packet_capture=false
-ocr_vision=false
-official_service_e2e=false
-raw_client_upload=false
+ocr_vision_used=false
+official_service_e2e_count=0
+raw_client_uploaded=false
 track_b_pr_284_modified=false
+field6_value=UNKNOWN
 ```
 
-The client may exist only transiently as static bytes inside the bounded GitHub-hosted analyzer job after repository-only GREEN. It is never executed and must be removed before sanitized artifact upload.
+A single non-semantic repair restored mandatory source-only Track A admission keys after governance run `33783950469`/job `100744081081` detected their accidental omission. The repaired admission check passed on run `33784080581`; analyzer semantics did not change.
 
-# Promoted starting anchors
-
-```text
-sendLogin_adapter_target=0xbd3050
-serialized_queue_object_identity=16-byte pair {object=allocation+0x10, owner=allocation}
-queue_insert_vslot_target=0xbd24a0
-queue_vtable_address_point=0x30ed588
-owned_drain_candidate=0xbd2190
-owned_drain_fde=0xbd2190..0xbd2495
-queued_gameclientmessage_causal_consumption=NOT_PROVEN
-final_queue_writer=UNKNOWN
-final_tcp_writer=UNKNOWN
-final_writer_contract=UNKNOWN
-```
-
-The new analyzer independently re-proves the exact pair and insertion before using `0xbd2190` as the only consumer seed. It may follow at most one identity-preserving next edge and must stop instead of performing global Qt/socket/TCP discovery.
-
-# TDD evidence
-
-Repository-only RED is proven on exact source head `2136730313912c7e025f0bc063cf42f18aa836c9`:
-
-```text
-workflow_run=33783273236
-job=100741848377
-Validate repository contract=failure
-first_actionable_error=AssertionError: drain_consumption.py is missing: expected RED before client materialization
-Prepare secret-free current official client metadata through WARP=skipped
-Materialize exact client transiently and run bounded static discriminator=skipped
-Emit sanitized source result=skipped
-Upload sanitized static evidence only=skipped
-```
-
-Production analyzer implementation was added only after this RED.
-
-# Current implementation
-
-`tools/tibia_re_be4f48_queue_drain_consumption/drain_consumption.py` now:
-
-1. fails closed on exact version/size/SHA;
-2. re-proves adapter allocation/object/owner pair, `GameclientMessage` RTTI, queue RTTI and vslot `+0x68 -> 0xbd24a0`;
-3. re-proves the 16-byte insertion and end advance by `0x10`;
-4. inspects only FDE `0xbd2190..0xbd2495` for the queue-begin 16-byte copy, owner refcount lifetime, one-element begin advance and exact semantic dispatch;
-5. withholds any next writer identity unless a unique identity-preserving edge and independent ownership cross-check are available.
-
-A governance run on implementation head `4471ccf1e396794ae0d2ce3de97d0474284e6fee` exposed a task-record defect, not an analyzer defect: admission fields required even for `runtime_access:none` had been accidentally omitted during checkpoint compaction. Run `33783950469`, job `100744081081` reported exactly:
-
-```text
-missing admission fields ['canonical_lease_generation', 'registration_lease_generation', 'gate_a', 'generation_rebind', 'gate_b', 'bootstrap', 'target_uniqueness']
-```
-
-This commit restores all seven as `NOT_APPLICABLE`; no runtime authority or canonical namespace is claimed.
+E2E: `NOT_APPLICABLE` because this source-only alias forbids official-client execution and official-service E2E.
 
 ## Context checkpoint
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-03T19:22:00+02:00
-head: 4471ccf1e396794ae0d2ce3de97d0474284e6fee
+updated_at: 2026-09-03T19:25:00+02:00
+head_before_terminal_checkpoint: c0fa61b5e02eb8827cab684a2cb181b34ec878ee
 branch: research/OTC-20260903-be4f48-queue-drain-consumption
 pr: 874
-status: implementing
+status: ready
 proven:
-  - exact fence and promoted queue/drain anchors are fixed by main at claim
-  - Draft PR #874 owns this alias on an isolated branch
-  - repository-only TDD RED run 33783273236 job 100741848377 occurred before any package/client access
-  - production analyzer was added after RED
-  - repository-only contract passed on implementation workflow run 33783945122 before WARP metadata preparation began
-  - Track A self-hosted PR boundary run 33783950324 passed on implementation head
-  - deterministic governance failure on 33783950469 was solely missing source-only admission keys and is repaired here
+  - exact public current client fence is unchanged and passed both metadata and transient-static-byte verification
+  - exact 16-byte GameclientMessage object/owner pair and queue insertion are independently re-proved
+  - owned callback 0xbd2190 causally consumes the exact queued pair and emits it through QMetaObject::activate signal 0xbf
+  - no unique next receiver/writer edge is proved and no final queue/TCP writer is claimed
+  - runtime access and official-service E2E remain zero; raw client bytes were removed before artifact upload
+  - Track B PR #284 was not modified by this source task
 unknown:
-  - final exact-current analyzer result
-  - next unique receiver/writer edge after bounded queue callback
+  - unique connected receiver/writer edge after signal 0xbf
   - final queue writer
   - final TCP writer
   - final writer contract
+conflicts:
+  - none
 first_failure:
-  marker: deterministic governance task-record schema failure on implementation head
-  evidence: run 33783950469 / job 100744081081 / seven missing admission fields
-rejected_hypotheses:
-  - global Qt/socket/TCP writer discovery: forbidden by source prompt
-  - treating governance failure as analyzer evidence: rejected because the failing job never evaluated exact-client source semantics
+  marker: expected repository-only TDD RED
+  evidence: run 33783273236 / job 100741848377
+repair_history:
+  - run 33783950469 exposed seven omitted source-only admission keys; restored as NOT_APPLICABLE; run 33784080581 passed
 validation:
-  - command: repository-only TDD RED / run 33783273236 job 100741848377
+  - command: exact-current source workflow / 33783945122
     result: PASS
-    evidence: expected missing-analyzer failure; client steps skipped
-  - command: implementation repository contract / run 33783945122
+    evidence: contract, public fence, transient exact fence, analyzer, sanitized artifact and raw-client cleanup all passed
+  - command: Track A runtime governance / 33784080581
     result: PASS
-    evidence: Validate repository contract completed successfully before WARP step
-  - command: Track A self-hosted PR boundary / run 33783950324
+    evidence: repaired source-only admission fields accepted
+  - command: Track A self-hosted PR boundary / 33784080524
     result: PASS
-    evidence: exact implementation head
+    evidence: repaired head accepted
   - command: official-service E2E
     result: NOT_APPLICABLE
-    evidence: source prompt forbids official-client execution/service E2E
+    evidence: source-only task forbids official-client execution/service E2E
 blockers:
-  - none
-next_action: require the repaired exact head to pass governance and the bounded exact-current static workflow, then inspect only the sanitized result artifact
+  - source PR lifecycle intentionally awaits independent clean coordinator promotion
+next_action: validate this terminal checkpoint exact head through focused workflow plus CI/governance/boundary checks, update Draft PR #874 with exact final IDs, then hand off sanitized facts to a clean coordinator promotion from fresh trusted main
 ```

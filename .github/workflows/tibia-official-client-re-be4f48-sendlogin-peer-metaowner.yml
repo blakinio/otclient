@@ -30,6 +30,8 @@ jobs:
           set -Eeuo pipefail
           python3 tools/tibia_re_be4f48_sendlogin_peer_metaowner/test_contract.py
           python3 -m py_compile tools/tibia_re_be4f48_sendlogin_peer_metaowner/test_contract.py
+          python3 -m py_compile tools/tibia_re_be4f48_sendlogin_peer_metaowner/peer_metaowner.py
+          python3 -m py_compile tools/tibia_re_be4f48_sendlogin_peer_metaowner/peer_metaowner_v2.py
           git diff --check "${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}"
 
       - name: Prepare exact public client package through WARP
@@ -107,7 +109,7 @@ jobs:
           pathlib.Path(dst).write_bytes(raw)
           PY
           mkdir -p artifacts/be4f48-sendlogin-peer-metaowner
-          python3 tools/tibia_re_be4f48_sendlogin_peer_metaowner/peer_metaowner.py \
+          python3 tools/tibia_re_be4f48_sendlogin_peer_metaowner/peer_metaowner_v2.py \
             --client "$RE_ROOT/pkg/client" \
             --output artifacts/be4f48-sendlogin-peer-metaowner/result.json
           rm -f "$RE_ROOT/pkg/client" "$RE_ROOT/pkg/client.lzma"

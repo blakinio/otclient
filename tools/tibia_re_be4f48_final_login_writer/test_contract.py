@@ -30,6 +30,14 @@ def test_exact_contract() -> None:
     assert mod.hx(0xBD24A0) == "0xbd24a0"
     assert mod.signed64(0xFFFFFFFFFFFFFFFF) == -1
     assert mod.signed64(0x10) == 0x10
+    assert mod.is_plausible_offset_to_top(0)
+    assert mod.is_plausible_offset_to_top(-0x20)
+    assert not mod.is_plausible_offset_to_top(0x100000)
+    assert (
+        mod.parse_itanium_nested_name("N5tibia8protocol21TProtocolMessageQueueE")
+        == "tibia::protocol::TProtocolMessageQueue"
+    )
+    assert mod.parse_itanium_nested_name("not-itanium") is None
 
 
 if __name__ == "__main__":

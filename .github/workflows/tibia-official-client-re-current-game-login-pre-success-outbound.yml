@@ -32,7 +32,8 @@ jobs:
             tools/tibia_re_current_game_login_pre_success_outbound/auth_graph.py \
             tools/tibia_re_current_game_login_pre_success_outbound/handler_owner.py \
             tools/tibia_re_current_game_login_pre_success_outbound/handler_connections.py \
-            tools/tibia_re_current_game_login_pre_success_outbound/sendlogin_binding.py
+            tools/tibia_re_current_game_login_pre_success_outbound/sendlogin_binding.py \
+            tools/tibia_re_current_game_login_pre_success_outbound/sendlogin_connection.py
 
       - name: Prepare exact public client package through WARP
         shell: bash
@@ -100,6 +101,7 @@ jobs:
           python3 tools/tibia_re_current_game_login_pre_success_outbound/handler_owner.py --client "$RE_ROOT/pkg/client" --output artifacts/current-game-login-pre-success-outbound/result.json
           python3 tools/tibia_re_current_game_login_pre_success_outbound/handler_connections.py --client "$RE_ROOT/pkg/client" --output artifacts/current-game-login-pre-success-outbound/result.json
           python3 tools/tibia_re_current_game_login_pre_success_outbound/sendlogin_binding.py --client "$RE_ROOT/pkg/client" --output artifacts/current-game-login-pre-success-outbound/result.json
+          python3 tools/tibia_re_current_game_login_pre_success_outbound/sendlogin_connection.py --client "$RE_ROOT/pkg/client" --output artifacts/current-game-login-pre-success-outbound/result.json
           rm -f "$RE_ROOT/pkg/client" "$RE_ROOT/pkg/client.lzma"
           echo RAW_CLIENT_RETAINED=false
 
@@ -130,6 +132,15 @@ jobs:
           assert len(binding['qmeta_dispatch']['candidates'])==1
           assert isinstance(binding['adapter_target'], str) and binding['adapter_target'].startswith('0x')
           assert binding['causal_binding_proven'] is False
+          connection=d['sendlogin_connection_binding']
+          assert connection['classification']=='SENDLOGIN_CONNECTION_BINDING'
+          assert isinstance(connection['peer_qmeta_candidates'], list)
+          assert connection['connection_block']['classification'] in (
+              'UNIQUE_PAIRED_CALLABLE_CONNECTION_BLOCK',
+              'UNKNOWN_ENDPOINT_PAIR',
+              'UNKNOWN_CONNECTION_BLOCK_SHAPE',
+              'UNKNOWN_ADAPTER_ALIGNED_OWNER_COUNT',
+          )
           print('CURRENT_GAME_LOGIN_PRE_SUCCESS_SANITIZED_RESULT=PASS')
           PY
 

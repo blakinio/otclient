@@ -6,7 +6,7 @@ on:
     paths:
       - .github/workflows/tibia-official-client-re-current-game-login-pre-success-outbound.yml
       - tools/tibia_re_current_game_login_pre_success_outbound/**
-      - docs/agents/tasks/active/OTC-20260828-current-game-login-pre-success-outbound.md
+      - docs/agents/tasks/active/OTC-20260903-be4f48-prelogin-sequence-rebind.md
 
 permissions:
   contents: read
@@ -67,7 +67,7 @@ jobs:
           if len(rows)!=1: raise SystemExit('expected one bin/client row')
           row=rows[0]
           vals={'VERSION':str(doc.get('version') or ''),'PACKED_SHA':str(row.get('packedhash') or '').lower(),'UNPACKED_SHA':str(row.get('unpackedhash') or '').lower(),'PACKED_SIZE':str(row.get('packedsize')),'UNPACKED_SIZE':str(row.get('unpackedsize')),'CLIENT_URL':str(row.get('url') or '')}
-          exp={'VERSION':'15.32.75d4a0','PACKED_SHA':'075810c54af2d6912000eab062763db29563f5a1f4bf1d984154b2d07fd5729f','UNPACKED_SHA':'d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a','UNPACKED_SIZE':'52105824'}
+          exp={'VERSION':'15.32.be4f48','UNPACKED_SHA':'552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1','UNPACKED_SIZE':'52105824'}
           for k,v in exp.items():
             if vals[k]!=v: raise SystemExit(f'exact current fence moved: {k}')
           with open(sys.argv[2],'a',encoding='utf-8') as h:
@@ -113,7 +113,7 @@ jobs:
           assert d['login_performed'] is False
           assert d['secret_access'] is False
           assert d['raw_client_uploaded'] is False
-          assert d['exact_client']['sha256']=='d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a'
+          assert d['exact_client']['sha256']=='552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1'
           assert d['primary_producer_field_presence']['outer_fields']['1']=='PRESENT'
           assert d['primary_producer_field_presence']['outer_fields']['2']=='PRESENT'
           assert d['primary_producer_field_presence']['outer_fields']['3']=='PRESENT'

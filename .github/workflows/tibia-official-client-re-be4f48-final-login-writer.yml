@@ -39,7 +39,11 @@ jobs:
         run: |
           set -Eeuo pipefail
           python3 tools/tibia_re_be4f48_final_login_writer/test_contract.py
-          python3 -m py_compile tools/tibia_re_be4f48_final_login_writer/writer_path.py
+          python3 -m py_compile \
+            tools/tibia_re_be4f48_final_login_writer/writer_path.py \
+            tools/tibia_re_be4f48_final_login_writer/owned_callback.py
+          git fetch --no-tags --depth=1 origin main
+          git diff --check FETCH_HEAD...HEAD
 
       - name: Prepare secret-free current official client metadata through WARP
         shell: bash
@@ -112,7 +116,7 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          trap 'rm -f "$WRITER_ROOT/pkg/client" "$WRITER_ROOT/pkg/client.lzma"' EXIT
+          trap 'rm -f "$WRITER_ROOT/pkg/client" "$WRITER_ROOT/pkg/client.lzma" artifacts/be4f48-final-login-writer/pass1.json' EXIT
           curl --socks5-hostname 127.0.0.1:25345 --compressed -fL -A 'Mozilla/5.0 (X11; Linux x86_64)' -e "$WRITER_BASE/$WRITER_CLIENT_URL" -H 'Accept: */*' "$WRITER_BASE/$WRITER_CLIENT_URL" -o "$WRITER_ROOT/pkg/client.lzma"
           echo "$WRITER_PACKED_SHA  $WRITER_ROOT/pkg/client.lzma" | sha256sum -c - >/dev/null
           test "$(stat -c %s "$WRITER_ROOT/pkg/client.lzma")" = "$WRITER_PACKED_SIZE"
@@ -134,8 +138,12 @@ jobs:
             --version "$WRITER_VERSION" \
             --sha256 "$WRITER_UNPACKED_SHA" \
             --size "$WRITER_UNPACKED_SIZE" \
+            --output artifacts/be4f48-final-login-writer/pass1.json
+          python3 tools/tibia_re_be4f48_final_login_writer/owned_callback.py \
+            --client "$WRITER_ROOT/pkg/client" \
+            --base-result artifacts/be4f48-final-login-writer/pass1.json \
             --output artifacts/be4f48-final-login-writer/result.json
-          rm -f "$WRITER_ROOT/pkg/client" "$WRITER_ROOT/pkg/client.lzma"
+          rm -f "$WRITER_ROOT/pkg/client" "$WRITER_ROOT/pkg/client.lzma" artifacts/be4f48-final-login-writer/pass1.json
           echo RAW_CLIENT_RETAINED=false
 
       - name: Emit sanitized source result

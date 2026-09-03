@@ -11,11 +11,11 @@ track_id: official-client-re
 task_kind: audit
 phase: wave_3_fresh_audit_e2e
 branch: test/OTC-20260902-vision-p2-e2e-audit
-base_branch: feat/OTC-20260902-vision-p2-vision-reconciliation
-base_main: 7c4941aa2ef374426ab46debb86d25346af1a986
+base_branch: main
+base_main: 2723dedd02634960bb3f1a04b8906e6d94157a31
 audited_integration_head: 9db0ae43ab5b0ce6b0c9504eec723087f13d5271
 created: 2026-09-02T11:28:36+02:00
-updated_at: 2026-09-03T07:54:46+02:00
+updated_at: 2026-09-03T07:57:19+02:00
 risk: high
 execution_class: hybrid
 execution_mode: github_plus_remote_read_only
@@ -63,13 +63,13 @@ owned_paths:
   - docs/agents/reports/OTC-20260902-vision-p2-e2e-audit.md
   - docs/agents/evidence/OTC-20260902-vision-p2-e2e-audit/**
 depends_on:
-  - PR #856 exact accepted head 9db0ae43ab5b0ce6b0c9504eec723087f13d5271
+  - PR #856 merged as 2723dedd02634960bb3f1a04b8906e6d94157a31 from exact accepted head 9db0ae43ab5b0ce6b0c9504eec723087f13d5271
   - coordinator review #5090102633 ACCEPT
 blocks:
   - Phase 2 completion and PR #857 terminal merge
 current_blocker: exact_head_ci_and_merge_pending
-next_action: require final exact-head CI, merge accepted PR #856, retarget/finalize PR #857 on main, then archive/release ownership
-last_progress_at: 2026-09-03T07:54:46+02:00
+next_action: retarget PR #857 to main, require terminal exact-head CI, merge accepted exact head, then archive task and release ownership
+last_progress_at: 2026-09-03T07:57:19+02:00
 physical_action_count: 0
 ---
 
@@ -109,7 +109,7 @@ At this checkpoint Molehill-PC's execution endpoint is offline, so the cross-hos
 ```yaml
 checkpoint_version: 1
 updated_at: 2026-09-03T07:54:46+02:00
-head: b3186d06dafffe28d6796cf1f12e0c0fe7fd6ca9
+head: c355faca3cfb6140bff83185df98e0b35ff532f5
 branch: test/OTC-20260902-vision-p2-e2e-audit
 pr: 857
 status: validating
@@ -137,7 +137,7 @@ derived:
   - no new edge daemon runtime-signal producer transport or subsystem is required for this gate
 unknown:
   - final exact-head GitHub Actions result for the evidence checkpoint generation
-  - terminal merge SHA for PR 856 and PR 857
+  - terminal merge SHA for PR 857
 conflicts:
   - none
 first_failure:
@@ -164,6 +164,6 @@ validation:
     result: PASS
     evidence: resident models empty task-owned PIDs stopped Ollama API down
 blockers:
-  - final exact-head Actions and terminal PR merge lifecycle only
-next_action: require final exact-head CI, merge accepted PR 856, retarget PR 857 to main, finalize exact-head CI and merge, then archive tasks and release ownership
+  - final exact-head Actions and terminal PR #857 merge lifecycle only
+next_action: retarget PR 857 to main, require terminal exact-head CI, merge accepted exact head, then archive task and release ownership
 ```

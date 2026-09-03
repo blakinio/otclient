@@ -1,18 +1,19 @@
 ---
 task_id: OTC-20260903-be4f48-final-login-writer
-status: investigating
+status: implementing
 agent: ChatGPT
 session_role: researcher
 project_lane: otclient
 lane: P2-NETWORK
 track_id: official-client-re
 task_kind: implementation
-phase: red
+phase: red_verified
 branch: research/OTC-20260903-be4f48-final-login-writer
 base_branch: main
 base_main: a35bbacd475a31ce52736ccbc3b5e837626def66
+pr: 870
 created: 2026-09-03T18:03:00+02:00
-updated_at: 2026-09-03T18:03:00+02:00
+updated_at: 2026-09-03T18:16:00+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: chat_github
@@ -46,8 +47,8 @@ heavy_validation_runs: 0
 stale_takeover_count: 0
 human_interruptions: 0
 invocation_started_at: 2026-09-03T18:03:00+02:00
-last_progress_at: 2026-09-03T18:03:00+02:00
-ci_checks_for_current_head: 0
+last_progress_at: 2026-09-03T18:16:00+02:00
+ci_checks_for_current_head: 1
 ci_check_generation: draft
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
@@ -71,7 +72,7 @@ owned_paths:
   - docs/superpowers/plans/2026-09-03-be4f48-final-login-writer.md
 modules_touched: []
 reuses:
-  - promoted exact-current source blocker evidence from merged PR #866
+  - merged PR #866 exact-current promotion
   - exact-current writer run 32998976901 / artifact 9886703883 as sanitized discovery input only
   - exact-current sendLogin adapter 0xbd3050..0xbd34dd and TProtocolMessageQueue vslot +0x68 target 0xbd24a0 under the be4f48 fence
   - historical writer source commit 3d87d729b73f868aefe1662c72af666a4921b1d8 only for bounded helper patterns, never as cross-build proof
@@ -84,25 +85,17 @@ blocks:
 
 # Objective
 
-Resolve only the exact-current `15.32.be4f48` boundary:
+Resolve only:
 
 ```text
 sendLogin serialized queue object -> final queue/TCP writer contract
 ```
 
-Do not reopen source PR #865, do not work on sender/peer ownership from PR #869, and do not modify Track B PR #284.
+for exact official native Linux client `15.32.be4f48`, size `52105824`, SHA-256 `552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1`.
 
-# Exact client fence
+Do not reopen #865, do not enter sender/peer scope from #869, and do not modify Track B PR #284.
 
-```text
-version=15.32.be4f48
-size=52105824
-sha256=552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1
-```
-
-The trusted-base fence contract `docs/agents/contracts/TRACK_A_CURRENT_CLIENT_FENCE_V1.json` agrees at claim time. The hosted workflow must additionally re-read the public current package before client materialization and fail closed if it moved.
-
-# Admission / safety
+# Safety / admission
 
 ```text
 runtime_access=none
@@ -116,15 +109,17 @@ raw_client_upload=false
 track_b_pr_284_modified=false
 ```
 
-The official client may be materialized only transiently as bytes for static ELF/disassembly analysis inside a GitHub-hosted disposable job after the RED repository contract is GREEN. It must never execute, and raw client bytes must be deleted before sanitized artifact upload.
+The official client may exist only transiently as static bytes inside the bounded GitHub-hosted job after the repository-only contract is GREEN. It must not execute and must be removed before sanitized artifact upload.
 
-# Live ownership / dependency preflight
+# Live preflight
 
-Trusted `main` at claim is `a35bbacd475a31ce52736ccbc3b5e837626def66`. Source PR #865 is closed unmerged and consumed by merged promotion #866. Track B PR #284 is open Draft and read-only for this lane. Open PR #869 owns only the independent sender/peer discriminator paths; its changed-file set does not overlap the writer paths declared here. No existing branch or open PR claims `OTC-BE4F48-FINAL-LOGIN-WRITER`.
+- trusted main at claim: `a35bbacd475a31ce52736ccbc3b5e837626def66`;
+- #865: closed unmerged, consumed by #866;
+- #284: open Draft, read-only cross-track hold;
+- #869: independent sender/peer lane with non-overlapping paths;
+- local worktree: unavailable because the connected Remote Desktop endpoint has no device; dedicated GitHub branch is the isolation boundary.
 
-A local worktree is unavailable because the connected Remote Desktop endpoint reports no device. The dedicated GitHub branch is the isolation boundary under `docs/agents/GITHUB_ONLY_EXECUTION.md`.
-
-# Promoted / revalidated starting facts
+# Exact-current starting anchors
 
 ```text
 sendLogin_qmeta_target=0xde82a2
@@ -132,36 +127,50 @@ sendLogin_external_tail=0xde82ae -> 0xbd3050
 sendLogin_adapter_fde=0xbd3050..0xbd34dd
 queue_vtable_address_point=0x30ed588
 queue_vslot_0x68=0xbd24a0
-final_frame_candidate=0xf4edd0..0xf4ef15
 packet_processor_vslot_0x68=0xf4eca0
+final_frame_candidate=0xf4edd0..0xf4ef15
 final_writer_contract=UNKNOWN
 ```
 
-The current artifact `9886703883` independently re-proves these addresses against the `be4f48` SHA. It also shows the adapter constructs a 16-byte pair on stack and calls queue vslot `+0x68`; the queue vslot copies the same 16-byte pair into its internal queue. This is discovery evidence to be independently reproduced by the bounded discriminator before promotion.
+Artifact `9886703883` independently re-proves those anchors on `be4f48` and shows discovery evidence for the adapter-built 16-byte pair entering queue vslot `+0x68`; the new analyzer must independently reproduce the causal edge before promotion.
 
-# TDD / bounded discriminator
+# TDD evidence
 
-1. RED: repository-only contract must fail because the analyzer is absent; failure must occur before any network/package/client step.
-2. GREEN-1: add the smallest exact-fenced analyzer that proves adapter-created queue-item identity, queue insertion, queue-drain ownership, and only the next uniquely bound writer transition.
-3. Run once against the exact public client on GitHub-hosted Linux.
-4. If sanitized evidence gives one mechanically testable continuation toward the packet/frame writer, allow one narrow evidence-derived correction or discriminator. Otherwise stop as `SOURCE_BLOCKER` at the first missing object/ownership edge.
-5. No whole-binary TCP/QMeta sweep, generic socket xref ranking, proximity/adjacency inference, runtime observation, OCR/Vision, sender/peer work, Field6 guessing, or Track B mutation.
+RED is proven on exact source head `0545bf2f6ce5aea3a037163fe29e12ebbc8a43e5`:
 
-# Acceptance
+```text
+workflow_run=33777551053
+job=100722916699
+Validate repository contract=failure
+first_actionable_error=AssertionError: writer_path.py is missing: expected RED before client materialization
+Prepare secret-free current official client metadata through WARP=skipped
+Materialize exact client transiently and run bounded static discriminator=skipped
+Upload sanitized static evidence only=skipped
+```
 
-A positive source result requires exact current fence plus a unique causal object/buffer chain from the adapter-built queue item through the concrete queue writer to final TCP/socket egress or an equivalent unique final wire-writer contract, with a second independent ownership/caller/vtable cross-check. If any required ownership/dataflow edge is not unique, the scientific terminal result is `SOURCE_BLOCKER`.
+This is the required RED-before-client-materialization proof. Production analyzer code may now be added.
 
-E2E is `NOT_APPLICABLE` because this is explicitly static/source-only; a live official-service run is forbidden for this task.
+# Bounded discriminator
+
+1. Independently prove adapter-created 16-byte queue item and queue insertion.
+2. Derive the concrete queued-object vtable from the adapter store and decode RTTI without adjacency inference.
+3. Inspect only `TProtocolMessageQueue` executable vslots and directly reached bounded callers to find a unique drain of the same 16-byte item.
+4. Follow only a uniquely reached queued-object/writer virtual edge toward packet/frame/TCP egress.
+5. Positive writer identity requires a second independent ownership/caller/vtable cross-check.
+6. At the first non-unique edge, stop as `SOURCE_BLOCKER`; no global TCP/QMeta/socket sweep.
+
+E2E is `NOT_APPLICABLE` because this task is source-only and live official-service execution is forbidden.
 
 # Current state
 
 ```text
 trusted_main=a35bbacd475a31ce52736ccbc3b5e837626def66
-phase=RED_SETUP
+source_head=0545bf2f6ce5aea3a037163fe29e12ebbc8a43e5
+phase=RED_VERIFIED
 runtime_access=none
 official_service_e2e_count=0
 track_b_pr_284_modified=false
 terminal_result=PENDING
 ```
 
-next_action: add the repository-only failing contract, minimal hosted workflow, and early Draft PR; verify RED fails before any current-client package request.
+next_action: implement the minimal exact-fenced `writer_path.py`, then require the repository-only contract and `py_compile` to pass before the first exact-client static run.

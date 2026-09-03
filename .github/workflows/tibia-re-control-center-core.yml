@@ -196,6 +196,22 @@ jobs:
                   'docs/agents/evidence/OTC-20260902-canonical-current-client-fence-be4f48/result.json',
                   'docs/agents/evidence/OTC-20260902-canonical-current-client-fence-be4f48/validation.md',
               }
+          vision_p2_reconcile_task = 'docs/agents/tasks/active/OTC-20260902-vision-p2-vision-reconciliation.md'
+          vision_p2_reconcile_report = 'docs/agents/reports/OTC-20260902-vision-p2-vision-reconciliation.md'
+          vision_p2_reconcile_branch = 'feat/OTC-20260902-vision-p2-vision-reconciliation'
+          vision_p2_reconcile_base = '7c4941aa2ef374426ab46debb86d25346af1a986'
+          vision_p2_reconcile_repo = 'blakinio/otclient'
+          if (
+              vision_p2_reconcile_task in changed
+              and base == vision_p2_reconcile_base
+              and os.environ.get('HEAD_REF') == vision_p2_reconcile_branch
+              and os.environ.get('HEAD_REPO') == vision_p2_reconcile_repo
+          ):
+              allowed_exact |= {
+                  vision_p2_reconcile_task,
+                  vision_p2_reconcile_report,
+              }
+
           qwen_schema_task = 'docs/agents/tasks/active/OTC-20260902-vision-p2-qwen-schema-repair.md'
           qwen_schema_branch = 'fix/OTC-20260902-vision-p2-qwen-schema-contract'
           qwen_schema_base = 'c16d180d336ba8aa9e1656807c79a44e81c15c66'

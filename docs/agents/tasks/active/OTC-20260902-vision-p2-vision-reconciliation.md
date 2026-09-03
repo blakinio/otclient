@@ -14,7 +14,7 @@ branch: feat/OTC-20260902-vision-p2-vision-reconciliation
 base_branch: main
 base_main: 7c4941aa2ef374426ab46debb86d25346af1a986
 created: 2026-09-02T10:46:00+02:00
-updated_at: 2026-09-02T17:05:30+02:00
+updated_at: 2026-09-03T05:24:04Z
 risk: high
 feature_scope:
   type: infrastructure
@@ -83,12 +83,12 @@ depends_on:
   - lifecycle closeout PR #855 merged as main 8441fc1cce1600033b505d68ebc5c0141b337394
 blocks:
   - OTC-VISION-P2-E2E-AUDIT
-current_blocker: post_central_fence_restack_exact_head_validation_pending
-next_action: validate the post-central-fence restack, publish the exact generation, then require terminal exact-head Actions before coordinator ACCEPT and Wave 3 final gate
+current_blocker: post_central_fence_restack_exact_head_actions_pending
+next_action: push the post-central-fence restack checkpoint and require terminal exact-head GitHub Actions before coordinator ACCEPT and Wave 3 final gate
 invocation_started_at: 2026-09-02T10:46:00+02:00
-last_progress_at: 2026-09-02T14:26:00+02:00
+last_progress_at: 2026-09-03T05:24:04Z
 ci_checks_for_current_head: 0
-ci_check_generation: post_admission_only_sync_pending
+ci_check_generation: 938acdd6f7948129cb2a019141be252e5e0efa29
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -174,15 +174,15 @@ Fresh synchronized validation passes the Wave 2 matrix `90/90`, runtime admissio
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-02T15:05:30Z
-head: 1768fac6b3f17634aa9c0bbbb02c9d475e5bf7f9
+updated_at: 2026-09-03T05:24:04Z
+head: 938acdd6f7948129cb2a019141be252e5e0efa29
 branch: feat/OTC-20260902-vision-p2-vision-reconciliation
 pr: 856
 status: validating
 context_routes:
   - tools/tibia_re_control_center/vision_p2_trusted_composition.py
-  - tools/tibia_re_control_center/agent_edge_bridge.py
   - tests/tools/tibia_re_control_center/test_vision_p2_trusted_composition.py
+  - .github/workflows/tibia-re-control-center-core.yml
   - docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
 owned_paths:
   - docs/agents/tasks/active/OTC-20260902-vision-p2-vision-reconciliation.md
@@ -192,50 +192,52 @@ owned_paths:
   - .github/workflows/tibia-re-control-center-core.yml
 proven:
   - original Wave 2 implementation remains 811b2d458c49806da2fa177911e6110318d28f96 with RED 04c26ab3dc13851d1e1a789a8378e10324669ce6
-  - prior accepted Wave 2 generation is 34fbf6e2d693058ce03a583087816b25639e9cb3 under coordinator review 5090102633
-  - admission-only repair PR 860 merged to trusted main a7c7eb8aa2cc69d70442578401d88be9262055e4
-  - main a7c7eb8aa2cc69d70442578401d88be9262055e4 merged into Wave 2 with one test-only conflict
-  - test conflict resolution preserves Wave 2 reconciliation imports and both admission-only guards
-  - Wave 2 Package A exception is rebound only to exact new base a7c7eb8aa2cc69d70442578401d88be9262055e4
-  - historical Qwen and admission-only one-time exceptions retain their original exact bases
-  - post-sync merge-base is exactly a7c7eb8aa2cc69d70442578401d88be9262055e4
-  - PR diff versus current main remains exactly five Wave 2 integration paths
-  - post-sync Wave 2 reconciliation edge-bridge session trusted-composition matrix passes 92 of 92
-  - current runtime-admission suite passes 14 of 14
-  - admission-only focused guards pass 2 of 2 and current-client fence passes
-  - changed production/test modules compile and Ruff I/F plus git diff check pass
-  - runtime_access remains none physical action count zero and direct Codex usage zero
+  - trusted main 7c4941aa2ef374426ab46debb86d25346af1a986 merged into Wave 2 without textual conflicts and PR diff remains exactly five owned paths
+  - Wave 2 Package A exception is rebound only to exact base 7c4941aa2ef374426ab46debb86d25346af1a986
+  - fresh Wave 2 reconciliation edge bridge session trusted composition matrix passes 92 of 92
+  - runtime admission passes 14 of 14 and current-client fence passes 11 of 11 plus canonical fence guard and Track A governance
+  - compile Ruff I/F YAML and git diff check pass
+  - exact Package A accepts the real branch base repo and rejects wrong base wrong branch and fork
+  - canonical reconciliation run 33683264576 passed with lease generation 45 registration current UNKNOWN and explicit release
+  - fresh Surveyor run 33718302097 passed for OTC-20260902-vision-p2-e2e-audit with PID 28379 start 36180734 exact current fence registration lease 45/45 read_only admission and target uniqueness PROVEN
+  - Wave 2 runtime_access remains none and physical action count remains zero
 derived:
-  - admission-only authority repair changes the trusted bridge boundary but not Wave 2 reconciliation semantics
-  - Wave 3 must audit the synchronized post-860 Wave 2 generation
+  - central current-client fence and reconciliation-auth changes require no Wave 2 production repair
+  - Wave 3 must audit this post-central-fence restacked generation
 unknown:
-  - exact-head GitHub Actions result for this synchronized generation
-  - fresh remaining Wave 3 live reconcile_vision result
+  - terminal exact-head GitHub Actions result for the published restack checkpoint
+  - final trusted capture exact-Qwen reconcile_vision result
 conflicts:
   - none
 first_failure:
-  marker: merging main after PR 860 produced one content conflict in trusted-composition tests
-  evidence: conflict was import-only and resolved by retaining Wave 2 reconciliation imports plus new admission-only imports
+  marker: none
+  evidence: none
 rejected_hypotheses:
-  - reconciliation production repair required: rejected by 92 of 92 Wave 2 matrix
-  - broad Package A documentation prefix required: rejected by exact branch repo base exception design
+  - reconciliation production repair required after centralization: rejected by fresh 92 of 92 matrix
+  - broad Package A documentation prefix required: rejected by exact branch repo base positive and negative controls
 changed_paths:
-  - docs/agents/tasks/active/OTC-20260902-vision-p2-vision-reconciliation.md
-  - docs/agents/reports/OTC-20260902-vision-p2-vision-reconciliation.md
-  - tools/tibia_re_control_center/vision_p2_trusted_composition.py
-  - tests/tools/tibia_re_control_center/test_vision_p2_trusted_composition.py
   - .github/workflows/tibia-re-control-center-core.yml
+  - docs/agents/reports/OTC-20260902-vision-p2-vision-reconciliation.md
+  - docs/agents/tasks/active/OTC-20260902-vision-p2-vision-reconciliation.md
+  - tests/tools/tibia_re_control_center/test_vision_p2_trusted_composition.py
+  - tools/tibia_re_control_center/vision_p2_trusted_composition.py
 validation:
   - command: Wave 2 reconciliation edge bridge session trusted composition matrix
     result: PASS
-    evidence: 92 tests OK on post-860 sync tree
-  - command: runtime admission plus admission-only guards and current-client fence
+    evidence: 92 tests OK on restacked tree
+  - command: runtime admission and central current-client fence
     result: PASS
-    evidence: 14 admission tests and 2 focused guards OK; current-client fence PASS
-  - command: py_compile Ruff I/F and git diff check
+    evidence: 14 admission tests and 11 current-fence tests OK; canonical current-fence guard PASS
+  - command: Track A runtime governance plus compile Ruff I/F YAML and diff check
     result: PASS
-    evidence: all returned zero
+    evidence: all returned zero or PASS
+  - command: Package A exact boundary positive and negative controls
+    result: PASS
+    evidence: exact branch base repo accepted five paths; wrong base wrong branch and fork rejected
+  - command: fresh Surveyor v2 read-only run 33718302097
+    result: PASS
+    evidence: exact client singleton PID/window registration binding read_only admission collect-all and sanitized artifact 9879312832
 blockers:
-  - final exact-head GitHub Actions for this synchronized generation are pending
-next_action: push this checkpoint and require terminal exact-head Actions before fresh coordinator ACCEPT and Wave 3 restack
+  - terminal exact-head GitHub Actions for final PR 856 head are pending
+next_action: push this checkpoint commit and require terminal exact-head GitHub Actions before coordinator ACCEPT and Wave 3 final gate
 ```

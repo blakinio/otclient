@@ -36,6 +36,17 @@ def test_exact_contract() -> None:
     assert not mod.is_plausible_offset_to_top(0x100000)
 
 
+def test_bounded_symbol_role_contract() -> None:
+    mod = load_analyzer()
+    assert mod.is_qmeta_activate_symbol("QMetaObject::activate(QObject*, int, void**)")
+    assert not mod.is_qmeta_activate_symbol("operator new(unsigned long)")
+    assert mod.is_qobject_connect_impl_symbol(
+        "QObject::connectImpl(QObject const*, void**, QObject const*, void**, QtPrivate::QSlotObjectBase*, Qt::ConnectionType, int const*, QMetaObject const*)"
+    )
+    assert not mod.is_qobject_connect_impl_symbol("QMetaObject::activate(QObject*, int, void**)")
+
+
 if __name__ == "__main__":
     test_exact_contract()
+    test_bounded_symbol_role_contract()
     print("BE4F48_SENDLOGIN_SENDER_PEER_CONTRACT=PASS")

@@ -1,0 +1,104 @@
+{
+  "task_id": "OTC-20260903-be4f48-sendlogin-sender-peer",
+  "decision": "SOURCE_BLOCKER",
+  "trusted_main": "a35bbacd475a31ce52736ccbc3b5e837626def66",
+  "source_head": "df9febe6f2817a606093898318595982222f056c",
+  "source_pr": 869,
+  "current_client": {
+    "version": "15.32.be4f48",
+    "size": 52105824,
+    "sha256": "552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1"
+  },
+  "tdd": {
+    "initial_red": {
+      "run_id": 33776945999,
+      "job_id": 100720910769,
+      "head": "6295381433c38949ae8af0ab51468243bf827274",
+      "repository_only_contract": "failure",
+      "exact_client_prepare": "skipped",
+      "client_materialization": "skipped"
+    },
+    "plt_discriminator_red": {
+      "run_id": 33777802812,
+      "job_id": 100723755748,
+      "head": "56d4684105118ff7e50a1503ffcc3e514754691e",
+      "repository_only_contract": "failure",
+      "exact_client_prepare": "skipped",
+      "client_materialization": "skipped"
+    }
+  },
+  "exact_source_runs": {
+    "stage1": {
+      "run_id": 33777474194,
+      "job_id": 100722673198,
+      "head": "12af7ca291bc88ea4868a6abfcb32efb9b6a4248",
+      "conclusion": "success",
+      "artifact_id": 9902213010,
+      "artifact_digest": "sha256:6a0d3d3fdec009c009c8ed359a45bca85119d16fc1e2a2155e672ce698ac66b3"
+    },
+    "bounded_followup": {
+      "run_id": 33778038445,
+      "job_id": 100724556224,
+      "head": "df9febe6f2817a606093898318595982222f056c",
+      "conclusion": "success",
+      "artifact_id": 9902452300,
+      "artifact_digest": "sha256:cbe454857fd778f0d989918553f8c999d80ab3dd0c866bcbcd638f3b78ffef89"
+    }
+  },
+  "accepted": {
+    "sendlogin_adapter_target": "0xbd3050",
+    "adapter_reference_site": "0x7c6b34",
+    "adapter_reference_owner_fde": [
+      "0x7c6700",
+      "0x7cc933"
+    ],
+    "peer_target": "0xd052a0",
+    "peer_fde": [
+      "0xd052a0",
+      "0xd052c7"
+    ],
+    "peer_instruction_count": 9,
+    "peer_signal_index_argument": 0,
+    "peer_static_metaobject_argument": "0x30b68a0",
+    "peer_direct_call_site": "0xd052bd",
+    "peer_direct_callee_target": "0x4d7dc0",
+    "peer_direct_callee_plt_section": ".plt",
+    "peer_direct_callee_relocation_symbol": "_ZN11QMetaObject8activateEP7QObjectPKS_iPPv",
+    "peer_direct_callee_demangled": "QMetaObject::activate(QObject*, QMetaObject const*, int, void**)",
+    "peer_role": "QT_SIGNAL_BODY_CALLING_QMETAOBJECT_ACTIVATE",
+    "peer_owner_identity": "UNKNOWN",
+    "promoted_connection_helper_target": "0x4d8670",
+    "promoted_connection_helper_plt_section": ".plt",
+    "promoted_connection_helper_relocation_symbol": "_Znwm",
+    "promoted_connection_helper_demangled": "operator new(unsigned long)",
+    "promoted_connection_helper_role": "ALLOCATOR_OPERATOR_NEW",
+    "promoted_connection_helper_is_qt_connection_primitive": false,
+    "sender_endpoint_identity": "UNKNOWN",
+    "receiver_endpoint_identity": "UNKNOWN",
+    "sendlogin_causal_binding_proven": false,
+    "pre_login_sequence_advanced": false
+  },
+  "withheld": {
+    "peer_class_owner": "UNKNOWN",
+    "sender_receiver_direction": "UNKNOWN",
+    "actual_qt_connection_primitive": "UNKNOWN",
+    "causal_signal_to_sendlogin_binding": "NOT_PROVEN",
+    "pre_success_send_sequence": "UNKNOWN",
+    "track_b_delta": "NOT_PROVEN"
+  },
+  "safety": {
+    "runtime_access": "none",
+    "official_client_executed": false,
+    "login_performed": false,
+    "credentials_used": false,
+    "secret_access": false,
+    "process_memory_access": false,
+    "packet_capture": false,
+    "official_service_e2e_count": 0,
+    "raw_client_uploaded": false,
+    "track_b_pr_284_modified": false
+  },
+  "terminal_result": "SOURCE_BLOCKER",
+  "FIRST_MISSING_BOUNDARY": "PROMOTED_HELPER_TARGET_IS_ALLOCATOR_NOT_A_CONNECTION_PRIMITIVE",
+  "next_action": "Clean coordinator promotion should record that 0xd052a0 is an exact-current Qt signal body while promoted helper 0x4d8670 is operator new, not a Qt connection primitive. Any further source task must start from the newly exposed peer static-metaobject anchor 0x30b68a0 and/or recover the actual bounded connection primitive without reusing 0x4d8670 as direction authority. Do not mutate Track B PR #284 from this lane."
+}

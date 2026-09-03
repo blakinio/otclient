@@ -1,0 +1,94 @@
+{
+  "schema": "otclient.track-a.be4f48-prelogin-sequence-promotion.v1",
+  "decision": "SOURCE_BLOCKER",
+  "source": {
+    "pr": 865,
+    "head": "8d6c752cd3d009a78b5deddb650c752c95156298",
+    "run": 33756449924,
+    "job": 100651924970,
+    "ci_run": 33756450210,
+    "governance_run": 33756449991,
+    "self_hosted_boundary_run": 33756449971,
+    "artifact": 9893838828,
+    "artifact_sha256": "20043e76288cf7377c480015a1c2726fb76f39fd1366e43faae445c3bfd87cee",
+    "result_json_sha256": "c44a1cdd3f20a84da4ca3c8ec6970a0dc86ef46c89ee8cd348db7d46729a2d37"
+  },
+  "writer_source": {
+    "head": "3d87d729b73f868aefe1662c72af666a4921b1d8",
+    "run": 32998976901,
+    "artifact": 9886703883,
+    "artifact_sha256": "84e88080ea862d2faf82fc169dde5f908fc5fd7a856585e434523795481fc4fa",
+    "result_json_sha256": "296f5a915d15f9383fc3f1c7809eb5c6934a3deb24a9e2b9cd1808b660c40f14"
+  },
+  "exact_client": {
+    "version": "15.32.be4f48",
+    "sha256": "552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1",
+    "size": 52105824
+  },
+  "accepted": {
+    "login_type": "tibia::protobuf::protocol::GameclientMessageLogin",
+    "gameclient_message_login_outer_fields_present": [1, 2, 3, 6],
+    "outer_field6_write_site": "0xe25ccc",
+    "outer_field6_source": "producer input edx via mov r14d, edx at 0xe25624",
+    "outer_field6_value": "UNKNOWN",
+    "nested_authinfo_source_fields_referenced": [1, 2, 5, 6, 7],
+    "queue_sendlogin_qmeta_index": 196,
+    "queue_signal_count": 192,
+    "queue_sendlogin_role": "NON_SIGNAL_METHOD",
+    "queue_sendlogin_qmeta_target": "0xde82a2",
+    "sendlogin_external_tail_site": "0xde82ae",
+    "sendlogin_adapter_target": "0xbd3050",
+    "sendlogin_adapter_fde": ["0xbd3050", "0xbd34dd"],
+    "sendlogin_adapter_binding": "UNIQUE_ADAPTER_DISCOVERED",
+    "aligned_adapter_reference_site": "0x7c6b34",
+    "adapter_reference_owner_fde": ["0x7c6700", "0x7cc933"],
+    "connection_block_classification": "UNKNOWN_ENDPOINT_PAIR",
+    "connection_peer_target": "0xd052a0",
+    "connection_helper_target": "0x4d8670",
+    "connection_peer_qmeta_candidates": [],
+    "connection_peer_qmeta_role": "UNKNOWN",
+    "bounded_gameclient_root_reachability": "UNKNOWN_PEER_QMETA_IDENTITY",
+    "pre_success_send_sequence": "UNKNOWN",
+    "proved_send_methods": [],
+    "writer_current_sendlogin_qmeta": "PROVEN",
+    "writer_current_sendlogin_first_direct_edges": "PROVEN",
+    "writer_current_sendlogin_adapter_fde": "PROVEN",
+    "writer_current_sendlogin_adapter_indirect_calls": "PROVEN",
+    "writer_final_contract": "UNKNOWN"
+  },
+  "withheld": {
+    "outer_field6_semantic_name": "UNKNOWN",
+    "outer_field6_value": "UNKNOWN",
+    "complete_pre_login_sequence": "UNKNOWN",
+    "pre_login_message_order": "UNKNOWN",
+    "pre_login_required_message_missing_in_otclient": "UNKNOWN",
+    "causal_signal_to_sendlogin_binding": "NOT_PROVEN",
+    "final_queue_writer": "UNKNOWN",
+    "final_tcp_writer": "UNKNOWN",
+    "safe_track_b_outbound_delta": "NOT_PROVEN"
+  },
+  "track_b_consequence": {
+    "pr": 284,
+    "mutation_authorized_from_this_result": false,
+    "official_service_game_e2e_authorized": false,
+    "pr_branch_modified": false,
+    "pre_login_sequence_complete": false,
+    "track_b_current_wire_delta": "NOT_PROVEN",
+    "next_blocker": "BLOCKED_REQUIRED_CURRENT_NATIVE_PRE_LOGIN_OUTBOUND_SEQUENCE_EVIDENCE"
+  },
+  "missing_boundaries": {
+    "first": "exact-current sender-side native event/peer identity and direction for the connection that binds TProtocolMessageQueue::sendLogin",
+    "secondary": "sendLogin serialized queue object -> final queue/TCP writer contract"
+  },
+  "safety": {
+    "runtime_access": "none",
+    "official_client_executed": false,
+    "login_performed": false,
+    "credentials_used": false,
+    "secret_access": false,
+    "process_memory_access": false,
+    "packet_capture": false,
+    "raw_client_uploaded": false,
+    "official_service_e2e_count": 0
+  }
+}

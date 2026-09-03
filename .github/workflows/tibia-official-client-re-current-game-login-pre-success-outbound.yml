@@ -20,6 +20,7 @@ jobs:
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
+          fetch-depth: 0
 
       - name: Validate source-only analyzer contract
         shell: bash
@@ -34,6 +35,7 @@ jobs:
             tools/tibia_re_current_game_login_pre_success_outbound/handler_connections.py \
             tools/tibia_re_current_game_login_pre_success_outbound/sendlogin_binding.py \
             tools/tibia_re_current_game_login_pre_success_outbound/sendlogin_connection.py
+          git diff --check "${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}"
 
       - name: Prepare exact public client package through WARP
         shell: bash

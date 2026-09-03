@@ -50,7 +50,7 @@ Static-only GitHub-hosted research. Do not execute the official client, log in, 
 
 # Anti-loop
 
-Only rebind the exact-client fence and repair the smallest build-drift assumptions proven by failing static gates. No new architecture, subsystem, or broad refactor.
+Only rebind the exact-client fence and repair the smallest build-drift assumptions proven by failing static gates. No new architecture, subsystem, broad BFS expansion, runtime experiment, feature toggle, or Track B E2E.
 
 # TDD evidence
 
@@ -58,19 +58,50 @@ Only rebind the exact-client fence and repair the smallest build-drift assumptio
 2. Fence GREEN: commit `17b1f32769570241174b74a48192a5274b00097f`, run `33742917386`, job `100608729800` succeeded on exact `be4f48`; sanitized result retained only.
 3. Exact-current result remained `PRE_SUCCESS_SEND_SEQUENCE=UNKNOWN`: direct-call BFS from current `TGameClient` roots did not reach any queue `send*`. This proves the next discriminator must target the indirect binding, not increase BFS depth.
 4. Adapter RED: commit `9bc619170d5e8bd74d13181effc5f86458286e8e`, run `33744487648`, job `100613732741` failed at contract validation with `sendLogin indirect binding discriminator not implemented`; all client materialization steps were skipped.
-5. First adapter implementation: commit `91095813cce1ce192b8dfb27939bf33a8ab4ef9c`, run `33748565022`, job `100626619546`, artifact `9890726629` on exact `be4f48`. The sanitized result falsified the initial bounded-method assumption: the scan crossed the first unconditional tail jump and consumed adjacent QMeta methods, yielding `UNKNOWN_MULTIPLE_EXTERNAL_DIRECT_TRANSFERS` with four candidates.
-6. Adapter method-boundary GREEN: commit `473be1ad313e181d27b4db76f83135165471bf8a`, run `33749268039`, job `100628816886`, artifact `9891026284`, digest `sha256:73064e958b3f856fbaa764ef1620b7f4dad59ad1087537560e6cdd2dfb81383c`. Exact-current sanitized result proves `sendLogin` QMeta target has one external tail transfer to adapter `0xbd3050`; independent exact-current writer artifact `9886703883` had already derived the same edge. The adapter has no direct-call xrefs and one unique RIP-owner FDE `0x7c6700-0x7cc933` (duplicate byte-aligned RIP detections at the same instruction are normalized as one owner).
-7. The unique adapter reference occurs inside a repeated static connection-construction block. The same bounded block contains a second executable callable and the endpoint object loads, but these values are not promoted by inspection alone. The next RED requires deriving the connection peer, endpoint displacements, and connection call target from exact-current bytes without hardcoding the observed addresses.
+5. First adapter implementation: commit `91095813cce1ce192b8dfb27939bf33a8ab4ef9c`, run `33748565022`, job `100626619546`, artifact `9890726629` on exact `be4f48`. The sanitized result falsified the initial bounded-method assumption because adjacent QMeta methods shared one FDE.
+6. Adapter method-boundary GREEN: commit `473be1ad313e181d27b4db76f83135165471bf8a`, run `33749268039`, job `100628816886`, artifact `9891026284`, digest `sha256:73064e958b3f856fbaa764ef1620b7f4dad59ad1087537560e6cdd2dfb81383c`. Exact-current sanitized result proves `sendLogin` QMeta target has one external tail transfer to adapter `0xbd3050`; independent exact-current writer artifact `9886703883` independently derived the same edge.
+7. Connection-peer RED: commit `434941b4972467b890ed25162649e377d8ab3ad2`, run `33750080047`, job `100631379090` failed exactly because `sendlogin_connection.py` did not exist; package acquisition and client materialization were skipped.
+8. Connection-peer GREEN: source head `d08bbeec7d7b0abf3ca565a96d089e8e44c3a6f7`, run `33755030910`, job `100647297444`, artifact `9893295350`, artifact digest `sha256:c6f45e4ccf4a9b1267293bfe00f79ac6565cecfda7fd25413b041f76a5a7db73`, sanitized `result.json` SHA-256 `c44a1cdd3f20a84da4ca3c8ec6970a0dc86ef46c89ee8cd348db7d46729a2d37`. Exact-head governance `33755030811`, self-hosted boundary `33755030936`, and CI `33755031063` all succeeded.
 
-# Current exact boundary
+# Exact-current findings
 
-Exact-current `TProtocolMessageQueue::sendLogin` QMeta -> adapter binding is complete and independently falsified. Causal ordering is not yet complete. The first missing edge is the unique static connection block containing the `sendLogin` adapter: identify its peer callable and map that peer against exact-current QMeta methods, fail-closed. Inherited #743 literals such as the old QObject-connect target / owner field are historical guidance only until independently re-derived from this current connection block.
+- `tibia::protobuf::protocol::GameclientMessageLogin` remains the current typed login message.
+- Outer field 6 is present and is produced from login-producer input `edx` through `r14d` into the current field-6 storage slot. Its exact runtime scalar value remains `UNKNOWN`; no historical 0/1 value is promoted.
+- `TProtocolMessageQueue::sendLogin` QMeta resolves to one current adapter; that structural adapter edge was independently falsified by the separate current writer analysis.
+- The adapter's unique aligned reference owner contains a current static connection-construction block. The block independently re-derives the two object-field displacements used around the callable construction, but the analyzer also identifies a stack-temporary false positive; therefore endpoint semantic ownership is not promoted.
+- The second executable callable in that block does not match any exact-current `tibia::client::TGameClient` QMeta method or signal. The hypothesis `peer callable == TGameClient QMeta event` is disproven for this build.
+- The inherited historical QObject/connect-target and owner-field literals are not used as current authority. Coincidental current structural values are not given semantic names without an independent current identity proof.
+- The bounded first-game-server-connect graph still proves no complete ordered queue send sequence. `sendLogin`, `sendEnterWorld`, and `sendSecondaryLogin` remain causally unbound in the required pre-success sequence.
+- Separate exact-current writer evidence still leaves the downstream queue/TCP writer contract unresolved.
 
-# Terminal outputs
+# Terminal source decision
 
-- `PRE_LOGIN_SEQUENCE_COMPLETE=true|false`
-- `PRE_LOGIN_MESSAGE_ORDER=<sanitized identities or UNKNOWN>`
-- `PRE_LOGIN_REQUIRED_MESSAGE_MISSING_IN_OTCLIENT=<type or NONE/UNKNOWN>`
-- `terminal_result=IMPLEMENTABLE_DELTA_PROVEN|STATIC_BOUNDARY_COMPLETE|INCONCLUSIVE`
+`terminal_result=SOURCE_BLOCKER`
 
-next_action: TDD RED for an exact-current sendLogin connection-peer discriminator; then derive the peer callable and map it against current TGameClient QMeta without hardcoded observed addresses.
+This is not `IMPLEMENTABLE_DELTA_PROVEN`: the structural Field6 omission in Track B is real, but its material value is unknown and the native pre-login message ordering is still incomplete. It is also not `RUNTIME_FIELD6_REQUIRED` because Field6 is not the only remaining unknown; static sequence and downstream writer boundaries remain unresolved.
+
+```text
+PRE_LOGIN_SEQUENCE_COMPLETE=false
+PRE_LOGIN_MESSAGE_ORDER=UNKNOWN
+PRE_LOGIN_REQUIRED_MESSAGE_MISSING_IN_OTCLIENT=UNKNOWN
+CURRENT_GAME_LOGIN_FIELD6_PRESENT=true
+CURRENT_GAME_LOGIN_FIELD6_SOURCE=producer input edx
+CURRENT_GAME_LOGIN_FIELD6_STATIC_VALUE=UNKNOWN
+FIELD6_STRUCTURAL_MISMATCH_PROVEN=true
+FINAL_LOGIN_SERIALIZER_IDENTIFIED=true
+FINAL_QUEUE_WRITER_IDENTIFIED=false
+FINAL_TCP_WRITER_IDENTIFIED=false
+TRACK_B_CURRENT_WIRE_DELTA=UNKNOWN
+RUNTIME_FIELD6_OBSERVATION_REQUIRED=false
+OFFICIAL_SERVICE_E2E_COUNT=0
+CREDENTIALS_USED=false
+RUNTIME_ACCESS=none
+```
+
+`FIRST_MISSING_BOUNDARY=exact-current be4f48 static signal/callable identity and direction in the connection block that binds the TProtocolMessageQueue::sendLogin adapter; specifically identify the sender-side native message event before claiming pre-login ordering`
+
+Secondary unresolved boundary: `sendLogin serialized queue object -> final queue/TCP writer`.
+
+# Disposition
+
+Stop source investigation here under strict anti-loop. Do not modify or E2E-test PR #284 from this result. A clean coordinator promotion may consume only the exact-current sanitized facts and the blocker above; source analyzers, historical addresses/Field6 values, payload bytes, secrets, and proprietary client material must not be promoted.

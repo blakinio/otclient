@@ -83,3 +83,16 @@ Do not treat this registry as standing permission for direct owner-funded Spark 
 ## Phase boundary
 
 All aliases in this registry are Phase 2 read-only. They grant no GUI/anti-idle input, login, credentials, character selection, gameplay, process control, process memory, packet/payload capture or physical executor authority. Phase 3+ requires a separate prompt/task/authorization family.
+
+## Current finalization handoff
+
+For the central current-client fence closeout and remaining Wave 3 completion, use a fresh agent/context:
+
+```text
+Uruchom OTC-VISION-P2-CENTRAL-FENCE-FINALIZE autonomicznie.
+```
+
+Canonical handoff:
+`docs/agents/prompts/OTC_20260902_VISION_P2_CENTRAL_FENCE_FINALIZATION_HANDOFF.md`
+
+This alias is anti-loop: resume the existing branch/PR chain, finish promotion and the single remaining live E2E, and do not create another architecture/refactor lane unless a concrete gate proves it necessary.

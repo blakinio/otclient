@@ -84,9 +84,6 @@ jobs:
     runs-on: [otclient, synology]
     timeout-minutes: 15
     env:
-      EXPECTED_VERSION: 15.32.be4f48
-      EXPECTED_SIZE: '52105824'
-      EXPECTED_SHA: 552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1
       CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime
       RECOVERY_TASK: OTC-20260829-track-a-kasm-canonical-bootstrap-invalidation-live
       BOOTSTRAP_TASK: OTC-20260829-track-a-kasm-canonical-bootstrap-live
@@ -119,6 +116,16 @@ jobs:
           python3 .github/scripts/test_track_a_agent_runtime_governance.py >/dev/null
           echo "trusted_main=$trusted_main" >> "$GITHUB_OUTPUT"
           echo TRACK_A_KASM_CANONICAL_BOOTSTRAP_TRUSTED_MAIN=PASS
+
+      - name: Load canonical current-client fence from trusted main
+        shell: bash
+        run: |
+          set +x
+          set -Eeuo pipefail
+          work="$RUNNER_TEMP/track-a-kasm-canonical-bootstrap-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          cd "$work"
+          PYTHONPATH=. python3 -m tools.tibia_re_control_center.current_client_fence github-env "$GITHUB_ENV" --prefix EXPECTED
+          echo TRACK_A_KASM_CURRENT_CLIENT_FENCE_SOURCE=PASS
 
       - name: Validate separate durable recovery and bootstrap admissions
         shell: bash

@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260902-vision-p2-vision-reconciliation
-status: waiting
+status: validating
 agent: ChatGPT
 session_role: phase2_worker
 worker_alias: OTC-VISION-P2-VISION-RECONCILIATION
@@ -12,7 +12,7 @@ task_kind: implementation
 phase: wave_2_trusted_reconciliation
 branch: feat/OTC-20260902-vision-p2-vision-reconciliation
 base_branch: main
-base_main: a7c7eb8aa2cc69d70442578401d88be9262055e4
+base_main: 7c4941aa2ef374426ab46debb86d25346af1a986
 created: 2026-09-02T10:46:00+02:00
 updated_at: 2026-09-02T17:05:30+02:00
 risk: high
@@ -83,8 +83,8 @@ depends_on:
   - lifecycle closeout PR #855 merged as main 8441fc1cce1600033b505d68ebc5c0141b337394
 blocks:
   - OTC-VISION-P2-E2E-AUDIT
-current_blocker: post_admission_only_sync_exact_head_actions_pending
-next_action: push the post-admission-only synchronized generation, require terminal exact-head Actions, then issue a fresh coordinator classification before Wave 3 restack
+current_blocker: post_central_fence_restack_exact_head_validation_pending
+next_action: validate the post-central-fence restack, publish the exact generation, then require terminal exact-head Actions before coordinator ACCEPT and Wave 3 final gate
 invocation_started_at: 2026-09-02T10:46:00+02:00
 last_progress_at: 2026-09-02T14:26:00+02:00
 ci_checks_for_current_head: 0
@@ -178,7 +178,7 @@ updated_at: 2026-09-02T15:05:30Z
 head: 1768fac6b3f17634aa9c0bbbb02c9d475e5bf7f9
 branch: feat/OTC-20260902-vision-p2-vision-reconciliation
 pr: 856
-status: waiting
+status: validating
 context_routes:
   - tools/tibia_re_control_center/vision_p2_trusted_composition.py
   - tools/tibia_re_control_center/agent_edge_bridge.py

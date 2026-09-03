@@ -21,15 +21,19 @@ REG = STATE / 'runtime-registration.json'
 LEASE = STATE / 'lease.json'
 LOCK = STATE / 'coordination.lock'
 RID = 'track-a-canonical-live'
-SOURCE_FENCE = (
-    '15.32',
-    52109920,
-    'ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8',
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from tools.tibia_re_control_center.current_client_fence import (  # noqa: E402
+    approved_reconciliation_sources,
+    current_client_fence,
 )
-CURRENT_FENCE = (
-    '15.32.75d4a0',
-    52105824,
-    'd1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a',
+
+_CURRENT_CLIENT_FENCE = current_client_fence()
+CURRENT_FENCE = _CURRENT_CLIENT_FENCE.as_tuple()
+APPROVED_SOURCE_FENCES = frozenset(
+    fence.as_tuple() for fence in approved_reconciliation_sources()
 )
 ADOPTION_PROOF = 'existing_runtime_adoption_v1'
 FAIL_CLOSED_EVIDENCE = {
@@ -161,7 +165,7 @@ def _read_source() -> dict[str, Any]:
     data = _load_json(REG, 'source_registration_file_unsafe', 'source_registration_invalid_json')
     _base_registration(data)
     fence = (data.get('client_version'), data.get('client_size'), data.get('client_sha256'))
-    if fence not in {SOURCE_FENCE, CURRENT_FENCE}:
+    if fence not in APPROVED_SOURCE_FENCES:
         raise ReconcileError('source_fence_not_approved')
     return data
 

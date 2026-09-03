@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import fcntl
 import hashlib
+import importlib
 import importlib.util
 import json
 import os
@@ -16,14 +17,22 @@ import time
 from pathlib import Path
 from typing import Any, Sequence
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+_CURRENT_FENCE_MODULE = importlib.import_module(
+    "tools.tibia_re_control_center.current_client_fence"
+)
+_CURRENT_CLIENT_FENCE = _CURRENT_FENCE_MODULE.current_client_fence()
+
 STATE = Path('/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime')
 REG = STATE / 'runtime-registration.json'
 GUARD_PATH = Path(__file__).with_name('tibia-official-client-re-canonical-live-guard.py')
 INPUT_LOCK_PATH = Path(__file__).with_name('tibia-official-client-re-input-lock.py')
 RID = 'track-a-canonical-live'
-VER = '15.32.be4f48'
-SIZE = 52105824
-SHA = '552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1'
+VER = _CURRENT_CLIENT_FENCE.version
+SIZE = _CURRENT_CLIENT_FENCE.size
+SHA = _CURRENT_CLIENT_FENCE.sha256
 STATES = {'LOGIN', 'CHARACTER_SELECT', 'IN_GAME', 'DISCONNECTED', 'UNKNOWN'}
 FIELDS = {
     'schema_version', 'runtime_id', 'registration_generation', 'lease_generation',

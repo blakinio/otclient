@@ -5,27 +5,27 @@ on:
     branches: [main]
     types: [opened, synchronize, reopened]
     paths:
+      - docs/agents/contracts/TRACK_A_CURRENT_CLIENT_FENCE_V1.json
+      - tools/tibia_re_control_center/current_client_fence.py
+      - tests/tools/tibia_re_control_center/test_current_client_fence.py
+      - tools/tibia_re_control_center/agent_runtime_admission.py
+      - tests/tools/tibia_re_control_center/test_agent_runtime_admission.py
       - .github/scripts/tibia-official-client-re-canonical-live-session.sh
-      - .github/scripts/test_tibia_official_client_re_canonical_live_session.py
       - .github/scripts/tibia-official-client-re-canonical-live-transition.py
-      - .github/scripts/test_tibia_official_client_re_canonical_live_transition.py
+      - .github/scripts/tibia-official-client-re-kasm-bootstrap-worker.py
       - .github/scripts/tibia-official-client-re-kasm-existing-runtime-probe.py
-      - .github/scripts/test_tibia_official_client_re_kasm_existing_runtime_probe.py
+      - .github/scripts/tibia-official-client-re-canonical-client-fence-reconcile.py
       - .github/scripts/test_track_a_agent_runtime_governance.py
       - .github/scripts/test_track_a_canonical_current_client_fence.py
       - .github/workflows/track-a-canonical-current-client-fence.yml
       - .github/workflows/track-a-canonical-live-governance.yml
-      - docs/agents/TIBIA_RESEARCH_TRACKS.md
-      - docs/agents/decisions/ADR-0001-track-a-canonical-live-runtime.md
-      - docs/agents/contracts/TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md
-      - docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
-      - docs/agents/CHANGELOG.md
-      - docs/agents/tasks/active/OTC-20260902-canonical-current-client-fence-be4f48.md
-      - docs/agents/evidence/OTC-20260902-canonical-current-client-fence-be4f48/**
-      - tools/tibia_re_control_center/agent_runtime_admission.py
-      - tests/tools/tibia_re_control_center/test_agent_runtime_admission.py
-      - .github/scripts/tibia-official-client-re-kasm-bootstrap-worker.py
       - .github/workflows/track-a-kasm-canonical-bootstrap.yml
+      - .github/workflows/track-a-surveyor-v2-readonly.yml
+      - .github/workflows/track-a-canonical-client-fence-reconciliation.yml
+      - docs/agents/TIBIA_RESEARCH_TRACKS.md
+      - docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
+      - docs/agents/contracts/TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md
+      - docs/agents/decisions/ADR-0001-track-a-canonical-live-runtime.md
 
 permissions:
   contents: read
@@ -34,93 +34,62 @@ jobs:
   current-canonical-fence:
     name: Current exact-client canonical fence
     runs-on: ubuntu-24.04
-    timeout-minutes: 8
+    timeout-minutes: 10
     steps:
-      - name: Checkout exact repair head
+      - name: Checkout exact PR head
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
           fetch-depth: 0
 
-      - name: Validate focused current-fence contract
+      - name: Validate central current-fence contract
         shell: bash
         run: |
           set -Eeuo pipefail
-          python3 .github/scripts/test_track_a_canonical_current_client_fence.py
+          git fetch --no-tags origin main
+          python3 .github/scripts/test_track_a_canonical_current_client_fence.py --base-ref origin/main
+          python3 -m unittest tests.tools.tibia_re_control_center.test_current_client_fence
 
-      - name: Validate canonical runtime components
+      - name: Validate canonical identity components
         shell: bash
         run: |
           set -Eeuo pipefail
           bash -n .github/scripts/tibia-official-client-re-canonical-live-session.sh
           python3 -m py_compile \
+            tools/tibia_re_control_center/current_client_fence.py \
+            tools/tibia_re_control_center/agent_runtime_admission.py \
             .github/scripts/tibia-official-client-re-canonical-live-transition.py \
+            .github/scripts/tibia-official-client-re-kasm-bootstrap-worker.py \
             .github/scripts/tibia-official-client-re-kasm-existing-runtime-probe.py \
+            .github/scripts/tibia-official-client-re-canonical-client-fence-reconcile.py \
             .github/scripts/test_track_a_agent_runtime_governance.py \
             .github/scripts/test_track_a_canonical_current_client_fence.py
+          python3 -m unittest tests.tools.tibia_re_control_center.test_agent_runtime_admission
           python3 .github/scripts/test_tibia_official_client_re_canonical_live_session.py -v
           python3 .github/scripts/test_tibia_official_client_re_canonical_live_transition.py -v
+          python3 .github/scripts/test_tibia_official_client_re_kasm_bootstrap_worker.py -v
           python3 .github/scripts/test_tibia_official_client_re_kasm_existing_runtime_probe.py -v
-          echo TRACK_A_CANONICAL_RUNTIME_COMPONENTS=PASS
+          python3 .github/scripts/test_tibia_official_client_re_canonical_client_fence_reconcile.py -v
+          echo TRACK_A_CANONICAL_IDENTITY_COMPONENTS=PASS
 
       - name: Validate deterministic Track A governance against exact PR scope
         shell: bash
         run: |
           set -Eeuo pipefail
-          git fetch --no-tags origin main
           python3 .github/scripts/test_track_a_agent_runtime_governance.py \
             --changed-from origin/main \
             --expected-branch "${GITHUB_HEAD_REF}"
           echo TRACK_A_DETERMINISTIC_GOVERNANCE=PASS
 
-      - name: Parse workflow YAML and validate diff
+      - name: Parse workflows and validate diff
         shell: bash
         run: |
           set -Eeuo pipefail
-          ruby -e 'require "yaml"; YAML.load_file(ARGV[0]); YAML.load_file(ARGV[1]); puts "YAML_PARSE=PASS"' \
+          ruby -e 'require "yaml"; ARGV.each { |path| YAML.load_file(path) }; puts "YAML_PARSE=PASS"' \
             .github/workflows/track-a-canonical-current-client-fence.yml \
-            .github/workflows/track-a-canonical-live-governance.yml
+            .github/workflows/track-a-canonical-live-governance.yml \
+            .github/workflows/track-a-kasm-canonical-bootstrap.yml \
+            .github/workflows/track-a-surveyor-v2-readonly.yml \
+            .github/workflows/track-a-canonical-client-fence-reconciliation.yml
           git diff --check origin/main...HEAD
           echo GIT_DIFF_CHECK=PASS
-
-      - name: Assert current-authority stale fence is absent
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          python3 - <<'PY'
-          from pathlib import Path
-          old_sha='ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8'
-          current_paths=(
-              '.github/scripts/tibia-official-client-re-canonical-live-session.sh',
-              '.github/scripts/tibia-official-client-re-canonical-live-transition.py',
-              '.github/scripts/tibia-official-client-re-kasm-existing-runtime-probe.py',
-              '.github/scripts/test_track_a_agent_runtime_governance.py',
-              '.github/workflows/track-a-canonical-live-governance.yml',
-              'docs/agents/TIBIA_RESEARCH_TRACKS.md',
-              'docs/agents/decisions/ADR-0001-track-a-canonical-live-runtime.md',
-              'docs/agents/contracts/TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md',
-              'docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md',
-          )
-          for path_s in current_paths:
-              text=Path(path_s).read_text(encoding='utf-8')
-              if old_sha in text:
-                  raise SystemExit(f'STALE_CURRENT_SHA:{path_s}')
-          print('STALE_CURRENT_AUTHORITY_SCAN=PASS')
-          PY
-
-      - name: Assert repository-only execution boundary
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          task='docs/agents/tasks/active/OTC-20260902-canonical-current-client-fence-be4f48.md'
-          grep -Fqx 'runtime_access: none' "$task"
-          grep -Fqx 'mutation_authorized: false' "$task"
-          grep -Fqx 'credentials_allowed: false' "$task"
-          grep -Fqx 'login_allowed: false' "$task"
-          grep -Fqx 'character_selection_allowed: false' "$task"
-          grep -Fqx 'gameplay_allowed: false' "$task"
-          grep -Fqx 'gui_input_authorized: false' "$task"
-          grep -Fqx 'process_control_authorized: false' "$task"
-          grep -Fqx 'network_payload_capture_allowed: false' "$task"
-          grep -Fqx 'physical_action_budget: 0' "$task"
-          echo TRACK_A_CANONICAL_CURRENT_FENCE_RUNTIME_ACCESS=NONE

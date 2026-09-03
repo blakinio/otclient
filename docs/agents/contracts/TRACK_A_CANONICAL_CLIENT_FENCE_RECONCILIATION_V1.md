@@ -12,7 +12,7 @@ mutation_authorized: false
 
 ## Purpose
 
-This contract defines one narrow canonical-registration recovery subtype for either a governance-driven exact-client fence advance from the immediately superseded approved build or a same-fence runtime-identity refresh when the durable canonical registration is already exact-current but its container/PID/start identity is stale.
+This contract defines one narrow canonical-registration recovery subtype for either a governance-driven exact-client fence advance from any exact build retained in the canonical approved history or a same-fence runtime-identity refresh when the durable canonical registration is already exact-current but its container/PID/start identity is stale.
 
 It exists to close the fail-closed gap exposed by the gameWindowState memory-free preflight: ordinary rebind cannot repair a changed client fence, same-boot stale-registration recovery and boot-epoch recovery intentionally require the previously accepted exact fence, adoption requires registration absence, and bootstrap must not run while a canonical registration exists.
 
@@ -20,26 +20,12 @@ This contract does **not** weaken those transitions. `rebind`, `stale-registrati
 
 ## Closed source and target fences
 
-v1 accepts exactly two closed source modes: the approved predecessor-to-current fence transition and an exact-current-to-exact-current runtime-identity refresh. No other source fence is admitted.
+The authoritative source is `docs/agents/contracts/TRACK_A_CURRENT_CLIENT_FENCE_V1.json`.
+Its strict `current` tuple is the only permitted reconciliation target. Its `approved_history` list contains exact earlier canonical-current tuples that may be accepted only as metadata-reconciliation sources. The exact current tuple is also a legal source for stale runtime-identity refresh.
 
-Approved superseded source registration:
+A source registration is admitted only when its exact `(client_version, client_size, client_sha256)` tuple equals `manifest.current` or one entry in `approved_history`. A fresh probe must always prove exactly `manifest.current` before commit. Listing a tuple in history grants no current-runtime, semantic, login, input, gameplay, process-control or mutation authority.
 
-```yaml
-client_version: 15.32
-client_size: 52109920
-client_sha256: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
-```
-
-Approved exact-current source for identity refresh, and required current target:
-
-```yaml
-client_version: 15.32.75d4a0
-client_size: 52105824
-client_sha256: d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a
-runtime_platform: official_native_linux_only
-```
-
-No family match, prefix match, arbitrary predecessor, mixed old/new tuple, alternative SHA/size, or future build is accepted. Any future fence migration requires a new reviewed trusted-base contract/change rather than widening v1.
+No family match, prefix match, caller-supplied tuple, mixed old/new tuple, alternative SHA/size, or unlisted build is accepted. A future official-client promotion updates the reviewed canonical manifest and retains the previous `current` in `approved_history`; this contract does not need a per-build source/target rewrite.
 
 ## Admission and authority
 
@@ -54,7 +40,7 @@ Before the registration can be replaced:
 3. the worker must prove the active lease record still names the same task/session and a generation newer than the old registration lease generation;
 4. the authoritative registration file must be a current-UID-owned regular mode-0600 file at the canonical path;
 5. the source record must be schema v1, `runtime_id: track-a-canonical-live`, `proof_kind: existing_runtime_adoption_v1`, `state: UNKNOWN`, and carry only fail-closed adoption state evidence;
-6. the source record must contain either the exact approved superseded fence or the exact approved current fence above, complete all-running-Docker inventory evidence, exactly one candidate, a self-consistent candidate fingerprint and an X11 window identity bound to its recorded PID.
+6. the source record must contain either `manifest.current` or one exact tuple from `approved_history`, complete all-running-Docker inventory evidence, exactly one candidate, a self-consistent candidate fingerprint and an X11 window identity bound to its recorded PID.
 
 An exact-current source may be rewritten only by this same guarded transaction to refresh runtime identity from repeated fresh exact-current singleton proof under a strictly newer canonical controller generation. The refresh does not change the client fence or semantic state. An unapproved/mixed/corrupt source fence fails closed and requires separate investigation.
 
@@ -83,7 +69,7 @@ Boot identity, PID, process-start ticks and container instance id are replaced f
 
 Inside one continuously supervised `guard-run` critical section the worker must:
 
-1. validate the exact approved predecessor-or-current source registration and current controller generation;
+1. validate the exact manifest-approved historical-or-current source registration and current controller generation;
 2. perform fresh current-target probe A and validate the full closed contract;
 3. stage a mode-0600 candidate registration derived from probe A;
 4. perform probe B and require the complete fresh adoption signature to equal probe A;
@@ -108,7 +94,7 @@ This transition MUST NOT:
 - access credentials, login, logout, relog or select a character;
 - infer `IN_GAME` from title, bridge presence, stale registration state or historical evidence;
 - delete the registration and fall through to adoption/bootstrap;
-- accept an arbitrary predecessor build or any source fence other than the two closed v1 source modes;
+- accept an arbitrary predecessor build or any source fence not present as `manifest.current` or in `approved_history`;
 - edit `runtime-registration.json` outside the reviewed atomic transaction.
 
 ## Postcondition

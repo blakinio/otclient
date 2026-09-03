@@ -1,6 +1,5 @@
-﻿from pathlib import Path
-import unittest
-
+﻿import unittest
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -13,6 +12,13 @@ class OperatorSemanticRegressionTests(unittest.TestCase):
         self.assertNotIn("state=PASS; login=NO", text)
         self.assertIn("state=UNKNOWN", text)
         self.assertIn("login=UNKNOWN", text)
+
+    def test_surveyor_workflow_uses_canonical_current_client_fence(self):
+        text = (ROOT / ".github/workflows/track-a-surveyor-v2-readonly.yml").read_text(encoding="utf-8")
+        self.assertIn("current_client_fence github-env", text)
+        self.assertIn('test "$version" = "$EXPECTED_VERSION"', text)
+        self.assertIn("'client_version': version", text)
+        self.assertIn('"$EXPECTED_VERSION" "$EXPECTED_SIZE" "$EXPECTED_SHA"', text)
 
     def test_native_login_bridge_presence_cannot_claim_gameplay_success(self):
         text = (ROOT / ".github/workflows/track-a-native-login.yml").read_text(encoding="utf-8")

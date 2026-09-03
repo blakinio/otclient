@@ -1,27 +1,27 @@
 ---
 task_id: OTC-20260901-vision-p2-runtime-admission
-status: waiting
+status: completed
 agent: ChatGPT
-session_role: phase2_worker
+session_role: closeout
 worker_alias: OTC-VISION-P2-RUNTIME-ADMISSION
 programme_id: OTC-VISION-P2-READONLY
 project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: implementation
-phase: waiting_runtime_observation
+phase: close
 branch: feat/OTC-20260901-vision-p2-runtime-admission
 base_branch: main
 base_main: 54a20bbd8721e92d069974af14d6ebd2f4f5a55d
 created: 2026-09-01T16:27:39+02:00
-updated_at: 2026-09-01T18:52:38+02:00
+updated_at: 2026-09-03T08:08:52+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: isolated_worker_branch
 preferred_execution: codex
 run_scope: wave_1_worker
-continuation_policy: continue_until_real_stop
-task_completion_policy: return_to_coordinator_for_classification
+continuation_policy: terminal
+task_completion_policy: merged_and_archived
 prompting_standard_version: 2.1
 policy_version: 2
 track_a_runtime_agent_admission_version: 1
@@ -65,8 +65,8 @@ depends_on:
   - main ca1a71b5852f6e00ba144ed183af470555c51f56
 related_prs:
   - PR #826 Wave 1 worker Draft
-current_blocker: coordinator-assigned serialized read-only observation window not granted; live runtime remains unauthorized
-next_action: return current-main-green Draft PR #826 to OTC-VISION-P2-COORDINATOR; coordinator may then assign exactly one serialized read-only observation window for fresh admission evidence
+current_blocker: none
+next_action: none
 invocation_started_at: 2026-09-01T16:47:00+02:00
 last_progress_at: 2026-09-01T18:52:38+02:00
 ci_checks_for_current_head: 4
@@ -83,6 +83,11 @@ runtime_nonclaims:
   rfb_6082_current_backend_mapping: UNKNOWN
   current_exact_client_pid: NOT_REGISTERED
   current_exact_client_session: NOT_REGISTERED
+ownership_released: true
+terminal_resolution: superseded_by_promotion
+terminal_pr: 838
+terminal_merge: fb0c489f2ed166e872c4f197c6a78375a8576685
+superseded_pr: 826
 ---
 
 # OTC-VISION-P2-RUNTIME-ADMISSION
@@ -204,3 +209,7 @@ blockers:
   - real runtime observation remains separately coordinator-gated and has not been assigned.
 next_action: return current-main-green Draft PR #826 to OTC-VISION-P2-COORDINATOR; coordinator may then assign exactly one serialized read-only observation window for fresh admission evidence.
 ```
+
+## Terminal closeout ? 2026-09-03T08:08:52+02:00
+
+Worker PR #826 closed unmerged; exact producer head was promoted by PR #838. Runtime ownership is released; no credentials, login, gameplay, GUI input, process control, process-memory access, packet capture or client mutation is authorized by this archive. Physical action count remains `0`.

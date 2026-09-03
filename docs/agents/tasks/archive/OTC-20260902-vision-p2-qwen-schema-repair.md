@@ -1,21 +1,21 @@
 ---
 task_id: OTC-20260902-vision-p2-qwen-schema-repair
-status: waiting
+status: completed
 agent: ChatGPT
-session_role: implementer
+session_role: closeout
 worker_alias: OTC-VISION-P2-QWEN-SCHEMA-REPAIR
 programme_id: OTC-VISION-P2-READONLY
 project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: bugfix
-phase: wave_3_finding_repair
+phase: close
 branch: fix/OTC-20260902-vision-p2-qwen-schema-contract
 base_branch: main
 base_main: c16d180d336ba8aa9e1656807c79a44e81c15c66
 pr: 859
 created: 2026-09-02T14:44:00+02:00
-updated_at: 2026-09-02T15:03:00+02:00
+updated_at: 2026-09-03T08:08:52+02:00
 risk: medium
 execution_class: repository_only
 execution_mode: chat
@@ -26,8 +26,8 @@ context_score: 3
 estimate_confidence: high
 decomposition_decision: single
 decomposition_reason: one prompt/schema bug with one production constant and one focused regression test
-continuation_policy: continue_until_real_stop
-task_completion_policy: return_to_coordinator_for_classification
+continuation_policy: terminal
+task_completion_policy: merged_and_archived
 policy_version: 2
 runtime_access: none
 persistent_session_role: none
@@ -63,8 +63,12 @@ red_head: c4c21863dbd36f602e413ae108bd337b02cf8631
 implementation_head: 5e0cd8c44ed136f6aca5ceaa458de2ee2dc39926
 ci_boundary_head: 8e4ef537816e25db58b0c2d942c317f527b380da
 repair_cycles_for_current_gate: 1
-current_blocker: exact_head_ci_after_one_time_package_a_boundary_repair
-next_action: publish the one-time Package A repair plus final checkpoint and require fully terminal exact-head CI before classification
+current_blocker: none
+next_action: none
+ownership_released: true
+terminal_resolution: merged
+terminal_pr: 859
+terminal_merge: 27f9bdd5f003c596529e7571343ae8bb053d5cff
 ---
 
 # Objective
@@ -156,3 +160,7 @@ blockers:
   - final exact-head GitHub Actions after the one-time Package A boundary repair are pending
 next_action: push the checkpoint head and require terminal exact-head CI before coordinator classification and Wave 3 restack
 ```
+
+## Terminal closeout ? 2026-09-03T08:08:52+02:00
+
+Exact-Qwen strict schema prompt repair merged and was physically revalidated in final Wave 3. Runtime ownership is released; no credentials, login, gameplay, GUI input, process control, process-memory access, packet capture or client mutation is authorized by this archive. Physical action count remains `0`.

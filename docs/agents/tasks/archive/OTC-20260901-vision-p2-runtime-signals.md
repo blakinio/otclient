@@ -1,27 +1,27 @@
 ---
 task_id: OTC-20260901-vision-p2-runtime-signals
-status: ready
+status: completed
 agent: ChatGPT
-session_role: phase2_worker
+session_role: closeout
 worker_alias: OTC-VISION-P2-RUNTIME-SIGNALS
 programme_id: OTC-VISION-P2-READONLY
 project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: implementation
-phase: worker_post_admission_ready_for_coordinator
+phase: close
 branch: feat/OTC-20260901-vision-p2-runtime-signals
 base_branch: main
 base_main: fb0c489f2ed166e872c4f197c6a78375a8576685
 created: 2026-09-01T16:27:39+02:00
-updated_at: 2026-09-01T20:53:26+02:00
+updated_at: 2026-09-03T08:08:52+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: isolated_worker_branch
 preferred_execution: codex
 run_scope: wave_1_worker
-continuation_policy: continue_until_real_stop
-task_completion_policy: return_to_coordinator_for_classification
+continuation_policy: terminal
+task_completion_policy: merged_and_archived
 prompting_standard_version: 2.1
 policy_version: 2
 track_a_runtime_agent_admission_version: 1
@@ -66,7 +66,7 @@ depends_on:
 related_prs:
   - PR #828 Wave 1 worker Draft
 current_blocker: none
-next_action: return exact-head-green Draft PR #828 to coordinator for promotion; worker must not self-promote or merge
+next_action: none
 invocation_started_at: 2026-09-01T17:02:17+02:00
 last_progress_at: 2026-09-01T20:53:26+02:00
 ci_checks_for_current_head: 4
@@ -83,6 +83,11 @@ runtime_nonclaims:
   rfb_6082_current_backend_mapping: UNKNOWN
   current_exact_client_pid: NOT_REGISTERED
   current_exact_client_session: NOT_REGISTERED
+ownership_released: true
+terminal_resolution: superseded_by_promotion
+terminal_pr: 839
+terminal_merge: e883543403d5430d7b1d287f59043b23c98f37d6
+superseded_pr: 828
 ---
 
 # OTC-VISION-P2-RUNTIME-SIGNALS
@@ -202,3 +207,7 @@ validation:
 blockers: []
 next_action: return exact-head-green Draft PR #828 to coordinator for promotion; worker must not self-promote or merge.
 ```
+
+## Terminal closeout ? 2026-09-03T08:08:52+02:00
+
+Worker PR #828 closed unmerged; exact producer head was promoted by PR #839. Runtime ownership is released; no credentials, login, gameplay, GUI input, process control, process-memory access, packet capture or client mutation is authorized by this archive. Physical action count remains `0`.

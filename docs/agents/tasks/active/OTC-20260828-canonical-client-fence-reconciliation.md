@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260828-canonical-client-fence-reconciliation
-status: live_admission_pending_central_fence_reconciliation
+status: waiting
 agent: ChatGPT
 session_role: implementer
 project_lane: otclient
@@ -15,20 +15,20 @@ created: 2026-08-28T22:00:00+02:00
 risk: high
 execution_class: self_hosted
 execution_mode: github_actions_metadata_reconciliation
-runtime_access: canonical_recovery
-runtime_owner_task: OTC-20260828-canonical-client-fence-reconciliation
-runtime_namespace: canonical-live-runtime
-canonical_registration: PRESENT
-canonical_lease_generation: UNKNOWN
-registration_lease_generation: UNKNOWN
-gate_a: REQUIRED_NOT_PROVEN
+runtime_access: none
+runtime_owner_task: NOT_APPLICABLE
+runtime_namespace: NOT_APPLICABLE
+canonical_registration: NOT_APPLICABLE
+canonical_lease_generation: NOT_APPLICABLE
+registration_lease_generation: NOT_APPLICABLE
+gate_a: NOT_APPLICABLE
 generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
-target_uniqueness: UNKNOWN
+target_uniqueness: NOT_APPLICABLE
 mutation_authorized: false
-recovery_mode: client_fence_reconciliation_v1
-client_fence_reconciliation_contract: TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_V1
+recovery_mode: NOT_APPLICABLE
+client_fence_reconciliation_contract: NOT_APPLICABLE
 credentials_allowed: false
 login_allowed: false
 relogin_allowed: false
@@ -67,6 +67,9 @@ reuses:
   - PR #779 retry reconciliation admission
 blocks:
   - LIVE_GAME_WINDOW_STATE_CAUSAL_VALIDATION
+updated_at: 2026-09-03T08:08:52+02:00
+current_blocker: none
+next_action: future owner-authorized client-fence reconciliation must first re-admit this task through a reviewed trusted-main PR before the existing owner-gated workflow can run
 ---
 
 # Objective
@@ -195,3 +198,7 @@ target_uniqueness: NOT_APPLICABLE
 mutation_authorized: false
 recovery_mode: NOT_APPLICABLE
 ```
+
+## Post-reconciliation release ? 2026-09-03T08:08:52+02:00
+
+Trusted-main run `33683264576` reconciled the registration to the centralized current fence, proved target uniqueness, released canonical lease generation `45`, and verified the final registration as current with state `UNKNOWN`. The one-shot `canonical_recovery` admission is therefore released back to `runtime_access:none`. Future reconciliation must explicitly re-admit this task; the existing workflow remains fail-closed while dormant.

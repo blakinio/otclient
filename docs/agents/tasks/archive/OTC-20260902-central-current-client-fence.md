@@ -1,20 +1,20 @@
 ---
 task_id: OTC-20260902-central-current-client-fence
-status: validating
+status: completed
 agent: ChatGPT
-session_role: implementer
+session_role: closeout
 worker_alias: OTC-CENTRAL-CURRENT-CLIENT-FENCE
 programme_id: OTC-VISION-P2-READONLY
 project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: refactor
-phase: shared_runtime_infrastructure
+phase: close
 branch: feat/OTC-20260902-central-current-client-fence
 base_branch: main
 base_main: 30fc46ce4dbff96d2484e624a58fcd85f2a9ecad
 created: 2026-09-02T21:16:00+02:00
-updated_at: 2026-09-02T22:41:57+02:00
+updated_at: 2026-09-03T08:08:52+02:00
 risk: medium
 execution_class: repository_only
 execution_mode: chat
@@ -25,8 +25,8 @@ context_score: 5
 estimate_confidence: high
 decomposition_decision: single
 decomposition_reason: one shared exact-fence source plus existing identity consumers
-continuation_policy: continue_until_real_stop
-task_completion_policy: return_to_coordinator_for_classification
+continuation_policy: terminal
+task_completion_policy: merged_and_archived
 policy_version: 2
 invocation_started_at: 2026-09-02T22:18:00+02:00
 last_progress_at: 2026-09-02T22:41:57+02:00
@@ -70,8 +70,8 @@ physical_action_count: 0
 owner_funded_ai_api_authorized: false
 red_head: 8d0bccbdc57e1d34f164eaa48a734be7fe47d2f6
 implementation_head: 30879f705cfeaf84567356b8f90e35cb886af822
-current_blocker: pr_862_exact_head_ci_after_single_ruff_typeerror_repair_pending
-next_action: publish the TDD Ruff TRY004 repair, then require one new terminal exact-head GitHub Actions generation plus fresh independent validator jobs before Ready/merge
+current_blocker: none
+next_action: none
 owned_paths:
   - docs/agents/contracts/TRACK_A_CURRENT_CLIENT_FENCE_V1.json
   - tools/tibia_re_control_center/current_client_fence.py
@@ -106,6 +106,12 @@ owned_paths:
   - docs/agents/prompts/OTC_20260901_VISION_P2_READONLY_ALIASES.md
   - docs/agents/prompts/OTC_20260902_VISION_P2_CENTRAL_FENCE_FINALIZATION_HANDOFF_ALIAS.md
   - docs/agents/prompts/OTC_20260902_VISION_P2_CENTRAL_FENCE_FINALIZATION_HANDOFF.md
+ownership_released: true
+terminal_resolution: merged_with_followup_repair
+terminal_pr: 862
+terminal_merge: 1744b804745ab6ff0f805df908c855a97c23ca84
+followup_pr: 863
+followup_merge: 7c4941aa2ef374426ab46debb86d25346af1a986
 ---
 
 # Objective
@@ -270,3 +276,7 @@ blockers:
   - Draft PR #862 needs one new exact-head GitHub Actions generation after the isolated Ruff repair; fresh independent validator jobs on that exact head must remain green
 next_action: push the isolated Ruff repair, require terminal exact-head CI and review hygiene, merge #862 if accepted; then use only existing canonical metadata reconciliation, one fresh Surveyor admission, and the final Vision P2 live E2E
 ```
+
+## Terminal closeout ? 2026-09-03T08:08:52+02:00
+
+Central fence merged; minimal checkout-auth repair merged; canonical reconciliation and downstream live gate passed. Runtime ownership is released; no credentials, login, gameplay, GUI input, process control, process-memory access, packet capture or client mutation is authorized by this archive. Physical action count remains `0`.

@@ -1,20 +1,20 @@
 ---
 task_id: OTC-20260902-vision-p2-vision-reconciliation
-status: validating
+status: completed
 agent: ChatGPT
-session_role: phase2_worker
+session_role: closeout
 worker_alias: OTC-VISION-P2-VISION-RECONCILIATION
 programme_id: OTC-VISION-P2-READONLY
 project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: implementation
-phase: wave_2_trusted_reconciliation
+phase: close
 branch: feat/OTC-20260902-vision-p2-vision-reconciliation
 base_branch: main
 base_main: 7c4941aa2ef374426ab46debb86d25346af1a986
 created: 2026-09-02T10:46:00+02:00
-updated_at: 2026-09-03T05:24:04Z
+updated_at: 2026-09-03T08:08:52+02:00
 risk: high
 feature_scope:
   type: infrastructure
@@ -32,8 +32,8 @@ context_score: 8
 estimate_confidence: medium
 decomposition_decision: single
 decomposition_reason: one cohesive producer-consumer integration across the existing trusted composition, deterministic reconciler and session evidence path
-continuation_policy: continue_until_real_stop
-task_completion_policy: return_to_coordinator_for_classification
+continuation_policy: terminal
+task_completion_policy: merged_and_archived
 policy_version: 2
 runtime_access: none
 runtime_owner_task: NOT_APPLICABLE
@@ -83,8 +83,8 @@ depends_on:
   - lifecycle closeout PR #855 merged as main 8441fc1cce1600033b505d68ebc5c0141b337394
 blocks:
   - OTC-VISION-P2-E2E-AUDIT
-current_blocker: post_central_fence_restack_exact_head_actions_pending
-next_action: push the post-central-fence restack checkpoint and require terminal exact-head GitHub Actions before coordinator ACCEPT and Wave 3 final gate
+current_blocker: none
+next_action: none
 invocation_started_at: 2026-09-02T10:46:00+02:00
 last_progress_at: 2026-09-03T05:24:04Z
 ci_checks_for_current_head: 0
@@ -96,6 +96,10 @@ identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 0
 stall_warnings: 0
+ownership_released: true
+terminal_resolution: merged
+terminal_pr: 856
+terminal_merge: 2723dedd02634960bb3f1a04b8906e6d94157a31
 ---
 
 # OTC-VISION-P2-VISION-RECONCILIATION
@@ -241,3 +245,7 @@ blockers:
   - terminal exact-head GitHub Actions for final PR 856 head are pending
 next_action: push this checkpoint commit and require terminal exact-head GitHub Actions before coordinator ACCEPT and Wave 3 final gate
 ```
+
+## Terminal closeout ? 2026-09-03T08:08:52+02:00
+
+Trusted reconcile_vision integration merged after central-fence restack and exact-head validation. Runtime ownership is released; no credentials, login, gameplay, GUI input, process control, process-memory access, packet capture or client mutation is authorized by this archive. Physical action count remains `0`.

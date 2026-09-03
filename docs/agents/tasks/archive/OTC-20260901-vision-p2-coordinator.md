@@ -1,25 +1,25 @@
 ---
 task_id: OTC-20260901-vision-p2-coordinator
-status: implementing
+status: completed
 agent: ChatGPT
-session_role: programme_coordinator
+session_role: closeout
 worker_alias: OTC-VISION-P2-COORDINATOR
 programme_id: OTC-VISION-P2-READONLY
 project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: coordination
-phase: wave_1_mcp_direct_repair_and_integration
+phase: close
 branch: docs/OTC-20260901-vision-p2-coordinator-mcp-override
 base_branch: main
 base_main: 03f0671232d1e6e6557d6c1fbb5547660a814415
 created: 2026-09-01T15:45:26+02:00
-updated_at: 2026-09-01T23:45:00+02:00
+updated_at: 2026-09-03T08:08:52+02:00
 risk: high
 execution_mode: chat_mcp_github
 run_scope: autonomous_program
-continuation_policy: continue_until_real_stop
-task_completion_policy: finalize_archive_and_continue
+continuation_policy: terminal
+task_completion_policy: merged_and_archived
 prompting_standard_version: 2.1
 policy_version: 2
 runtime_access: none
@@ -72,8 +72,8 @@ related_prs:
   - PR #843 coordinator benchmark reconciliation checkpoint
   - PR #846 trusted-composition integration Draft
   - PR #847 coordinator Spark real-stop checkpoint
-current_blocker: EDGE_TRANSPORT_AUTH_PROOF_RFR_AND_TRUSTED_COMPOSITION_IMPLEMENTATION
-next_action: execute #829 proof-boundary repair directly through owner-authorized MCP, independently re-review it, then implement #846 trusted composition through MCP and run exact-head gates before Wave 2
+current_blocker: none
+next_action: none
 invocation_started_at: 2026-09-01T17:47:00+02:00
 last_progress_at: 2026-09-01T23:45:00+02:00
 ci_checks_for_current_head: 0
@@ -85,6 +85,10 @@ identical_failure_retries: 0
 repair_cycles_for_current_gate: 3
 context_reconstruction_attempts: 1
 stall_warnings: 0
+ownership_released: true
+terminal_resolution: programme_completed
+terminal_pr: 857
+terminal_merge: 874a86fb391834656924432921ad7c0d5b63f5d9
 ---
 
 # OTC Vision Phase 2 read-only programme coordinator
@@ -179,3 +183,7 @@ next_action: repair #829 directly through MCP, independently re-review exact hea
 | trusted composition repair | #846 Draft | scaffold `04050655d9eb0d18bf55dc2d1324b0a1bc613eeb`, CI/Track A GREEN | MCP implementation authorized; waits only for accepted #829 before replay persistence; sole integration owner |
 
 Official runtime observation remains unauthorized at this checkpoint. All Phase 2 mutation/effect authorities remain false and physical action budget/count remain `0/0`.
+
+## Terminal closeout ? 2026-09-03T08:08:52+02:00
+
+Vision P2 programme completed through merged Wave 2 PR #856 and Wave 3 PR #857. Runtime ownership is released; no credentials, login, gameplay, GUI input, process control, process-memory access, packet capture or client mutation is authorized by this archive. Physical action count remains `0`.

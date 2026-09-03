@@ -1,21 +1,21 @@
 ---
 task_id: OTC-20260902-vision-p2-e2e-audit
-status: validating
+status: completed
 agent: ChatGPT
-session_role: phase2_auditor
+session_role: closeout
 worker_alias: OTC-VISION-P2-E2E-AUDIT
 programme_id: OTC-VISION-P2-READONLY
 project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: audit
-phase: wave_3_fresh_audit_e2e
+phase: close
 branch: test/OTC-20260902-vision-p2-e2e-audit
 base_branch: main
 base_main: 2723dedd02634960bb3f1a04b8906e6d94157a31
 audited_integration_head: 9db0ae43ab5b0ce6b0c9504eec723087f13d5271
 created: 2026-09-02T11:28:36+02:00
-updated_at: 2026-09-03T07:57:19+02:00
+updated_at: 2026-09-03T08:08:52+02:00
 risk: high
 execution_class: hybrid
 execution_mode: github_plus_remote_read_only
@@ -26,8 +26,8 @@ context_score: 7
 estimate_confidence: medium
 decomposition_decision: single
 decomposition_reason: one audit owns the accepted integration generation and the remaining real edge-path evidence
-continuation_policy: continue_until_real_stop
-task_completion_policy: return_to_coordinator_for_classification
+continuation_policy: terminal
+task_completion_policy: merged_and_archived
 policy_version: 2
 implementation_authorized: false
 runtime_access: none
@@ -67,10 +67,14 @@ depends_on:
   - coordinator review #5090102633 ACCEPT
 blocks:
   - Phase 2 completion and PR #857 terminal merge
-current_blocker: exact_head_ci_and_merge_pending
-next_action: retarget PR #857 to main, require terminal exact-head CI, merge accepted exact head, then archive task and release ownership
+current_blocker: none
+next_action: none
 last_progress_at: 2026-09-03T07:57:19+02:00
 physical_action_count: 0
+ownership_released: true
+terminal_resolution: merged
+terminal_pr: 857
+terminal_merge: 874a86fb391834656924432921ad7c0d5b63f5d9
 ---
 
 # OTC-VISION-P2-E2E-AUDIT
@@ -167,3 +171,7 @@ blockers:
   - final exact-head Actions and terminal PR #857 merge lifecycle only
 next_action: retarget PR 857 to main, require terminal exact-head CI, merge accepted exact head, then archive task and release ownership
 ```
+
+## Terminal closeout ? 2026-09-03T08:08:52+02:00
+
+Final encrypted view-only capture -> exact Qwen -> reconcile_vision gate passed as UNKNOWN/runtime_current=false. Runtime ownership is released; no credentials, login, gameplay, GUI input, process control, process-memory access, packet capture or client mutation is authorized by this archive. Physical action count remains `0`.

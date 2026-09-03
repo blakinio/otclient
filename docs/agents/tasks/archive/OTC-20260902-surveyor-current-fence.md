@@ -1,21 +1,21 @@
 ---
 task_id: OTC-20260902-surveyor-current-fence
-status: validating
+status: completed
 agent: ChatGPT
-session_role: implementer
+session_role: closeout
 worker_alias: OTC-SURVEYOR-CURRENT-FENCE
 programme_id: OTC-VISION-P2-READONLY
 project_lane: otclient
 lane: RUNTIME_INFRA
 track_id: official-client-re
 task_kind: bugfix
-phase: wave_3_execution_path_repair
+phase: close
 branch: fix/OTC-20260902-surveyor-current-fence
 base_branch: main
 base_main: a7c7eb8aa2cc69d70442578401d88be9262055e4
 pr: 861
 created: 2026-09-02T20:16:06+02:00
-updated_at: 2026-09-02T20:21:35+02:00
+updated_at: 2026-09-03T08:08:52+02:00
 risk: medium
 execution_class: repository_only
 execution_mode: chat
@@ -26,8 +26,8 @@ context_score: 2
 estimate_confidence: high
 decomposition_decision: single
 decomposition_reason: one stale workflow fence plus one focused regression guard
-continuation_policy: continue_until_real_stop
-task_completion_policy: return_to_coordinator_for_classification
+continuation_policy: terminal
+task_completion_policy: merged_and_archived
 policy_version: 2
 runtime_access: none
 persistent_session_role: none
@@ -64,8 +64,12 @@ owned_paths:
   - tests/tools/tibia_re_surveyor/test_operator_semantics.py
   - docs/agents/tasks/active/OTC-20260902-surveyor-current-fence.md
   - .github/workflows/tibia-re-control-center-core.yml
-current_blocker: exact_head_ci_pending
-next_action: require terminal exact-head GitHub Actions and fresh coordinator scope review before merge
+current_blocker: none
+next_action: none
+ownership_released: true
+terminal_resolution: merged
+terminal_pr: 861
+terminal_merge: 30fc46ce4dbff96d2484e624a58fcd85f2a9ecad
 ---
 
 # Objective
@@ -147,3 +151,7 @@ blockers:
   - exact-head GitHub Actions pending
 next_action: require terminal exact-head GitHub Actions and fresh coordinator scope review before merge
 ```
+
+## Terminal closeout ? 2026-09-03T08:08:52+02:00
+
+Surveyor current-client fence repair merged and later centralization consumed the current manifest. Runtime ownership is released; no credentials, login, gameplay, GUI input, process control, process-memory access, packet capture or client mutation is authorized by this archive. Physical action count remains `0`.

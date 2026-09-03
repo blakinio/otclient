@@ -1,18 +1,18 @@
 ---
 task_id: OTC-20260903-be4f48-sendlogin-peer-metaowner
-status: investigating
+status: implementing
 agent: ChatGPT
 session_role: researcher
 project_lane: otclient
 lane: P2-NETWORK
 track_id: official-client-re
 task_kind: discovery
-phase: investigate
+phase: implementation
 branch: ai/OTC-20260903-be4f48-sendlogin-peer-metaowner
 base_branch: main
 base_main: 446eb643d6ef24dc996a410df812393e19800973
 created: 2026-09-03T19:11:13+02:00
-updated_at: 2026-09-03T19:11:13+02:00
+updated_at: 2026-09-03T19:14:15+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: chat_github
@@ -46,9 +46,9 @@ heavy_validation_runs: 0
 stale_takeover_count: 0
 human_interruptions: 0
 invocation_started_at: 2026-09-03T19:11:13+02:00
-last_progress_at: 2026-09-03T19:11:13+02:00
+last_progress_at: 2026-09-03T19:14:15+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: draft
+ci_check_generation: green-implementation
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -154,6 +154,26 @@ The exact official Linux client may be materialized only transiently inside a bo
 
 Trusted `main` is `446eb643d6ef24dc996a410df812393e19800973`. Open PR search for `be4f48` found only independent queue-drain PR #874; no open PR claims this alias or the owned paths above. Local worktree state is unavailable because the connected Remote Desktop endpoint has no device; the dedicated GitHub branch is the isolation boundary and no local filesystem state is assumed.
 
+# TDD RED evidence
+
+The repository-only contract was executed before any production analyzer existed:
+
+```text
+pr=#875
+head=df2d291073ab6c6b3a716d40639d94fad3550226
+run=33783290711
+job=100741903966
+job_conclusion=failure
+failed_step=Validate repository-only peer metaowner contract
+failure=AssertionError: peer_metaowner.py must exist
+exact-client prepare=SKIPPED
+client materialization=SKIPPED
+sanitized-result validation=SKIPPED
+artifact upload=SKIPPED
+```
+
+This is the required observed RED. Production implementation may now begin.
+
 # Acceptance
 
 Positive terminal result is legal only if static evidence uniquely proves all of:
@@ -168,47 +188,40 @@ sendlogin_causal_binding_proven=true
 terminal_result=SENDLOGIN_PEER_METAOWNER_AND_DIRECTION_PROVEN
 ```
 
-Otherwise stop at the first missing causal edge with:
-
-```text
-terminal_result=SOURCE_BLOCKER
-```
-
-No semantic signal name may be invented if Qt metadata does not uniquely provide it.
+Otherwise stop at the first missing causal edge with `terminal_result=SOURCE_BLOCKER`. No semantic signal name may be invented if Qt metadata does not uniquely provide it.
 
 # TDD / validation contract
 
-1. Create a repository-only test that fails while the production analyzer is absent.
-2. Open a Draft PR and observe that RED on the exact head before any exact-client materialization.
-3. Add the minimal bounded analyzer and make the repository contract GREEN.
-4. Run the hosted exact-current static discriminator behind the exact version/size/SHA guard.
-5. Inspect sanitized evidence; allow only evidence-derived, bounded repairs/follow-ups within the same static-metaobject/local-connection fence.
-6. Persist deterministic evidence and independently falsify any positive owner/direction claim.
-7. Run exact-head required CI/governance checks and inspect the complete diff before terminal classification.
+1. Repository-only RED observed and persisted above.
+2. Add the minimal bounded analyzer and make the repository contract GREEN.
+3. Run the hosted exact-current static discriminator behind the exact version/size/SHA guard.
+4. Inspect sanitized evidence; allow only evidence-derived, bounded repairs/follow-ups within the same static-metaobject/local-connection fence.
+5. Persist deterministic evidence and independently falsify any positive owner/direction claim.
+6. Run exact-head required CI/governance checks and inspect the complete diff before terminal classification.
 
 # Recovery checkpoint
 
 ```yaml
 recovery:
   policy_version: 1
-  generation: 1
+  generation: 2
   session_id: chatgpt-20260903T191113+0200
   session_started_at: 2026-09-03T19:11:13+02:00
-  checkpointed_at: 2026-09-03T19:11:13+02:00
-  last_progress_at: 2026-09-03T19:11:13+02:00
-  phase: investigate
-  exact_head: 446eb643d6ef24dc996a410df812393e19800973
-  pull_request: none
+  checkpointed_at: 2026-09-03T19:14:15+02:00
+  last_progress_at: 2026-09-03T19:14:15+02:00
+  phase: implementation
+  exact_head: df2d291073ab6c6b3a716d40639d94fad3550226
+  pull_request: 875
   active_operation: none
-  external_run_ids: []
-  operation_started_at: null
+  external_run_ids: [33783290711]
+  operation_started_at: 2026-09-03T19:13:35+02:00
   wait_deadline_at: null
-  check_generation: draft
-  checks_used: 0
+  check_generation: red-contract
+  checks_used: 1
   status: active
   safe_to_resume: true
-  resume_condition: dedicated branch remains uniquely owned and no overlapping PR appears
-  next_action: persist the TDD implementation plan and repository-only RED workflow/test without adding production analyzer code
+  resume_condition: RED evidence remains preserved and PR #875 remains dedicated to this task
+  next_action: add the minimal bounded peer_metaowner.py analyzer and observe the repository contract GREEN before interpreting exact-client evidence
 ```
 
-next_action: persist the TDD implementation plan and repository-only RED workflow/test without adding production analyzer code.
+next_action: add the minimal bounded `peer_metaowner.py` analyzer and observe the repository contract GREEN before interpreting exact-client evidence.

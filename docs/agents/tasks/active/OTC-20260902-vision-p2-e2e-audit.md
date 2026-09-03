@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260902-vision-p2-e2e-audit
-status: waiting
+status: validating
 agent: ChatGPT
 session_role: phase2_auditor
 worker_alias: OTC-VISION-P2-E2E-AUDIT
@@ -12,10 +12,10 @@ task_kind: audit
 phase: wave_3_fresh_audit_e2e
 branch: test/OTC-20260902-vision-p2-e2e-audit
 base_branch: feat/OTC-20260902-vision-p2-vision-reconciliation
-base_main: a7c7eb8aa2cc69d70442578401d88be9262055e4
-audited_integration_head: 2346ffb704c213f2e3050f87fc80aaa611454cd3
+base_main: 7c4941aa2ef374426ab46debb86d25346af1a986
+audited_integration_head: 9db0ae43ab5b0ce6b0c9504eec723087f13d5271
 created: 2026-09-02T11:28:36+02:00
-updated_at: 2026-09-02T19:07:04+02:00
+updated_at: 2026-09-03T07:54:46+02:00
 risk: high
 execution_class: hybrid
 execution_mode: github_plus_remote_read_only
@@ -57,19 +57,19 @@ process_memory_access_allowed: false
 physical_action_budget: 0
 physical_action_count: 0
 owner_funded_ai_api_authorized: false
-worktree: Molehill-PC:C:\Users\barte\AppData\Local\Temp\otclient-vision-p2-e2e-audit-pr857
+worktree: Molehill-PC:C:\Users\barte\otclient-pr857-finalize
 owned_paths:
   - docs/agents/tasks/active/OTC-20260902-vision-p2-e2e-audit.md
   - docs/agents/reports/OTC-20260902-vision-p2-e2e-audit.md
   - docs/agents/evidence/OTC-20260902-vision-p2-e2e-audit/**
 depends_on:
-  - PR #856 exact accepted head 34fbf6e2d693058ce03a583087816b25639e9cb3
+  - PR #856 exact accepted head 9db0ae43ab5b0ce6b0c9504eec723087f13d5271
   - coordinator review #5090102633 ACCEPT
 blocks:
-  - Phase 2 completion and merge of PR #856
-current_blocker: final_live_reconcile_waiting_synology_execution_endpoint
-next_action: when Synology execution endpoint returns, take a new exact-target preflight, durably re-admit read_only, then run exactly one trusted capture to exact-Qwen to reconcile_vision path expecting UNKNOWN with runtime_current false
-last_progress_at: 2026-09-02T16:42:26+02:00
+  - Phase 2 completion and PR #857 terminal merge
+current_blocker: exact_head_ci_and_merge_pending
+next_action: require final exact-head CI, merge accepted PR #856, retarget/finalize PR #857 on main, then archive/release ownership
+last_progress_at: 2026-09-03T07:54:46+02:00
 physical_action_count: 0
 ---
 
@@ -108,59 +108,62 @@ At this checkpoint Molehill-PC's execution endpoint is offline, so the cross-hos
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-09-02T17:07:04Z
-head: 568748c0617b1cea54d3c43b24ad9de9418ecd4d
+updated_at: 2026-09-03T07:54:46+02:00
+head: b3186d06dafffe28d6796cf1f12e0c0fe7fd6ca9
 branch: test/OTC-20260902-vision-p2-e2e-audit
 pr: 857
-status: waiting
+status: validating
 context_routes:
   - tools/tibia_re_control_center/vision_p2_trusted_composition.py
   - tools/tibia_re_control_center/agent_vision.py
   - docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
+  - docs/agents/evidence/OTC-20260902-vision-p2-e2e-audit/final-wave3-live-e2e.md
 owned_paths:
   - docs/agents/tasks/active/OTC-20260902-vision-p2-e2e-audit.md
   - docs/agents/reports/OTC-20260902-vision-p2-e2e-audit.md
   - docs/agents/evidence/OTC-20260902-vision-p2-e2e-audit/**
 proven:
-  - trusted main is a7c7eb8aa2cc69d70442578401d88be9262055e4 and accepted Wave 2 is 2346ffb704c213f2e3050f87fc80aaa611454cd3
-  - post-repair security and provenance matrix passes and admission-only guards are green
-  - real secret-safe capture exact-Qwen and authenticated Synology to Molehill edge transport gates are PASS historical evidence
-  - admission-only zero-contract authority repair is merged and permits UNKNOWN without semantic runtime evidence
-  - Molehill execution endpoint is online and task-owned Ollama process count is zero
-  - Synology NAS is LAN-reachable but its authorized Remote Desktop execution endpoint is offline
-  - existing self-hosted read-only Surveyor workflow is pinned to an obsolete client fence and is not a valid substitute
-  - existing current-fence Kasm workflow_dispatch is mutating bootstrap and is outside this auditor authority
-  - no password cookie key or secret was extracted to bypass the missing execution endpoint
-  - final post-admission capture model reconciliation run did not start after endpoint loss
-  - physical action count remains zero and direct Codex usage remains zero
+  - central client fence and metadata-only reconciliation are merged and reconciliation run 33683264576 passed with explicit lease release
+  - exactly one fresh Surveyor run 33718302097 passed on main 7c4941aa2ef374426ab46debb86d25346af1a986
+  - Surveyor proved PID 28379 start 36180734 XID 31457303 and exact current fence 15.32.be4f48 52105824 552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1
+  - PR 856 restack head 9db0ae43ab5b0ce6b0c9504eec723087f13d5271 passes focused 92 14 11 matrices Package A and exact-head Actions after one isolated hosted-browser retry
+  - PR 857 restacked conflict-free on exact Wave 2 head as b3186d06dafffe28d6796cf1f12e0c0fe7fd6ca9
+  - encrypted KasmVNC view-only framebuffer was used with no GUI input credentials login process control memory or packet capture
+  - accepted secret-safe full-mask artifact b73b2b2c6626a91f03744b76f9ba59761c5122f047cfacd4c755bb15467393bc is 762x272 and all RGB bytes are zero
+  - durable VISION_RECONCILED event proves UNKNOWN runtime_current false empty runtime evidence exact Qwen profile physical_effect false
+  - task-owned model and viewer cleanup passed resident models empty Ollama API down physical action count zero
 derived:
-  - the previous read_only observation window is closed fail-closed and runtime_access is none
-  - a new fresh Synology preflight and durable read_only admission are mandatory before final observation
+  - Phase 2 visual-only truthfully closes as UNKNOWN without manufacturing semantic runtime evidence
+  - no new edge daemon runtime-signal producer transport or subsystem is required for this gate
 unknown:
-  - next fresh exact-target identity after Synology execution endpoint reconnects
-  - final capture and exact-Qwen observation for that new window
-  - final reconcile_vision state runtime_current event persistence and closeout classification
+  - final exact-head GitHub Actions result for the evidence checkpoint generation
+  - terminal merge SHA for PR 856 and PR 857
 conflicts:
   - none
 first_failure:
-  marker: WAITING_EXECUTION_ENDPOINT
-  evidence: authorized Synology Remote Desktop execution endpoint is offline while the NAS remains network-reachable
+  marker: FINAL_HARNESS_POSTPROCESS_HELPER_MISSING
+  evidence: accepted capture Qwen and reconcile completed; only the post-result event-reader helper name was wrong and durable SQLite evidence recovered the result without another capture
 rejected_hypotheses:
-  - stale read_only admission may remain current across execution endpoint loss: rejected fail-closed
-  - obsolete Surveyor workflow may substitute for current client evidence: rejected because its embedded client fence is stale
-  - mutating Kasm bootstrap should be used merely to regain read-only access: rejected as outside audit authority
+  - stronger runtime state must be manufactured for acceptance: rejected because UNKNOWN runtime_current false is canonical expected result
+  - a new persistent capture or edge subsystem is required: rejected by real encrypted view-only capture and prior real edge transport PASS
 changed_paths:
   - docs/agents/tasks/active/OTC-20260902-vision-p2-e2e-audit.md
   - docs/agents/reports/OTC-20260902-vision-p2-e2e-audit.md
-  - docs/agents/evidence/OTC-20260902-vision-p2-e2e-audit/final-live-access-interruption.md
+  - docs/agents/evidence/OTC-20260902-vision-p2-e2e-audit/final-wave3-live-e2e.md
 validation:
-  - command: Molehill model-host cleanup and process census
+  - command: fresh Track A Surveyor v2 read-only admission
     result: PASS
-    evidence: zero Ollama or llama-server processes and task-only stale PID/log files removed
-  - command: final full trusted reconcile_vision E2E
-    result: BLOCKED
-    evidence: Synology authorized execution endpoint is offline; no final capture was started
+    evidence: GitHub run 33718302097 artifact 9879312832
+  - command: final encrypted view-only capture exact-Qwen reconcile_vision
+    result: PASS
+    evidence: VISION_RECONCILED UNKNOWN runtime_current false physical_effect false capture b73b2b2c6626a91f03744b76f9ba59761c5122f047cfacd4c755bb15467393bc
+  - command: full-mask integrity verification
+    result: PASS
+    evidence: 762x272 RGB nonzero bytes 0 max byte 0
+  - command: task-owned model and viewer cleanup
+    result: PASS
+    evidence: resident models empty task-owned PIDs stopped Ollama API down
 blockers:
-  - authorized Synology execution endpoint must reconnect before a new fresh read_only observation window can open
-next_action: on Synology endpoint reconnect perform one new exact-target preflight then durable read_only admission then exactly one full trusted capture exact-Qwen reconcile_vision run expecting UNKNOWN and runtime_current false
+  - final exact-head Actions and terminal PR merge lifecycle only
+next_action: require final exact-head CI, merge accepted PR 856, retarget PR 857 to main, finalize exact-head CI and merge, then archive tasks and release ownership
 ```

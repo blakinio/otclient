@@ -17,6 +17,15 @@ execution_class: github_hosted
 execution_mode: chat_github
 runtime_access: none
 runtime_owner_task: NOT_APPLICABLE
+runtime_namespace: NOT_APPLICABLE
+canonical_registration: NOT_APPLICABLE
+canonical_lease_generation: NOT_APPLICABLE
+registration_lease_generation: NOT_APPLICABLE
+gate_a: NOT_APPLICABLE
+generation_rebind: NOT_APPLICABLE
+gate_b: NOT_APPLICABLE
+bootstrap: NOT_APPLICABLE
+target_uniqueness: NOT_APPLICABLE
 mutation_authorized: true
 physical_e2e_required: false
 implementation_authorized: false
@@ -43,11 +52,16 @@ Static-only GitHub-hosted research. Do not execute the official client, log in, 
 
 Only rebind the exact-client fence and repair the smallest build-drift assumptions proven by failing static gates. No new architecture, subsystem, or broad refactor.
 
-# TDD gate
+# TDD evidence
 
-1. RED: copied #743 workflow remains on `75d4a0`; `test_contract.py` must fail because exact-current `be4f48` is required.
-2. GREEN: update only the exact-current fence and any minimally proven drift; contract must pass before package acquisition.
-3. Run one source-only analysis and consume only sanitized `result.json`.
+1. Fence RED: commit `96ee55ae5b0757870359050ad6932cace4220c7e`, run `33742788471`, job `100608313904` failed at contract validation before package acquisition.
+2. Fence GREEN: commit `17b1f32769570241174b74a48192a5274b00097f`, run `33742917386`, job `100608729800` succeeded on exact `be4f48`; sanitized result retained only.
+3. Exact-current result remained `PRE_SUCCESS_SEND_SEQUENCE=UNKNOWN`: direct-call BFS from current `TGameClient` roots did not reach any queue `send*`. This proves the next discriminator must target the indirect binding, not increase BFS depth.
+4. Next RED requires a minimal `sendLogin` adapter xref/binding discriminator before implementation.
+
+# Current exact boundary
+
+`TProtocolMessageQueue::sendLogin` QMeta is proven exact-current and dispatches to an adapter, while the current `TGameClient` root graph has no direct edge to that QMeta entry. Recover the exact adapter and its static RIP/direct references, preserving UNKNOWN unless a unique causal binding is proven.
 
 # Terminal outputs
 
@@ -56,4 +70,4 @@ Only rebind the exact-client fence and repair the smallest build-drift assumptio
 - `PRE_LOGIN_REQUIRED_MESSAGE_MISSING_IN_OTCLIENT=<type or NONE/UNKNOWN>`
 - `terminal_result=IMPLEMENTABLE_DELTA_PROVEN|STATIC_BOUNDARY_COMPLETE|INCONCLUSIVE`
 
-next_action: prove RED on the stale #743 fence before changing the workflow fence.
+next_action: prove RED for the missing sendLogin indirect-binding discriminator before implementing it.

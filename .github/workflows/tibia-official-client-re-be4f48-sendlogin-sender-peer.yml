@@ -28,9 +28,9 @@ jobs:
         run: |
           set -Eeuo pipefail
           python3 tools/tibia_re_be4f48_sendlogin_sender_peer/test_contract.py
-          if test -f tools/tibia_re_be4f48_sendlogin_sender_peer/peer_owner.py; then
-            python3 -m py_compile tools/tibia_re_be4f48_sendlogin_sender_peer/peer_owner.py
-          fi
+          python3 -m py_compile \
+            tools/tibia_re_be4f48_sendlogin_sender_peer/peer_owner.py \
+            tools/tibia_re_be4f48_sendlogin_sender_peer/plt_discriminator.py
           git diff --check "${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}"
 
       - name: Prepare exact public client package through WARP
@@ -111,6 +111,9 @@ jobs:
           python3 tools/tibia_re_be4f48_sendlogin_sender_peer/peer_owner.py \
             --client "$RE_ROOT/pkg/client" \
             --output artifacts/be4f48-sendlogin-sender-peer/result.json
+          python3 tools/tibia_re_be4f48_sendlogin_sender_peer/plt_discriminator.py \
+            --client "$RE_ROOT/pkg/client" \
+            --output artifacts/be4f48-sendlogin-sender-peer/followup.json
           rm -f "$RE_ROOT/pkg/client" "$RE_ROOT/pkg/client.lzma"
           echo RAW_CLIENT_RETAINED=false
 
@@ -120,20 +123,24 @@ jobs:
           set -Eeuo pipefail
           python3 - <<'PY'
           import json
-          p='artifacts/be4f48-sendlogin-sender-peer/result.json'
-          d=json.load(open(p,encoding='utf-8'))
-          assert d['runtime_access']=='none'
-          assert d['official_client_executed'] is False
-          assert d['login_performed'] is False
-          assert d['secret_access'] is False
-          assert d['raw_client_uploaded'] is False
-          assert d['exact_client']['version']=='15.32.be4f48'
-          assert d['exact_client']['size']==52105824
-          assert d['exact_client']['sha256']=='552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1'
-          assert d['peer_target']=='0xd052a0'
-          assert d['connection_helper_target']=='0x4d8670'
-          assert d['sendlogin_adapter_target']=='0xbd3050'
-          assert d['track_b_pr_284_modified'] is False
+          base='artifacts/be4f48-sendlogin-sender-peer'
+          d=json.load(open(base+'/result.json',encoding='utf-8'))
+          f=json.load(open(base+'/followup.json',encoding='utf-8'))
+          for row in (d,f):
+              assert row['runtime_access']=='none'
+              assert row['official_client_executed'] is False
+              assert row['login_performed'] is False
+              assert row['secret_access'] is False
+              assert row['raw_client_uploaded'] is False
+              assert row['exact_client']['version']=='15.32.be4f48'
+              assert row['exact_client']['size']==52105824
+              assert row['exact_client']['sha256']=='552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1'
+              assert row['peer_target']=='0xd052a0'
+              assert row['connection_helper_target']=='0x4d8670'
+              assert row['sendlogin_adapter_target']=='0xbd3050'
+              assert row['track_b_pr_284_modified'] is False
+          assert f['peer_direct_callee_target']=='0x4d7dc0'
+          assert f['terminal_result']=='SOURCE_BLOCKER'
           print('BE4F48_SENDLOGIN_SENDER_PEER_SANITIZED_RESULT=PASS')
           PY
 
@@ -141,6 +148,6 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: be4f48-sendlogin-sender-peer-${{ github.sha }}
-          path: artifacts/be4f48-sendlogin-sender-peer/result.json
+          path: artifacts/be4f48-sendlogin-sender-peer/*.json
           if-no-files-found: error
           retention-days: 3

@@ -58,12 +58,13 @@ Only rebind the exact-client fence and repair the smallest build-drift assumptio
 2. Fence GREEN: commit `17b1f32769570241174b74a48192a5274b00097f`, run `33742917386`, job `100608729800` succeeded on exact `be4f48`; sanitized result retained only.
 3. Exact-current result remained `PRE_SUCCESS_SEND_SEQUENCE=UNKNOWN`: direct-call BFS from current `TGameClient` roots did not reach any queue `send*`. This proves the next discriminator must target the indirect binding, not increase BFS depth.
 4. Adapter RED: commit `9bc619170d5e8bd74d13181effc5f86458286e8e`, run `33744487648`, job `100613732741` failed at contract validation with `sendLogin indirect binding discriminator not implemented`; all client materialization steps were skipped.
-5. First adapter implementation: commit `91095813cce1ce192b8dfb27939bf33a8ab4ef9c`, run `33748565022`, job `100626619546`, artifact `9890726629` on exact `be4f48`. The sanitized result falsified the initial bounded-method assumption: the scan crossed the first unconditional tail jump and consumed adjacent QMeta methods, yielding `UNKNOWN_MULTIPLE_EXTERNAL_DIRECT_TRANSFERS` with four candidates. This is the behavioral RED for the minimal method-boundary repair.
-6. Current GREEN requirement: stop at the first unconditional `jmp` from the exact QMeta method entry and require exactly one external direct transfer before accepting an adapter. Xrefs remain discovery only and do not establish pre-login ordering.
+5. First adapter implementation: commit `91095813cce1ce192b8dfb27939bf33a8ab4ef9c`, run `33748565022`, job `100626619546`, artifact `9890726629` on exact `be4f48`. The sanitized result falsified the initial bounded-method assumption: the scan crossed the first unconditional tail jump and consumed adjacent QMeta methods, yielding `UNKNOWN_MULTIPLE_EXTERNAL_DIRECT_TRANSFERS` with four candidates.
+6. Adapter method-boundary GREEN: commit `473be1ad313e181d27b4db76f83135165471bf8a`, run `33749268039`, job `100628816886`, artifact `9891026284`, digest `sha256:73064e958b3f856fbaa764ef1620b7f4dad59ad1087537560e6cdd2dfb81383c`. Exact-current sanitized result proves `sendLogin` QMeta target has one external tail transfer to adapter `0xbd3050`; independent exact-current writer artifact `9886703883` had already derived the same edge. The adapter has no direct-call xrefs and one unique RIP-owner FDE `0x7c6700-0x7cc933` (duplicate byte-aligned RIP detections at the same instruction are normalized as one owner).
+7. The unique adapter reference occurs inside a repeated static connection-construction block. The same bounded block contains a second executable callable and the endpoint object loads, but these values are not promoted by inspection alone. The next RED requires deriving the connection peer, endpoint displacements, and connection call target from exact-current bytes without hardcoding the observed addresses.
 
 # Current exact boundary
 
-`TProtocolMessageQueue::sendLogin` QMeta is proven exact-current, while the current `TGameClient` root graph has no direct edge to that QMeta entry. Exact-current behavioral RED proved that adjacent QMeta methods share one FDE, so a function-level bound alone is insufficient. The discriminator now uses the first unconditional tail transfer as the fail-closed method boundary, then recovers static xrefs only if that transfer is unique.
+Exact-current `TProtocolMessageQueue::sendLogin` QMeta -> adapter binding is complete and independently falsified. Causal ordering is not yet complete. The first missing edge is the unique static connection block containing the `sendLogin` adapter: identify its peer callable and map that peer against exact-current QMeta methods, fail-closed. Inherited #743 literals such as the old QObject-connect target / owner field are historical guidance only until independently re-derived from this current connection block.
 
 # Terminal outputs
 
@@ -72,4 +73,4 @@ Only rebind the exact-client fence and repair the smallest build-drift assumptio
 - `PRE_LOGIN_REQUIRED_MESSAGE_MISSING_IN_OTCLIENT=<type or NONE/UNKNOWN>`
 - `terminal_result=IMPLEMENTABLE_DELTA_PROVEN|STATIC_BOUNDARY_COMPLETE|INCONCLUSIVE`
 
-next_action: run the exact-current GREEN discriminator; if it proves a unique sendLogin adapter, inspect only its bounded static reference owners to locate the first causal pre-login binding edge.
+next_action: TDD RED for an exact-current sendLogin connection-peer discriminator; then derive the peer callable and map it against current TGameClient QMeta without hardcoded observed addresses.

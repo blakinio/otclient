@@ -8,6 +8,7 @@ auth_graph = root / 'tools/tibia_re_current_game_login_pre_success_outbound/auth
 handler_owner = root / 'tools/tibia_re_current_game_login_pre_success_outbound/handler_owner.py'
 handler_connections = root / 'tools/tibia_re_current_game_login_pre_success_outbound/handler_connections.py'
 sendlogin_binding = root / 'tools/tibia_re_current_game_login_pre_success_outbound/sendlogin_binding.py'
+sendlogin_connection = root / 'tools/tibia_re_current_game_login_pre_success_outbound/sendlogin_connection.py'
 workflow = root / '.github/workflows/tibia-official-client-re-current-game-login-pre-success-outbound.yml'
 assert probe.exists(), 'pre-success outbound probe not implemented'
 assert qmeta_runner.exists(), 'qmeta class-root regression runner not implemented'
@@ -15,6 +16,7 @@ assert auth_graph.exists(), 'auth start-game causal graph not implemented'
 assert handler_owner.exists(), 'handler owner-field census not implemented'
 assert handler_connections.exists(), 'handler connection thunk graph not implemented'
 assert sendlogin_binding.exists(), 'sendLogin indirect binding discriminator not implemented'
+assert sendlogin_connection.exists(), 'sendLogin connection peer discriminator not implemented'
 assert workflow.exists(), 'pre-success outbound workflow missing'
 text = probe.read_text(encoding='utf-8')
 runner = qmeta_runner.read_text(encoding='utf-8')
@@ -22,6 +24,7 @@ graph = auth_graph.read_text(encoding='utf-8')
 owner = handler_owner.read_text(encoding='utf-8')
 connections = handler_connections.read_text(encoding='utf-8')
 binding = sendlogin_binding.read_text(encoding='utf-8')
+connection = sendlogin_connection.read_text(encoding='utf-8')
 workflow_text = workflow.read_text(encoding='utf-8')
 for required in (
     "'runtime_access': 'none'",
@@ -64,12 +67,20 @@ assert 'rip_refs' in binding
 assert 'direct_call_refs' in binding
 assert "EXPECTED_SHA256 = '552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1'" in binding
 assert 'EXPECTED_SIZE = 52105824' in binding
+assert 'SENDLOGIN_CONNECTION_BINDING' in connection
+assert 'sendlogin_connection_binding' in connection
+assert 'tibia::client::TGameClient' in connection
+assert 'peer_qmeta_candidates' in connection
+assert "EXPECTED_SHA256 = '552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1'" in connection
+assert 'EXPECTED_SIZE = 52105824' in connection
+for stale_literal in ('0xd052a0', '0x4d6800', '0x9c0'):
+    assert stale_literal not in connection.lower(), f'connection discriminator hardcodes discovered address: {stale_literal}'
 assert "'field6_source_context'" in runner
 assert "'field6_backward_source'" in runner
 assert "'nested_source_contexts'" in runner
 assert "'producer_callsite_contexts'" in runner
 assert "'virtual_slot_0x60_callsites'" in runner
-combined = text + runner + graph + owner + connections + binding
+combined = text + runner + graph + owner + connections + binding + connection
 assert 'subprocess' not in combined
 assert 'ptrace' not in combined.lower()
 assert 'process_vm_readv' not in combined.lower()
@@ -78,9 +89,11 @@ assert "'UNPACKED_SHA':'552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d92
 assert "'UNPACKED_SIZE':'52105824'" in workflow_text
 assert "d['exact_client']['sha256']=='552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1'" in workflow_text
 assert 'python3 tools/tibia_re_current_game_login_pre_success_outbound/sendlogin_binding.py --client' in workflow_text
+assert 'python3 tools/tibia_re_current_game_login_pre_success_outbound/sendlogin_connection.py --client' in workflow_text
 assert "assert binding['classification']=='SENDLOGIN_ADAPTER_BINDING'" in workflow_text
 assert "assert binding['binding_status']=='UNIQUE_ADAPTER_DISCOVERED'" in workflow_text
 assert "assert binding['qmeta_dispatch']['classification']=='UNIQUE_EXTERNAL_DIRECT_TRANSFER'" in workflow_text
+assert "assert connection['classification']=='SENDLOGIN_CONNECTION_BINDING'" in workflow_text
 assert '15.32.75d4a0' not in workflow_text
 assert 'd1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a' not in workflow_text
 print('CURRENT_GAME_LOGIN_PRE_SUCCESS_OUTBOUND_CONTRACT=PASS')

@@ -10,37 +10,35 @@ from typing import Any
 import writer_path as base
 
 QUEUE_MEMBER_OFFSETS = set(range(0x60, 0xD0, 8))
+QUEUE_VTABLE_REF_SITES = (0xBE2A72, 0xBE3092)
 
 
 def rip_refs_to_exact_target(img: base.Image, target: int) -> list[dict[str, Any]]:
-    """Scan only for RIP-relative references to one already-proven concrete address."""
-    from capstone.x86_const import X86_OP_MEM, X86_REG_RIP
-
+    """Re-prove only the two exact-current queue-vtable refs exposed by prior sanitized evidence."""
     out: list[dict[str, Any]] = []
-    for sec in img.sections:
-        if not (sec.flags & 4) or not sec.size:
-            continue
-        blob = img.raw[sec.offset : sec.offset + sec.size]
-        for ins in img.md.disasm(blob, sec.va):
-            for op in ins.operands:
-                if op.type != X86_OP_MEM or op.mem.base != X86_REG_RIP:
-                    continue
-                resolved = int(ins.address) + int(ins.size) + int(op.mem.disp)
-                if resolved != target:
-                    continue
-                fde = img.containing_fde(int(ins.address))
-                if fde is None:
-                    continue
-                _, insns = img.fde_instructions(int(ins.address))
-                out.append(
-                    {
-                        "at": base.hx(int(ins.address)),
-                        "mnemonic": ins.mnemonic,
-                        "operand": ins.op_str,
-                        "fde": [base.hx(fde[0]), base.hx(fde[1])],
-                        "context": base.context(insns, int(ins.address), before=8, after=10),
-                    }
-                )
+    for site in QUEUE_VTABLE_REF_SITES:
+        fde = img.containing_fde(site)
+        if fde is None:
+            raise RuntimeError(f"no unique FDE for exact queue-vtable ref {base.hx(site)}")
+        _, insns = img.fde_instructions(site)
+        ins = base.one_at(insns, site)
+        if ins.mnemonic != "lea":
+            raise RuntimeError(f"expected lea at exact queue-vtable ref {base.hx(site)}")
+        resolved = base.rip_target(ins)
+        if resolved != target:
+            raise RuntimeError(
+                f"queue-vtable ref moved at {base.hx(site)}: {base.hx(resolved)} != {base.hx(target)}"
+            )
+        out.append(
+            {
+                "at": base.hx(site),
+                "mnemonic": ins.mnemonic,
+                "operand": ins.op_str,
+                "resolved_target": base.hx(resolved),
+                "fde": [base.hx(fde[0]), base.hx(fde[1])],
+                "context": base.context(insns, site, before=8, after=10),
+            }
+        )
     return out
 
 
@@ -119,7 +117,7 @@ def choose_constructor(
         "queue_vtable_refs": refs,
         "queue_executable_vslot_targets": [base.hx(x) for x in sorted(slot_targets)],
         "non_vslot_reference_fdes": [[base.hx(a), base.hx(b)] for a, b in sorted(non_vslot)],
-        "selection_rule": "unique queue-vtable RIP-reference FDE whose start is not an executable queue vslot target",
+        "selection_rule": "unique exact-seed queue-vtable reference FDE whose start is not an executable queue vslot target",
     }
     if len(non_vslot) != 1:
         return None, evidence

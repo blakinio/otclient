@@ -1,0 +1,162 @@
+name: Track A be4f48 final login writer
+
+on:
+  push:
+    branches: [research/OTC-20260903-be4f48-final-login-writer]
+    paths:
+      - '.github/workflows/tibia-official-client-re-be4f48-final-login-writer.yml'
+      - 'tools/tibia_re_be4f48_final_login_writer/**'
+      - 'docs/agents/tasks/active/OTC-20260903-be4f48-final-login-writer.md'
+      - 'docs/agents/evidence/OTC-20260903-be4f48-final-login-writer/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/tibia-official-client-re-be4f48-final-login-writer.yml'
+      - 'tools/tibia_re_be4f48_final_login_writer/**'
+      - 'docs/agents/tasks/active/OTC-20260903-be4f48-final-login-writer.md'
+      - 'docs/agents/evidence/OTC-20260903-be4f48-final-login-writer/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: be4f48-final-login-writer-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static-current-build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Validate repository contract
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 tools/tibia_re_be4f48_final_login_writer/test_contract.py
+          python3 -m py_compile tools/tibia_re_be4f48_final_login_writer/writer_path.py
+
+      - name: Prepare secret-free current official client metadata through WARP
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends curl python3-capstone python3-pyelftools
+          r="$RUNNER_TEMP/be4f48-final-writer"
+          mkdir -p "$r/bin" "$r/state" "$r/pkg"
+          trap 'rm -rf "$r"' EXIT
+          curl -fsSL -o "$r/bin/wgcf" https://github.com/ViRb3/wgcf/releases/download/v2.2.32/wgcf_2.2.32_linux_amd64
+          echo '2ff97f2201972ce582a424455d50a3719a380eef0cd1f3144f7779348e122a2c  '"$r"'/bin/wgcf' | sha256sum -c - >/dev/null
+          curl -fsSL -o "$r/bin/wireproxy.tgz" https://github.com/windtf/wireproxy/releases/download/v1.1.3/wireproxy_linux_amd64.tar.gz
+          echo 'e88c1d090740373fc606c1bafd81d9a5eadc642cce5667616e20e9d7a444f51c  '"$r"'/bin/wireproxy.tgz' | sha256sum -c - >/dev/null
+          mkdir "$r/bin/wp"
+          tar -xzf "$r/bin/wireproxy.tgz" -C "$r/bin/wp"
+          cp "$(find "$r/bin/wp" -type f -name wireproxy -print -quit)" "$r/bin/wireproxy"
+          chmod 755 "$r/bin/wgcf" "$r/bin/wireproxy"
+          cd "$r/state"
+          "$r/bin/wgcf" register --accept-tos >/dev/null
+          "$r/bin/wgcf" generate >/dev/null
+          printf 'WGConfig = %s\n\n[Socks5]\nBindAddress = 127.0.0.1:25345\n' "$r/state/wgcf-profile.conf" > wireproxy.conf
+          nohup "$r/bin/wireproxy" -c wireproxy.conf >"$r/wireproxy.log" 2>&1 </dev/null &
+          for _ in $(seq 1 30); do
+            curl --socks5-hostname 127.0.0.1:25345 -fsS --max-time 10 https://www.cloudflare.com/cdn-cgi/trace >"$r/trace" 2>/dev/null && grep -Eq '^warp=(on|plus)$' "$r/trace" && break
+            sleep 2
+          done
+          grep -Eq '^warp=(on|plus)$' "$r/trace"
+          base=https://static.tibia.com/launcher/tibiaclient-linux-current
+          curl --socks5-hostname 127.0.0.1:25345 --compressed -fL -A 'Mozilla/5.0 (X11; Linux x86_64)' -e "$base/package.json" -H 'Accept: */*' "$base/package.json" -o "$r/pkg/package.json"
+          python3 - "$r/pkg/package.json" "$GITHUB_ENV" <<'PY'
+          import json,re,sys
+          expected_version='15.32.be4f48'
+          expected_size=52105824
+          expected_sha='552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1'
+          doc=json.load(open(sys.argv[1],encoding='utf-8'))
+          version=str(doc.get('version') or '')
+          rows=[x for x in doc.get('files',[]) if isinstance(x,dict) and x.get('localfile')=='bin/client']
+          if len(rows)!=1: raise SystemExit('expected one bin/client row')
+          row=rows[0]
+          unpacked_sha=str(row.get('unpackedhash') or '').lower()
+          unpacked_size=int(row.get('unpackedsize') or 0)
+          packed_sha=str(row.get('packedhash') or '').lower()
+          packed_size=int(row.get('packedsize') or 0)
+          client_url=str(row.get('url') or '')
+          print('PUBLIC_CURRENT_VERSION='+version)
+          print('PUBLIC_CURRENT_UNPACKED_SHA256='+unpacked_sha)
+          print('PUBLIC_CURRENT_UNPACKED_SIZE='+str(unpacked_size))
+          if (version,unpacked_size,unpacked_sha)!=(expected_version,expected_size,expected_sha):
+              raise SystemExit('PUBLIC_CURRENT_FENCE_MOVED')
+          if not re.fullmatch(r'[0-9a-f]{64}',packed_sha): raise SystemExit('bad packed hash')
+          if not client_url.startswith('bin/client'): raise SystemExit('unexpected client URL')
+          values={
+            'WRITER_VERSION':version,
+            'WRITER_UNPACKED_SHA':unpacked_sha,
+            'WRITER_UNPACKED_SIZE':str(unpacked_size),
+            'WRITER_PACKED_SHA':packed_sha,
+            'WRITER_PACKED_SIZE':str(packed_size),
+            'WRITER_CLIENT_URL':client_url,
+          }
+          with open(sys.argv[2],'a',encoding='utf-8') as h:
+            for k,v in values.items(): h.write(f'{k}={v}\n')
+          print('PUBLIC_CURRENT_EXACT_FENCE=PASS')
+          PY
+          echo "WRITER_ROOT=$r" >> "$GITHUB_ENV"
+          echo "WRITER_BASE=$base" >> "$GITHUB_ENV"
+          trap - EXIT
+
+      - name: Materialize exact client transiently and run bounded static discriminator
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          trap 'rm -f "$WRITER_ROOT/pkg/client" "$WRITER_ROOT/pkg/client.lzma"' EXIT
+          curl --socks5-hostname 127.0.0.1:25345 --compressed -fL -A 'Mozilla/5.0 (X11; Linux x86_64)' -e "$WRITER_BASE/$WRITER_CLIENT_URL" -H 'Accept: */*' "$WRITER_BASE/$WRITER_CLIENT_URL" -o "$WRITER_ROOT/pkg/client.lzma"
+          echo "$WRITER_PACKED_SHA  $WRITER_ROOT/pkg/client.lzma" | sha256sum -c - >/dev/null
+          test "$(stat -c %s "$WRITER_ROOT/pkg/client.lzma")" = "$WRITER_PACKED_SIZE"
+          python3 - "$WRITER_ROOT/pkg/client.lzma" "$WRITER_ROOT/pkg/client" "$WRITER_UNPACKED_SHA" "$WRITER_UNPACKED_SIZE" <<'PY'
+          import hashlib,lzma,pathlib,sys
+          src,dst,expected_sha,expected_size=sys.argv[1:]
+          b=pathlib.Path(src).read_bytes()
+          if len(b)<45: raise SystemExit('short launcher payload')
+          prop=b[32]; lc=prop%9; z=prop//9; lp=z%5; pb=z//5; ds=int.from_bytes(b[33:37],'little')
+          raw=lzma.decompress(b[45:],format=lzma.FORMAT_RAW,filters=[{'id':lzma.FILTER_LZMA1,'dict_size':ds,'lc':lc,'lp':lp,'pb':pb}])
+          if len(raw)!=int(expected_size): raise SystemExit('unpacked size mismatch')
+          if hashlib.sha256(raw).hexdigest()!=expected_sha: raise SystemExit('unpacked hash mismatch')
+          pathlib.Path(dst).write_bytes(raw)
+          print('CURRENT_CLIENT_EXACT_FENCE=PASS')
+          PY
+          mkdir -p artifacts/be4f48-final-login-writer
+          python3 tools/tibia_re_be4f48_final_login_writer/writer_path.py \
+            --client "$WRITER_ROOT/pkg/client" \
+            --version "$WRITER_VERSION" \
+            --sha256 "$WRITER_UNPACKED_SHA" \
+            --size "$WRITER_UNPACKED_SIZE" \
+            --output artifacts/be4f48-final-login-writer/result.json
+          rm -f "$WRITER_ROOT/pkg/client" "$WRITER_ROOT/pkg/client.lzma"
+          echo RAW_CLIENT_RETAINED=false
+
+      - name: Emit sanitized source result
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          import json
+          d=json.load(open('artifacts/be4f48-final-login-writer/result.json',encoding='utf-8'))
+          print('FINAL_WRITER_TERMINAL_RESULT='+d['terminal_result'])
+          print('FINAL_WRITER_QUEUE_IDENTIFIED='+str(d['final_queue_writer_identified']).lower())
+          print('FINAL_WRITER_TCP_IDENTIFIED='+str(d['final_tcp_writer_identified']).lower())
+          print('FINAL_WRITER_FIRST_MISSING_BOUNDARY='+str(d['FIRST_MISSING_BOUNDARY']))
+          print('OFFICIAL_SERVICE_E2E_COUNT=0')
+          print('TRACK_B_PR_284_MODIFIED=false')
+          PY
+
+      - name: Upload sanitized static evidence only
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: be4f48-final-login-writer-${{ github.event.pull_request.head.sha || github.sha }}
+          path: artifacts/be4f48-final-login-writer/result.json
+          if-no-files-found: error
+          retention-days: 3

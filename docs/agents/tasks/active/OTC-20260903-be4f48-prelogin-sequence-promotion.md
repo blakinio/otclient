@@ -16,6 +16,16 @@ risk: high
 execution_class: github_hosted
 execution_mode: chat_github
 runtime_access: none
+runtime_owner_task: NOT_APPLICABLE
+runtime_namespace: NOT_APPLICABLE
+canonical_registration: NOT_APPLICABLE
+canonical_lease_generation: NOT_APPLICABLE
+registration_lease_generation: NOT_APPLICABLE
+gate_a: NOT_APPLICABLE
+generation_rebind: NOT_APPLICABLE
+gate_b: NOT_APPLICABLE
+bootstrap: NOT_APPLICABLE
+target_uniqueness: NOT_APPLICABLE
 mutation_authorized: false
 physical_e2e_required: false
 implementation_authorized: false
@@ -42,7 +52,7 @@ Promote only independently verified exact-current source facts for Linux Tibia `
 4. Record that the current connection peer does not map to `TGameClient` QMeta and that the bounded pre-success send sequence remains UNKNOWN.
 5. Record the independent exact-current writer boundary: current sendLogin QMeta/first direct edge/adapter FDE/adapter indirect calls are proven, but the final writer contract remains UNKNOWN.
 6. Explicitly keep Track B payload mutation and any new official-service E2E unauthorized from this result.
-7. Exact-head CI/governance/self-hosted boundary and full diff review must pass before merge.
+7. Exact-head required promotion CI/governance and full diff review must pass before merge; the source evidence already carries exact-head self-hosted boundary run `33756449971=SUCCESS`.
 8. After merge, close source PR #865 unmerged as consumed and archive this promotion task in a separate narrow lifecycle PR.
 
 # Source evidence
@@ -65,6 +75,10 @@ writer artifact        9886703883
 writer artifact sha256 84e88080ea862d2faf82fc169dde5f908fc5fd7a856585e434523795481fc4fa
 writer result sha256   296f5a915d15f9383fc3f1c7809eb5c6934a3deb24a9e2b9cd1808b660c40f14
 ```
+
+# Promotion validation history
+
+Initial promotion head `5e2878502292b0344d4a84959b53b903acc83e50` had main CI `33773362539=SUCCESS` and fresh admission behavior audit SUCCESS, but deterministic governance job `100708897807` failed before merge because this static/no-runtime coordinator task omitted the mandatory Track A admission metadata fields. The fix is metadata-only: all runtime authority fields are now explicitly `NOT_APPLICABLE` under `runtime_access: none`. No promoted evidence or decision changed.
 
 # Decision
 

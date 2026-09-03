@@ -43,7 +43,7 @@ jobs:
             tools/tibia_re_be4f48_final_login_writer/writer_path.py \
             tools/tibia_re_be4f48_final_login_writer/owned_callback.py
           git fetch --no-tags --depth=1 origin main
-          git diff --check FETCH_HEAD...HEAD
+          git diff --check FETCH_HEAD HEAD
 
       - name: Prepare secret-free current official client metadata through WARP
         shell: bash

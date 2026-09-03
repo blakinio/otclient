@@ -78,7 +78,9 @@ assert "'UNPACKED_SHA':'552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d92
 assert "'UNPACKED_SIZE':'52105824'" in workflow_text
 assert "d['exact_client']['sha256']=='552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1'" in workflow_text
 assert 'python3 tools/tibia_re_current_game_login_pre_success_outbound/sendlogin_binding.py --client' in workflow_text
-assert "d['sendlogin_adapter_binding']['classification']=='SENDLOGIN_ADAPTER_BINDING'" in workflow_text
+assert "assert binding['classification']=='SENDLOGIN_ADAPTER_BINDING'" in workflow_text
+assert "assert binding['binding_status']=='UNIQUE_ADAPTER_DISCOVERED'" in workflow_text
+assert "assert binding['qmeta_dispatch']['classification']=='UNIQUE_EXTERNAL_DIRECT_TRANSFER'" in workflow_text
 assert '15.32.75d4a0' not in workflow_text
 assert 'd1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a' not in workflow_text
 print('CURRENT_GAME_LOGIN_PRE_SUCCESS_OUTBOUND_CONTRACT=PASS')

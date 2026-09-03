@@ -7,6 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 ANALYZER = ROOT / "writer_path.py"
+FOLLOWUP = ROOT / "owned_callback.py"
 
 
 def load_analyzer():
@@ -42,6 +43,13 @@ def test_exact_contract() -> None:
     assert mod.parse_itanium_nested_name("not-itanium") is None
 
 
+def test_evidence_derived_followup_contract() -> None:
+    assert FOLLOWUP.is_file(), (
+        "owned_callback.py is missing: expected evidence-derived RED before the one allowed queue-owner follow-up"
+    )
+
+
 if __name__ == "__main__":
     test_exact_contract()
+    test_evidence_derived_followup_contract()
     print("BE4F48_FINAL_LOGIN_WRITER_CONTRACT=PASS")

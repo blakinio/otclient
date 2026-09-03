@@ -26,7 +26,7 @@ generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
 target_uniqueness: NOT_APPLICABLE
-mutation_authorized: true
+mutation_authorized: false
 physical_e2e_required: false
 implementation_authorized: false
 owned_paths:
@@ -57,11 +57,12 @@ Only rebind the exact-client fence and repair the smallest build-drift assumptio
 1. Fence RED: commit `96ee55ae5b0757870359050ad6932cace4220c7e`, run `33742788471`, job `100608313904` failed at contract validation before package acquisition.
 2. Fence GREEN: commit `17b1f32769570241174b74a48192a5274b00097f`, run `33742917386`, job `100608729800` succeeded on exact `be4f48`; sanitized result retained only.
 3. Exact-current result remained `PRE_SUCCESS_SEND_SEQUENCE=UNKNOWN`: direct-call BFS from current `TGameClient` roots did not reach any queue `send*`. This proves the next discriminator must target the indirect binding, not increase BFS depth.
-4. Next RED requires a minimal `sendLogin` adapter xref/binding discriminator before implementation.
+4. Adapter RED: commit `9bc619170d5e8bd74d13181effc5f86458286e8e`, run `33744487648`, job `100613732741` failed at contract validation with `sendLogin indirect binding discriminator not implemented`; all client materialization steps were skipped.
+5. GREEN implementation begins at commit `28262d9ad24905e013b0a12419af358b8b88a4a5`; exact-current workflow result is required before any source conclusion.
 
 # Current exact boundary
 
-`TProtocolMessageQueue::sendLogin` QMeta is proven exact-current and dispatches to an adapter, while the current `TGameClient` root graph has no direct edge to that QMeta entry. Recover the exact adapter and its static RIP/direct references, preserving UNKNOWN unless a unique causal binding is proven.
+`TProtocolMessageQueue::sendLogin` QMeta is proven exact-current, while the current `TGameClient` root graph has no direct edge to that QMeta entry. The bounded discriminator now recovers only the QMeta entry's direct external transfer candidate and static xrefs to a uniquely discovered adapter; xrefs alone do not prove causal pre-login ordering.
 
 # Terminal outputs
 
@@ -70,4 +71,4 @@ Only rebind the exact-client fence and repair the smallest build-drift assumptio
 - `PRE_LOGIN_REQUIRED_MESSAGE_MISSING_IN_OTCLIENT=<type or NONE/UNKNOWN>`
 - `terminal_result=IMPLEMENTABLE_DELTA_PROVEN|STATIC_BOUNDARY_COMPLETE|INCONCLUSIVE`
 
-next_action: prove RED for the missing sendLogin indirect-binding discriminator before implementing it.
+next_action: run the integrated exact-current source-only discriminator and inspect the sanitized sendLogin adapter/xref boundary; preserve UNKNOWN unless a unique causal binding is proven.

@@ -62,6 +62,8 @@ assert 'SENDLOGIN_ADAPTER_BINDING' in binding
 assert 'sendlogin_adapter_binding' in binding
 assert 'rip_refs' in binding
 assert 'direct_call_refs' in binding
+assert "EXPECTED_SHA256 = '552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1'" in binding
+assert 'EXPECTED_SIZE = 52105824' in binding
 assert "'field6_source_context'" in runner
 assert "'field6_backward_source'" in runner
 assert "'nested_source_contexts'" in runner
@@ -75,6 +77,8 @@ assert "'VERSION':'15.32.be4f48'" in workflow_text
 assert "'UNPACKED_SHA':'552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1'" in workflow_text
 assert "'UNPACKED_SIZE':'52105824'" in workflow_text
 assert "d['exact_client']['sha256']=='552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1'" in workflow_text
+assert 'python3 tools/tibia_re_current_game_login_pre_success_outbound/sendlogin_binding.py --client' in workflow_text
+assert "d['sendlogin_adapter_binding']['classification']=='SENDLOGIN_ADAPTER_BINDING'" in workflow_text
 assert '15.32.75d4a0' not in workflow_text
 assert 'd1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a' not in workflow_text
 print('CURRENT_GAME_LOGIN_PRE_SUCCESS_OUTBOUND_CONTRACT=PASS')

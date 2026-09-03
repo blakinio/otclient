@@ -50,10 +50,8 @@ def direct_dispatch_candidates(img: core.Image, target: int) -> dict:
                 })
         if row.mnemonic.startswith('ret'):
             break
-        if row.mnemonic == 'jmp' and row.operands and row.operands[0].type == core.X86_OP_IMM:
-            branch_target = int(row.operands[0].imm)
-            if fde[0] <= branch_target < fde[1]:
-                break
+        if row.mnemonic == 'jmp':
+            break
     unique_targets = sorted({int(row['target'], 16) for row in candidates})
     if len(unique_targets) == 1:
         classification = 'UNIQUE_EXTERNAL_DIRECT_TRANSFER'

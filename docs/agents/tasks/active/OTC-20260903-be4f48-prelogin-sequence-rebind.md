@@ -58,11 +58,12 @@ Only rebind the exact-client fence and repair the smallest build-drift assumptio
 2. Fence GREEN: commit `17b1f32769570241174b74a48192a5274b00097f`, run `33742917386`, job `100608729800` succeeded on exact `be4f48`; sanitized result retained only.
 3. Exact-current result remained `PRE_SUCCESS_SEND_SEQUENCE=UNKNOWN`: direct-call BFS from current `TGameClient` roots did not reach any queue `send*`. This proves the next discriminator must target the indirect binding, not increase BFS depth.
 4. Adapter RED: commit `9bc619170d5e8bd74d13181effc5f86458286e8e`, run `33744487648`, job `100613732741` failed at contract validation with `sendLogin indirect binding discriminator not implemented`; all client materialization steps were skipped.
-5. GREEN implementation begins at commit `28262d9ad24905e013b0a12419af358b8b88a4a5`; exact-current workflow result is required before any source conclusion.
+5. First adapter implementation: commit `91095813cce1ce192b8dfb27939bf33a8ab4ef9c`, run `33748565022`, job `100626619546`, artifact `9890726629` on exact `be4f48`. The sanitized result falsified the initial bounded-method assumption: the scan crossed the first unconditional tail jump and consumed adjacent QMeta methods, yielding `UNKNOWN_MULTIPLE_EXTERNAL_DIRECT_TRANSFERS` with four candidates. This is the behavioral RED for the minimal method-boundary repair.
+6. Current GREEN requirement: stop at the first unconditional `jmp` from the exact QMeta method entry and require exactly one external direct transfer before accepting an adapter. Xrefs remain discovery only and do not establish pre-login ordering.
 
 # Current exact boundary
 
-`TProtocolMessageQueue::sendLogin` QMeta is proven exact-current, while the current `TGameClient` root graph has no direct edge to that QMeta entry. The bounded discriminator now recovers only the QMeta entry's direct external transfer candidate and static xrefs to a uniquely discovered adapter; xrefs alone do not prove causal pre-login ordering.
+`TProtocolMessageQueue::sendLogin` QMeta is proven exact-current, while the current `TGameClient` root graph has no direct edge to that QMeta entry. Exact-current behavioral RED proved that adjacent QMeta methods share one FDE, so a function-level bound alone is insufficient. The discriminator now uses the first unconditional tail transfer as the fail-closed method boundary, then recovers static xrefs only if that transfer is unique.
 
 # Terminal outputs
 
@@ -71,4 +72,4 @@ Only rebind the exact-client fence and repair the smallest build-drift assumptio
 - `PRE_LOGIN_REQUIRED_MESSAGE_MISSING_IN_OTCLIENT=<type or NONE/UNKNOWN>`
 - `terminal_result=IMPLEMENTABLE_DELTA_PROVEN|STATIC_BOUNDARY_COMPLETE|INCONCLUSIVE`
 
-next_action: run the integrated exact-current source-only discriminator and inspect the sanitized sendLogin adapter/xref boundary; preserve UNKNOWN unless a unique causal binding is proven.
+next_action: run the exact-current GREEN discriminator; if it proves a unique sendLogin adapter, inspect only its bounded static reference owners to locate the first causal pre-login binding edge.

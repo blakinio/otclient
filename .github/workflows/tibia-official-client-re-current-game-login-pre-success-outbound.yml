@@ -123,9 +123,13 @@ jobs:
           assert d['auth_start_gameserver_login_graph']['classification']=='AUTH_START_GAMESERVER_LOGIN_GRAPH'
           assert d['handler_owner_field_refs']['classification']=='HANDLER_OWNER_FIELD_REF_CENSUS'
           assert d['handler_connection_thunk_graph']['classification']=='HANDLER_CONNECTION_THUNK_GRAPH'
-          assert d['sendlogin_adapter_binding']['classification']=='SENDLOGIN_ADAPTER_BINDING'
-          assert d['sendlogin_adapter_binding']['binding_status'] in ('UNIQUE_ADAPTER_DISCOVERED','UNKNOWN')
-          assert d['sendlogin_adapter_binding']['causal_binding_proven'] is False
+          binding=d['sendlogin_adapter_binding']
+          assert binding['classification']=='SENDLOGIN_ADAPTER_BINDING'
+          assert binding['binding_status']=='UNIQUE_ADAPTER_DISCOVERED'
+          assert binding['qmeta_dispatch']['classification']=='UNIQUE_EXTERNAL_DIRECT_TRANSFER'
+          assert len(binding['qmeta_dispatch']['candidates'])==1
+          assert isinstance(binding['adapter_target'], str) and binding['adapter_target'].startswith('0x')
+          assert binding['causal_binding_proven'] is False
           print('CURRENT_GAME_LOGIN_PRE_SUCCESS_SANITIZED_RESULT=PASS')
           PY
 

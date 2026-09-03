@@ -199,7 +199,7 @@ jobs:
           vision_p2_reconcile_task = 'docs/agents/tasks/active/OTC-20260902-vision-p2-vision-reconciliation.md'
           vision_p2_reconcile_report = 'docs/agents/reports/OTC-20260902-vision-p2-vision-reconciliation.md'
           vision_p2_reconcile_branch = 'feat/OTC-20260902-vision-p2-vision-reconciliation'
-          vision_p2_reconcile_base = 'a7c7eb8aa2cc69d70442578401d88be9262055e4'
+          vision_p2_reconcile_base = '7c4941aa2ef374426ab46debb86d25346af1a986'
           vision_p2_reconcile_repo = 'blakinio/otclient'
           if (
               vision_p2_reconcile_task in changed
@@ -234,6 +234,59 @@ jobs:
               and os.environ.get('HEAD_REPO') == admission_only_repo
           ):
               allowed_exact.add(admission_only_task)
+          surveyor_fence_task = 'docs/agents/tasks/active/OTC-20260902-surveyor-current-fence.md'
+          surveyor_fence_branch = 'fix/OTC-20260902-surveyor-current-fence'
+          surveyor_fence_base = 'a7c7eb8aa2cc69d70442578401d88be9262055e4'
+          surveyor_fence_repo = 'blakinio/otclient'
+          if (
+              surveyor_fence_task in changed
+              and base == surveyor_fence_base
+              and os.environ.get('HEAD_REF') == surveyor_fence_branch
+              and os.environ.get('HEAD_REPO') == surveyor_fence_repo
+          ):
+              allowed_exact |= {
+                  surveyor_fence_task,
+                  '.github/workflows/track-a-surveyor-v2-readonly.yml',
+                  'tests/tools/tibia_re_surveyor/test_operator_semantics.py',
+              }
+          central_fence_task = 'docs/agents/tasks/active/OTC-20260902-central-current-client-fence.md'
+          central_fence_branch = 'feat/OTC-20260902-central-current-client-fence'
+          central_fence_base = '30fc46ce4dbff96d2484e624a58fcd85f2a9ecad'
+          central_fence_repo = 'blakinio/otclient'
+          if (
+              central_fence_task in changed
+              and base == central_fence_base
+              and os.environ.get('HEAD_REF') == central_fence_branch
+              and os.environ.get('HEAD_REPO') == central_fence_repo
+          ):
+              allowed_exact |= {
+                  central_fence_task,
+                  '.github/scripts/test_tibia_official_client_re_canonical_client_fence_reconcile.py',
+                  '.github/scripts/test_track_a_agent_runtime_governance.py',
+                  '.github/scripts/test_track_a_canonical_current_client_fence.py',
+                  '.github/scripts/tibia-official-client-re-canonical-client-fence-reconcile.py',
+                  '.github/scripts/tibia-official-client-re-canonical-live-session.sh',
+                  '.github/scripts/tibia-official-client-re-canonical-live-transition.py',
+                  '.github/scripts/tibia-official-client-re-kasm-bootstrap-worker.py',
+                  '.github/scripts/tibia-official-client-re-kasm-existing-runtime-probe.py',
+                  '.github/workflows/track-a-canonical-client-fence-reconciliation.yml',
+                  '.github/workflows/track-a-canonical-current-client-fence.yml',
+                  '.github/workflows/track-a-canonical-live-governance.yml',
+                  '.github/workflows/track-a-kasm-canonical-bootstrap.yml',
+                  '.github/workflows/track-a-surveyor-v2-readonly.yml',
+                  'docs/agents/TIBIA_RESEARCH_TRACKS.md',
+                  'docs/agents/contracts/TRACK_A_CANONICAL_CLIENT_FENCE_RECONCILIATION_V1.md',
+                  'docs/agents/contracts/TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md',
+                  'docs/agents/contracts/TRACK_A_CURRENT_CLIENT_FENCE_V1.json',
+                  'docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md',
+                  'docs/agents/decisions/ADR-0001-track-a-canonical-live-runtime.md',
+                  'docs/agents/prompts/OTC_20260901_VISION_P2_READONLY_ALIASES.md',
+                  'docs/agents/prompts/OTC_20260902_VISION_P2_CENTRAL_FENCE_FINALIZATION_HANDOFF.md',
+                  'docs/agents/prompts/OTC_20260902_VISION_P2_CENTRAL_FENCE_FINALIZATION_HANDOFF_ALIAS.md',
+                  'docs/superpowers/plans/2026-09-02-central-current-client-fence.md',
+                  'docs/superpowers/specs/2026-09-02-central-current-client-fence-design.md',
+                  'tests/tools/tibia_re_surveyor/test_operator_semantics.py',
+              }
           unexpected = [
               path for path in changed
               if path not in allowed_exact and not path.startswith(allowed_prefixes)

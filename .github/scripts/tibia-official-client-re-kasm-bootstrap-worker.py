@@ -4,14 +4,24 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib
 import json
 import os
 import re
 import stat
 import subprocess
+import sys
 import time
 from pathlib import Path
 from typing import Any, Callable, Sequence
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+_CURRENT_FENCE_MODULE = importlib.import_module(
+    "tools.tibia_re_control_center.current_client_fence"
+)
+_CURRENT_CLIENT_FENCE = _CURRENT_FENCE_MODULE.current_client_fence()
 
 TARGET_CONTAINER = 'otclient-track-a-kasmvnc'
 TARGET_USER = 'kasm-user'
@@ -19,9 +29,9 @@ TARGET_DISPLAY = ':1'
 HOME_DIR = '/home/kasm-user'
 PACKAGE_DIR = '/home/kasm-user/.local/share/CipSoft GmbH/Tibia/packages/Tibia'
 CLIENT_PATH = PACKAGE_DIR + '/bin/client'
-VER = '15.32.be4f48'
-SIZE = 52105824
-SHA = '552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1'
+VER = _CURRENT_CLIENT_FENCE.version
+SIZE = _CURRENT_CLIENT_FENCE.size
+SHA = _CURRENT_CLIENT_FENCE.sha256
 PREFLIGHT_SCHEMA = 'otclient.track-a.kasm-bootstrap.preflight.v1'
 LAUNCH_SCHEMA = 'otclient.track-a.kasm-bootstrap.launch.v1'
 LAUNCH_METHOD = 'docker_exec_detached_direct_env'

@@ -11,6 +11,7 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from .canonical import sha256_jcs
+from .current_client_fence import current_client_fence
 from .model import (
     ValidationError,
     checked_non_negative,
@@ -21,9 +22,10 @@ from .model import (
 OBSERVATION_SCHEMA = "otclient.local-agent.runtime-observation.v1"
 ADMISSION_SCHEMA = "otclient.local-agent.runtime-admission.v1"
 PROVENANCE_SCHEMA = "otclient.local-agent.runtime-provenance.v1"
-CURRENT_CLIENT_VERSION = "15.32.be4f48"
-CURRENT_CLIENT_SIZE = 52_105_824
-CURRENT_CLIENT_SHA256 = "552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1"
+_CURRENT_CLIENT_FENCE = current_client_fence()
+CURRENT_CLIENT_VERSION = _CURRENT_CLIENT_FENCE.version
+CURRENT_CLIENT_SIZE = _CURRENT_CLIENT_FENCE.size
+CURRENT_CLIENT_SHA256 = _CURRENT_CLIENT_FENCE.sha256
 RUNTIME_PLATFORM = "official_native_linux_only"
 
 _OBSERVATION_KEYS = (

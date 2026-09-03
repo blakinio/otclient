@@ -20,8 +20,6 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  EXPECTED_SHA: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
-  EXPECTED_SIZE: '52109920'
   CONTAINER: otclient-track-a-kasmvnc
   DISPLAY_NAME: ':1'
   CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime
@@ -50,6 +48,13 @@ jobs:
         with:
           persist-credentials: false
           ref: main
+
+      - name: Load canonical current-client fence
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          PYTHONPATH=. python3 -m tools.tibia_re_control_center.current_client_fence github-env "$GITHUB_ENV" --prefix EXPECTED
+          echo CURRENT_CLIENT_FENCE_SOURCE=PASS
 
       - name: Read safe canonical control-plane metadata
         shell: bash
@@ -135,6 +140,8 @@ jobs:
           test "$size" = "$EXPECTED_SIZE"
           sha="$(docker exec "$CONTAINER" sha256sum "/proc/$target_pid/exe" | awk '{print $1}')"
           test "$sha" = "$EXPECTED_SHA"
+          version="$(docker exec "$CONTAINER" cat '/home/kasm-user/.local/share/CipSoft GmbH/Tibia/packages/Tibia/package.json.version')"
+          test "$version" = "$EXPECTED_VERSION"
           echo TARGET_EXACT_CLIENTS=1
           echo TARGET_UNIQUENESS_SCOPE=DECLARED_RUNTIME_NAMESPACE
           echo EXTERNAL_CONTAINERS_SCANNED=false
@@ -171,10 +178,10 @@ jobs:
           RUNTIME_TASK_ID: ${{ inputs.runtime_task_id }}
         run: |
           set -Eeuo pipefail
-          python3 - "$RUNNER_TEMP/control.json" "$TARGET_PID" "$TARGET_START" "$EXPECTED_SIZE" "$EXPECTED_SHA" "$DISPLAY_NAME" <<'PY'
+          python3 - "$RUNNER_TEMP/control.json" "$TARGET_PID" "$TARGET_START" "$EXPECTED_VERSION" "$EXPECTED_SIZE" "$EXPECTED_SHA" "$DISPLAY_NAME" <<'PY'
           import json, pathlib, sys
           control = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding='utf-8'))
-          pid, start, size, sha, display = int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4]), sys.argv[5], sys.argv[6]
+          pid, start, version, size, sha, display = int(sys.argv[2]), int(sys.argv[3]), sys.argv[4], int(sys.argv[5]), sys.argv[6], sys.argv[7]
           reg = control.get('registration')
           reg_state = 'ABSENT'
           reg_gen = 'UNKNOWN'
@@ -185,6 +192,7 @@ jobs:
               expected = {
                   'pid': pid,
                   'process_start_ticks': start,
+                  'client_version': version,
                   'client_size': size,
                   'client_sha256': sha,
                   'display': display,

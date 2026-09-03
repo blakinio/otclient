@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "current": {
+    "version": "15.32.be4f48",
+    "size": 52105824,
+    "sha256": "552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1"
+  },
+  "approved_history": [
+    {
+      "version": "15.32.75d4a0",
+      "size": 52105824,
+      "sha256": "d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a"
+    },
+    {
+      "version": "15.32",
+      "size": 52109920,
+      "sha256": "ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8"
+    },
+    {
+      "version": "15.32.df7b29",
+      "size": 51965216,
+      "sha256": "e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe"
+    }
+  ],
+  "current_provenance": "docs/agents/evidence/OTC-20260902-canonical-current-client-fence-be4f48/result.json"
+}

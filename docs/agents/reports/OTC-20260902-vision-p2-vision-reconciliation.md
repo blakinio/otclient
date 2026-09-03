@@ -85,3 +85,14 @@ This synchronization does not satisfy Wave 3 physical E2E. It only makes the rep
 PR #860 merged the bounded admission-only authority repair to trusted `main@a7c7eb8aa2cc69d70442578401d88be9262055e4`. Synchronizing that base into Wave 2 produced one test-only conflict. The final union preserves Wave 2 reconciliation imports and both new admission-only guards; bridge repair code entered from trusted main unchanged.
 
 Fresh local validation passes the reconciliation/edge/session/trusted-composition matrix `92/92`, runtime admission `14/14`, admission-only focused guards `2/2`, current-client fence, compile/Ruff and diff check. The Wave 2 Package A one-time exception is rebound only to the new exact base; historical Qwen and admission-only exceptions keep their original bases. The PR diff versus current main remains the same five Wave 2 integration paths. No reconciliation code repair was required. Runtime access remains `none`, physical action count `0`, direct Codex usage `0`.
+
+
+## Post-central-fence finalization synchronization — 2026-09-03
+
+Trusted main advanced through central-fence PR #862 and bounded reconciliation-auth PR #863 to 7c4941aa2ef374426ab46debb86d25346af1a986. Merging this trusted main into PR #856 produced no textual conflicts and required no production reconciliation repair. The Wave 2 one-time Package A exception is rebound only to this exact new base; all other exact historical exceptions remain unchanged.
+
+Post-merge canonical reconciliation run 33683264576 passed on synology-otclient-01: decision RECONCILE, lease generation 45, three exact-current probes PASS, target uniqueness PROVEN, final registration current with semantic state UNKNOWN, and explicit lease release. Client mutation, process-memory observation and semantic promotion were false.
+
+Fresh Surveyor v2 run 33718302097 then passed on the same trusted main for runtime task OTC-20260902-vision-p2-e2e-audit: exact current client 15.32.be4f48 / 52105824 / 552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1, PID 28379, start ticks 36180734, one PID-owned visible Tibia window, registration/lease generation 45/45, runtime_access=read_only, target uniqueness PROVEN, collector ready, structural state UNKNOWN, and runtime mutation false. Sanitized Surveyor artifact: run 33718302097, artifact 9879312832.
+
+This evidence does not itself satisfy the final Qwen/reconcile_vision physical gate; it only proves the required fresh admission and that Wave 2 remains compatible with the centralized current-client identity.

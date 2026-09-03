@@ -13,6 +13,15 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from tools.tibia_re_control_center.current_client_fence import (
+    approved_historical_fences,
+    current_client_fence,
+)
+
 SCRIPT = Path(__file__).with_name(
     "tibia-official-client-re-canonical-client-fence-reconcile.py"
 )
@@ -69,6 +78,8 @@ class Tests(unittest.TestCase):
                 "tibia-official-client-re-kasm-existing-runtime-probe.py"
             ),
         )
+        source = approved_historical_fences()[0]
+        current = current_client_fence()
         self.old = {
             "schema_version": 1,
             "runtime_id": "track-a-canonical-live",
@@ -78,9 +89,9 @@ class Tests(unittest.TestCase):
             "boot_id_sha256": "a" * 64,
             "pid": 19590,
             "process_start_ticks": 76611792,
-            "client_version": "15.32",
-            "client_size": 52109920,
-            "client_sha256": "ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8",
+            "client_version": source.version,
+            "client_size": source.size,
+            "client_sha256": source.sha256,
             "display": ":1",
             "window_identity": "x11:0x9:pid:19590:class:client/Tibia:title_sha256:" + "b" * 64,
             "remote_view_endpoint": "https://127.0.0.1:6901/",
@@ -103,9 +114,9 @@ class Tests(unittest.TestCase):
             "boot_id_sha256": "c" * 64,
             "pid": 646,
             "process_start_ticks": 1394843,
-            "client_version": "15.32.75d4a0",
-            "client_size": 52105824,
-            "client_sha256": "d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a",
+            "client_version": current.version,
+            "client_size": current.size,
+            "client_sha256": current.sha256,
             "display": ":1",
             "window_identity": "x11:0x17:pid:646:class:client/Tibia:title_sha256:" + "d" * 64,
             "remote_view_endpoint": "https://127.0.0.1:6901/",
@@ -180,6 +191,33 @@ class Tests(unittest.TestCase):
             self.m.reconcile(self.args)
         return probe
 
+    def test_reconciles_any_approved_historical_source_to_manifest_current(self):
+        history = approved_historical_fences()
+        self.assertGreaterEqual(len(history), 2)
+        source = history[-1]
+        current = current_client_fence()
+        old = dict(
+            self.old,
+            client_version=source.version,
+            client_size=source.size,
+            client_sha256=source.sha256,
+        )
+        old["candidate_fingerprint"] = fingerprint(old)
+        fresh = dict(
+            self.fresh,
+            client_version=current.version,
+            client_size=current.size,
+            client_sha256=current.sha256,
+        )
+        fresh["candidate_fingerprint"] = fingerprint(fresh)
+        self.write_registration(old)
+        self.reconcile([dict(fresh), dict(fresh), dict(fresh)])
+        data = json.loads(self.m.REG.read_text())
+        self.assertEqual(
+            (data["client_version"], data["client_size"], data["client_sha256"]),
+            current.as_tuple(),
+        )
+
     def test_reconciles_only_approved_superseded_fence_to_current_exact_target(self):
         probe = self.reconcile()
         data = json.loads(self.m.REG.read_text())
@@ -205,6 +243,15 @@ class Tests(unittest.TestCase):
         self.assertIn("RECONCILE|RECONCILE_CURRENT_IDENTITY", text)
         self.assertIn("steps.decision.outputs.decision == 'RECONCILE_CURRENT_IDENTITY'", text)
 
+    def test_live_reconciliation_retains_read_only_checkout_auth_for_live_main_guard(self):
+        text = WORKFLOW.read_text(encoding="utf-8")
+        live = text.split("  live-reconciliation:", 1)[1]
+        checkout = live.split("      - name: Deterministic pre-runtime verification", 1)[0]
+        self.assertIn("persist-credentials: true", checkout)
+        self.assertGreaterEqual(
+            live.count("git ls-remote origin refs/heads/main"),
+            3,
+        )
     def test_reconciles_stale_identity_when_source_fence_is_already_current(self):
         current = dict(
             self.old,

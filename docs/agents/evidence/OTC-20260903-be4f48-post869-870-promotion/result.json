@@ -1,0 +1,91 @@
+{
+  "schema": "otclient.track-a.be4f48-post869-870-promotion.v1",
+  "decision": "SOURCE_BLOCKER",
+  "coordinator_classification": "BLOCKED_NO_IMPLEMENTABLE_WIRE_DELTA",
+  "trusted_main": "a35bbacd475a31ce52736ccbc3b5e837626def66",
+  "exact_client": {
+    "version": "15.32.be4f48",
+    "size": 52105824,
+    "sha256": "552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1"
+  },
+  "sender_peer_source": {
+    "pr": 869,
+    "final_head": "cce4f0dc4f34eecb069f326681958e58a8e6585c",
+    "focused_run": 33778468114,
+    "ci_run": 33778468410,
+    "governance_run": 33778468111,
+    "self_hosted_boundary_run": 33778468084,
+    "artifact": 9902622204,
+    "artifact_sha256": "b820e4e9423183a8277e36d8635bd31bf0feca0edbfbd0f6ecab51e133438ae2",
+    "terminal_result": "SOURCE_BLOCKER"
+  },
+  "final_writer_source": {
+    "pr": 870,
+    "final_head": "a87904047032fcc8c20b7ac7c1aac6c43d805207",
+    "focused_run": 33779461583,
+    "ci_run": 33779461865,
+    "governance_run": 33779461528,
+    "self_hosted_boundary_run": 33779461550,
+    "artifact": 9902982410,
+    "artifact_sha256": "bc7529dab9a3ccf1c6c5356bbd14e7600dc8beae7205806416620e7c970bea3a",
+    "result_json_sha256": "509ebc4086edbd5dba5b82638079568080ca56fa480baebb33e3f354c670ad9a",
+    "terminal_result": "SOURCE_BLOCKER"
+  },
+  "accepted": {
+    "peer_target": "0xd052a0",
+    "peer_fde": ["0xd052a0", "0xd052c7"],
+    "peer_role": "QT_SIGNAL_BODY_CALLING_QMETAOBJECT_ACTIVATE",
+    "peer_qmeta_activate_target": "0x4d7dc0",
+    "peer_static_metaobject_argument": "0x30b68a0",
+    "peer_signal_index_argument": 0,
+    "promoted_helper_target": "0x4d8670",
+    "promoted_helper_role": "ALLOCATOR_OPERATOR_NEW",
+    "promoted_helper_is_qt_connection_primitive": false,
+    "serialized_queue_object_identity": "16-byte pair {object=allocation+0x10, owner=allocation} copied unchanged into TProtocolMessageQueue storage",
+    "queue_insert_vslot_target": "0xbd24a0",
+    "owned_drain_candidate_count": 1,
+    "owned_drain_candidate": "0xbd2190",
+    "owned_drain_fde": ["0xbd2190", "0xbd2495"]
+  },
+  "withheld": {
+    "peer_class_owner": "UNKNOWN",
+    "actual_qt_connection_primitive": "UNKNOWN",
+    "sender_receiver_direction": "UNKNOWN",
+    "causal_signal_to_sendlogin_binding": "NOT_PROVEN",
+    "pre_success_send_sequence": "UNKNOWN",
+    "field6_value": "UNKNOWN",
+    "queued_gameclientmessage_causal_consumption_by_0xbd2190": "NOT_PROVEN",
+    "final_queue_writer": "UNKNOWN",
+    "final_tcp_writer": "UNKNOWN",
+    "final_writer_contract": "UNKNOWN",
+    "safe_track_b_wire_delta": "NOT_PROVEN"
+  },
+  "next_source_tasks": [
+    {
+      "alias": "OTC-BE4F48-SENDLOGIN-PEER-METAOWNER",
+      "boundary": "static-metaobject 0x30b68a0 / signal index 0 -> peer class owner and actual bounded Qt connection primitive/direction"
+    },
+    {
+      "alias": "OTC-BE4F48-QUEUE-DRAIN-CONSUMPTION",
+      "boundary": "owned queue callback 0xbd2190 -> causal consumption of exact queued GameclientMessage object"
+    }
+  ],
+  "track_b": {
+    "pr": 284,
+    "modified": false,
+    "mutation_authorized": false,
+    "official_service_e2e_authorized": false,
+    "implementable_wire_delta": false
+  },
+  "safety": {
+    "runtime_access": "none",
+    "official_client_executed": false,
+    "login_performed": false,
+    "credentials_used": false,
+    "process_memory_access": false,
+    "packet_capture": false,
+    "ocr_vision_used": false,
+    "official_service_e2e_count": 0
+  },
+  "terminal_result": "SOURCE_BLOCKER"
+}

@@ -12,7 +12,7 @@ branch: research/OTC-20260904-be4f48-sendlogin-connection-owner-type
 base_branch: main
 base_main: e94e6c5764851f9cb62691d90c55f42e9c6253a1
 created: 2026-09-04T14:11:00+02:00
-updated_at: 2026-09-04T14:23:00+02:00
+updated_at: 2026-09-04T14:26:00+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: chat_github
@@ -45,11 +45,11 @@ estimate_confidence: high
 decomposition_decision: single
 decomposition_reason: one bounded exact-current connection-owner type discriminator with one static analysis workflow
 invocation_started_at: 2026-09-04T14:11:00+02:00
-last_progress_at: 2026-09-04T14:23:00+02:00
-ci_checks_for_current_head: 14
-ci_check_generation: source_terminal
+last_progress_at: 2026-09-04T14:26:00+02:00
+ci_checks_for_current_head: 0
+ci_check_generation: audit_checkpoint_pending_qualification
 terminal_ci_wait_started_at: null
-terminal_ci_checks_for_current_generation: 14
+terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
@@ -102,12 +102,18 @@ pre_success_send_sequence: UNKNOWN
 field6_value: UNKNOWN
 e2e_result: NOT_APPLICABLE
 e2e_reason: source-only static discriminator; official-client execution and official-service E2E are explicitly forbidden
-audit_result: PENDING
+audit_head: acbf446a5a883741711aa5fcdc0f3d1d91f6d93e
+audit_result: pass
 audit_independent: false
-audit_material_findings_open: PENDING
-audit_evidence: PENDING
-last_completed_step: exact-current source workflow succeeded and stopped fail-closed after the single admitted owner identity edge did not prove one exact type
-next_action: perform fresh whole-diff falsification and exact-head qualification; then clean coordinator promotion may consume this SOURCE_BLOCKER
+audit_material_findings_open: 0
+audit_evidence: docs/agents/evidence/OTC-20260904-be4f48-sendlogin-connection-owner-type/20260904-whole-diff-falsification.md
+qualification_head: PENDING
+qualification_source_run: PENDING
+qualification_ci_run: PENDING
+qualification_governance_run: PENDING
+qualification_self_hosted_boundary_run: PENDING
+last_completed_step: fresh whole-diff self-falsification found zero open material findings and preserved the fail-closed SOURCE_BLOCKER
+next_action: obtain fresh exact-head qualification checks, update the stale Draft PR lifecycle description, then hand off only to a clean coordinator promotion
 ---
 
 # Objective
@@ -155,10 +161,12 @@ Sanitized exact-current result: `docs/agents/evidence/OTC-20260904-be4f48-sendlo
 
 Source report: `docs/agents/evidence/OTC-20260904-be4f48-sendlogin-connection-owner-type/20260904-source-result.md`.
 
+Whole-diff falsification: `docs/agents/evidence/OTC-20260904-be4f48-sendlogin-connection-owner-type/20260904-whole-diff-falsification.md`.
+
 # Safety
 
 Source-only static analysis. No official-client execution, login, credential/session/cookie/character/world access, process-memory access, packet capture, OCR/Vision, official-service E2E, runtime Field6 observation, queue/QSlot/writer work, Track B mutation, guessed Field6 value or guessed pre-success order.
 
 # Lifecycle
 
-This source task is scientifically terminal and ready for falsification/qualification and then clean coordinator consumption. PR #889 remains Draft and must not self-merge. Track B PR #284 remains untouched.
+This source task is scientifically terminal. Whole-diff self-falsification has zero open material findings. The exact audit-checkpoint head still requires fresh PR qualification checks before clean coordinator consumption. PR #889 remains Draft and must not self-merge. Track B PR #284 remains untouched.

@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260904-be4f48-post911-promotion
-status: validating
+status: completed
 agent: Codex
 session_id: login-closure-20260904-ae070f034ee4
 session_role: coordinator
@@ -8,7 +8,7 @@ project_lane: otclient
 lane: P2-NETWORK
 track_id: official-client-re
 task_kind: integration
-phase: validate
+phase: archive
 branch: docs/OTC-20260904-be4f48-post911-promotion
 base_branch: main
 base_main: 7b197b9cbe9a3d7635c1266a3539748749bb720b
@@ -80,8 +80,8 @@ depends_on: []
 blocks:
   - clean coordinator consumption of this exact source result
 cross_repository_task_ids: []
-ownership_released: false
-next_action: clean promotion exact-head audit/checks, squash then source close unmerged and separatearchive
+ownership_released: true
+next_action: ownership released; register bounded continuation successor separately after archive merge
 ---
 
 
@@ -119,3 +119,40 @@ Final focused33929723341/job101205693927; CI33929723527; governance33929723350; 
 Merge clean promotion after exact-head gates and0findings; close911 unmerged as consumed; separatearchive moves coordinator task and explicitly imports historical source record, ownership_released:true. Only after archive register one exact continuation-semantic successor, preferentially first exit0x1d36fb ->0xc6c16. Do not automatically include secondexit0xc6c5c, privatecallee0x1cd220 or queuecallee0xdd8df0 in that source task. This task-local blocker does not establish static-proof exhaustion or programme success.
 
 runtime_access=none; official_client_executed=false;login_performed=false;credentials_used=false;process_memory_access=false;packet_capture=false;ocr_vision_used=false;official_service_e2e_count=0;track_b_pr_284_modified=false.
+
+## Archive closeout
+
+Promotion #912 merged at a2ae1be0f0fc5eeca5bb1200ea3e3ff50637b763. Source #911 exact head a79b6115b9b0f6ebe4b766966c7d7cc11a74392d closed unmerged as consumed. This archive releases ownership; no new source is registered here.
+
+## Programme handoff at next-source admission boundary
+
+```yaml
+invocation_result: ROTATE
+checkpoint_status: ready
+invocation_started_at: 2026-09-04T22:06:00Z
+last_progress_at: 2026-09-04T23:41:00Z
+foreground_runtime_budget_minutes: 120
+elapsed_minutes_at_checkpoint: 95
+remaining_minutes_at_checkpoint: 25
+minimum_remaining_minutes_to_start_additional_task: 30
+max_additional_tasks_after_terminal_entry_task: 4
+additional_source_tasks_started: 2
+budget_reset: false
+runtime_budget_extended: false
+next_action: In a fresh invocation, refresh live authority and register one exact QtCore 0x1d36fb to 0xc6c16 continuation-semantic successor after this archive merge.
+```
+
+The separate archive is required lifecycle closeout. No new source is admitted in this invocation. Anti-Stall and Execution Budget Contract 2.1 requires the 30-minute admission minimum and a durable handoff when it is not met. The recorded task-count extension did not enlarge the original 120-minute runtime. This is not a programme-level AUTHORITY_BLOCKER, STATIC_PROOF_EXHAUSTED or success. Static continuation, private-callee and queue-index semantic classes remain available subject to fresh bounded selection; never relaunch a consumed scan. No successor alias or source ownership is created here.
+
+Next selected proof is only the exact first out-of-FDE continuation 0x1d36fb -> 0xc6c16 in the pinned packaged QtCore. Prove containing bounded code ownership/first semantic edge without assuming a separate function or runtime-loaded identity. Do not automatically include exit0xc6c5c, privatecallee0x1cd220 or queuecallee0xdd8df0. Exact client and QtCore fences from promotion912 must be freshly verified.
+
+### Invocation ledger
+
+| Source / registration | Clean promotion | Separate archive | Merge authority |
+|---|---|---|---|
+| Source904 closed unmerged, head191a8ff86f1b354d313a95e6901e9c7abcd389d8 | 905 | 906 | promotion e050f3c21a996607eaf94d5058055316da5b8fbc; archive6439ec169ae6e0dfe8b3893dc136c752001949eb |
+| Source907 closed unmerged, head08505bec88fd162cbf7de4c3483a869ec3a08f64 | 908 | 909 | promotion29a7d602ef4402ae543c712dc82cea8fe3760fe4; archive29529465d5b0a74e830974008742f817aa0fa3a0 |
+| Registration910 | not applicable | alias retired here | 7b197b9cbe9a3d7635c1266a3539748749bb720b |
+| Source911 closed unmerged, heada79b6115b9b0f6ebe4b766966c7d7cc11a74392d | 912 | this archive913 | promotiona2ae1be0f0fc5eeca5bb1200ea3e3ff50637b763; resolve archive merge from live GitHub |
+
+Track B284 remains Draft at62383aded3acbeb5f405a12fe1f93849cd8e35f9. SENDLOGIN_RECEIVER=UNKNOWN; SENDLOGIN_CAUSAL_BINDING=NOT_PROVEN; FINAL_QUEUE_WRITER=UNKNOWN; FINAL_TCP_WRITER=UNKNOWN; FINAL_WRITER_CONTRACT=UNKNOWN; FIELD6_VALUE=UNKNOWN; PRE_SUCCESS_SEND_SEQUENCE=UNKNOWN; TRACK_B_CURRENT_WIRE_DELTA=NOT_PROVEN; OFFICIAL_SERVICE_E2E_COUNT=0; FINAL_LOGIN_RESULT=NOT_PROVEN. Latest scientific missing boundary is EXACT_QT_CONNECTIMPL_OUT_OF_FDE_CONTINUATION_SEMANTICS_NOT_PROVEN.

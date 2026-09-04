@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260904-be4f48-sendlogin-owner-edge-7e8f30-identity
-status: implementing
+status: waiting
 agent: ChatGPT
 session_role: researcher
 project_lane: otclient
@@ -12,7 +12,7 @@ branch: research/OTC-20260904-be4f48-sendlogin-owner-edge-7e8f30-identity
 base_branch: main
 base_main: 7e67c67783b19575ec7f378c7be49cb69d87f1ce
 created: 2026-09-04T15:44:00+02:00
-updated_at: 2026-09-04T15:44:00+02:00
+updated_at: 2026-09-04T15:47:00+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: chat_github
@@ -45,12 +45,12 @@ estimate_confidence: high
 decomposition_decision: single
 decomposition_reason: one exact-current callee-local owner identity discriminator with one static analysis workflow
 invocation_started_at: 2026-09-04T15:37:00+02:00
-last_progress_at: 2026-09-04T15:44:00+02:00
-ci_checks_for_current_head: 0
+last_progress_at: 2026-09-04T15:45:26+02:00
+ci_checks_for_current_head: 2
 ci_check_generation: red_contract
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
-unchanged_state_checks: 0
+unchanged_state_checks: 1
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 0
@@ -69,10 +69,10 @@ reuses:
 depends_on: []
 blocks:
   - clean coordinator promotion before any Track B decision
-red_head: PENDING
-red_run: PENDING
+red_head: 098a143abce3008d30d5c8ca0209695ccf6621a7
+red_run: 33879840472
 red_job: PENDING
-red_result: PENDING
+red_result: PENDING_WORKFLOW_COMPLETION
 red_first_error: PENDING
 tdd_red_verified: false
 green_implementation_commit: PENDING
@@ -96,28 +96,28 @@ pre_success_send_sequence: UNKNOWN
 field6_value: UNKNOWN
 e2e_result: NOT_APPLICABLE
 e2e_reason: source-only static discriminator; official-client execution and official-service E2E are explicitly forbidden
-last_completed_step: claimed non-overlapping exact-callee source task from trusted main
-next_action: publish repository-only RED contract and verify it fails because edge_identity.py is missing before any client materialization
+last_completed_step: branch, task, RED contract and Draft PR #894 were published; first two aggregate observations saw RED run 33879840472 progress from queued to in_progress
+next_action: inspect completed RED workflow run for the expected missing edge_identity.py failure and prove WARP/client materialization was skipped; only then implement the analyzer
 recovery:
   policy_version: 1
   generation: 1
   session_id: chat-github-20260904T153700+0200
   session_started_at: 2026-09-04T15:37:00+02:00
-  checkpointed_at: 2026-09-04T15:44:00+02:00
-  last_progress_at: 2026-09-04T15:44:00+02:00
+  checkpointed_at: 2026-09-04T15:47:00+02:00
+  last_progress_at: 2026-09-04T15:45:26+02:00
   phase: implement
-  exact_head: PENDING
-  pull_request: none
-  active_operation: repository-only RED workflow preparation
-  external_run_ids: []
-  operation_started_at: null
+  exact_head: 098a143abce3008d30d5c8ca0209695ccf6621a7
+  pull_request: 894
+  active_operation: repository-only RED workflow run 33879840472
+  external_run_ids: [33879840472, 33879840469, 33879840434, 33879840754]
+  operation_started_at: 2026-09-04T15:45:26+02:00
   wait_deadline_at: null
   check_generation: red_contract
-  checks_used: 0
-  status: active
+  checks_used: 2
+  status: waiting
   safe_to_resume: true
-  resume_condition: branch contains task record plus RED contract/workflow
-  next_action: create RED contract and workflow, open Draft PR, then inspect first workflow run for the expected missing-analyzer failure
+  resume_condition: RED workflow 33879840472 reaches a terminal conclusion
+  next_action: inspect run 33879840472 and its failed job/log; require the missing-analyzer assertion and skipped materialization before adding edge_identity.py
 ---
 
 # Objective

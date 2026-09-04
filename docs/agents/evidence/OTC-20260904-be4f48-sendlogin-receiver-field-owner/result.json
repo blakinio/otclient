@@ -1,0 +1,51 @@
+{
+  "schema": "otclient.track-a.be4f48-sendlogin-receiver-field-owner.source-result.v1",
+  "source_pr": 884,
+  "source_head": "29d30b7de6a59bfa0a40c619abfbf3f3061692e1",
+  "source_merge_ref_sha": "d239e42d62b1a778873cd4e2df58b7478528307c",
+  "tdd_red": {
+    "run": 33865752388,
+    "job": 101000116304,
+    "result": "EXPECTED_FAILURE_BEFORE_CLIENT_MATERIALIZATION",
+    "first_error": "AssertionError: receiver_field_owner.py is missing: expected RED before client materialization"
+  },
+  "exact_source_run": 33866338005,
+  "exact_source_job": 101001945445,
+  "artifact_id": 9934120718,
+  "artifact_digest": "sha256:2a8313249628076f1daef8766ac07ae6adf4fdc72e5f232f6b955ceaa4b62614",
+  "ci_run": 33866338387,
+  "governance_run": 33866337998,
+  "self_hosted_boundary_run": 33866338017,
+  "exact_client": {
+    "version": "15.32.be4f48",
+    "size": 52105824,
+    "sha256": "552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1"
+  },
+  "receiver_field_provenance": "OBJECT_FIELD:[entry-rdi-derived-rbx+0x88]",
+  "receiver_field_definition_site": "UNKNOWN",
+  "receiver_owner_chain": "UNKNOWN",
+  "receiver_endpoint_identity": "UNKNOWN",
+  "receiver_identity_proven": false,
+  "receiver_identity_proof_classes": [],
+  "bounded_trace": {
+    "proven": false,
+    "callers": [],
+    "missing": "CONNECTION_OWNER_FDE_DIRECT_CALLER_NOT_UNIQUE"
+  },
+  "complete_sender_receiver_pair_proven": false,
+  "sendlogin_causal_binding_proven": false,
+  "pre_success_send_sequence": "UNKNOWN",
+  "field6_value": "UNKNOWN",
+  "runtime_access": "none",
+  "official_client_executed": false,
+  "login_performed": false,
+  "credentials_used": false,
+  "process_memory_access": false,
+  "packet_capture": false,
+  "ocr_vision_used": false,
+  "official_service_e2e_count": 0,
+  "track_b_pr_284_modified": false,
+  "terminal_result": "SOURCE_BLOCKER",
+  "FIRST_MISSING_BOUNDARY": "CONNECTION_OWNER_FDE_DIRECT_CALLER_NOT_UNIQUE",
+  "next_action": "clean coordinator promotion after the parallel queue-signal QSlot source lane reaches its own terminal durable state"
+}

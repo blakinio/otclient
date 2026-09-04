@@ -1,0 +1,92 @@
+{
+  "schema": "otclient.track-a.be4f48-post879-880-promotion.v1",
+  "decision": "SOURCE_BLOCKER",
+  "integration_status": "BLOCKED_NO_IMPLEMENTABLE_WIRE_DELTA",
+  "trusted_main": "f7a471c2cc7ab7fd53afacc8a7458eeefb96ad97",
+  "exact_client": {
+    "version": "15.32.be4f48",
+    "size": 52105824,
+    "sha256": "552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1"
+  },
+  "source_879": {
+    "pr": 879,
+    "final_source_head": "7bbbc1f1e5c02f31a71999333ba5423649e3d94a",
+    "analysis_head": "12070c649dd2e5e1f237fd524a3c48e7ca8375a0",
+    "analysis_run": 33854810739,
+    "analysis_job": 100965538997,
+    "artifact_id": 9929762469,
+    "artifact_digest": "sha256:eb9212da7acc41e0d67fc7c6a85740c846ac961faddf2ea0e79c49cdd684fd72",
+    "final_focused_run": 33856163340,
+    "final_ci_run": 33856163561,
+    "final_governance_run": 33856163288,
+    "final_self_hosted_boundary_run": 33856163258,
+    "terminal_result": "SOURCE_BLOCKER",
+    "first_missing_boundary": "RECEIVER_FIELD_DEFINITION_OUTSIDE_SELECTED_CONNECTION_OWNER_FDE"
+  },
+  "source_880": {
+    "pr": 880,
+    "final_source_head": "2b640340864c599851c07f9e31564a5644b8628d",
+    "analysis_head": "b2dd0fac6c58c325b93566c3f150e86e807ae208",
+    "analysis_run": 33856767530,
+    "analysis_job": 100971771959,
+    "artifact_id": 9930504401,
+    "artifact_digest": "sha256:0eae231ded57a47aa7ea2dfa37339b2a2e465a0e1b031e618e95dccd04da8f6f",
+    "final_focused_run": 33857039832,
+    "final_ci_run": 33857040196,
+    "final_governance_run": 33857039745,
+    "final_self_hosted_boundary_run": 33857039810,
+    "terminal_result": "SOURCE_BLOCKER",
+    "first_missing_boundary": "QUEUE_SIGNAL_BF_QSLOT_FUNCTION_NOT_UNIQUELY_PROVEN"
+  },
+  "promoted_facts": {
+    "sendlogin_sender_identity": "tibia::authentication::TLoginProtocolMessageHandler",
+    "sendlogin_signal": "sendLoginMessage",
+    "sendlogin_connectimpl_callsite": "0x7c6b9f",
+    "sendlogin_adapter_target": "0xbd3050",
+    "sendlogin_receiver_provenance": "OBJECT_FIELD:[entry-rdi-derived-rbx+0x88]",
+    "sendlogin_receiver_field_read_count_in_selected_fde": 165,
+    "sendlogin_receiver_field_write_count_in_selected_fde": 0,
+    "sendlogin_receiver_identity": "UNKNOWN",
+    "sendlogin_causal_binding_proven": false,
+    "queue_drain_causal_consumption": true,
+    "queue_sender_identity": "tibia::protocol::TProtocolMessageQueue",
+    "queue_signal_index": 191,
+    "queue_signal_index_hex": "0xbf",
+    "queue_signal_name": "clientMessageReadyToProcess",
+    "queue_signal_body": "0xbd2190",
+    "queue_signal_static_metaobject": "0x30b73e0",
+    "queue_signal_static_metaobject_argument_proven": true,
+    "queue_signal_connectimpl_candidate_count": 1,
+    "queue_signal_connectimpl_callsite": "0xbe2eee",
+    "queue_signal_connectimpl_fde": ["0xbe2a50", "0xbe3086"],
+    "queue_signal_receiver_provenance": "ENTRY_ARG:rdi",
+    "queue_signal_slot_identity": "UNKNOWN",
+    "queue_signal_writer_identity": "UNKNOWN"
+  },
+  "withheld": {
+    "sendlogin_receiver_class_identity": "UNKNOWN",
+    "complete_sendlogin_sender_receiver_pair": "NOT_PROVEN",
+    "pre_success_send_sequence": "UNKNOWN",
+    "field6_value": "UNKNOWN",
+    "queue_signal_qslot_function": "UNKNOWN",
+    "final_queue_writer": "UNKNOWN",
+    "final_tcp_writer": "UNKNOWN",
+    "final_writer_contract": "UNKNOWN",
+    "track_b_current_wire_delta": "NOT_PROVEN"
+  },
+  "next_source_boundaries": [
+    "OTC-BE4F48-SENDLOGIN-RECEIVER-FIELD-OWNER",
+    "OTC-BE4F48-QUEUE-SIGNAL-BF-QSLOT-IDENTITY"
+  ],
+  "safety": {
+    "runtime_access": "none",
+    "official_client_executed": false,
+    "login_performed": false,
+    "credentials_used": false,
+    "process_memory_access": false,
+    "packet_capture": false,
+    "ocr_vision_used": false,
+    "official_service_e2e_count": 0,
+    "track_b_pr_284_modified": false
+  }
+}

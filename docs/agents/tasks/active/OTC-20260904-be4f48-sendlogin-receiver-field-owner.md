@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260904-be4f48-sendlogin-receiver-field-owner
-status: validating
+status: waiting
 agent: ChatGPT
 session_role: researcher
 project_lane: otclient
@@ -12,7 +12,7 @@ branch: research/OTC-20260904-be4f48-sendlogin-receiver-field-owner
 base_branch: main
 base_main: e24462d72942d8381e1a468de84f16b60f1aa8c9
 created: 2026-09-04T12:52:00+02:00
-updated_at: 2026-09-04T13:05:00+02:00
+updated_at: 2026-09-04T13:06:00+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: chat_github
@@ -37,12 +37,12 @@ estimate_confidence: medium
 decomposition_decision: single
 decomposition_reason: one bounded static field-owner discriminator with one exact-current analysis workflow
 invocation_started_at: 2026-09-04T12:52:00+02:00
-last_progress_at: 2026-09-04T13:05:00+02:00
-ci_checks_for_current_head: 1
+last_progress_at: 2026-09-04T13:06:00+02:00
+ci_checks_for_current_head: 2
 ci_check_generation: draft
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
-unchanged_state_checks: 1
+unchanged_state_checks: 2
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 0
@@ -66,9 +66,18 @@ red_job: 101000116304
 red_result: expected_failure_before_client_materialization
 red_first_error: "AssertionError: receiver_field_owner.py is missing: expected RED before client materialization"
 tdd_red_verified: true
-green_attempt_head: bb39f99c8188ec5166eb95b868cfcecfcd9951bf
-last_completed_step: verified repository-only RED from job 101000116304, then added the minimal bounded exact-current field-owner analyzer
-next_action: inspect the focused source workflow on the current GREEN-attempt head; use its sanitized exact-current result to terminalize or make one evidence-based analyzer repair
+green_implementation_commit: bb39f99c8188ec5166eb95b868cfcecfcd9951bf
+source_wait_head: a5488f205f81a59c7c174784446d2f1104667de0
+source_run: 33866269803
+source_run_state: queued
+ci_run: 33866270555
+ci_run_state: pending
+governance_run: 33866269897
+governance_result: success
+self_hosted_boundary_run: 33866269877
+self_hosted_boundary_result: success
+last_completed_step: verified RED and implemented the bounded analyzer; governance and self-hosted boundary passed while the exact-current source discriminator remained queued after the two ordinary observations allowed for head a5488f205f81a59c7c174784446d2f1104667de0
+next_action: on continuation inspect source run 33866269803 first; if terminal, read its exact job result/artifact and either persist the scientific terminal result or make one evidence-based analyzer repair
 ---
 
 # Objective
@@ -103,11 +112,13 @@ receiver_endpoint_identity=UNKNOWN
 FIRST_MISSING_BOUNDARY=RECEIVER_FIELD_DEFINITION_OUTSIDE_SELECTED_CONNECTION_OWNER_FDE
 ```
 
-# TDD state
+# TDD / implementation state
 
-Repository-only RED is verified on head `e9e20394fc28bb5caa4332b0baf4458ef1445c9a`: workflow run `33865752388`, job `101000116304`, failed in the first contract step because `receiver_field_owner.py` was deliberately absent. WARP preparation, exact-client materialization, analysis and artifact upload were all skipped. Only after that expected RED was observed, the bounded analyzer was added on head `bb39f99c8188ec5166eb95b868cfcecfcd9951bf`.
+Repository-only RED is verified on head `e9e20394fc28bb5caa4332b0baf4458ef1445c9a`: workflow run `33865752388`, job `101000116304`, failed in the first contract step because `receiver_field_owner.py` was deliberately absent. WARP preparation, exact-client materialization, analysis and artifact upload were all skipped. Only after that expected RED was observed, the bounded analyzer was added in commit `bb39f99c8188ec5166eb95b868cfcecfcd9951bf`.
 
-The GREEN attempt performs only the target-specific direct-caller xref for the promoted connection-owner FDE, inspects only the resulting unique caller FDE, binds a `+0x88` member store to the exact owner argument, and follows only constructor calls fed by that exact stored object. A positive identity requires both a unique bound field-store/constructor chain and matching primary-vptr Itanium RTTI.
+The analyzer performs only the target-specific direct-caller xref for the promoted connection-owner FDE, inspects only the resulting unique caller FDE, binds a `+0x88` member store to the exact owner argument, and follows only constructor calls fed by that exact stored object. A positive identity requires both a unique bound field-store/constructor chain and matching primary-vptr Itanium RTTI.
+
+On exact head `a5488f205f81a59c7c174784446d2f1104667de0`, Track A governance run `33866269897` and self-hosted PR boundary run `33866269877` passed. Focused exact-current source run `33866269803` remained queued and repository CI run `33866270555` remained pending after the two ordinary observations permitted for that exact head, so this session stops rather than polling again.
 
 # Safety
 

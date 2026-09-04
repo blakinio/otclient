@@ -16,6 +16,7 @@ def main() -> None:
         "CONNECTIMPL_CALLSITE = 0x7C6B9F",
         "RECEIVER_FIELD_OFFSET = 0x88",
         "ADAPTER_TARGET = 0xBD3050",
+        'OBJECT_TIED_THIS_REGISTER = "rdi"',
         "def resolve_receiver_argument(",
         "def classify_receiver_field_value_use(",
         "def find_unique_object_tied_type_edge(",
@@ -44,9 +45,10 @@ def main() -> None:
         "OWNER_EDGE_CALLEE",
         "receiver_field_refs",
         "executable_ranges",
+        "for reg in ARG_REGS",
     )
     for token in forbidden:
-        assert token not in text, f"consumed/global proof mode must not be reintroduced: {token}"
+        assert token not in text, f"consumed/global or non-this proof mode must not be reintroduced: {token}"
 
     workflow = WORKFLOW.read_text(encoding="utf-8")
     assert "receiver_field_use_semantics.py" in workflow, "workflow must execute receiver_field_use_semantics.py"

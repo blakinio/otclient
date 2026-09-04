@@ -12,21 +12,11 @@ branch: research/OTC-20260904-be4f48-sendlogin-owner-edge-7e8f30-identity
 base_branch: main
 base_main: 7e67c67783b19575ec7f378c7be49cb69d87f1ce
 created: 2026-09-04T15:44:00+02:00
-updated_at: 2026-09-04T15:58:00+02:00
+updated_at: 2026-09-04T15:59:00+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: chat_github
 runtime_access: none
-runtime_owner_task: NOT_APPLICABLE
-runtime_namespace: NOT_APPLICABLE
-canonical_registration: NOT_APPLICABLE
-canonical_lease_generation: NOT_APPLICABLE
-registration_lease_generation: NOT_APPLICABLE
-gate_a: NOT_APPLICABLE
-generation_rebind: NOT_APPLICABLE
-gate_b: NOT_APPLICABLE
-bootstrap: NOT_APPLICABLE
-target_uniqueness: NOT_APPLICABLE
 mutation_authorized: false
 physical_e2e_required: false
 implementation_authorized: true
@@ -44,17 +34,6 @@ context_score: 7
 estimate_confidence: high
 decomposition_decision: single
 decomposition_reason: one exact-current callee-local owner identity discriminator with one static analysis workflow
-invocation_started_at: 2026-09-04T15:37:00+02:00
-last_progress_at: 2026-09-04T15:58:00+02:00
-ci_checks_for_current_head: 0
-ci_check_generation: final_qualification
-terminal_ci_wait_started_at: null
-terminal_ci_checks_for_current_generation: 0
-unchanged_state_checks: 0
-identical_failure_retries: 0
-repair_cycles_for_current_gate: 0
-context_reconstruction_attempts: 0
-stall_warnings: 0
 owned_paths:
   - .github/workflows/tibia-official-client-re-be4f48-sendlogin-owner-edge-7e8f30-identity.yml
   - tools/tibia_re_be4f48_sendlogin_owner_edge_7e8f30_identity/**
@@ -68,7 +47,7 @@ reuses:
   - closed source PR #889 only as consumed sanitized evidence and generic analyzer/workflow pattern; its owner-FDE scan is not repeated
 depends_on: []
 blocks:
-  - clean coordinator promotion before any new Track A step or Track B decision
+  - clean coordinator consumption before any newly admitted Track A step or Track B decision
 red_head: 684e301ada1feef6590fc59b3375a19c547f16a8
 red_run: 33879930241
 red_job: 101045813815
@@ -102,40 +81,43 @@ audit_result: pass
 audit_independent: false
 audit_material_findings_open: 0
 audit_evidence: docs/agents/evidence/OTC-20260904-be4f48-sendlogin-owner-edge-7e8f30-identity/20260904-whole-diff-falsification.md
-qualification_head: LIVE_PR_HEAD
-qualification_source_run: PENDING
-qualification_ci_run: PENDING
-qualification_governance_run: PENDING
-qualification_self_hosted_boundary_run: PENDING
-last_completed_step: terminal exact-current SOURCE_BLOCKER was persisted and the complete scoped PR diff was freshly falsified with zero material findings
-next_action: obtain fresh exact-head qualification on the final PR head, then hand the terminal evidence to a clean coordinator; do not widen the source search
+qualification_head: e1cb7e3f981a4176048ea0d67f021745dc63c8f3
+qualification_source_run: 33880858875
+qualification_source_job: 101048892758
+qualification_source_artifact_id: 9939805366
+qualification_source_artifact_digest: sha256:dc2fe4c16fd7241ad21e996beeb392055db81e49c1ce1158bfadbcfd163b657b
+qualification_ci_run: 33880859518
+qualification_governance_run: 33880858844
+qualification_self_hosted_boundary_run: 33880859027
+qualification_result: pass
+review_threads_open: 0
+last_completed_step: exact-head qualification on e1cb7e3f981a4176048ea0d67f021745dc63c8f3 passed task-specific source, CI, Track A governance and self-hosted boundary and reproduced the same terminal SOURCE_BLOCKER
+next_action: clean coordinator consumption of this terminal negative evidence; do not widen this worker
 recovery:
   policy_version: 1
-  generation: 3
+  generation: 4
   session_id: chat-github-20260904T153700+0200
   session_started_at: 2026-09-04T15:37:00+02:00
-  checkpointed_at: 2026-09-04T15:58:00+02:00
-  last_progress_at: 2026-09-04T15:58:00+02:00
+  checkpointed_at: 2026-09-04T15:59:00+02:00
+  last_progress_at: 2026-09-04T15:59:00+02:00
   phase: integrate
-  exact_head: LIVE_PR_HEAD
+  exact_head: HEAD_CONTAINS_QUALIFICATION_METADATA_ONLY
   pull_request: 894
-  active_operation: final exact-head qualification
-  external_run_ids: []
-  operation_started_at: 2026-09-04T15:58:00+02:00
+  active_operation: none
+  external_run_ids: [33880858875, 33880859518, 33880858844, 33880859027]
+  operation_started_at: null
   wait_deadline_at: null
-  check_generation: final_qualification
+  check_generation: qualification_metadata_only
   checks_used: 0
   status: ready
   safe_to_resume: true
-  resume_condition: final PR head emits task-specific source, CI, Track A governance and self-hosted boundary checks
-  next_action: aggregate final exact-head checks for PR #894; on green, preserve Draft source PR for clean coordinator consumption
+  resume_condition: clean coordinator is ready to consume PR #894 evidence
+  next_action: consume the terminal SOURCE_BLOCKER in a clean coordinator; any further source step requires a newly admitted bounded task
 ---
 
 # Objective
 
-Resolve only the exact identity semantics of the already-promoted owner-bound edge `0x7c67b8 -> 0x7e8f30`, carrying the same `ENTRY_ARG:rdi` owner object.
-
-Analyze only the callee FDE and, if necessary, at most one unique internal identity-preserving edge. Do not repeat #884 caller discovery or #889 owner-FDE scanning and do not open a global constructor, RTTI, QMeta, QObject, vtable or `+0x88` census.
+Resolve only the exact identity semantics of the promoted owner-bound edge `0x7c67b8 -> 0x7e8f30`, carrying the same `ENTRY_ARG:rdi` owner object. Analysis is restricted to the callee FDE and at most one unique identity-preserving internal edge; #884 caller discovery, #889 owner-FDE scanning and global constructor/RTTI/QMeta/QObject/vtable/`+0x88` censuses are forbidden.
 
 # Exact fence
 
@@ -145,19 +127,7 @@ size=52105824
 sha256=552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1
 ```
 
-# TDD RED evidence
-
-At exact head `684e301ada1feef6590fc59b3375a19c547f16a8`, workflow run `33879930241`, job `101045813815` failed exactly at the repository-only contract with:
-
-```text
-AssertionError: edge_identity.py is missing: expected RED before client materialization
-```
-
-The subsequent WARP, client materialization, result validation and artifact steps were all skipped.
-
-# Scientific source result
-
-At source head `9c68d92657100b054c6d5006ab46ddc5303112ee`, workflow run `33880393758`, job `101047349555` passed the repository contract, exact-fence check, bounded static analyzer, sanitized-result validation and artifact upload.
+# Terminal scientific result
 
 ```text
 EXACT_CLIENT_FENCE_PROVEN=true
@@ -181,26 +151,33 @@ terminal_result=SOURCE_BLOCKER
 FIRST_MISSING_BOUNDARY=CALLEE_INTERNAL_IDENTITY_EDGE_NOT_FOUND
 ```
 
-Inside only `0x7e8f30..0x7f06d6`, no vptr/Itanium RTTI event was tied to the carried `ENTRY_ARG:rdi`, no same-object external constructor/metaobject call was present, and no same-object direct internal edge candidate existed. Therefore no internal edge was followed and the owner identity remains fail-closed `UNKNOWN`.
+Inside only `0x7e8f30..0x7f06d6`, no vptr/Itanium RTTI event was tied to the carried `ENTRY_ARG:rdi`, no same-object external constructor/metaobject call was present, and no admissible same-object direct internal edge candidate existed. Therefore no internal edge was followed and the owner identity remains fail-closed `UNKNOWN`.
 
-The sanitized result is persisted at `docs/agents/evidence/OTC-20260904-be4f48-sendlogin-owner-edge-7e8f30-identity/result.json`; the source report and fresh whole-diff falsification are in the same evidence directory. Artifact `9939610461` has digest `sha256:ae15b1091e72ca4a4ae5eb970fe91695189f2248582a6519286660a03d646877`.
+# Validation
 
-# Audit
+Repository-only RED: head `684e301ada1feef6590fc59b3375a19c547f16a8`, run `33879930241`, job `101045813815`; failed exactly because `edge_identity.py` was absent, with all WARP/client-materialization steps skipped.
 
-Fresh whole-diff falsification found no material finding:
+Scientific GREEN/source evidence: head `9c68d92657100b054c6d5006ab46ddc5303112ee`, run `33880393758`, job `101047349555`, artifact `9939610461`, digest `sha256:ae15b1091e72ca4a4ae5eb970fe91695189f2248582a6519286660a03d646877`.
+
+Exact-head qualification on `e1cb7e3f981a4176048ea0d67f021745dc63c8f3`:
 
 ```text
-WHOLE_DIFF_FALSIFICATION=PASS
-MATERIAL_FINDINGS_OPEN=0
-SOURCE_WORKER_SELF_PROMOTION_USED=false
+TASK_SOURCE_RUN=33880858875 PASS
+CI_RUN=33880859518 PASS
+TRACK_A_GOVERNANCE_RUN=33880858844 PASS
+SELF_HOSTED_BOUNDARY_RUN=33880859027 PASS
+QUALIFICATION_ARTIFACT=9939805366
+QUALIFICATION_ARTIFACT_DIGEST=sha256:dc2fe4c16fd7241ad21e996beeb392055db81e49c1ce1158bfadbcfd163b657b
 ```
 
-This is a source-worker falsification, not coordinator promotion. The source result remains non-authoritative for later programme mutation until consumed by a clean coordinator.
+The qualification source run reproduced the same `SOURCE_BLOCKER`, exact fence PASS, sanitized result PASS and `RAW_CLIENT_RETAINED=false`.
 
-# Safety
+# Audit and safety
 
-Source-only static analysis. No official-client execution, login, credential/session/cookie/character/world access, process-memory access, packet capture, OCR/Vision, official-service E2E, runtime Field6 observation, queue/QSlot/writer work, Track B mutation, guessed Field6 value or guessed pre-success order.
+Whole-diff falsification at `docs/agents/evidence/OTC-20260904-be4f48-sendlogin-owner-edge-7e8f30-identity/20260904-whole-diff-falsification.md` is `PASS` with zero material findings. It is not coordinator promotion.
+
+No official-client execution, login, credential/session access, process-memory access, packet capture, OCR/Vision, official-service E2E, runtime Field6 observation, queue/QSlot/writer work or Track B #284 mutation occurred. Field6 and pre-success order remain `UNKNOWN`.
 
 # Terminal disposition
 
-The exact callee identity question is scientifically terminal as `SOURCE_BLOCKER`. Do not widen this worker into another analyzer family. After fresh exact-head qualification, hand this terminal negative evidence to a clean coordinator, which may either consume it as a blocker or admit one newly bounded source step.
+The exact callee identity question is scientifically terminal as `SOURCE_BLOCKER`. PR #894 remains Draft intentionally for clean coordinator consumption and must not self-merge. Any continuation beyond this boundary requires a newly admitted bounded task from that coordinator.

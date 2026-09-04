@@ -1,18 +1,18 @@
 ---
 task_id: OTC-20260904-be4f48-sendlogin-receiver-field-owner
-status: investigating
+status: waiting
 agent: ChatGPT
 session_role: researcher
 project_lane: otclient
 lane: P2-NETWORK
 track_id: official-client-re
 task_kind: discovery
-phase: investigate
+phase: validate
 branch: research/OTC-20260904-be4f48-sendlogin-receiver-field-owner
 base_branch: main
 base_main: e24462d72942d8381e1a468de84f16b60f1aa8c9
 created: 2026-09-04T12:52:00+02:00
-updated_at: 2026-09-04T12:52:00+02:00
+updated_at: 2026-09-04T12:58:00+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: chat_github
@@ -36,6 +36,17 @@ context_score: 8
 estimate_confidence: medium
 decomposition_decision: single
 decomposition_reason: one bounded static field-owner discriminator with one exact-current analysis workflow
+invocation_started_at: 2026-09-04T12:52:00+02:00
+last_progress_at: 2026-09-04T12:58:00+02:00
+ci_checks_for_current_head: 2
+ci_check_generation: draft
+terminal_ci_wait_started_at: null
+terminal_ci_checks_for_current_generation: 0
+unchanged_state_checks: 2
+identical_failure_retries: 0
+repair_cycles_for_current_gate: 0
+context_reconstruction_attempts: 0
+stall_warnings: 0
 owned_paths:
   - .github/workflows/tibia-official-client-re-be4f48-sendlogin-receiver-field-owner.yml
   - tools/tibia_re_be4f48_sendlogin_receiver_field_owner/**
@@ -49,8 +60,13 @@ reuses:
 depends_on: []
 blocks:
   - clean coordinator promotion before any Track B decision
-last_completed_step: claimed isolated source-only task from trusted main
-next_action: add repository-only RED contract and draft PR before any exact-client materialization
+red_head: bd3982a0dda9642ec7a68d69532a1c08706e13ff
+red_run: 33865649707
+red_job: 100999783222
+red_observed_state: in_progress
+tdd_red_verified: false
+last_completed_step: created isolated Draft PR #884 with repository-only RED contract; production analyzer intentionally absent
+next_action: observe run 33865649707 once it reaches a terminal state; only after the expected first-step RED is verified, add the minimal field-owner analyzer and run exact-current GREEN validation
 ---
 
 # Objective
@@ -84,6 +100,10 @@ receiver_field_writes_in_selected_fde=0
 receiver_endpoint_identity=UNKNOWN
 FIRST_MISSING_BOUNDARY=RECEIVER_FIELD_DEFINITION_OUTSIDE_SELECTED_CONNECTION_OWNER_FDE
 ```
+
+# Current TDD state
+
+Draft PR #884 head `bd3982a0dda9642ec7a68d69532a1c08706e13ff` contains the repository-only contract and focused source workflow but deliberately does not contain `receiver_field_owner.py`. The focused workflow run `33865649707`, job `100999783222`, remained `in_progress` after the two ordinary observations allowed for this exact head. No GREEN implementation has been written before observing the RED.
 
 # Safety
 

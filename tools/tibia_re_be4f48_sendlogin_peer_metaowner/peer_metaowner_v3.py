@@ -9,6 +9,7 @@ import peer_metaowner as base
 from capstone.x86_const import X86_OP_IMM, X86_OP_MEM, X86_OP_REG, X86_REG_RSP
 
 CONNECTIMPL_HAS_HIDDEN_SRET = True
+SRET_BINARY_PROOF_REQUIRED = True
 CONNECTIMPL_FORMAL_ABI = {
     "sender": "rsi",
     "signal": "rdx",
@@ -250,6 +251,89 @@ def qt_connect_candidates(img: base.Image, instructions: list[Any]) -> list[tupl
     return rows
 
 
+def direct_register_source(img: base.Image, ins: Any, destination: str) -> str | None:
+    if not ins.mnemonic.startswith("mov") or len(ins.operands) < 2:
+        return None
+    dst, src = ins.operands[0], ins.operands[1]
+    if dst.type != X86_OP_REG or src.type != X86_OP_REG:
+        return None
+    if base.canonical_reg(img, dst.reg) != destination:
+        return None
+    return base.canonical_reg(img, src.reg)
+
+
+def prove_hidden_sret(img: base.Image, instructions: list[Any], call_idx: int) -> dict[str, Any]:
+    result: dict[str, Any] = {
+        "sret_binary_proven": False,
+        "connect_call_site": base.hx(instructions[call_idx].address),
+        "classification": "SRET_BINARY_PROOF_NOT_ESTABLISHED",
+    }
+
+    storage_reg = None
+    storage_site = None
+    for idx in range(call_idx - 1, max(-1, call_idx - 24), -1):
+        source = direct_register_source(img, instructions[idx], "rdi")
+        if source is not None:
+            storage_reg = source
+            storage_site = base.hx(instructions[idx].address)
+            break
+    if storage_reg is None:
+        result["reason"] = "CONNECTIMPL_RDI_STORAGE_REGISTER_NOT_FOUND"
+        return result
+
+    destructor_idx = None
+    destructor_symbol = None
+    destructor_demangled = None
+    for idx in range(call_idx + 1, min(len(instructions), call_idx + 24)):
+        ins = instructions[idx]
+        if ins.mnemonic != "call":
+            continue
+        target = base.direct_target(ins)
+        if target is None:
+            continue
+        symbol = img.plt_symbol(target)
+        dm = base.demangle(symbol)
+        if dm and dm.startswith("QMetaObject::Connection::~Connection()"):
+            destructor_idx = idx
+            destructor_symbol = symbol
+            destructor_demangled = dm
+            break
+    if destructor_idx is None:
+        result.update(
+            {
+                "storage_register": storage_reg,
+                "storage_definition_site": storage_site,
+                "reason": "QMetaObject::Connection::~Connection()_NOT_FOUND_AFTER_CONNECTIMPL",
+            }
+        )
+        return result
+
+    destructor_arg_reg = None
+    destructor_arg_site = None
+    for idx in range(destructor_idx - 1, call_idx, -1):
+        source = direct_register_source(img, instructions[idx], "rdi")
+        if source is not None:
+            destructor_arg_reg = source
+            destructor_arg_site = base.hx(instructions[idx].address)
+            break
+
+    proven = destructor_arg_reg == storage_reg and destructor_arg_reg is not None
+    result.update(
+        {
+            "classification": "CONNECTIMPL_HIDDEN_SRET_PROVEN" if proven else "CONNECTIMPL_HIDDEN_SRET_STORAGE_MISMATCH",
+            "storage_register": storage_reg,
+            "storage_definition_site": storage_site,
+            "destructor_call_site": base.hx(instructions[destructor_idx].address),
+            "destructor_symbol": destructor_symbol,
+            "destructor_demangled": destructor_demangled,
+            "destructor_argument_register": destructor_arg_reg,
+            "destructor_argument_definition_site": destructor_arg_site,
+            "sret_binary_proven": proven,
+        }
+    )
+    return result
+
+
 def adapter_slot_object_binding(
     img: base.Image,
     instructions: list[Any],
@@ -407,6 +491,7 @@ def analyze_connection(img: base.Image, owner: str) -> dict[str, Any]:
         "sendlogin_adapter_bound_to_connection": False,
         "sendlogin_causal_binding_proven": False,
         "connectimpl_has_hidden_sret": CONNECTIMPL_HAS_HIDDEN_SRET,
+        "sret_binary_proof_required": SRET_BINARY_PROOF_REQUIRED,
         "connectimpl_formal_abi": CONNECTIMPL_FORMAL_ABI,
     }
     if len(anchor_indexes) != 1:
@@ -467,6 +552,15 @@ def analyze_connection(img: base.Image, owner: str) -> dict[str, Any]:
     result["connection_selection_reason"] = (
         "FIRST_QOBJECT_CONNECTIMPL_AFTER_EXACT_ADAPTER_REFERENCE_WITH_ONE_PEER_AND_ONE_ADAPTER_REFERENCE_SINCE_PREVIOUS_CONNECTIMPL"
     )
+
+    sret = prove_hidden_sret(img, instructions, call_idx)
+    result["sret_binary_proof"] = sret
+    result["sret_binary_proven"] = bool(sret.get("sret_binary_proven"))
+    if SRET_BINARY_PROOF_REQUIRED and not result["sret_binary_proven"]:
+        result["actual_qt_connection_primitive"] = "UNKNOWN"
+        result["actual_qt_connection_callsite"] = None
+        result["classification"] = "CONNECTIMPL_HIDDEN_SRET_BINARY_PROOF_NOT_ESTABLISHED"
+        return result
 
     args = {
         name: resolve_register(img, instructions, call_idx, reg, deltas)

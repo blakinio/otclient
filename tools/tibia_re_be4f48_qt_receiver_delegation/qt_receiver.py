@@ -101,8 +101,7 @@ def analyze(selected,client,core):
                        'analysis_stop':path['stop_reason'],'analysis_steps':path['steps'],
                        'receiver_delegations':list(candidates.values()),
                        'receiver_delegation_scope':'conditional modeled in-FDE paths only; no completeness across external continuations',
-                       'incomplete_boundaries':path['incomplete_boundaries'],
-                       'bounded_frontier':path['semantic_trace'][-4:]})
+                       'incomplete_boundaries':path['incomplete_boundaries']})
         proven=resolved_delegation(path['complete'],list(candidates.values()))
         if proven:
             target=int(next(iter(candidates.values()))['target'],16)

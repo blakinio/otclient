@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260904-be4f48-sendlogin-receiver-field-owner
-status: waiting
+status: validating
 agent: ChatGPT
 session_role: researcher
 project_lane: otclient
@@ -12,7 +12,7 @@ branch: research/OTC-20260904-be4f48-sendlogin-receiver-field-owner
 base_branch: main
 base_main: e24462d72942d8381e1a468de84f16b60f1aa8c9
 created: 2026-09-04T12:52:00+02:00
-updated_at: 2026-09-04T12:58:00+02:00
+updated_at: 2026-09-04T13:05:00+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: chat_github
@@ -37,12 +37,12 @@ estimate_confidence: medium
 decomposition_decision: single
 decomposition_reason: one bounded static field-owner discriminator with one exact-current analysis workflow
 invocation_started_at: 2026-09-04T12:52:00+02:00
-last_progress_at: 2026-09-04T12:58:00+02:00
-ci_checks_for_current_head: 2
+last_progress_at: 2026-09-04T13:05:00+02:00
+ci_checks_for_current_head: 1
 ci_check_generation: draft
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
-unchanged_state_checks: 2
+unchanged_state_checks: 1
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 0
@@ -60,13 +60,15 @@ reuses:
 depends_on: []
 blocks:
   - clean coordinator promotion before any Track B decision
-red_head: bd3982a0dda9642ec7a68d69532a1c08706e13ff
-red_run: 33865649707
-red_job: 100999783222
-red_observed_state: in_progress
-tdd_red_verified: false
-last_completed_step: created isolated Draft PR #884 with repository-only RED contract; production analyzer intentionally absent
-next_action: observe run 33865649707 once it reaches a terminal state; only after the expected first-step RED is verified, add the minimal field-owner analyzer and run exact-current GREEN validation
+red_head: e9e20394fc28bb5caa4332b0baf4458ef1445c9a
+red_run: 33865752388
+red_job: 101000116304
+red_result: expected_failure_before_client_materialization
+red_first_error: "AssertionError: receiver_field_owner.py is missing: expected RED before client materialization"
+tdd_red_verified: true
+green_attempt_head: bb39f99c8188ec5166eb95b868cfcecfcd9951bf
+last_completed_step: verified repository-only RED from job 101000116304, then added the minimal bounded exact-current field-owner analyzer
+next_action: inspect the focused source workflow on the current GREEN-attempt head; use its sanitized exact-current result to terminalize or make one evidence-based analyzer repair
 ---
 
 # Objective
@@ -101,9 +103,11 @@ receiver_endpoint_identity=UNKNOWN
 FIRST_MISSING_BOUNDARY=RECEIVER_FIELD_DEFINITION_OUTSIDE_SELECTED_CONNECTION_OWNER_FDE
 ```
 
-# Current TDD state
+# TDD state
 
-Draft PR #884 head `bd3982a0dda9642ec7a68d69532a1c08706e13ff` contains the repository-only contract and focused source workflow but deliberately does not contain `receiver_field_owner.py`. The focused workflow run `33865649707`, job `100999783222`, remained `in_progress` after the two ordinary observations allowed for this exact head. No GREEN implementation has been written before observing the RED.
+Repository-only RED is verified on head `e9e20394fc28bb5caa4332b0baf4458ef1445c9a`: workflow run `33865752388`, job `101000116304`, failed in the first contract step because `receiver_field_owner.py` was deliberately absent. WARP preparation, exact-client materialization, analysis and artifact upload were all skipped. Only after that expected RED was observed, the bounded analyzer was added on head `bb39f99c8188ec5166eb95b868cfcecfcd9951bf`.
+
+The GREEN attempt performs only the target-specific direct-caller xref for the promoted connection-owner FDE, inspects only the resulting unique caller FDE, binds a `+0x88` member store to the exact owner argument, and follows only constructor calls fed by that exact stored object. A positive identity requires both a unique bound field-store/constructor chain and matching primary-vptr Itanium RTTI.
 
 # Safety
 

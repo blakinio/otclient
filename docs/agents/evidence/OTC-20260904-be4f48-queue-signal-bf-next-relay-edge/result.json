@@ -1,0 +1,85 @@
+{
+  "task_id": "OTC-20260904-be4f48-queue-signal-bf-next-relay-edge",
+  "alias": "OTC-BE4F48-QUEUE-SIGNAL-BF-NEXT-RELAY-EDGE",
+  "analyzer_head": "88e8c05babc856d89892226ad3cd27d6739997ce",
+  "tdd_red": {
+    "head": "7a728b81ee22b22fd600c08b1807533de61e266f",
+    "run_id": 33880000891,
+    "job_id": 101046053737,
+    "observed_failure": "AssertionError: next_relay_edge.py is missing: expected RED before client materialization"
+  },
+  "exact_head_validation": {
+    "head": "88e8c05babc856d89892226ad3cd27d6739997ce",
+    "run_id": 33880857084,
+    "job_id": 101048886180,
+    "conclusion": "success",
+    "repository_contract": "PASS",
+    "exact_fence": "PASS",
+    "sanitized_result": "PASS",
+    "raw_client_retained": false,
+    "artifact_id": 9939797638,
+    "artifact_sha256": "4d6204b966c9a55b84478128db5f7abf313a1e92094465962bdc8160fa6f65b7"
+  },
+  "exact_client": {
+    "version": "15.32.be4f48",
+    "size": 52105824,
+    "sha256": "552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1"
+  },
+  "promoted_inputs": {
+    "queue_signal": "clientMessageReadyToProcess",
+    "queue_signal_index": "0xbf",
+    "queue_signal_argv1_identity": "exact GameclientMessage shared pair",
+    "queue_signal_receiver_identity": "tibia::protocol::TProtocolMessageQueue",
+    "queue_signal_connection_role": "SIGNAL_RELAY",
+    "qslot_function_target": "0xbd2190",
+    "self_relay_connectimpl_callsite": "0xbe2eee"
+  },
+  "bounded_connection_context": {
+    "scope": "queue constructor FDE only",
+    "fde": [
+      "0xbe2a50",
+      "0xbe3086"
+    ],
+    "connectimpl_target": "0x4d6800",
+    "connectimpl_demangled": "QObject::connectImpl(QObject const*, void**, QObject const*, void**, QtPrivate::QSlotObjectBase*, Qt::ConnectionType, int const*, QMetaObject const*)",
+    "connectimpl_nontrivial_return_uses_hidden_sret": true,
+    "candidate_count": 2,
+    "candidate_callsites": [
+      "0xbe2e54",
+      "0xbe2eee"
+    ],
+    "self_relay_present_exactly_once": true,
+    "after_self_relay_connect_count": 0,
+    "additional_identity_preserving_candidate_count": 0,
+    "pre_self_candidate": {
+      "callsite": "0xbe2e54",
+      "queue_signal_body_reference_sites": [],
+      "queue_static_metaobject_reference_sites": [],
+      "identity_preserving_source_candidate": false
+    },
+    "self_relay_candidate": {
+      "callsite": "0xbe2eee",
+      "queue_signal_body_reference_sites": [
+        "0xbe2e86"
+      ],
+      "queue_signal_body_used_as_slot_callable": true,
+      "receiver_identity": "tibia::protocol::TProtocolMessageQueue"
+    }
+  },
+  "exact_client_fence_proven": true,
+  "next_unique_relay_edge": "UNKNOWN",
+  "next_endpoint_identity": "UNKNOWN",
+  "next_relay_identity_preserved": false,
+  "queue_signal_writer_identity": "UNKNOWN",
+  "final_queue_writer_identified": false,
+  "final_tcp_writer_identified": false,
+  "final_writer_contract": "UNKNOWN",
+  "field6_value": "UNKNOWN",
+  "runtime_access": "none",
+  "official_client_executed": false,
+  "official_service_e2e_count": 0,
+  "track_b_pr_284_modified": false,
+  "terminal_result": "SOURCE_BLOCKER",
+  "FIRST_MISSING_BOUNDARY": "NO_NEXT_CLIENTMESSAGEREADYTOPROCESS_SOURCE_CONNECTION_IN_BOUNDED_QUEUE_CONSTRUCTOR_FDE",
+  "NEXT_ACTION": "clean coordinator promotion of this precise bounded source blocker before admitting any further source step"
+}

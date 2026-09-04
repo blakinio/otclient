@@ -6,6 +6,7 @@ import json
 import re
 from pathlib import Path, PurePosixPath
 from static_flow import Image, trace_paths, verify_fence, EXPECTED_VERSION, EXPECTED_SIZE, EXPECTED_SHA256
+from receiver_flow import receiver_flow
 
 SYMBOL='_ZN7QObject11connectImplEPKS_PPvS1_S3_PN9QtPrivate15QSlotObjectBaseEN2Qt14ConnectionTypeEPKiPK11QMetaObject'
 
@@ -89,16 +90,13 @@ def analyze(selected,client,core):
         qualify_core_identity(img.elf.elfclass,img.elf['e_machine'],sonames,syms[0]['st_info']['type'])
         fde=img.containing_fde(address)
         if not fde or fde[0]!=address or fde[1]-fde[0]>0x4000:raise ValueError('CONNECTIMPL_FDE_NOT_EXACT_OR_BOUNDED')
-        path=trace_paths(img.read(fde[0],fde[1]-fde[0]),fde[0],{'rcx':'registered:receiver'},symbols=img.plt_symbol)
-        candidates={}
-        for c in path['calls']+path['tail_edges']:
-            carrier=[r for r,v in c['arguments'].items() if v=='registered:receiver']
-            if carrier:
-                row={'site':c['site'],'target':c['target'],'receiver_argument_registers':carrier}
-                candidates[json.dumps(row,sort_keys=True)]=row
+        path=receiver_flow(img.read(fde[0],fde[1]-fde[0]),fde[0])
+        candidates={json.dumps(c,sort_keys=True):c for c in path['receiver_delegations']}
         result.update({'qt_connectimpl_address':hex(address),'qt_connectimpl_fde':[hex(x) for x in fde],
                        'qt_connectimpl_symbol_size':size,'analysis_complete':path['complete'],
-                       'analysis_stop':path['stop_reason'],'analysis_steps':path['steps'],
+                       'analysis_fixedpoint_reached':path['fixedpoint_reached'],
+                       'analysis_state_updates':path['state_updates'],
+                       'analysis_reachable_instructions':path['reachable_instructions'],
                        'receiver_delegations':list(candidates.values()),
                        'receiver_delegation_scope':'conditional modeled in-FDE paths only; no completeness across external continuations',
                        'incomplete_boundaries':path['incomplete_boundaries']})

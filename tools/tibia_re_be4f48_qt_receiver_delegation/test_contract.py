@@ -85,4 +85,32 @@ class Contract(unittest.TestCase):
         p=trace_paths(bytes.fromhex('ebffc3'),0x1000)
         self.assertFalse(p['complete'])
 
+    def test_receiver_fixedpoint_closes_identity_preserving_loop(self):
+        from receiver_flow import receiver_flow
+        # mov rbx,rcx; test eax,eax; jne back to test; mov rcx,rbx; call0x2000;ret
+        p=receiver_flow(bytes.fromhex('4889cb85c075fc4889d9e8f10f0000c3'),0x1000)
+        self.assertTrue(p['fixedpoint_reached'])
+        self.assertEqual(p['receiver_delegations'][0]['receiver_argument_registers'],['rcx'])
+
+    def test_receiver_fixedpoint_joins_clobbering_path(self):
+        from receiver_flow import receiver_flow
+        # optional xor ebx,ebx on loop, so final rbxbased copy is not proven.
+        p=receiver_flow(bytes.fromhex('4889cb85c0740431dbebf84889d9e8ee0f0000c3'),0x1000)
+        self.assertEqual(p['receiver_delegations'],[])
+
+    def test_receiver_fixedpoint_call_clobbers_volatile_source(self):
+        from receiver_flow import receiver_flow
+        p=receiver_flow(bytes.fromhex('e800000000e800000000c3'),0x1000)
+        self.assertEqual(len(p['receiver_delegations']),1)
+
+    def test_receiver_fixedpoint_does_not_invent_memory_identity(self):
+        from receiver_flow import receiver_flow
+        p=receiver_flow(bytes.fromhex('488b0fe800000000c3'),0x1000)
+        self.assertEqual(p['receiver_delegations'],[])
+
+    def test_receiver_fixedpoint_fallthrough_is_not_source_boundary(self):
+        from receiver_flow import receiver_flow
+        p=receiver_flow(bytes.fromhex('4889cb'),0x1000)
+        self.assertFalse(self.module().only_external_branches(p))
+
 if __name__=='__main__':unittest.main()

@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260904-be4f48-sendlogin-receiver-field-88-use-semantics
-status: implementing
+status: ready
 agent: ChatGPT
 session_id: chat-github-20260904T165603+0200
 session_role: researcher
@@ -8,12 +8,12 @@ project_lane: otclient
 lane: P2-NETWORK
 track_id: official-client-re
 task_kind: discovery
-phase: implement
+phase: integrate
 branch: ai/OTC-20260904-be4f48-sendlogin-receiver-field-88-use-semantics
 base_branch: main
 base_main: 73bf55043e1a46732b30fd0be537742b0ac6fed9
 created: 2026-09-04T16:56:03+02:00
-updated_at: 2026-09-04T17:10:42+02:00
+updated_at: 2026-09-04T17:13:30+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: chat_github
@@ -49,9 +49,9 @@ estimate_confidence: high
 decomposition_decision: single
 decomposition_reason: one exact-current receiver-field-value use/type discriminator with one bounded source-analysis workflow
 invocation_started_at: 2026-09-04T16:49:00+02:00
-last_progress_at: 2026-09-04T17:10:42+02:00
+last_progress_at: 2026-09-04T17:13:30+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: pending-evidence-audit-head
+ci_check_generation: final-exact-head-qualification-pending
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -104,7 +104,7 @@ source_self_hosted_boundary_run: 33887723792
 source_self_hosted_boundary_result: success
 scientific_terminal_result: SOURCE_BLOCKER
 first_missing_boundary: NO_UNIQUE_OBJECT_TIED_TYPE_EDGE_IN_EXACT_FIELD_VALUE_LIFETIME
-receiver_field_definition_site: 0x7c6b18
+receiver_field_load_site: 0x7c6b18
 receiver_field_value_use: QOBJECT_CONNECTIMPL_RECEIVER_ARGUMENT
 receiver_field_value_use_proven: true
 sendlogin_receiver_identity: UNKNOWN
@@ -115,11 +115,13 @@ pre_success_send_sequence: UNKNOWN
 field6_value: UNKNOWN
 e2e_result: NOT_APPLICABLE
 e2e_reason: source-only static discriminator; the exact task contract forbids official-client execution and official-service E2E
-audit_result: PENDING_WHOLE_DIFF_FALSIFICATION
+audit_result: SELF_FALSIFICATION_PASS
 audit_independent: false
 audit_material_findings_open: 0
-last_completed_step: accepted repaired source head proved exact +0x88 value use as QObject::connectImpl receiver and stopped fail-closed because no unique object-tied type edge exists in the exact field-value lifetime
-next_action: persist source evidence, run fresh whole-diff falsification, record its result, and exact-head qualify the final Draft source PR for clean coordinator consumption
+audit_evidence: docs/agents/evidence/OTC-20260904-be4f48-sendlogin-receiver-field-88-use-semantics/20260904-whole-diff-falsification.md
+qualification_pre_audit_head: bb3f61b5739100578699cfa589e05990fb944261
+last_completed_step: fresh whole-diff falsification found zero material findings, retained the proven receiver-use claim, and confirmed fail-closed identity at the first missing object-tied type edge
+next_action: exact-head qualify this final source-task audit/checkpoint head; then clean coordinator promotion may consume PR #899 without widening this source lane
 ---
 
 # Objective
@@ -195,6 +197,7 @@ RAW_CLIENT_RETAINED=false
 
 Durable sanitized result: `docs/agents/evidence/OTC-20260904-be4f48-sendlogin-receiver-field-88-use-semantics/result.json`.
 Run/repair narrative: `docs/agents/evidence/OTC-20260904-be4f48-sendlogin-receiver-field-88-use-semantics/source-qualification.md`.
+Fresh whole-diff falsification: `docs/agents/evidence/OTC-20260904-be4f48-sendlogin-receiver-field-88-use-semantics/20260904-whole-diff-falsification.md` = `SELF_FALSIFICATION_PASS`, zero material findings. It is explicitly not represented as an independent closeout audit; independent lifecycle review belongs to the clean coordinator promotion.
 
 # Safety
 
@@ -202,4 +205,4 @@ Source-only static analysis. No official-client execution, login, credentials, s
 
 # Lifecycle
 
-This source lane is scientifically terminal but remains a Draft source PR. It must not self-merge. After fresh whole-diff falsification and exact-head qualification, a clean coordinator may consume the sanitized terminal facts and close this source PR unmerged as consumed. Track B remains unchanged.
+This source lane is scientifically terminal and ready for coordinator consumption, not complete/archived. PR #899 remains Draft and must not self-merge. After exact-head qualification, the clean coordinator may promote only the sanitized terminal facts, then close this source PR unmerged as consumed. Track B remains unchanged.

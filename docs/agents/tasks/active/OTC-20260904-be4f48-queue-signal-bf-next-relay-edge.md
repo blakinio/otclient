@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260904-be4f48-queue-signal-bf-next-relay-edge
-status: implementing
+status: completed
 agent: ChatGPT
 session_id: chatgpt-20260904T1537+0200
 session_role: researcher
@@ -8,12 +8,12 @@ project_lane: otclient
 lane: P2-NETWORK
 track_id: official-client-re
 task_kind: discovery
-phase: implement
+phase: closeout
 branch: ai/OTC-20260904-be4f48-queue-signal-bf-next-relay-edge
 base_branch: main
 base_main: 7e67c67783b19575ec7f378c7be49cb69d87f1ce
 created: 2026-09-04T15:37:00+02:00
-updated_at: 2026-09-04T15:37:00+02:00
+updated_at: 2026-09-04T15:57:19+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: chat_github
@@ -48,16 +48,17 @@ feature_scope:
   e2e_required: false
   completion_claim: internal_only
 invocation_started_at: 2026-09-04T15:37:00+02:00
-last_progress_at: 2026-09-04T15:37:00+02:00
-ci_checks_for_current_head: 0
-ci_check_generation: initial_red
-terminal_ci_wait_started_at: null
-terminal_ci_checks_for_current_generation: 0
+last_progress_at: 2026-09-04T15:57:19+02:00
+repair_cycles_for_current_gate: 1
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 0
 stall_warnings: 0
+validated_implementation_head: 88e8c05babc856d89892226ad3cd27d6739997ce
+validated_workflow_run: 33880857084
+validated_workflow_job: 101048886180
+terminal_result: SOURCE_BLOCKER
+first_missing_boundary: NO_NEXT_CLIENTMESSAGEREADYTOPROCESS_SOURCE_CONNECTION_IN_BOUNDED_QUEUE_CONSTRUCTOR_FDE
 owned_paths:
   - .github/workflows/tibia-official-client-re-be4f48-queue-signal-bf-next-relay-edge.yml
   - tools/tibia_re_be4f48_queue_signal_bf_next_relay_edge/**
@@ -70,8 +71,8 @@ reuses:
 depends_on: []
 blocks:
   - clean coordinator promotion before any Track B decision
-last_completed_step: trusted-base preflight complete; no overlapping branch or open PR found; static no-runtime admission persisted
-next_action: create repository-only RED contract and draft PR before implementing the analyzer
+last_completed_step: exact-current bounded queue-constructor/connect discriminator reached a precise SOURCE_BLOCKER; sanitized evidence persisted
+next_action: clean coordinator promotion of the precise bounded source blocker before admitting any further source step
 ---
 
 # Objective
@@ -86,47 +87,41 @@ size=52105824
 sha256=552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1
 ```
 
-# Promoted inputs
+# Terminal finding
+
+The exact-current hosted discriminator proved the promoted self-relay exactly once inside queue-constructor FDE `0xbe2a50..0xbe3086`. That bounded FDE contains exactly two direct calls to `QObject::connectImpl` at `0xbe2e54` and `0xbe2eee`. The first is before the promoted self-relay and has no reference to the exact `clientMessageReadyToProcess` body or queue static metaobject. The second is the promoted self-relay and uses `0xbd2190` as the slot callable. There are zero `connectImpl` calls after `0xbe2eee` and zero additional identity-preserving exact-signal candidates inside the admitted constructor context.
+
+Therefore the next relay edge cannot be uniquely proven without widening beyond the task fence. The task stops at the first precise source boundary rather than starting a global connect/QObject/QSlot/socket/writer census.
 
 ```text
+EXACT_CLIENT_FENCE_PROVEN=true
 QUEUE_SIGNAL=clientMessageReadyToProcess
 QUEUE_SIGNAL_INDEX=0xbf
-QUEUE_SIGNAL_ARGV1_IDENTITY=exact GameclientMessage shared pair
-QUEUE_SIGNAL_BODY=0xbd2190
-QUEUE_SIGNAL_CONNECTIMPL_CALLSITE=0xbe2eee
-QUEUE_SIGNAL_CONNECTIMPL_FDE=0xbe2a50..0xbe3086
-QUEUE_SIGNAL_RECEIVER_PROVENANCE=ENTRY_ARG:rdi
 QUEUE_SIGNAL_RECEIVER_IDENTITY=tibia::protocol::TProtocolMessageQueue
-QUEUE_SIGNAL_RECEIVER_IDENTITY_PROVEN=true
-QSLOT_FUNCTION_TARGET=0xbd2190
 QUEUE_SIGNAL_CONNECTION_ROLE=SIGNAL_RELAY
+QSLOT_FUNCTION_TARGET=0xbd2190
 NEXT_UNIQUE_RELAY_EDGE=UNKNOWN
 NEXT_ENDPOINT_IDENTITY=UNKNOWN
+NEXT_RELAY_IDENTITY_PRESERVED=false
+QUEUE_SIGNAL_WRITER_IDENTITY=UNKNOWN
 FINAL_QUEUE_WRITER_IDENTIFIED=false
 FINAL_TCP_WRITER_IDENTIFIED=false
 FINAL_WRITER_CONTRACT=UNKNOWN
 FIELD6_VALUE=UNKNOWN
+RUNTIME_ACCESS=none
+OFFICIAL_SERVICE_E2E_COUNT=0
+TRACK_B_PR_284_MODIFIED=false
+terminal_result=SOURCE_BLOCKER
+FIRST_MISSING_BOUNDARY=NO_NEXT_CLIENTMESSAGEREADYTOPROCESS_SOURCE_CONNECTION_IN_BOUNDED_QUEUE_CONSTRUCTOR_FDE
+NEXT_ACTION=clean coordinator promotion of the precise bounded source blocker before admitting any further source step
 ```
 
-Do not re-prove receiver RTTI/type from #890 or QSlot construction from #885.
+# TDD and validation
 
-# Bounded evidence rule
-
-Allowed path only:
-
-```text
-promoted self-relay at connectImpl@0xbe2eee
-  -> exact clientMessageReadyToProcess / GameclientMessage shared pair
-  -> queue constructor/metaobject/connect context causally tied to that exact signal/pair
-  -> at most one next unique identity-preserving relay edge
-  -> exact endpoint type/callable if uniquely proven
-```
-
-Stop when the next relay edge or endpoint ceases to be unique. No global QObject/connect/QSlot/socket/TCP/writer census, no broad whole-executable generic xref discovery, no Track B mutation.
-
-# TDD contract
-
-The repository-only contract must fail before exact-client materialization while the analyzer is absent. After observing that RED, add the smallest bounded analyzer that can produce deterministic sanitized JSON. Raw official-client bytes remain transient and must be deleted before artifact upload.
+- RED: head `7a728b81ee22b22fd600c08b1807533de61e266f`, run `33880000891`, job `101046053737`; contract failed because `next_relay_edge.py` did not yet exist, before any exact-client materialization.
+- GREEN: implementation head `88e8c05babc856d89892226ad3cd27d6739997ce`, run `33880857084`, job `101048886180`; repository contract, exact fence, transient client analysis, sanitized-result validation, and sanitized artifact upload all passed.
+- Raw exact-client bytes were deleted before artifact upload (`RAW_CLIENT_RETAINED=false`).
+- Durable sanitized evidence: `docs/agents/evidence/OTC-20260904-be4f48-queue-signal-bf-next-relay-edge/result.json`.
 
 # Safety
 
@@ -142,27 +137,53 @@ official_service_e2e=false
 track_b_pr_284_modified=false
 ```
 
-# Required terminal schema
+# Context checkpoint
 
-```text
-EXACT_CLIENT_FENCE_PROVEN=true|false
-QUEUE_SIGNAL=clientMessageReadyToProcess
-QUEUE_SIGNAL_INDEX=0xbf
-QUEUE_SIGNAL_RECEIVER_IDENTITY=tibia::protocol::TProtocolMessageQueue
-QUEUE_SIGNAL_CONNECTION_ROLE=SIGNAL_RELAY
-QSLOT_FUNCTION_TARGET=0xbd2190
-NEXT_UNIQUE_RELAY_EDGE=<exact edge|UNKNOWN>
-NEXT_ENDPOINT_IDENTITY=<exact type/callable|UNKNOWN>
-NEXT_RELAY_IDENTITY_PRESERVED=true|false
-QUEUE_SIGNAL_WRITER_IDENTITY=<value|UNKNOWN>
-FINAL_QUEUE_WRITER_IDENTIFIED=true|false
-FINAL_TCP_WRITER_IDENTIFIED=true|false
-FINAL_WRITER_CONTRACT=<value|UNKNOWN>
-FIELD6_VALUE=UNKNOWN
-RUNTIME_ACCESS=none
-OFFICIAL_SERVICE_E2E_COUNT=0
-TRACK_B_PR_284_MODIFIED=false
-terminal_result=<QUEUE_SIGNAL_BF_NEXT_RELAY_EDGE_PROVEN|SOURCE_BLOCKER>
-FIRST_MISSING_BOUNDARY=<none|precise boundary>
-NEXT_ACTION=<clean coordinator promotion or one newly admitted bounded source step>
+```yaml
+checkpoint_version: 1
+updated_at: 2026-09-04T15:57:19+02:00
+head: 88e8c05babc856d89892226ad3cd27d6739997ce
+branch: ai/OTC-20260904-be4f48-queue-signal-bf-next-relay-edge
+pr: 895
+status: completed
+context_routes:
+  - docs/agents/evidence/OTC-20260904-be4f48-queue-signal-bf-next-relay-edge/result.json
+owned_paths:
+  - .github/workflows/tibia-official-client-re-be4f48-queue-signal-bf-next-relay-edge.yml
+  - tools/tibia_re_be4f48_queue_signal_bf_next_relay_edge/**
+  - docs/agents/tasks/active/OTC-20260904-be4f48-queue-signal-bf-next-relay-edge.md
+  - docs/agents/evidence/OTC-20260904-be4f48-queue-signal-bf-next-relay-edge/**
+proven:
+  - exact current fence 15.32.be4f48 / 52105824 / 552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1
+  - promoted self-relay is exactly present at connectImpl@0xbe2eee in FDE 0xbe2a50..0xbe3086
+  - bounded FDE has exactly two connectImpl calls, none after the promoted self-relay
+  - no additional exact-signal identity-preserving candidate exists inside that bounded constructor FDE
+  - runtime_access=none and Track B PR #284 was not modified
+unknown:
+  - next unique relay edge outside the admitted bounded constructor context
+  - next endpoint identity
+  - final queue/TCP writer contract
+  - FIELD6_VALUE
+conflicts: []
+first_failure:
+  marker: NO_NEXT_CLIENTMESSAGEREADYTOPROCESS_SOURCE_CONNECTION_IN_BOUNDED_QUEUE_CONSTRUCTOR_FDE
+  evidence: docs/agents/evidence/OTC-20260904-be4f48-queue-signal-bf-next-relay-edge/result.json
+rejected_hypotheses:
+  - a second exact-signal connect exists after the promoted self-relay in the same queue-constructor FDE
+changed_paths:
+  - .github/workflows/tibia-official-client-re-be4f48-queue-signal-bf-next-relay-edge.yml
+  - tools/tibia_re_be4f48_queue_signal_bf_next_relay_edge/test_contract.py
+  - tools/tibia_re_be4f48_queue_signal_bf_next_relay_edge/next_relay_edge.py
+  - docs/agents/tasks/active/OTC-20260904-be4f48-queue-signal-bf-next-relay-edge.md
+  - docs/agents/evidence/OTC-20260904-be4f48-queue-signal-bf-next-relay-edge/result.json
+validation:
+  - command: focused GitHub Actions exact-client source discriminator
+    result: PASS
+    evidence: run 33880857084 / job 101048886180 on implementation head 88e8c05babc856d89892226ad3cd27d6739997ce
+  - command: official-service E2E
+    result: NOT_APPLICABLE
+    evidence: source-only static discriminator; official client execution/login/E2E explicitly prohibited by task fence
+blockers:
+  - next relay identity cannot be uniquely proven inside the admitted bounded constructor context
+next_action: clean coordinator promotion of this precise bounded source blocker before admitting any further source step
 ```

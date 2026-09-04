@@ -12,7 +12,7 @@ phase: implement
 branch: ai/OTC-20260904-be4f48-queue-qmeta-index
 base_branch: main
 base_main: 6439ec169ae6e0dfe8b3893dc136c752001949eb
-created: 2026-09-04T22:06:00Z
+created: 2026-09-04T22:38:02Z
 updated_at: 2026-09-04T22:25:59Z
 invocation_started_at: 2026-09-04T22:06:00Z
 last_progress_at: 2026-09-04T22:25:59Z
@@ -101,3 +101,7 @@ FACT: promoted exact tuple and prior conditional adapter result only. INFERENCE:
 # Safety
 
 runtime_access=none; official_client_executed=false; login_performed=false; credentials_used=false; process_memory_access=false; packet_capture=false; ocr_vision_used=false; official_service_e2e_count=0; track_b_pr_284_modified=false. Temporary static hosted acquisition only; raw client deleted before artifact upload.
+
+# Exact source checkpoint
+
+Repository-only RED 647b7c2854f8e0f4347a83ec0f4a5b26d3490b8c; seven missing-module failures before any client materialization. Current suite18 PASS, regression RED observed for missing image helper, exact revision guard, immutable reads, stack provenance/arithmetic and unsupported stack widths/pop rsp. Parent00f259421c1e5cbdb3e1fc07a2076823f73b4d7d exact run33926925770/job101197364666 traversed20steps to unique tail0xde823a ->0xdd8df0 with same entry receiver. This differs from known signal body0xbd2190 and cannot be relabelled as that body. New candidate is a bounded callee-semantics boundary, not a writer/registration proof. Final stack fix requires new exact-head qualification and independent audit.

@@ -74,5 +74,18 @@ class Contract(unittest.TestCase):
         r=self.module().walk(bytes.fromhex('554889e54883ec084883c4085de9ef1f0000'),0x1000,{})
         self.assertEqual(r['stop'],'EDGE_REACHED')
 
+    def test_non64_stack_operation_is_not_modeled_as_qword(self):
+        r=self.module().walk(bytes.fromhex('576650585fe800000000'),0x1000,{})
+        self.assertEqual(r['stop'],'UNSUPPORTED_STACK_WIDTH')
+
+    def test_pop_rsp_fails_closed(self):
+        r=self.module().walk(bytes.fromhex('505ce800000000'),0x1000,{})
+        self.assertEqual(r['stop'],'UNSUPPORTED_STACK_DESTINATION')
+
+    def test_new_callable_is_not_known_signal_or_registration(self):
+        c=self.module().classify_edge({'kind':'tail','target':'0xdd8df0'})
+        self.assertFalse(c['connection_proven'])
+        self.assertEqual(c['next_endpoint_identity'],'UNKNOWN')
+
 if __name__=='__main__':
     unittest.main()

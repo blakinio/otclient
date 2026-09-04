@@ -25,7 +25,7 @@ def qualify_header(header):
 def readonly_read(img,addr,size):
     if not 1<=size<=8 or not any(lo<=addr and addr+size<=hi and flags&2 and not flags&1 for lo,hi,off,flags in img.sections):
         raise ValueError('NON_IMMUTABLE_SELECTED_READ')
-    if any(addr<r+8 and r<addr+size for r in img.relative_relocations):
+    if any(addr<r+8 and r<addr+size for r in set(img.relative_relocations)|set(getattr(img,'symbol_relocations',{}))):
         raise ValueError('RELOCATED_SELECTED_READ')
     return img.read(addr,size)
 
@@ -82,7 +82,10 @@ def walk(raw,start,initial,read=None,max_steps=200):
                 try:
                     data=read(a,op.size)
                     if len(data)!=op.size:return None
-                    reads.append({'site':hex(ins.address),'address':hex(a),'width':op.size})
+                    reads.append({'site':hex(ins.address),'address':hex(a),'width':op.size,
+                                  'base_register':md.reg_name(op.mem.base),'base_value':regs.get(md.reg_name(op.mem.base)),
+                                  'index_register':md.reg_name(op.mem.index),'index_value':regs.get(md.reg_name(op.mem.index)),
+                                  'scale':op.mem.scale})
                     return int.from_bytes(data,'little')
                 except ValueError:return None
         return None
@@ -110,10 +113,13 @@ def walk(raw,start,initial,read=None,max_steps=200):
             target=val(i,ops[0]);trace[-1]['taken']=choices[m]
             pc=target if choices[m] else nxt;continue
         if m=='push':
+            if ops[0].size!=8:return result('UNSUPPORTED_STACK_WIDTH')
             sp=regs.get('rsp');v=val(i,ops[0])
             if not isinstance(sp,int) or not -4088<=sp<=0:return result('UNPROVEN_STACK')
             regs['rsp']=sp-8;stack[(sp-8,8)]=v
         elif m=='pop' and ops[0].type==X86_OP_REG:
+            if ops[0].size!=8:return result('UNSUPPORTED_STACK_WIDTH')
+            if reg(md,ops[0])=='rsp':return result('UNSUPPORTED_STACK_DESTINATION')
             sp=regs.get('rsp')
             if not isinstance(sp,int) or not -4096<=sp<=-8:return result('UNPROVEN_STACK')
             regs[reg(md,ops[0])]=stack.get((sp,8));regs['rsp']=sp+8
@@ -171,16 +177,20 @@ def analyze(img):
     if not fde or fde[0]!=fn or fde[1]-fde[0]>65536:raise ValueError('NON_UNIQUE_OR_UNBOUNDED_STATIC_METACALL')
     path=walk(img.read(fde[0],fde[1]-fde[0]),fde[0],{'rsi':0,'rdx':191},lambda a,s:readonly_read(img,a,s))
     edge=path.get('edge') or {}
-    proven=path['stop']=='EDGE_REACHED' and edge.get('target')=='0xbd2190' and edge.get('receiver')=='entry:object'
+    proven=(path['stop']=='EDGE_REACHED' and edge.get('site')=='0xde823a'
+            and edge.get('target')=='0xdd8df0' and edge.get('receiver')=='entry:object'
+            and len(path['immutable_reads'])==1 and path['immutable_reads'][0]['index_value']==191
+            and path['immutable_reads'][0]['address']=='0x1da95e0')
     return {'schema':'otclient.track-a.be4f48-queue-qmeta-index.v1',
             'exact_client':{'version':VERSION,'size':SIZE,'sha256':SHA},
             'queue_static_metaobject':hex(meta),'queue_signal_index':'0xbf','queue_signal_method_row':hex(row),
             'queue_owner':owner,'queue_signal_name':name,'qmeta_revision':header[0],
             'static_metacall':hex(fn),'static_metacall_fde':[hex(x) for x in fde],
             'conditional_numeric_inputs':{'esi':0,'edx':'0xbf'},'selected_path':path,
-            'index_to_signal_dispatch_proven':proven,'connection_registration_proven':False,
+            'index_to_callable_dispatch_proven':proven,'index_to_known_signal_body_proven':False,
+            'connection_registration_proven':False,
             'terminal_result':'SOURCE_BLOCKER' if proven else 'ANALYSIS_INCOMPLETE',
-            'FIRST_MISSING_BOUNDARY':'EXACT_STATIC_METACALL_DISPATCH_DOES_NOT_IDENTIFY_CONNECTION_REGISTRATION' if proven else 'COMPLETE_SELECTED_STATIC_METACALL_PATH_REQUIRED',
+            'FIRST_MISSING_BOUNDARY':'EXACT_INDEX_CALLEE_0_DD8DF0_CONNECTION_REGISTRATION_SEMANTICS_NOT_PROVEN' if proven else 'COMPLETE_SELECTED_STATIC_METACALL_PATH_REQUIRED',
             'classification':classify_edge(edge),'next_endpoint_identity':'UNKNOWN','final_writer_contract':'UNKNOWN',
             'field6_value':'UNKNOWN','pre_success_send_sequence':'UNKNOWN','runtime_access':'none',
             'official_client_executed':False,'login_performed':False,'credentials_used':False,

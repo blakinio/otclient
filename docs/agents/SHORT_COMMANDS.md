@@ -4,6 +4,7 @@ This registry maps owner-facing programme aliases to repository-owned prompts or
 
 | Alias | Canonical entry point | Purpose |
 |---|---|---|
+| `OTC-BE4F48-QT-CONNECTIMPL-RECEIVER-DELEGATION` | `docs/agents/prompts/OTC_BE4F48_QT_CONNECTIMPL_RECEIVER_DELEGATION.md` | Qualify the exact packaged QtCore dependency and one receiver-carrying delegation edge from the selected connectImpl import; source-only, no runtime binding assumption. |
 | `OTCLIENT-TIBIA-RE` | `docs/agents/prompts/OTCLIENT_TIBIA_RE_CANONICAL.md` | Continue Track A: official Linux Tibia client reverse engineering in `blakinio/otclient`. |
 | `OTCLIENT-GLOBAL-LOGIN` | PR `#284`, branch `feat/OTC-20260813-tibia-global-login-lab`, task `docs/agents/tasks/active/OTC-20260813-tibia-global-login-lab.md` on that branch | Continue Track B: make this OTClient fork authenticate to and enter official Tibia Global. |
 | `OTCLIENT-TIBIA-GLOBAL-LOGIN-FINAL-CONTINUE` | `docs/agents/prompts/OTCLIENT_TIBIA_GLOBAL_LOGIN_FINAL_CONTINUE.md` | Single-window Track B coordinator with local Vision/Qwen post-processing when independently legal secret-safe keyframes exist. |
@@ -36,7 +37,7 @@ Uruchom OTCLIENT-GLOBAL-LOGIN autonomicznie.
 Uruchom OTCLIENT-TIBIA-GLOBAL-LOGIN-FINAL-CONTINUE autonomicznie.
 ```
 
-No current bounded successor is registered by this archive. Select one from fresh coordinator authority after archival. No alias authorizes runtime, Track B mutation or official-service E2E without its own explicit authority.
+The current bounded successor is `OTC-BE4F48-QT-CONNECTIMPL-RECEIVER-DELEGATION`, registered after archive #909. Read its exact prompt and latest promotion before claiming ownership. No alias authorizes runtime, Track B mutation or official-service E2E without its own explicit authority.
 
 ## `OTCLIENT-TIBIA-RE` resolution
 

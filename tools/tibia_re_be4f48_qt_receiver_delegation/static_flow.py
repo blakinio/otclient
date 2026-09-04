@@ -217,10 +217,14 @@ def execute(md, ins, regs, memory, calls, stores, symbols=None):
             memory.clear()
         return
     if m == "push":
+        if ops[0].size != 8:
+            raise ValueError('UNSUPPORTED_STACK_WIDTH')
         regs["rsp"] = add(regs.get("rsp", UNKNOWN), -8)
         memory[(regs["rsp"], 8)] = value(md, ins, ops[0], regs, memory)
         return
     if m == "pop":
+        if ops[0].size != 8 or reg_name(md, ops[0].reg) == 'rsp':
+            raise ValueError('UNSUPPORTED_STACK_WIDTH_OR_DESTINATION')
         regs[reg_name(md, ops[0].reg)] = memory.get((regs.get("rsp"),8),UNKNOWN)
         regs["rsp"] = add(regs.get("rsp",UNKNOWN),8)
         return
@@ -351,5 +355,3 @@ def trace_paths(raw, start, initial=None, memory=None, symbols=None, max_steps=4
     return {'complete':complete,'stop_reason':reason,'calls':unique(calls),'stores':unique(stores),
             'tail_edges':unique(tails),'steps':steps,'semantic_trace':unique(trace),
             'all_paths_reach_receiver':bool(stop_at_receiver and complete and not return_without_receiver and not tails and calls)}
-
-

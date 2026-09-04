@@ -39,4 +39,24 @@ class Contract(unittest.TestCase):
         with self.assertRaises(ValueError):m.unique_definition([(1,0x1000,20),(1,0x2000,20)])
         self.assertEqual(m.unique_definition([(1,0x1000,20)]),(0x1000,20))
 
+    def test_reused_flow_rejects_non64_stack_operation(self):
+        from static_flow import trace_paths
+        with self.assertRaises(ValueError):trace_paths(bytes.fromhex('576650585fc3'),0x1000)
+
+    def test_reused_flow_rejects_pop_rsp(self):
+        from static_flow import trace_paths
+        with self.assertRaises(ValueError):trace_paths(bytes.fromhex('505cc3'),0x1000)
+
+    def test_unresolved_callee_is_not_positive_delegation(self):
+        m=self.module()
+        self.assertFalse(m.resolved_delegation(True,[{'target':'UNKNOWN'}]))
+        self.assertFalse(m.resolved_delegation(False,[{'target':'0x1234'}]))
+        self.assertTrue(m.resolved_delegation(True,[{'target':'0x1234'}]))
+
+    def test_dependency_elf_identity(self):
+        m=self.module()
+        m.qualify_core_identity(64,'EM_X86_64',['libQt6Core.so.6'],'STT_FUNC')
+        for v in [(32,'EM_X86_64',['libQt6Core.so.6'],'STT_FUNC'),(64,'EM_AARCH64',['libQt6Core.so.6'],'STT_FUNC'),(64,'EM_X86_64',['libOther.so'],'STT_FUNC'),(64,'EM_X86_64',['libQt6Core.so.6'],'STT_OBJECT')]:
+            with self.assertRaises(ValueError):m.qualify_core_identity(*v)
+
 if __name__=='__main__':unittest.main()

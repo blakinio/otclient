@@ -54,6 +54,7 @@ jobs:
           "$r/bin/wgcf" generate >/dev/null
           printf 'WGConfig = %s\n\n[Socks5]\nBindAddress = 127.0.0.1:25347\n' "$r/state/wgcf-profile.conf" > wireproxy.conf
           nohup "$r/bin/wireproxy" -c wireproxy.conf >"$r/wireproxy.log" 2>&1 </dev/null &
+          echo "$!" >"$r/wireproxy.pid"
           for _ in $(seq 1 30); do
             curl --socks5-hostname 127.0.0.1:25347 -fsS --max-time 10 https://www.cloudflare.com/cdn-cgi/trace >"$r/trace" 2>/dev/null && grep -Eq '^warp=(on|plus)$' "$r/trace" && break
             sleep 2
@@ -61,7 +62,7 @@ jobs:
           grep -Eq '^warp=(on|plus)$' "$r/trace"
           base=https://static.tibia.com/launcher/tibiaclient-linux-current
           curl --socks5-hostname 127.0.0.1:25347 --compressed -fL "$base/package.json" -o "$r/pkg/package.json"
-          python3 tools/tibia_re_be4f48_qt_receiver_delegation/qt_receiver.py --manifest "$r/pkg/package.json" --selection "$r/selected.json"
+          python3 "$GITHUB_WORKSPACE/tools/tibia_re_be4f48_qt_receiver_delegation/qt_receiver.py" --manifest "$r/pkg/package.json" --selection "$r/selected.json"
           echo "RE_ROOT=$r" >>"$GITHUB_ENV"
           echo BE4F48_QT_RECEIVER_DELEGATION_EXACT_PACKAGE_FENCE=PASS
 
@@ -108,6 +109,14 @@ jobs:
           print('BE4F48_QT_RECEIVER_DELEGATION_SANITIZED_RESULT=PASS')
           print(json.dumps(d,sort_keys=True))
           PY
+
+      - name: Delete all acquisition state before artifact
+        shell: bash
+        run: |
+          if test -f "$RE_ROOT/wireproxy.pid"; then kill "$(cat "$RE_ROOT/wireproxy.pid")" || true; fi
+          rm -rf "$RE_ROOT"
+          test ! -e "$RE_ROOT"
+          echo ACQUISITION_STATE_REMOVED_BEFORE_ARTIFACT=true
 
       - name: Upload sanitized bounded result only
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a

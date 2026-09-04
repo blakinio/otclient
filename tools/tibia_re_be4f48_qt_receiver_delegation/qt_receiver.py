@@ -42,10 +42,18 @@ def unique_definition(rows):
         raise ValueError('NO_UNIQUE_BOUNDED_DEFINED_CONNECTIMPL')
     return rows[0][1],rows[0][2]
 
+def resolved_delegation(complete,rows):
+    return bool(complete and len(rows)==1 and re.fullmatch(r'0x[0-9a-f]+',str(rows[0]['target'])) and int(rows[0]['target'],16)>0)
+
+def qualify_core_identity(elfclass,machine,sonames,symbol_type):
+    if (elfclass,machine,sonames,symbol_type)!=(64,'EM_X86_64',['libQt6Core.so.6'],'STT_FUNC'):
+        raise ValueError('QTCORE_ELF_SONAME_OR_FUNCTION_NOT_QUALIFIED')
+
 def analyze(selected,client,core):
     verify_fence(client.read_bytes(),selected['version'])
     img=Image(client)
     try:
+        if img.elf.elfclass!=64 or img.elf['e_machine']!='EM_X86_64':raise ValueError('CLIENT_ELF_ARCHITECTURE_MISMATCH')
         dyn=img.elf.get_section_by_name('.dynamic')
         needed=[t.needed for t in dyn.iter_tags() if t.entry.d_tag=='DT_NEEDED' and t.needed=='libQt6Core.so.6']
         imports=[s for s in img.elf.get_section_by_name('.dynsym').iter_symbols() if s.name==SYMBOL]
@@ -68,6 +76,8 @@ def analyze(selected,client,core):
     try:
         syms=[s for s in img.elf.get_section_by_name('.dynsym').iter_symbols() if s.name==SYMBOL]
         address,size=unique_definition([(s['st_shndx'],int(s['st_value']),int(s['st_size'])) for s in syms])
+        sonames=[t.soname for t in img.elf.get_section_by_name('.dynamic').iter_tags() if t.entry.d_tag=='DT_SONAME']
+        qualify_core_identity(img.elf.elfclass,img.elf['e_machine'],sonames,syms[0]['st_info']['type'])
         fde=img.containing_fde(address)
         if not fde or fde[0]!=address or fde[1]-fde[0]>0x4000:raise ValueError('CONNECTIMPL_FDE_NOT_EXACT_OR_BOUNDED')
         path=trace_paths(img.read(fde[0],fde[1]-fde[0]),fde[0],{'rcx':'registered:receiver'},symbols=img.plt_symbol)
@@ -82,7 +92,11 @@ def analyze(selected,client,core):
                        'analysis_stop':path['stop_reason'],'analysis_steps':path['steps'],
                        'receiver_delegations':list(candidates.values()),
                        'bounded_frontier':path['semantic_trace'][-4:]})
-        proven=path['complete'] and len(candidates)==1
+        proven=resolved_delegation(path['complete'],list(candidates.values()))
+        if proven:
+            target=int(next(iter(candidates.values()))['target'],16)
+            proven=bool(img.containing_fde(target) or img.plt_symbol(target))
+        result['qtcore_elf_identity']={'class':64,'machine':'EM_X86_64','soname':sonames[0],'symbol_type':'STT_FUNC'}
         result['receiver_delegation_proven']=proven
         result['terminal_result']='SOURCE_BLOCKER' if path['complete'] else 'ANALYSIS_INCOMPLETE'
         result['FIRST_MISSING_BOUNDARY']='DELEGATED_QT_RECEIVER_REGISTRATION_STORAGE_AND_DELIVERY_NOT_PROVEN' if proven else 'NO_UNIQUE_PROVEN_QT_RECEIVER_DELEGATION' if path['complete'] else 'COMPLETE_BOUNDED_QT_CONNECTIMPL_FLOW_REQUIRED'

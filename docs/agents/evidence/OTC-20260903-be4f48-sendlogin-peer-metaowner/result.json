@@ -1,0 +1,116 @@
+{
+  "task_id": "OTC-20260903-be4f48-sendlogin-peer-metaowner",
+  "decision": "SOURCE_BLOCKER",
+  "trusted_main": "446eb643d6ef24dc996a410df812393e19800973",
+  "source_analysis_head": "6174d44df2017bc5a435de0e843ee824520a12a5",
+  "source_pr": 875,
+  "current_client": {
+    "version": "15.32.be4f48",
+    "size": 52105824,
+    "sha256": "552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1"
+  },
+  "tdd": {
+    "initial_red": {
+      "run_id": 33783290711,
+      "job_id": 100741903966,
+      "head": "df2d291073ab6c6b3a716d40639d94fad3550226",
+      "repository_only_contract": "failure",
+      "exact_client_prepare": "skipped",
+      "client_materialization": "skipped"
+    },
+    "v3_red": {
+      "run_id": 33837464949,
+      "job_id": 100912796002,
+      "head": "c86500f8d110bac43c582738213e5ea1458c3d30",
+      "repository_only_contract": "failure",
+      "exact_client_prepare": "skipped",
+      "client_materialization": "skipped"
+    },
+    "sret_audit_red": {
+      "run_id": 33837902877,
+      "job_id": 100914066665,
+      "head": "64472af5ebca95c116198010dc343387a6f2cb15",
+      "repository_only_contract": "failure",
+      "exact_client_prepare": "skipped",
+      "client_materialization": "skipped"
+    }
+  },
+  "exact_source_run": {
+    "run_id": 33838135600,
+    "job_id": 100914746055,
+    "head": "6174d44df2017bc5a435de0e843ee824520a12a5",
+    "conclusion": "success",
+    "artifact_id": 9923975240,
+    "artifact_digest": "sha256:e96c91c2b8bf408c06ff829ac25d48d39595f719a275e7361886cea93cb7d8ff"
+  },
+  "accepted": {
+    "peer_target": "0xd052a0",
+    "peer_static_metaobject": "0x30b68a0",
+    "peer_owner_identity": "tibia::authentication::TLoginProtocolMessageHandler",
+    "peer_signal_index": 0,
+    "peer_signal_name": "sendLoginMessage",
+    "actual_qt_connection_primitive": "QObject::connectImpl(QObject const*, void**, QObject const*, void**, QtPrivate::QSlotObjectBase*, Qt::ConnectionType, int const*, QMetaObject const*)",
+    "actual_qt_connection_callsite": "0x7c6b9f",
+    "selected_block_previous_connect": "0x7c6b07",
+    "sendlogin_adapter_reference_site": "0x7c6b34",
+    "sendlogin_adapter_target": "0xbd3050",
+    "peer_reference_site": "0x7c6b40",
+    "allocator_site": "0x7c6b5e",
+    "connectimpl_hidden_sret_proven": true,
+    "connectimpl_sret_storage_register": "rbp",
+    "connectimpl_sret_storage_definition_site": "0x7c6b69",
+    "connection_destructor_argument_definition_site": "0x7c6ba8",
+    "connection_destructor_callsite": "0x7c6bab",
+    "connectimpl_formal_abi": {
+      "sender": "rsi",
+      "signal": "rdx",
+      "receiver": "rcx",
+      "slot_ptr": "r8",
+      "slot_object": "r9",
+      "connection_type": "stack0",
+      "types": "stack8",
+      "sender_metaobject": "stack16"
+    },
+    "sender_metaobject_bound_to_connection": true,
+    "peer_signal_bound_to_connection": true,
+    "sendlogin_adapter_bound_into_qslot_object": true,
+    "qslot_object_adapter_field_offset": "0x10",
+    "sender_endpoint_identity": "tibia::authentication::TLoginProtocolMessageHandler",
+    "receiver_endpoint_provenance": "OBJECT_FIELD:[entry-rdi-derived-rbx+0x88]",
+    "receiver_endpoint_identity": "UNKNOWN",
+    "sendlogin_causal_binding_proven": false,
+    "pre_login_sequence_advanced": false
+  },
+  "withheld": {
+    "receiver_endpoint_class_identity": "UNKNOWN",
+    "complete_sender_receiver_pair": "NOT_PROVEN",
+    "causal_signal_to_sendlogin_binding": "NOT_PROVEN",
+    "pre_success_send_sequence": "UNKNOWN",
+    "track_b_delta": "NOT_PROVEN"
+  },
+  "safety": {
+    "runtime_access": "none",
+    "official_client_executed": false,
+    "login_performed": false,
+    "credentials_used": false,
+    "secret_access": false,
+    "process_memory_access": false,
+    "packet_capture": false,
+    "official_service_e2e_count": 0,
+    "raw_client_uploaded": false,
+    "track_b_pr_284_modified": false
+  },
+  "audit": {
+    "result": "PASS_AFTER_REMEDIATION",
+    "validator": "fresh-validator-role-20260904",
+    "material_findings_open": 0,
+    "fixed_finding": "SRET-001: hidden-sret ABI was modeled but not independently proven from exact ELF; final analyzer now requires same rbp return storage to be passed to QMetaObject::Connection::~Connection()."
+  },
+  "e2e": {
+    "result": "NOT_APPLICABLE",
+    "reason": "This task is an exact-current source-only static discriminator and explicitly forbids official-client execution, login, runtime observation and official-service E2E."
+  },
+  "terminal_result": "SOURCE_BLOCKER",
+  "FIRST_MISSING_BOUNDARY": "SENDER_RECEIVER_ENDPOINT_IDENTITY_NOT_PROVEN",
+  "next_action": "Clean coordinator promotion should promote only these sanitized facts, keep Track B PR #284 unchanged, close source PR #875 unmerged as consumed, and admit any later receiver-identity source discriminator as a new bounded task rather than extending this source lane."
+}

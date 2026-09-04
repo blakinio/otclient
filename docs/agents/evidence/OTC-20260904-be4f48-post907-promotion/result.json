@@ -1,0 +1,81 @@
+{
+  "schema": "otclient.track-a.be4f48-post907-promotion.v1",
+  "exact_client": {
+    "sha256": "552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1",
+    "size": 52105824,
+    "version": "15.32.be4f48"
+  },
+  "source_pr": 907,
+  "source_head": "08505bec88fd162cbf7de4c3483a869ec3a08f64",
+  "scientific_source_head": "fe80db6ccc6ffd2e2af97fd954a0c18e33446545",
+  "FACT": {
+    "ADAPTER_EDGE_SCOPE": "modeled normal returning paths; same symbolic adapter entry receiver; no resolved dynamic vptr",
+    "ADAPTER_FIRST_RECEIVER_EDGE": "0xbd31e4 -> load64(add(load64(arg:rdi),0x68))",
+    "ADAPTER_INVOCATION_ABI": "Conditional on QSlot entry edi=1 and constructed slot in rsi: entry rdx -> adapter rdi; [entry rcx+8] -> adapter rsi",
+    "CONNECTIMPL_FORMAL_RECEIVER_REGISTER": "rcx",
+    "QSLOT_DISPATCH_FUNCTION": "0x7c4f10",
+    "QSLOT_MEMBER_POINTER": {
+      "function": "0xbd3050",
+      "this_adjustment": 0
+    },
+    "SELECTED_CONNECTIMPL_SYMBOL_DEFINED_IN_EXECUTABLE": false,
+    "SENDLOGIN_ADAPTER_TARGET": "0xbd3050",
+    "SENDLOGIN_CONNECTIMPL_CALLSITE": "0x7c6b9f",
+    "SENDLOGIN_RECEIVER_PROVENANCE": "OBJECT_FIELD:[entry-rdi-derived-rbx+0x88]",
+    "QUEUE_STATIC_METAOBJECT": "0x30b73e0",
+    "QUEUE_SIGNAL_INDEX": "0xbf",
+    "QUEUE_SIGNAL_METHOD_ROW": "0x1ce47c0",
+    "QUEUE_SIGNAL_NAME": "clientMessageReadyToProcess",
+    "QUEUE_QMETA_REVISION": 13,
+    "QUEUE_STATIC_METACALL": "0xde76a0",
+    "QUEUE_NUMERIC_INDEX_INPUTS": {
+      "esi": 0,
+      "edx": 191
+    },
+    "QUEUE_NUMERIC_INDEX_CALLABLE_EDGE": "0xde823a -> 0xdd8df0",
+    "QUEUE_NUMERIC_INDEX_RECEIVER": "same conditional entry object",
+    "QUEUE_NUMERIC_INDEX_TABLE_ENTRY": "0x1da95e0",
+    "QUEUE_NUMERIC_INDEX_PROOF_SCOPE": "20-step selected numeric path; immutable 4-byte table read; no Qt enum or registration claim"
+  },
+  "INFERENCE": {
+    "required_binding_proof": "Exact deployed Qt registration-to-invocation mapping is required before binding conditional adapter ABI to registered receiver",
+    "next_bounded_callee_mode": "0xdd8df0 is a new unique exact callee; its relationship to connection registration and known signal body0xbd2190 needs separate semantic proof"
+  },
+  "UNKNOWN": {
+    "COMPLETE_SENDLOGIN_SENDER_RECEIVER_PAIR": "NOT_PROVEN",
+    "FIELD6_VALUE": "UNKNOWN",
+    "FINAL_QUEUE_WRITER": "UNKNOWN",
+    "FINAL_TCP_WRITER": "UNKNOWN",
+    "FINAL_WRITER_CONTRACT": "UNKNOWN",
+    "NEXT_QUEUE_SIGNAL_ENDPOINT": "UNKNOWN",
+    "PRE_SUCCESS_SEND_SEQUENCE": "UNKNOWN",
+    "SENDLOGIN_CAUSAL_BINDING": "NOT_PROVEN",
+    "SENDLOGIN_RECEIVER_IDENTITY": "UNKNOWN",
+    "TRACK_B_CURRENT_WIRE_DELTA": "NOT_PROVEN",
+    "QUEUE_QMETA_CALLEE_IDENTITY": "UNKNOWN",
+    "QUEUE_QMETA_CONNECTION_REGISTRATION": "NOT_PROVEN",
+    "QUEUE_QMETA_CALLEE_TO_KNOWN_SIGNAL_BODY": "NOT_PROVEN"
+  },
+  "terminal_result": "SOURCE_BLOCKER",
+  "FIRST_MISSING_BOUNDARY": "EXACT_INDEX_CALLEE_0_DD8DF0_CONNECTION_REGISTRATION_SEMANTICS_NOT_PROVEN",
+  "qualification": {
+    "focused_run": 33927266456,
+    "focused_job": 101198387605,
+    "ci_run": 33927266789,
+    "governance_run": 33927266451,
+    "boundary_run": 33927266465,
+    "all": "success",
+    "scientific_review": "Codex /root/adapter_review PASS",
+    "evidence_review": "Codex /root/queue_evidence_review PASS",
+    "material_findings": 0
+  },
+  "runtime_access": "none",
+  "official_client_executed": false,
+  "login_performed": false,
+  "credentials_used": false,
+  "process_memory_access": false,
+  "packet_capture": false,
+  "ocr_vision_used": false,
+  "official_service_e2e_count": 0,
+  "track_b_pr_284_modified": false
+}

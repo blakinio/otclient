@@ -1,0 +1,102 @@
+{
+  "schema": "otclient.track-a.be4f48-post889-890-promotion.v1",
+  "decision": "SOURCE_BLOCKER",
+  "integration_status": "BLOCKED_NO_IMPLEMENTABLE_WIRE_DELTA",
+  "trusted_main": "e94e6c5764851f9cb62691d90c55f42e9c6253a1",
+  "exact_client": {
+    "version": "15.32.be4f48",
+    "size": 52105824,
+    "sha256": "552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1"
+  },
+  "source_889": {
+    "pr": 889,
+    "final_pr_head": "66bd46b42cbc5d18e0f338d4a37b2ee13390adb4",
+    "scientific_source_head": "903b7e6c5f9452d9be545d698355bcb151c62aec",
+    "analysis_run": 33872240794,
+    "analysis_job": 101020701224,
+    "artifact_id": 9936389943,
+    "artifact_digest": "sha256:f4fcfd66b409c31ddaf7b06c471eccd33a638d7ff6cdaeeae9c4f47bef147636",
+    "final_focused_run": 33872718283,
+    "final_ci_run": 33872718522,
+    "final_governance_run": 33872718247,
+    "final_self_hosted_boundary_run": 33872718325,
+    "terminal_result": "SOURCE_BLOCKER",
+    "first_missing_boundary": "UNIQUE_ENTRY_OBJECT_EDGE_TYPE_NOT_PROVEN"
+  },
+  "source_890": {
+    "pr": 890,
+    "final_pr_head": "a9bdeb4a39d27cbaff8f77cf67212b06c6630510",
+    "scientific_source_head": "7dab5a0cb60f9f971ff0623aa0d5b9922bbbcd65",
+    "analysis_run": 33873246506,
+    "analysis_job": 101024010911,
+    "artifact_id": 9936796961,
+    "artifact_digest": "sha256:9dd2bb0d11af5240b5f0275df89f8b4bccabb3af8d19461642619883ebcc3879",
+    "final_focused_run": 33873511549,
+    "final_ci_run": 33873512071,
+    "final_governance_run": 33873511534,
+    "final_self_hosted_boundary_run": 33873511577,
+    "terminal_result": "QUEUE_SIGNAL_BF_RELAY_RECEIVER_TYPE_PROVEN",
+    "first_missing_boundary": "NEXT_RELAY_EDGE_NOT_UNIQUELY_PROVEN_WITHIN_BOUNDED_RECEIVER_TYPE_PROOF"
+  },
+  "promoted_facts": {
+    "sendlogin_sender_identity": "tibia::authentication::TLoginProtocolMessageHandler",
+    "sendlogin_signal": "sendLoginMessage",
+    "sendlogin_connectimpl_callsite": "0x7c6b9f",
+    "sendlogin_adapter_target": "0xbd3050",
+    "sendlogin_connection_owner_fde": ["0x7c6700", "0x7cc933"],
+    "sendlogin_connection_owner_entry_object": "ENTRY_ARG:rdi",
+    "sendlogin_connection_owner_identity": "UNKNOWN",
+    "sendlogin_unique_owner_bound_edge": "0x7c67b8->0x7e8f30",
+    "sendlogin_receiver_provenance": "OBJECT_FIELD:[entry-rdi-derived-rbx+0x88]",
+    "sendlogin_receiver_identity": "UNKNOWN",
+    "sendlogin_causal_binding_proven": false,
+    "queue_sender_identity": "tibia::protocol::TProtocolMessageQueue",
+    "queue_signal_index": 191,
+    "queue_signal_index_hex": "0xbf",
+    "queue_signal_name": "clientMessageReadyToProcess",
+    "queue_signal_body": "0xbd2190",
+    "queue_signal_connectimpl_callsite": "0xbe2eee",
+    "queue_signal_connectimpl_fde": ["0xbe2a50", "0xbe3086"],
+    "queue_signal_receiver_provenance": "ENTRY_ARG:rdi",
+    "queue_signal_receiver_identity": "tibia::protocol::TProtocolMessageQueue",
+    "queue_signal_receiver_identity_proven": true,
+    "queue_signal_receiver_vptr": "0x30ed588",
+    "queue_signal_receiver_typeinfo": "0x30ed548",
+    "qslot_function_target": "0xbd2190",
+    "queue_signal_connection_role": "SIGNAL_RELAY"
+  },
+  "withheld": {
+    "sendlogin_connection_owner_class_identity": "UNKNOWN",
+    "sendlogin_receiver_class_identity": "UNKNOWN",
+    "complete_sendlogin_sender_receiver_pair": "NOT_PROVEN",
+    "pre_success_send_sequence": "UNKNOWN",
+    "field6_value": "UNKNOWN",
+    "next_unique_relay_edge": "UNKNOWN",
+    "next_relay_endpoint_identity": "UNKNOWN",
+    "final_queue_writer": "UNKNOWN",
+    "final_tcp_writer": "UNKNOWN",
+    "final_writer_contract": "UNKNOWN",
+    "track_b_current_wire_delta": "NOT_PROVEN"
+  },
+  "independent_coordinator_falsification": {
+    "result": "PASS",
+    "material_findings_open": 0,
+    "implementable_delta_count": 0,
+    "source_worker_self_promotion_used": false
+  },
+  "next_source_boundaries": [
+    "OTC-BE4F48-SENDLOGIN-OWNER-EDGE-7E8F30-IDENTITY",
+    "OTC-BE4F48-QUEUE-SIGNAL-BF-NEXT-RELAY-EDGE"
+  ],
+  "safety": {
+    "runtime_access": "none",
+    "official_client_executed": false,
+    "login_performed": false,
+    "credentials_used": false,
+    "process_memory_access": false,
+    "packet_capture": false,
+    "ocr_vision_used": false,
+    "official_service_e2e_count": 0,
+    "track_b_pr_284_modified": false
+  }
+}

@@ -12,12 +12,22 @@ branch: ai/OTC-20260903-be4f48-sendlogin-peer-metaowner
 base_branch: main
 base_main: 446eb643d6ef24dc996a410df812393e19800973
 created: 2026-09-03T19:11:13+02:00
-updated_at: 2026-09-04T06:50:00+02:00
+updated_at: 2026-09-04T06:52:00+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: chat_github
 routing_contract: docs/agents/programs/OTCLIENT_TIBIA_RE_HYBRID_EXECUTION_ROUTING.md
 runtime_access: none
+runtime_owner_task: NOT_APPLICABLE
+runtime_namespace: NOT_APPLICABLE
+canonical_registration: NOT_APPLICABLE
+canonical_lease_generation: NOT_APPLICABLE
+registration_lease_generation: NOT_APPLICABLE
+gate_a: NOT_APPLICABLE
+generation_rebind: NOT_APPLICABLE
+gate_b: NOT_APPLICABLE
+bootstrap: NOT_APPLICABLE
+target_uniqueness: NOT_APPLICABLE
 persistent_session_role: none
 physical_e2e_required: false
 mutation_authorized: false
@@ -35,14 +45,14 @@ heavy_validation_runs: 0
 stale_takeover_count: 0
 human_interruptions: 1
 invocation_started_at: 2026-09-04T06:34:00+02:00
-last_progress_at: 2026-09-04T06:50:00+02:00
+last_progress_at: 2026-09-04T06:52:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: final-documentation-pending
+ci_check_generation: final-admission-repair
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 1
+repair_cycles_for_current_gate: 2
 context_reconstruction_attempts: 0
 stall_warnings: 0
 owned_paths:
@@ -206,22 +216,22 @@ track_b_pr_284_modified=false
 ```yaml
 recovery:
   policy_version: 1
-  generation: 2
+  generation: 3
   session_id: chatgpt-20260904T063400+0200
   session_started_at: 2026-09-04T06:34:00+02:00
-  checkpointed_at: 2026-09-04T06:50:00+02:00
-  last_progress_at: 2026-09-04T06:50:00+02:00
+  checkpointed_at: 2026-09-04T06:52:00+02:00
+  last_progress_at: 2026-09-04T06:52:00+02:00
   phase: terminal-source-blocker
   source_analysis_head: 6174d44df2017bc5a435de0e843ee824520a12a5
   pull_request: 875
-  active_operation: final exact-head documentation/governance qualification
-  external_run_ids: [33838135600]
-  check_generation: final-documentation-pending
+  active_operation: final exact-head admission-metadata qualification
+  external_run_ids: [33838135600, 33838307772]
+  check_generation: final-admission-repair
   checks_used: 0
   status: blocked
   safe_to_resume: true
   resume_condition: source evidence remains unchanged and PR #875 remains dedicated to this task
-  next_action: qualify the final documentation head, then hand off SOURCE_BLOCKER to a clean coordinator promotion
+  next_action: observe final exact-head qualification once, inspect only failures, then hand off SOURCE_BLOCKER to a clean coordinator promotion
 ```
 
-next_action: qualify the final documentation head, then hand off `SOURCE_BLOCKER` to a clean coordinator promotion that keeps Track B PR #284 unchanged and closes PR #875 unmerged as consumed.
+next_action: observe final exact-head qualification once, inspect only failures, then hand off `SOURCE_BLOCKER` to a clean coordinator promotion that keeps Track B PR #284 unchanged and closes PR #875 unmerged as consumed.

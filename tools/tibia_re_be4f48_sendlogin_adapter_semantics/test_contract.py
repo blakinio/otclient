@@ -71,6 +71,18 @@ class Contract(unittest.TestCase):
                                       memory={('add(arg:rdi,0x10)',8):0x1230})
         self.assertNotEqual(result['calls'][0]['target'],'0x1230')
 
+    def test_external_call_invalidates_condition_flags(self):
+        # cmp edi,1; call rax; jne ret; call rbx; ret
+        result=self.module.trace_paths(bytes.fromhex('83ff01ffd07502ffd3c3'),0x1000,{'rdi':0})
+        self.assertEqual({c['site'] for c in result['calls']},{'0x1003','0x1007'})
+
+    def test_adapter_trace_stops_at_first_receiver_edge(self):
+        # mov rbx,rdi; mov rax,[rdi]; call [rax+0x68]; mov rdi,rbx; call rax; ret
+        code=bytes.fromhex('4889fb488b07ff50684889dfffd0c3')
+        result=self.module.trace_paths(code,0x1000,stop_at_receiver=True)
+        self.assertEqual(len(result['calls']),1)
+        self.assertTrue(result['complete'])
+
 
 if __name__ == '__main__':
     unittest.main()

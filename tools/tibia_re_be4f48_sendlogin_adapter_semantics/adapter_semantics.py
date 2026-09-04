@@ -269,7 +269,7 @@ def trace_block(raw, start, initial=None, memory=None, symbols=None):
     return {"calls":calls,"stores":stores,"registers":regs,"memory":mem,
             "stop_reason":stop,"stop_site":stop_site,"receiver_identity":UNKNOWN}
 
-def trace_paths(raw, start, initial=None, memory=None, symbols=None, max_steps=4000):
+def trace_paths(raw, start, initial=None, memory=None, symbols=None, max_steps=4000, stop_at_receiver=False):
     """Enumerate only this FDE; loops and undecodable/out-of-range edges fail closed."""
     md=Cs(CS_ARCH_X86,CS_MODE_64); md.detail=True
     insns={i.address:i for i in md.disasm(raw,start)}
@@ -307,9 +307,11 @@ def trace_paths(raw, start, initial=None, memory=None, symbols=None, max_steps=4
             if m in ('cmp','test'):
                 a=value(md,ins,ins.operands[0],regs,mem);b=value(md,ins,ins.operands[1],regs,mem)
                 zero=(a==b if m=='cmp' else (a&b)==0) if isinstance(a,int) and isinstance(b,int) else None
-            elif ins.eflags:
+            elif ins.eflags or m=='call':
                 zero=None
             execute(md,ins,regs,mem,calls,stores,symbols)
+            if stop_at_receiver and m=='call' and calls[-1]['receiver']=='arg:rdi':
+                break
             pc=nxt
         else:
             complete=False;reason='UNDECODED_FALLTHROUGH'
@@ -341,12 +343,21 @@ def analyze(client, version, output):
             raise ValueError('QSLOT_FUNCTION_NOT_UNIQUE_OR_BOUNDED')
         dispatch=trace_paths(img.read(slot_fde[0],slot_fde[1]-slot_fde[0]),slot_fde[0],
                              {'rdi':1,'rsi':slot,'rdx':'qt:receiver','rcx':'qt:argv'},mem,img.plt_symbol)
-        adapter_paths=trace_paths(img.read(adapter_fde[0],adapter_fde[1]-adapter_fde[0]),adapter_fde[0],symbols=img.plt_symbol)
+        adapter_paths=trace_paths(img.read(adapter_fde[0],adapter_fde[1]-adapter_fde[0]),adapter_fde[0],symbols=img.plt_symbol,stop_at_receiver=True)
         # This phase intentionally emits evidence without converting an incomplete
         # analyzer traversal into a scientific SOURCE_BLOCKER.
         adapter=trace_block(img.read(*[adapter_fde[0],adapter_fde[1]-adapter_fde[0]]),adapter_fde[0])
         for record in (connection,adapter):
             record.pop("memory")
+        dispatch_edges=dispatch['calls']+dispatch['tail_edges']
+        invocation_proven=(dispatch['complete'] and len(dispatch_edges)==1
+                           and dispatch_edges[0]['target']=='0xbd3050'
+                           and dispatch_edges[0]['receiver']=='qt:receiver'
+                           and dispatch_edges[0]['arguments']['rsi']=='load64(add(qt:argv,0x8))')
+        receiver_edges=[c for c in adapter_paths['calls'] if c['receiver']=='arg:rdi']
+        edge_keys={(c['site'],c['target']) for c in receiver_edges}
+        adapter_edge_proven=adapter_paths['complete'] and len(edge_keys)==1
+        scientific_terminal=invocation_proven and adapter_edge_proven
         result={"schema":"otclient.track-a.be4f48-sendlogin-adapter-semantics.v1",
                 "exact_client":{"version":version,"size":EXPECTED_SIZE,"sha256":EXPECTED_SHA256},
                 "connection_prefix":connection,"adapter_entry_block":adapter,
@@ -354,8 +365,14 @@ def analyze(client, version, output):
                 "member_pointer":{"function":hex(member),"this_adjustment":adjustment},
                 "qslot_invocation_operation_1":dispatch,"adapter_paths":adapter_paths,
                 "adapter_fde":[hex(x) for x in adapter_fde],
-                "terminal_result":"ANALYSIS_INCOMPLETE",
-                "FIRST_MISSING_BOUNDARY":"COMPLETE_QSLOT_AND_ADAPTER_CONTROL_FLOW_ANALYSIS_REQUIRED",
+                "terminal_result":"SOURCE_BLOCKER" if scientific_terminal else "ANALYSIS_INCOMPLETE",
+                "FIRST_MISSING_BOUNDARY":"CURRENT_QT_REGISTERED_RECEIVER_TO_QSLOT_ENTRY_RDX_NOT_PROVEN" if scientific_terminal else "COMPLETE_QSLOT_AND_ADAPTER_CONTROL_FLOW_ANALYSIS_REQUIRED",
+                "adapter_invocation_abi_proven":invocation_proven,
+                "adapter_invocation_abi":"operation edi=1, slot rsi with member {0xbd3050,0}: entry rdx -> adapter rdi; [entry rcx+8] -> adapter rsi" if invocation_proven else UNKNOWN,
+                "adapter_first_receiver_edge_proven":adapter_edge_proven,
+                "adapter_first_receiver_edges":receiver_edges,
+                "adapter_receiver_object_matches_field_88":False,
+                "external_qt_dispatch_receiver_binding":"NOT_PROVEN",
                 "sendlogin_receiver_identity":UNKNOWN,"sendlogin_causal_binding_proven":False,
                 "field6_value":UNKNOWN,"pre_success_send_sequence":UNKNOWN,
                 "runtime_access":"none","official_client_executed":False,

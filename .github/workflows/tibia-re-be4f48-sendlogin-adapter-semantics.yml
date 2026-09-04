@@ -111,7 +111,10 @@ jobs:
           assert d['official_service_e2e_count']==0
           assert d['exact_client']['version']=='15.32.be4f48' and d['exact_client']['size']==52105824
           assert d['exact_client']['sha256']=='552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1'
-          assert d['terminal_result']=='ANALYSIS_INCOMPLETE'
+          assert d['terminal_result'] in ('SOURCE_BLOCKER','ANALYSIS_INCOMPLETE')
+          if d['terminal_result']=='SOURCE_BLOCKER':
+              assert d['adapter_invocation_abi_proven'] and d['adapter_first_receiver_edge_proven']
+              assert d['external_qt_dispatch_receiver_binding']=='NOT_PROVEN'
           assert d['sendlogin_causal_binding_proven'] is False
           assert d['pre_success_send_sequence']=='UNKNOWN' and d['field6_value']=='UNKNOWN'
           print('BE4F48_SENDLOGIN_ADAPTER_SEMANTICS_SANITIZED_RESULT=PASS')

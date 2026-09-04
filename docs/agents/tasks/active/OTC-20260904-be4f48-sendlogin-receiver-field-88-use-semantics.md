@@ -13,7 +13,7 @@ branch: ai/OTC-20260904-be4f48-sendlogin-receiver-field-88-use-semantics
 base_branch: main
 base_main: 73bf55043e1a46732b30fd0be537742b0ac6fed9
 created: 2026-09-04T16:56:03+02:00
-updated_at: 2026-09-04T16:56:03+02:00
+updated_at: 2026-09-04T17:10:42+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: chat_github
@@ -49,14 +49,14 @@ estimate_confidence: high
 decomposition_decision: single
 decomposition_reason: one exact-current receiver-field-value use/type discriminator with one bounded source-analysis workflow
 invocation_started_at: 2026-09-04T16:49:00+02:00
-last_progress_at: 2026-09-04T16:56:03+02:00
+last_progress_at: 2026-09-04T17:10:42+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: draft
+ci_check_generation: pending-evidence-audit-head
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 0
+repair_cycles_for_current_gate: 1
 context_reconstruction_attempts: 0
 stall_warnings: 0
 owned_paths:
@@ -74,10 +74,52 @@ depends_on: []
 blocks:
   - clean coordinator promotion after this source discriminator becomes scientifically terminal
 cross_repository_task_ids: []
+red_head: f0d94c0e6a16dff41e8135bbd4a2700c70172cd6
+red_run: 33886750137
+red_job: 101068292328
+red_result: expected_failure_before_client_materialization
+red_first_error: "AssertionError: receiver_field_use_semantics.py is missing: expected RED before client materialization"
+tdd_red_verified: true
+first_green_head: 4c309fd088257d9f94fc6a0ecdaa316be0445030
+first_green_run: 33887133223
+first_green_job: 101069574567
+first_green_result: rejected_by_self_falsification
+first_green_rejection: generic ABI-register candidate admission falsely treated stale receiver in rcx at operator new(unsigned long)@0x7c6b5e as object-tied
+regression_red_head: 0573a784ce3554345ea1c9730f664f95b17d5cd2
+regression_red_run: 33887477954
+regression_red_job: 101070712173
+regression_red_result: expected_failure_before_client_materialization
+regression_red_first_error: "AssertionError: missing receiver-field-use contract token: OBJECT_TIED_THIS_REGISTER = \"rdi\""
+source_head: 9397bb9eb44c7566a789f6a310e20c0da7845923
+source_run: 33887723682
+source_job: 101071529772
+source_result: success
+source_artifact_id: 9942554299
+source_artifact_digest: sha256:b9da2ed976d0fb93dcd84f337c71e8e2a5a963124abd61ae62e18cb4215e19ef
+source_ci_run: 33887724009
+source_ci_result: success
+source_governance_run: 33887723710
+source_governance_result: success
+source_self_hosted_boundary_run: 33887723792
+source_self_hosted_boundary_result: success
+scientific_terminal_result: SOURCE_BLOCKER
+first_missing_boundary: NO_UNIQUE_OBJECT_TIED_TYPE_EDGE_IN_EXACT_FIELD_VALUE_LIFETIME
+receiver_field_definition_site: 0x7c6b18
+receiver_field_value_use: QOBJECT_CONNECTIMPL_RECEIVER_ARGUMENT
+receiver_field_value_use_proven: true
+sendlogin_receiver_identity: UNKNOWN
+sendlogin_receiver_identity_proven: false
+complete_sender_receiver_pair_proven: false
+sendlogin_causal_binding_proven: false
+pre_success_send_sequence: UNKNOWN
+field6_value: UNKNOWN
 e2e_result: NOT_APPLICABLE
 e2e_reason: source-only static discriminator; the exact task contract forbids official-client execution and official-service E2E
-last_completed_step: trusted-main authority, exact alias, no-overlap state, source-only runtime admission and bounded predecessor evidence were refreshed
-next_action: commit repository-only contract test and workflow without the analyzer, open Draft PR, and verify expected RED before any client materialization
+audit_result: PENDING_WHOLE_DIFF_FALSIFICATION
+audit_independent: false
+audit_material_findings_open: 0
+last_completed_step: accepted repaired source head proved exact +0x88 value use as QObject::connectImpl receiver and stopped fail-closed because no unique object-tied type edge exists in the exact field-value lifetime
+next_action: persist source evidence, run fresh whole-diff falsification, record its result, and exact-head qualify the final Draft source PR for clean coordinator consumption
 ---
 
 # Objective
@@ -92,63 +134,72 @@ size=52105824
 sha256=552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1
 ```
 
-# Promoted starting facts
+# Terminal source result
 
 ```text
-SENDLOGIN_SENDER_IDENTITY=tibia::authentication::TLoginProtocolMessageHandler
-SENDLOGIN_SIGNAL=sendLoginMessage
+EXACT_CLIENT_FENCE_PROVEN=true
 SENDLOGIN_CONNECTIMPL_CALLSITE=0x7c6b9f
-SENDLOGIN_ADAPTER_TARGET=0xbd3050
 SENDLOGIN_RECEIVER_PROVENANCE=OBJECT_FIELD:[entry-rdi-derived-rbx+0x88]
+RECEIVER_FIELD_VALUE_USE=QOBJECT_CONNECTIMPL_RECEIVER_ARGUMENT
+RECEIVER_FIELD_VALUE_USE_PROVEN=true
 SENDLOGIN_RECEIVER_IDENTITY=UNKNOWN
+SENDLOGIN_RECEIVER_IDENTITY_PROVEN=false
+COMPLETE_SENDER_RECEIVER_PAIR_PROVEN=false
 SENDLOGIN_CAUSAL_BINDING_PROVEN=false
-OWNER_EDGE=0x7c67b8->0x7e8f30
-OWNER_OBJECT_IDENTITY=UNKNOWN
-OWNER/CALLEE_IDENTITY_PATHS_EXHAUSTED=true
-PRE_SUCCESS_SEND_SEQUENCE=UNKNOWN
-FIELD6_VALUE=UNKNOWN
-```
-
-# Bounded implementation contract
-
-Admitted path only:
-
-```text
-sendLogin connectImpl@0x7c6b9f
-  -> exact stack-aware receiver argument handoff
-  -> exact receiver field value loaded from [entry-rdi-derived-rbx+0x88]
-  -> immediate field-value use semantics
-  -> at most one unique object-tied type/QMeta/vptr edge
-```
-
-Stop at the first non-unique field-value use or type edge. Do not redo PR #884 caller discovery, PR #889 owner-FDE type analysis or PR #894 `0x7e8f30` identity analysis. Do not perform a global `+0x88`, RTTI, QMeta, QObject or vtable census. Do not enter queue/QSlot/writer scope or mutate Track B PR #284.
-
-# TDD state
-
-Repository-only RED is required before the analyzer exists or any exact client bytes are materialized. The RED workflow must fail on the missing analyzer in its first repository-only step; every WARP/package/client step must therefore be skipped. Only after that failure is observed may the minimal analyzer be added.
-
-# Required terminal report
-
-```text
-EXACT_CLIENT_FENCE_PROVEN=true|false
-SENDLOGIN_CONNECTIMPL_CALLSITE=0x7c6b9f
-SENDLOGIN_RECEIVER_PROVENANCE=OBJECT_FIELD:[entry-rdi-derived-rbx+0x88]
-RECEIVER_FIELD_VALUE_USE=<exact bounded description|UNKNOWN>
-RECEIVER_FIELD_VALUE_USE_PROVEN=true|false
-SENDLOGIN_RECEIVER_IDENTITY=<value|UNKNOWN>
-SENDLOGIN_RECEIVER_IDENTITY_PROVEN=true|false
-COMPLETE_SENDER_RECEIVER_PAIR_PROVEN=true|false
-SENDLOGIN_CAUSAL_BINDING_PROVEN=true|false
 PRE_SUCCESS_SEND_SEQUENCE=UNKNOWN
 FIELD6_VALUE=UNKNOWN
 RUNTIME_ACCESS=none
 OFFICIAL_SERVICE_E2E_COUNT=0
 TRACK_B_PR_284_MODIFIED=false
-terminal_result=<SENDLOGIN_RECEIVER_FIELD_USE_IDENTITY_PROVEN|SOURCE_BLOCKER>
-FIRST_MISSING_BOUNDARY=<none|precise boundary>
-NEXT_ACTION=<clean coordinator promotion or one newly admitted bounded step>
+terminal_result=SOURCE_BLOCKER
+FIRST_MISSING_BOUNDARY=NO_UNIQUE_OBJECT_TIED_TYPE_EDGE_IN_EXACT_FIELD_VALUE_LIFETIME
 ```
+
+The exact field value is loaded at `0x7c6b18`, preserved through the bounded stack-aware slice, and supplied in formal receiver register `rcx` to `QObject::connectImpl@0x7c6b9f`. The immediate use is therefore proven. After the regression repair, the exact field-value lifetime from `0x7c6b18` to `0x7c6b9f` contains zero admitted object-tied `this` or primary-vptr edges, so receiver class identity remains `UNKNOWN` and this source task stops at that first bounded missing edge.
+
+# TDD and repair evidence
+
+Initial RED:
+
+```text
+RED_HEAD=f0d94c0e6a16dff41e8135bbd4a2700c70172cd6
+RED_RUN=33886750137
+RED_JOB=101068292328
+RESULT=expected failure before client materialization
+```
+
+The first implemented head `4c309fd088257d9f94fc6a0ecdaa316be0445030` / run `33887133223` / job `101069574567` completed technically but was scientifically rejected by self-falsification because generic ABI-register candidate admission manufactured an object-tied edge from stale `rcx` at `operator new(unsigned long)@0x7c6b5e`.
+
+Regression RED:
+
+```text
+REGRESSION_RED_HEAD=0573a784ce3554345ea1c9730f664f95b17d5cd2
+REGRESSION_RED_RUN=33887477954
+REGRESSION_RED_JOB=101070712173
+RESULT=expected failure before client materialization
+```
+
+Accepted repaired source evidence:
+
+```text
+SOURCE_HEAD=9397bb9eb44c7566a789f6a310e20c0da7845923
+SOURCE_RUN=33887723682 success
+SOURCE_JOB=101071529772 success
+ARTIFACT_ID=9942554299
+ARTIFACT_DIGEST=sha256:b9da2ed976d0fb93dcd84f337c71e8e2a5a963124abd61ae62e18cb4215e19ef
+CI_RUN=33887724009 success
+GOVERNANCE_RUN=33887723710 success
+SELF_HOSTED_BOUNDARY_RUN=33887723792 success
+RAW_CLIENT_RETAINED=false
+```
+
+Durable sanitized result: `docs/agents/evidence/OTC-20260904-be4f48-sendlogin-receiver-field-88-use-semantics/result.json`.
+Run/repair narrative: `docs/agents/evidence/OTC-20260904-be4f48-sendlogin-receiver-field-88-use-semantics/source-qualification.md`.
 
 # Safety
 
-No official-client execution, login, credential/session/cookie/character/world access, process-memory access, packet capture, OCR/Vision, official-service E2E, runtime Field6 observation or Track B mutation. Static deterministic analysis runs on GitHub-hosted infrastructure with transient exact client bytes deleted before the sanitized result artifact is uploaded.
+Source-only static analysis. No official-client execution, login, credentials, session/cookie/character/world access, process memory, packet capture, OCR/Vision, official-service E2E, runtime Field6 observation, Track B PR #284 mutation, or protocol rewrite. Exact client bytes were transient and removed before sanitized artifact upload.
+
+# Lifecycle
+
+This source lane is scientifically terminal but remains a Draft source PR. It must not self-merge. After fresh whole-diff falsification and exact-head qualification, a clean coordinator may consume the sanitized terminal facts and close this source PR unmerged as consumed. Track B remains unchanged.

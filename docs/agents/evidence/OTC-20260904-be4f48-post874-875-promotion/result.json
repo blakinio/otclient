@@ -1,0 +1,98 @@
+{
+  "schema": "otclient.track-a.be4f48-post874-875-promotion.v1",
+  "decision": "SOURCE_BLOCKER",
+  "track_b_disposition": "BLOCKED_NO_IMPLEMENTABLE_WIRE_DELTA",
+  "trusted_main": "446eb643d6ef24dc996a410df812393e19800973",
+  "exact_client": {
+    "version": "15.32.be4f48",
+    "size": 52105824,
+    "sha256": "552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1"
+  },
+  "queue_drain_source": {
+    "pr": 874,
+    "head": "369acfb075e8a9d2716dcd73280ca092e0600332",
+    "focused_run": 33784324169,
+    "focused_job": 100745591266,
+    "ci_run": 33784324506,
+    "governance_run": 33784324157,
+    "self_hosted_boundary_run": 33784324096,
+    "artifact": 9904873672,
+    "artifact_sha256": "acb7f2747b0c83c57bf03dba3690b90e4df4b8854b74e94d498e6a885b096e01",
+    "result_json_sha256": "47ac0c9f8dc79d024a8eaa484474bd8e33bf9cf2407458c2a2bc8256211ddb70",
+    "terminal_result": "QUEUE_DRAIN_CONSUMPTION_PROVEN"
+  },
+  "peer_metaowner_source": {
+    "pr": 875,
+    "final_pr_head": "9653268fc57e94adcfb41c1f6b1a3e7914f2aa0f",
+    "source_analysis_head": "6174d44df2017bc5a435de0e843ee824520a12a5",
+    "exact_source_run": 33838135600,
+    "exact_source_job": 100914746055,
+    "source_artifact": 9923975240,
+    "source_artifact_sha256": "e96c91c2b8bf408c06ff829ac25d48d39595f719a275e7361886cea93cb7d8ff",
+    "final_focused_run": 33838475637,
+    "final_ci_run": 33838475915,
+    "final_governance_run": 33838475665,
+    "final_self_hosted_boundary_run": 33838475643,
+    "final_artifact": 9924087376,
+    "final_artifact_sha256": "47a0a890d903a3d400ac0aa0d0530517249934f496276c3b0a2f4dce57d5b6de",
+    "terminal_result": "SOURCE_BLOCKER"
+  },
+  "accepted": {
+    "queue_insert_target": "0xbd24a0",
+    "owned_drain_callback": "0xbd2190",
+    "owned_drain_fde": ["0xbd2190", "0xbd2495"],
+    "queued_gameclientmessage_causal_consumption": true,
+    "queue_signal_dispatch_callsite": "0xbd22c2",
+    "queue_signal_sender": "TProtocolMessageQueue",
+    "queue_signal_static_metaobject": "0x30b73e0",
+    "queue_signal_index": 191,
+    "queue_signal_index_hex": "0xbf",
+    "queue_signal_argv1_identity": "exact copied 16-byte GameclientMessage {object,owner} pair",
+    "sendlogin_peer_owner": "tibia::authentication::TLoginProtocolMessageHandler",
+    "sendlogin_signal_index": 0,
+    "sendlogin_signal_name": "sendLoginMessage",
+    "sendlogin_connectimpl_callsite": "0x7c6b9f",
+    "sendlogin_connection_primitive": "QObject::connectImpl(...) ",
+    "sendlogin_sender_identity": "tibia::authentication::TLoginProtocolMessageHandler",
+    "sendlogin_adapter_target": "0xbd3050",
+    "sendlogin_adapter_bound_into_qslot_object": true,
+    "sendlogin_qslot_adapter_field_offset": "0x10",
+    "sendlogin_receiver_provenance": "OBJECT_FIELD:[entry-rdi-derived-rbx+0x88]"
+  },
+  "withheld": {
+    "sendlogin_receiver_identity": "UNKNOWN",
+    "sendlogin_complete_sender_receiver_pair": "NOT_PROVEN",
+    "sendlogin_causal_binding": "NOT_PROVEN",
+    "queue_signal_bf_receiver_identity": "UNKNOWN",
+    "queue_signal_bf_writer_identity": "UNKNOWN",
+    "next_unique_writer_edge": "UNKNOWN",
+    "pre_success_send_sequence": "UNKNOWN",
+    "field6_value": "UNKNOWN",
+    "final_queue_writer": "UNKNOWN",
+    "final_tcp_writer": "UNKNOWN",
+    "final_writer_contract": "UNKNOWN",
+    "safe_track_b_wire_delta": "NOT_PROVEN"
+  },
+  "next_aliases": [
+    {
+      "alias": "OTC-BE4F48-SENDLOGIN-RECEIVER-IDENTITY",
+      "boundary": "[entry-rdi-derived-rbx+0x88] -> exact receiver class identity -> complete connectImpl sender/receiver pair and prove/reject causal sendLogin adapter binding"
+    },
+    {
+      "alias": "OTC-BE4F48-QUEUE-SIGNAL-BF-RECEIVER",
+      "boundary": "TProtocolMessageQueue signal 0xbf carrying exact GameclientMessage -> unique connected receiver/slot/writer -> at most next unique writer edge"
+    }
+  ],
+  "safety": {
+    "runtime_access": "none",
+    "official_client_executed": false,
+    "login_performed": false,
+    "credentials_used": false,
+    "process_memory_access": false,
+    "packet_capture": false,
+    "ocr_vision_used": false,
+    "official_service_e2e_count": 0,
+    "track_b_pr_284_modified": false
+  },
+  "terminal_result": "SOURCE_BLOCKER"
+}

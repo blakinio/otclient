@@ -1,0 +1,122 @@
+{
+  "schema": "otclient.track-a.be4f48-post911-promotion.v1",
+  "exact_client": {
+    "sha256": "552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1",
+    "size": 52105824,
+    "version": "15.32.be4f48"
+  },
+  "source_pr": 911,
+  "source_head": "a79b6115b9b0f6ebe4b766966c7d7cc11a74392d",
+  "scientific_source_head": "98ff5e7760673ad2e98b7c95c0faaff2f4c73669",
+  "FACT": {
+    "ADAPTER_EDGE_SCOPE": "modeled normal returning paths; same symbolic adapter entry receiver; no resolved dynamic vptr",
+    "ADAPTER_FIRST_RECEIVER_EDGE": "0xbd31e4 -> load64(add(load64(arg:rdi),0x68))",
+    "ADAPTER_INVOCATION_ABI": "Conditional on QSlot entry edi=1 and constructed slot in rsi: entry rdx -> adapter rdi; [entry rcx+8] -> adapter rsi",
+    "CONNECTIMPL_FORMAL_RECEIVER_REGISTER": "rcx",
+    "QSLOT_DISPATCH_FUNCTION": "0x7c4f10",
+    "QSLOT_MEMBER_POINTER": {
+      "function": "0xbd3050",
+      "this_adjustment": 0
+    },
+    "SELECTED_CONNECTIMPL_SYMBOL_DEFINED_IN_EXECUTABLE": false,
+    "SENDLOGIN_ADAPTER_TARGET": "0xbd3050",
+    "SENDLOGIN_CONNECTIMPL_CALLSITE": "0x7c6b9f",
+    "SENDLOGIN_RECEIVER_PROVENANCE": "OBJECT_FIELD:[entry-rdi-derived-rbx+0x88]",
+    "QUEUE_STATIC_METAOBJECT": "0x30b73e0",
+    "QUEUE_SIGNAL_INDEX": "0xbf",
+    "QUEUE_SIGNAL_METHOD_ROW": "0x1ce47c0",
+    "QUEUE_SIGNAL_NAME": "clientMessageReadyToProcess",
+    "QUEUE_QMETA_REVISION": 13,
+    "QUEUE_STATIC_METACALL": "0xde76a0",
+    "QUEUE_NUMERIC_INDEX_INPUTS": {
+      "esi": 0,
+      "edx": 191
+    },
+    "QUEUE_NUMERIC_INDEX_CALLABLE_EDGE": "0xde823a -> 0xdd8df0",
+    "QUEUE_NUMERIC_INDEX_RECEIVER": "same conditional entry object",
+    "QUEUE_NUMERIC_INDEX_TABLE_ENTRY": "0x1da95e0",
+    "QUEUE_NUMERIC_INDEX_PROOF_SCOPE": "20-step selected numeric path; immutable 4-byte table read; no Qt enum or registration claim",
+    "PACKAGED_QTCORE": {
+      "path": "bin/lib/libQt6Core.so.6",
+      "size": 7354472,
+      "sha256": "03ac3e4e7356399897ec58d42c81ae5c257072d45d539de1def528a8a04911fa",
+      "elf_class": 64,
+      "machine": "EM_X86_64",
+      "soname": "libQt6Core.so.6"
+    },
+    "CLIENT_QTCORE_DT_NEEDED": "libQt6Core.so.6",
+    "QT_CONNECTIMPL_FDE": [
+      "0x1d3570",
+      "0x1d376a"
+    ],
+    "QT_CONNECTIMPL_SYMBOL_SIZE": 506,
+    "QT_RECEIVER_DATAFLOW": {
+      "fixedpoint_reached": true,
+      "state_updates": 137,
+      "reachable_instructions": 131,
+      "scope": "must identity on modeled paths inside selected FDE; no external continuation completeness"
+    },
+    "QT_CONDITIONAL_RECEIVER_CALL": {
+      "site": "0x1d36e8",
+      "target": "0x1cd220",
+      "receiver_argument": "rcx"
+    },
+    "QT_FDE_SCOPE_EXITS": [
+      {
+        "site": "0x1d36fb",
+        "target": "0xc6c16",
+        "kind": "conditional jne"
+      },
+      {
+        "site": "0x1d375c",
+        "target": "0xc6c5c",
+        "kind": "unconditional jmp"
+      }
+    ]
+  },
+  "INFERENCE": {
+    "required_binding_proof": "Exact deployed Qt registration-to-invocation mapping is required before binding conditional adapter ABI to registered receiver",
+    "next_bounded_callee_mode": "0xdd8df0 is a new unique exact callee; its relationship to connection registration and known signal body0xbd2190 needs separate semantic proof",
+    "next_qt_mode": "bounded semantic/ownership classification of one exact FDE scope exit; may be a cold partition, not automatically a distinct callee"
+  },
+  "UNKNOWN": {
+    "COMPLETE_SENDLOGIN_SENDER_RECEIVER_PAIR": "NOT_PROVEN",
+    "FIELD6_VALUE": "UNKNOWN",
+    "FINAL_QUEUE_WRITER": "UNKNOWN",
+    "FINAL_TCP_WRITER": "UNKNOWN",
+    "FINAL_WRITER_CONTRACT": "UNKNOWN",
+    "NEXT_QUEUE_SIGNAL_ENDPOINT": "UNKNOWN",
+    "PRE_SUCCESS_SEND_SEQUENCE": "UNKNOWN",
+    "SENDLOGIN_CAUSAL_BINDING": "NOT_PROVEN",
+    "SENDLOGIN_RECEIVER_IDENTITY": "UNKNOWN",
+    "TRACK_B_CURRENT_WIRE_DELTA": "NOT_PROVEN",
+    "QUEUE_QMETA_CALLEE_IDENTITY": "UNKNOWN",
+    "QUEUE_QMETA_CONNECTION_REGISTRATION": "NOT_PROVEN",
+    "QUEUE_QMETA_CALLEE_TO_KNOWN_SIGNAL_BODY": "NOT_PROVEN",
+    "QT_RUNTIME_LOADED_IDENTITY": "UNKNOWN",
+    "QT_EXTERNAL_RECEIVER_REGISTRATION_DELIVERY": "NOT_PROVEN",
+    "QT_COMPLETE_RECEIVER_DELEGATION": "NOT_PROVEN",
+    "QT_SCOPE_EXIT_SEMANTICS": "UNKNOWN"
+  },
+  "terminal_result": "SOURCE_BLOCKER",
+  "FIRST_MISSING_BOUNDARY": "EXACT_QT_CONNECTIMPL_OUT_OF_FDE_CONTINUATION_SEMANTICS_NOT_PROVEN",
+  "qualification": {
+    "focused_run": 33929723341,
+    "focused_job": 101205693927,
+    "ci_run": 33929723527,
+    "governance_run": 33929723350,
+    "boundary_run": 33929723375,
+    "all": "success",
+    "independent_review": "Codex /root/queue_evidence_review PASS",
+    "material_findings": 0
+  },
+  "runtime_access": "none",
+  "official_client_executed": false,
+  "login_performed": false,
+  "credentials_used": false,
+  "process_memory_access": false,
+  "packet_capture": false,
+  "ocr_vision_used": false,
+  "official_service_e2e_count": 0,
+  "track_b_pr_284_modified": false
+}

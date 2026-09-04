@@ -25,14 +25,14 @@ def main() -> None:
     ):
         assert token in text, f"missing contract token: {token}"
 
-    # The final bounded follow-up must model the SysV hidden return-object pointer
-    # for QMetaObject::Connection. Without that shift the exported connectImpl
-    # signature is mapped onto the wrong registers and sender/receiver claims are
-    # unsound.
     assert V3.exists(), "peer_metaowner_v3.py must exist"
     v3 = V3.read_text(encoding="utf-8")
     for token in (
         "CONNECTIMPL_HAS_HIDDEN_SRET = True",
+        "SRET_BINARY_PROOF_REQUIRED = True",
+        "def prove_hidden_sret(",
+        '"sret_binary_proven"',
+        "QMetaObject::Connection::~Connection()",
         '"sender": "rsi"',
         '"signal": "rdx"',
         '"receiver": "rcx"',

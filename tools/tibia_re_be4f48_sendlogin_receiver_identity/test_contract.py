@@ -21,10 +21,12 @@ def main() -> None:
         "def stack_deltas(",
         "def resolve_stack_slot(",
         "def resolve_receiver_argument(",
-        '"runtime_access": "none"',
-        '"track_b_pr_284_modified": False',
+        '"runtime_access"',
+        '"track_b_pr_284_modified"',
     ):
         assert token in text, f"missing receiver-identity contract token: {token}"
+    assert '"none"' in text, "receiver analyzer must emit runtime_access=none"
+    assert "False" in text, "receiver analyzer must emit fail-closed boolean safety fields"
     workflow = WORKFLOW.read_text(encoding="utf-8")
     assert "receiver_identity.py" in workflow, "workflow must execute receiver_identity.py"
     assert "Validate repository-only receiver identity contract" in workflow

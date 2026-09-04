@@ -83,6 +83,28 @@ class Contract(unittest.TestCase):
         self.assertEqual(len(result['calls']),1)
         self.assertTrue(result['complete'])
 
+    def test_high_byte_write_cannot_forge_branch_condition(self):
+        result=self.module.trace_paths(bytes.fromhex('b40183f8017402ffd3c3'),0x1000,{'rax':0})
+        self.assertTrue(result['calls'])
+
+    def test_compare_uses_low32_operand(self):
+        result=self.module.trace_paths(bytes.fromhex('83ff017402ffd3c3'),0x1000,{'rdi':0x100000001})
+        self.assertEqual(result['calls'],[])
+
+    def test_loop_instruction_fails_closed(self):
+        result=self.module.trace_paths(bytes.fromhex('e2feffd0c3'),0x1000)
+        self.assertFalse(result['complete'])
+        self.assertEqual(result['calls'],[])
+
+    def test_call_invalidates_pointer_memory(self):
+        result=self.module.trace_paths(bytes.fromhex('4889fbe8000000004889df488b4710ffd0c3'),0x1000,
+                                       memory={('add(arg:rdi,0x10)',8):0x1230})
+        self.assertTrue(all(c['target']!='0x1230' for c in result['calls']))
+
+    def test_return_only_path_cannot_prove_total_receiver_invocation(self):
+        result=self.module.trace_paths(bytes.fromhex('7402ffd0c3'),0x1000,stop_at_receiver=True)
+        self.assertFalse(result.get('all_paths_reach_receiver',True))
+
 
 if __name__ == '__main__':
     unittest.main()

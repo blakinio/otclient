@@ -180,7 +180,14 @@ def value(md, ins, op, regs, memory):
     if op.type == X86_OP_IMM:
         return int(op.imm)
     if op.type == X86_OP_REG:
-        return regs.get(reg_name(md, op.reg), UNKNOWN)
+        out=regs.get(reg_name(md, op.reg), UNKNOWN)
+        if isinstance(out,int):
+            if md.reg_name(op.reg) in ('ah','bh','ch','dh'):
+                out >>= 8
+            out &= (1 << (op.size*8))-1
+        elif op.size<8:
+            out=UNKNOWN
+        return out
     if op.type == X86_OP_MEM:
         addr = address(md, ins, op, regs)
         if addr == UNKNOWN:
@@ -201,8 +208,13 @@ def execute(md, ins, regs, memory, calls, stores, symbols=None):
         symbol = symbols(target) if symbols and isinstance(target, int) else None
         for r in VOLATILE:
             regs[r] = UNKNOWN
+        for r in list(regs):
+            if r.startswith(('xmm','ymm','zmm')):
+                regs[r]=UNKNOWN
         if symbol and symbol.startswith("_Znwm"):
             regs["rax"] = f"allocation:{hex(ins.address)}"
+        else:
+            memory.clear()
         return
     if m == "push":
         regs["rsp"] = add(regs.get("rsp", UNKNOWN), -8)
@@ -235,7 +247,9 @@ def execute(md, ins, regs, memory, calls, stores, symbols=None):
         return
     dst = ops[0]
     if dst.type == X86_OP_REG:
-        if dst.size < 8 and not isinstance(out,int):
+        if dst.size < 4:
+            out=UNKNOWN
+        elif dst.size < 8 and not isinstance(out,int):
             out = UNKNOWN
         elif dst.size < 8 and isinstance(out,int):
             out &= (1 << (dst.size * 8)) - 1
@@ -277,14 +291,26 @@ def trace_paths(raw, start, initial=None, memory=None, symbols=None, max_steps=4
     regs['rsp']=0; regs.update(initial or {})
     pending=[(start,regs,dict(memory or {}),None,frozenset())]
     calls=[];stores=[];tails=[];steps=0;complete=True;reason='ALL_PATHS_TERMINATED'
+    seen=set();trace=[];return_without_receiver=False
     while pending:
         pc,regs,mem,zero,visited=pending.pop()
         while pc in insns:
             steps+=1
             if pc in visited or steps>max_steps:
                 complete=False;reason='LOOP_OR_PATH_BUDGET';break
+            signature=(pc,repr(sorted(regs.items())),repr(sorted(mem.items(),key=repr)),zero)
+            if signature in seen:
+                break
+            seen.add(signature)
             visited=visited|{pc}; ins=insns[pc]; nxt=pc+ins.size; m=ins.mnemonic
+            trace.append({'site':hex(pc),'operation':m,'rdi':regs.get('rdi',UNKNOWN),
+                          'rsi':regs.get('rsi',UNKNOWN),'rdx':regs.get('rdx',UNKNOWN),
+                          'rcx':regs.get('rcx',UNKNOWN),'r8':regs.get('r8',UNKNOWN),
+                          'zero_flag':zero})
+            if m.startswith('loop') or m in ('jrcxz','jecxz','jcxz'):
+                complete=False;reason='UNSUPPORTED_CONTROL_FLOW';break
             if m.startswith('ret'):
+                return_without_receiver=True
                 break
             if m.startswith('j'):
                 target=value(md,ins,ins.operands[0],regs,mem)
@@ -320,12 +346,23 @@ def trace_paths(raw, start, initial=None, memory=None, symbols=None, max_steps=4
     def unique(rows):
         return [json.loads(s) for s in sorted({json.dumps(x,sort_keys=True) for x in rows})]
     return {'complete':complete,'stop_reason':reason,'calls':unique(calls),'stores':unique(stores),
-            'tail_edges':unique(tails),'steps':steps}
+            'tail_edges':unique(tails),'steps':steps,'semantic_trace':unique(trace),
+            'all_paths_reach_receiver':bool(stop_at_receiver and complete and not return_without_receiver and not tails and calls)}
 
 def analyze(client, version, output):
     verify_fence(client.read_bytes(),version)
     img=Image(client)
     try:
+        call=img.disassemble(0x7c6b9f,0x7c6ba4)
+        if len(call)!=1 or call[0].mnemonic!='call' or call[0].operands[0].type!=X86_OP_IMM:
+            raise ValueError('CONNECTIMPL_CALL_CHANGED')
+        import_name=img.plt_symbol(int(call[0].operands[0].imm))
+        if not import_name or 'connectImpl' not in import_name:
+            raise ValueError('CONNECTIMPL_IMPORT_NOT_BOUND')
+        dynamic=img.elf.get_section_by_name('.dynsym')
+        imports=[s for s in dynamic.iter_symbols() if s.name==import_name]
+        if len(imports)!=1 or imports[0]['st_shndx']!='SHN_UNDEF':
+            raise ValueError('SELECTED_CONNECTIMPL_NOT_AN_UNDEFINED_IMPORT')
         adapter_fde=img.containing_fde(0xbd3050)
         if not adapter_fde or adapter_fde[0]!=0xbd3050 or adapter_fde[1]-adapter_fde[0]>0x2000:
             raise ValueError("ADAPTER_FDE_NOT_UNIQUE_OR_BOUNDED")
@@ -344,6 +381,7 @@ def analyze(client, version, output):
         dispatch=trace_paths(img.read(slot_fde[0],slot_fde[1]-slot_fde[0]),slot_fde[0],
                              {'rdi':1,'rsi':slot,'rdx':'qt:receiver','rcx':'qt:argv'},mem,img.plt_symbol)
         adapter_paths=trace_paths(img.read(adapter_fde[0],adapter_fde[1]-adapter_fde[0]),adapter_fde[0],symbols=img.plt_symbol,stop_at_receiver=True)
+        adapter_paths.pop('semantic_trace')
         # This phase intentionally emits evidence without converting an incomplete
         # analyzer traversal into a scientific SOURCE_BLOCKER.
         adapter=trace_block(img.read(*[adapter_fde[0],adapter_fde[1]-adapter_fde[0]]),adapter_fde[0])
@@ -356,13 +394,15 @@ def analyze(client, version, output):
                            and dispatch_edges[0]['arguments']['rsi']=='load64(add(qt:argv,0x8))')
         receiver_edges=[c for c in adapter_paths['calls'] if c['receiver']=='arg:rdi']
         edge_keys={(c['site'],c['target']) for c in receiver_edges}
-        adapter_edge_proven=adapter_paths['complete'] and len(edge_keys)==1
+        adapter_edge_proven=(adapter_paths['all_paths_reach_receiver'] and len(edge_keys)==1
+                             and all(c['target']=='load64(add(load64(arg:rdi),0x68))' for c in receiver_edges))
         scientific_terminal=invocation_proven and adapter_edge_proven
         result={"schema":"otclient.track-a.be4f48-sendlogin-adapter-semantics.v1",
                 "exact_client":{"version":version,"size":EXPECTED_SIZE,"sha256":EXPECTED_SHA256},
                 "connection_prefix":connection,"adapter_entry_block":adapter,
                 "qslot_dispatch_function":hex(slot_function),"qslot_fde":[hex(x) for x in slot_fde],
                 "member_pointer":{"function":hex(member),"this_adjustment":adjustment},
+                "connectimpl_import":{"site":"0x7c6b9f","symbol":import_name,"defined_in_client":False},
                 "qslot_invocation_operation_1":dispatch,"adapter_paths":adapter_paths,
                 "adapter_fde":[hex(x) for x in adapter_fde],
                 "terminal_result":"SOURCE_BLOCKER" if scientific_terminal else "ANALYSIS_INCOMPLETE",

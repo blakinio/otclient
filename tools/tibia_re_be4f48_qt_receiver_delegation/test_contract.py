@@ -113,4 +113,14 @@ class Contract(unittest.TestCase):
         p=receiver_flow(bytes.fromhex('4889cb'),0x1000)
         self.assertFalse(self.module().only_external_branches(p))
 
+    def test_receiver_fixedpoint_push_invalidates_overlapping_slot(self):
+        from receiver_flow import receiver_flow
+        p=receiver_flow(bytes.fromhex('48894c24fc50488b4c2404e800000000c3'),0x1000)
+        self.assertEqual(p['receiver_delegations'],[])
+
+    def test_unconditional_scope_exit_is_not_labelled_conditional(self):
+        from receiver_flow import receiver_flow
+        p=receiver_flow(bytes.fromhex('eb10'),0x1000)
+        self.assertIs(p['incomplete_boundaries'][0]['taken'],True)
+
 if __name__=='__main__':unittest.main()

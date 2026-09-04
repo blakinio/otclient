@@ -111,7 +111,7 @@ def analyze(selected,client,core):
         result['FIRST_MISSING_BOUNDARY']='DELEGATED_QT_RECEIVER_REGISTRATION_STORAGE_AND_DELIVERY_NOT_PROVEN' if proven else 'NO_UNIQUE_PROVEN_QT_RECEIVER_DELEGATION' if path['complete'] else 'COMPLETE_BOUNDED_QT_CONNECTIMPL_FLOW_REQUIRED'
         if only_external_branches(path):
             result['terminal_result']='SOURCE_BLOCKER'
-            result['FIRST_MISSING_BOUNDARY']='EXACT_QT_CONNECTIMPL_OUT_OF_FDE_CONDITIONAL_CONTINUATION_SEMANTICS_NOT_PROVEN'
+            result['FIRST_MISSING_BOUNDARY']='EXACT_QT_CONNECTIMPL_OUT_OF_FDE_CONTINUATION_SEMANTICS_NOT_PROVEN'
         return result
     finally:img.close()
 

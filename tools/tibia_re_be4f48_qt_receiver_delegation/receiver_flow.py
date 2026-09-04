@@ -19,7 +19,7 @@ def receiver_flow(raw,start,max_updates=20000):
     def event(kind,site,target=None,condition=None,state=None):
         row={'kind':kind,'site':hex(site)}
         if target is not None:row['target']=hex(target)
-        if condition:row.update(condition=condition,taken='conditional_not_evaluated')
+        if condition:row.update(condition=condition,taken=True if condition=='jmp' else 'conditional_not_evaluated')
         if state is not None:row['receiver_registers']=sorted(state[0])
         frontiers[(kind,site,target)]=row
     def submit(target,state,site,condition=None):
@@ -62,7 +62,7 @@ def receiver_flow(raw,start,max_updates=20000):
             if ops[0].size!=8:event('UNSUPPORTED_STACK_WIDTH',pc);continue
             off=sp.get('rsp');bit=identity(ops[0])
             if off is None or off-8 < -4096:event('UNPROVEN_STACK',pc);continue
-            off-=8;mem.discard(off)
+            off-=8;mem={a for a in mem if not (off<a+8 and a<off+8)}
             if bit:mem.add(off)
             sp['rsp']=off
         elif m=='pop':

@@ -24,6 +24,8 @@ QUEUE_STATIC_METAOBJECT = 0x30B73E0
 QUEUE_SIGNAL_INDEX = 0xBF
 DRAIN_CALLBACK = 0xBD2190
 DRAIN_FDE = (0xBD2190, 0xBD2495)
+DRAIN_METAOBJECT_LEA_SITE = 0xBD221D
+DRAIN_METAOBJECT_ARG_SITE = 0xBD22AE
 DRAIN_ACTIVATE_CALLSITE = 0xBD22C2
 QMETAOBJECT_ACTIVATE = 0x4D7DC0
 Q_SLOT_FUNCTION_FIELD = 0x10
@@ -33,21 +35,6 @@ BOUNDED_RIP_XREF_ONLY = True
 
 def hx(value: int | None) -> str | None:
     return None if value is None else f"0x{value:x}"
-
-
-def signed64(value: int) -> int:
-    value &= 0xFFFFFFFFFFFFFFFF
-    return value - (1 << 64) if value & (1 << 63) else value
-
-
-def demangle(symbol: str | None) -> str | None:
-    if not symbol:
-        return None
-    try:
-        p = subprocess.run(["c++filt", symbol], check=True, text=True, capture_output=True, timeout=2)
-        return p.stdout.strip() or symbol
-    except Exception:
-        return symbol
 
 
 @dataclass(frozen=True)
@@ -76,10 +63,10 @@ class Image:
             symtab = self.elf.get_section(sec["sh_link"]) if sec["sh_link"] else None
             for rel in sec.iter_relocations():
                 symbol = None
-                idx = int(rel["r_info_sym"])
-                if symtab is not None and idx:
+                sym_index = int(rel["r_info_sym"])
+                if symtab is not None and sym_index:
                     try:
-                        symbol = symtab.get_symbol(idx).name or None
+                        symbol = symtab.get_symbol(sym_index).name or None
                     except Exception:
                         symbol = None
                 self.relocations[int(rel["r_offset"])] = {
@@ -192,15 +179,25 @@ def direct_target(ins: Any) -> int | None:
     return int(ins.operands[0].imm) if ins.operands[0].type == X86_OP_IMM else None
 
 
+def demangle(symbol: str | None) -> str | None:
+    if not symbol:
+        return None
+    try:
+        result = subprocess.run(["c++filt", symbol], check=True, text=True, capture_output=True, timeout=2)
+        return result.stdout.strip() or symbol
+    except Exception:
+        return symbol
+
+
 def decode_qt_string(img: Image, base: int, index: int) -> dict[str, Any]:
     if index < 0 or index > 4096 or not img.mapped(base + index * 8, 8):
         return {"index": index, "classification": "INVALID_STRING_INDEX"}
-    off = img.u32(base + index * 8)
+    offset = img.u32(base + index * 8)
     length = img.u32(base + index * 8 + 4)
-    text = img.read_text(base + off, length) if off <= 0x100000 else None
+    text = img.read_text(base + offset, length) if offset <= 0x100000 else None
     return {
         "index": index,
-        "offset": off,
+        "offset": offset,
         "length": length,
         "value": text,
         "classification": "QT6_OFFSET_LENGTH_STRING" if text else "UNRESOLVED_STRING",
@@ -229,13 +226,70 @@ def decode_queue_metaobject(img: Image) -> dict[str, Any]:
     owner = decode_qt_string(img, stringdata, h["class_name_index"])
     result["owner_identity"] = owner.get("value") or "UNKNOWN"
     if h["signal_count"] > QUEUE_SIGNAL_INDEX and h["method_count"] > QUEUE_SIGNAL_INDEX:
-        row = metadata + h["method_data"] * 4 + QUEUE_SIGNAL_INDEX * 24
-        if img.mapped(row, 24):
-            raw = [img.u32(row + i * 4) for i in range(6)]
-            name = decode_qt_string(img, stringdata, raw[0])
-            result["signal_name"] = name.get("value") or "UNKNOWN"
+        method_row = metadata + h["method_data"] * 4 + QUEUE_SIGNAL_INDEX * 24
+        if img.mapped(method_row, 24):
+            raw = [img.u32(method_row + i * 4) for i in range(6)]
+            method_name = decode_qt_string(img, stringdata, raw[0])
+            result["signal_name"] = method_name.get("value") or "UNKNOWN"
             result["signal_method_raw_u32"] = raw
     result["classification"] = "QUEUE_QMETA_DECODED" if result["owner_identity"] != "UNKNOWN" else "QUEUE_QMETA_UNKNOWN"
+    return result
+
+
+def instruction_at(insns: list[Any], address: int) -> Any | None:
+    rows = [ins for ins in insns if int(ins.address) == address]
+    return rows[0] if len(rows) == 1 else None
+
+
+def resolve_static_metaobject_argument(img: Image, insns: list[Any]) -> dict[str, Any]:
+    lea = instruction_at(insns, DRAIN_METAOBJECT_LEA_SITE)
+    arg = instruction_at(insns, DRAIN_METAOBJECT_ARG_SITE)
+    result: dict[str, Any] = {
+        "proven": False,
+        "lea_site": hx(DRAIN_METAOBJECT_LEA_SITE),
+        "argument_site": hx(DRAIN_METAOBJECT_ARG_SITE),
+        "expected_static_metaobject": hx(QUEUE_STATIC_METAOBJECT),
+    }
+    if lea is None or arg is None:
+        result["classification"] = "METAOBJECT_CHAIN_INSTRUCTION_NOT_EXACT"
+        return result
+    if (
+        lea.mnemonic != "lea"
+        or len(lea.operands) < 2
+        or lea.operands[0].type != X86_OP_REG
+        or canonical_reg(img, lea.operands[0].reg) != "rbp"
+        or rip_target(lea) != QUEUE_STATIC_METAOBJECT
+    ):
+        result["classification"] = "METAOBJECT_LEA_NOT_EXACT"
+        result["lea_op_str"] = lea.op_str
+        result["resolved_lea_target"] = hx(rip_target(lea))
+        return result
+    if (
+        arg.mnemonic != "mov"
+        or len(arg.operands) < 2
+        or arg.operands[0].type != X86_OP_REG
+        or arg.operands[1].type != X86_OP_REG
+        or canonical_reg(img, arg.operands[0].reg) != "rsi"
+        or canonical_reg(img, arg.operands[1].reg) != "rbp"
+    ):
+        result["classification"] = "METAOBJECT_ARGUMENT_MOVE_NOT_EXACT"
+        result["argument_op_str"] = arg.op_str
+        return result
+    for ins in insns:
+        if not (DRAIN_METAOBJECT_LEA_SITE < int(ins.address) < DRAIN_METAOBJECT_ARG_SITE):
+            continue
+        if not ins.operands or ins.operands[0].type != X86_OP_REG:
+            continue
+        if canonical_reg(img, ins.operands[0].reg) == "rbp":
+            result["classification"] = "METAOBJECT_RBP_REDEFINED_BEFORE_ARGUMENT"
+            result["redefinition_site"] = hx(int(ins.address))
+            return result
+    result.update({
+        "classification": "STATIC_METAOBJECT_ARGUMENT_PROVEN",
+        "proven": True,
+        "register_chain": "0xbd221d: rbp=0x30b73e0 -> 0xbd22ae: rsi=rbp -> 0xbd22c2",
+        "static_metaobject": hx(QUEUE_STATIC_METAOBJECT),
+    })
     return result
 
 
@@ -270,24 +324,24 @@ def bounded_signal_body_proof(img: Image) -> dict[str, Any]:
         result["actual_fde"] = [hx(fde[0]), hx(fde[1])] if fde else None
         return result
     insns = img.disassemble(*DRAIN_FDE)
-    sites = [i for i, ins in enumerate(insns) if int(ins.address) == DRAIN_ACTIVATE_CALLSITE]
-    if len(sites) != 1:
+    meta = resolve_static_metaobject_argument(img, insns)
+    result["static_metaobject_argument"] = meta
+    call_sites = [i for i, ins in enumerate(insns) if int(ins.address) == DRAIN_ACTIVATE_CALLSITE]
+    if len(call_sites) != 1:
         result["classification"] = "ACTIVATE_CALLSITE_NOT_EXACT"
         return result
-    i = sites[0]
-    call = insns[i]
+    call_index = call_sites[0]
+    call = insns[call_index]
     if call.mnemonic != "call" or direct_target(call) != QMETAOBJECT_ACTIVATE:
         result["classification"] = "ACTIVATE_TARGET_MISMATCH"
         return result
-    idx = resolve_constant_before(img, insns, i, "rdx")
-    meta_refs = [int(x.address) for x in insns[max(0, i - 24):i] if rip_target(x) == QUEUE_STATIC_METAOBJECT]
+    signal_index = resolve_constant_before(img, insns, call_index, "rdx")
     result.update({
         "activate_callsite": hx(DRAIN_ACTIVATE_CALLSITE),
         "activate_target": hx(QMETAOBJECT_ACTIVATE),
-        "resolved_signal_index": idx,
-        "metaobject_reference_sites": [hx(x) for x in meta_refs],
+        "resolved_signal_index": signal_index,
     })
-    if idx != QUEUE_SIGNAL_INDEX or not meta_refs:
+    if signal_index != QUEUE_SIGNAL_INDEX or not meta.get("proven"):
         result["classification"] = "DRAIN_SIGNAL_BF_BINDING_NOT_PROVEN"
         return result
     result["classification"] = "DRAIN_SIGNAL_BF_BODY_PROVEN"
@@ -296,11 +350,7 @@ def bounded_signal_body_proof(img: Image) -> dict[str, Any]:
 
 
 def exact_lea_refs(img: Image, target: int) -> list[int]:
-    """Find only exact RIP-relative LEA references to one promoted target.
-
-    This is a byte prefilter plus per-candidate instruction-boundary validation;
-    it never disassembles an entire executable section.
-    """
+    """Find exact RIP-relative LEA references using a byte prefilter and per-FDE validation."""
     candidates: set[int] = set()
     validated_fdes: dict[tuple[int, int], dict[int, int | None]] = {}
     for sec in img.sections:
@@ -315,8 +365,7 @@ def exact_lea_refs(img: Image, target: int) -> list[int]:
                 starts.insert(0, op_at - 1)
             for start in starts:
                 va = sec.va + start
-                raw = data[start : min(len(data), start + 15)]
-                decoded = list(img.md.disasm(raw, va, count=1))
+                decoded = list(img.md.disasm(data[start : min(len(data), start + 15)], va, count=1))
                 if len(decoded) != 1 or decoded[0].mnemonic != "lea" or rip_target(decoded[0]) != target:
                     continue
                 fde = img.containing_fde(va)
@@ -376,7 +425,7 @@ def resolve_reg(img: Image, insns: list[Any], before: int, wanted: str, depth: i
                     return row
                 row.update({"classification": "OBJECT_FIELD", "base_register": base, "displacement": hx(int(src.mem.disp))})
                 return row
-        row.update({"classification": "UNKNOWN"})
+        row["classification"] = "UNKNOWN"
         return row
     return {"classification": f"ENTRY_ARG:{wanted}"}
 
@@ -395,18 +444,18 @@ def slot_function_candidates(img: Image, insns: list[Any], start: int, stop: int
         dst, src = ins.operands[0], ins.operands[1]
         if dst.type != X86_OP_MEM or int(dst.mem.disp) != Q_SLOT_FUNCTION_FIELD or src.type != X86_OP_REG:
             continue
-        sreg = canonical_reg(img, src.reg)
-        if sreg not in refs:
+        source_reg = canonical_reg(img, src.reg)
+        if source_reg not in refs:
             continue
-        ref_i, target = refs[sreg]
+        ref_index, target = refs[source_reg]
         fde = img.containing_fde(target)
         candidates.append({
-            "reference_site": hx(int(insns[ref_i].address)),
+            "reference_site": hx(int(insns[ref_index].address)),
             "store_site": hx(int(ins.address)),
             "target": hx(target),
             "target_fde": [hx(fde[0]), hx(fde[1])] if fde else None,
         })
-    return list({c["target"]: c for c in candidates}.values())
+    return list({row["target"]: row for row in candidates}.values())
 
 
 def find_connection_candidates(img: Image, signal_body: int) -> dict[str, Any]:
@@ -419,31 +468,31 @@ def find_connection_candidates(img: Image, signal_body: int) -> dict[str, Any]:
             continue
         seen.add(fde)
         insns = img.disassemble(*fde)
-        body_refs = [i for i, x in enumerate(insns) if rip_target(x) == signal_body]
+        body_refs = [i for i, ins in enumerate(insns) if rip_target(ins) == signal_body]
         if not body_refs:
             continue
-        for ci, ins in enumerate(insns):
+        for call_index, ins in enumerate(insns):
             if ins.mnemonic != "call":
                 continue
-            tgt = direct_target(ins)
-            if tgt is None:
+            target = direct_target(ins)
+            if target is None:
                 continue
-            dm = demangle(img.plt_symbol(tgt))
+            dm = demangle(img.plt_symbol(target))
             if not dm or "QObject::connectImpl(" not in dm:
                 continue
-            preceding = [i for i in body_refs if i < ci and ci - i <= 180]
+            preceding = [i for i in body_refs if i < call_index and call_index - i <= 180]
             if not preceding:
                 continue
-            local_start = max(0, ci - 180)
+            local_start = max(0, call_index - 180)
             rows.append({
                 "fde": [hx(fde[0]), hx(fde[1])],
                 "connect_callsite": hx(int(ins.address)),
-                "connect_target": hx(tgt),
+                "connect_target": hx(target),
                 "connect_demangled": dm,
                 "signal_body_reference_sites": [hx(int(insns[i].address)) for i in preceding],
-                "receiver_provenance": resolve_reg(img, insns, ci, "rcx"),
-                "slot_object_provenance": resolve_reg(img, insns, ci, "r9"),
-                "slot_function_candidates": slot_function_candidates(img, insns, local_start, ci, signal_body),
+                "receiver_provenance": resolve_reg(img, insns, call_index, "rcx"),
+                "slot_object_provenance": resolve_reg(img, insns, call_index, "r9"),
+                "slot_function_candidates": slot_function_candidates(img, insns, local_start, call_index, signal_body),
             })
     return {
         "xref_strategy": "exact .text RIP-relative LEA references only; per-candidate FDE validation",
@@ -455,9 +504,9 @@ def find_connection_candidates(img: Image, signal_body: int) -> dict[str, Any]:
 
 def analyze(client: Path, output: Path) -> dict[str, Any]:
     raw = client.read_bytes()
-    sha = hashlib.sha256(raw).hexdigest()
-    if len(raw) != EXPECTED_SIZE or sha != EXPECTED_SHA256:
-        raise RuntimeError(f"EXACT_CURRENT_CLIENT_FENCE_MISMATCH:size={len(raw)} sha256={sha}")
+    actual_sha = hashlib.sha256(raw).hexdigest()
+    if len(raw) != EXPECTED_SIZE or actual_sha != EXPECTED_SHA256:
+        raise RuntimeError(f"EXACT_CURRENT_CLIENT_FENCE_MISMATCH:size={len(raw)} sha256={actual_sha}")
     img = Image(client)
     try:
         queue_meta = decode_queue_metaobject(img)
@@ -475,13 +524,13 @@ def analyze(client: Path, output: Path) -> dict[str, Any]:
         writer_identity = "UNKNOWN"
         next_edge = "UNKNOWN"
         if signal_body is None:
-            missing = "QUEUE_SIGNAL_BF_BODY_NOT_PROVEN_IN_PROMOTED_DRAIN_FDE"
+            missing = "QUEUE_SIGNAL_BF_STATIC_METAOBJECT_ARGUMENT_NOT_PROVEN"
         elif connections["candidate_count"] != 1:
             missing = "QUEUE_SIGNAL_BF_CONNECTIMPL_NOT_UNIQUE_FROM_EXACT_SIGNAL_BODY_XREF"
         else:
-            c = connections["candidates"][0]
-            receiver_provenance = c["receiver_provenance"]
-            slots = c["slot_function_candidates"]
+            connection = connections["candidates"][0]
+            receiver_provenance = connection["receiver_provenance"]
+            slots = connection["slot_function_candidates"]
             if len(slots) != 1:
                 missing = "QUEUE_SIGNAL_BF_QSLOT_FUNCTION_NOT_UNIQUELY_PROVEN"
             else:
@@ -491,7 +540,7 @@ def analyze(client: Path, output: Path) -> dict[str, Any]:
                 else:
                     missing = "QUEUE_SIGNAL_BF_RECEIVER_CLASS_OR_WRITER_TYPE_NOT_PROVEN"
         result = {
-            "schema": "otclient.track-a.be4f48-queue-signal-bf-receiver.v2",
+            "schema": "otclient.track-a.be4f48-queue-signal-bf-receiver.v3",
             "runtime_access": "none",
             "official_client_executed": False,
             "login_performed": False,
@@ -534,11 +583,11 @@ def analyze(client: Path, output: Path) -> dict[str, Any]:
 
 
 def main() -> None:
-    p = argparse.ArgumentParser()
-    p.add_argument("--client", type=Path, required=True)
-    p.add_argument("--output", type=Path, required=True)
-    a = p.parse_args()
-    analyze(a.client, a.output)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--client", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    args = parser.parse_args()
+    analyze(args.client, args.output)
 
 
 if __name__ == "__main__":

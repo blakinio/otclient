@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import struct
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -26,7 +27,10 @@ CONNECTIMPL_FDE = (0xBE2A50, 0xBE3086)
 CONNECTIMPL_CALLSITE = 0xBE2EEE
 QSLOT_PRODUCER_CALLSITE = 0xBE2EB1
 QSLOT_CONSTRUCTION_WINDOW = (0xBE2E80, 0xBE2EEE)
+QSLOT_IMPL_STORE_SITE = 0xBE2EBF
+QSLOT_IMPL_REGISTER = "r13"
 MAX_SLOT_TARGET_INSTRUCTIONS = 192
+MAX_REGISTER_TRANSFER_HOPS = 4
 
 
 def hx(value: int | None) -> str | None:
@@ -111,6 +115,14 @@ class Image:
             return False
         return 0 <= off <= len(self.raw) - size
 
+    def qword(self, va: int) -> int | None:
+        rel = self.relocations.get(va)
+        if rel and rel.get("addend"):
+            return int(rel["addend"]) & 0xFFFFFFFFFFFFFFFF
+        if not self.mapped(va, 8):
+            return None
+        return struct.unpack("<Q", self.read(va, 8))[0]
+
     def disassemble(self, lo: int, hi: int) -> list[Any]:
         return list(self.md.disasm(self.read(lo, hi - lo), lo))
 
@@ -192,6 +204,14 @@ def instruction_at(insns: list[Any], address: int) -> Any | None:
     return rows[0] if len(rows) == 1 else None
 
 
+def explicit_register_write(img: Image, ins: Any, register: str) -> bool:
+    return bool(
+        ins.operands
+        and ins.operands[0].type == X86_OP_REG
+        and canonical_reg(img, ins.operands[0].reg) == register
+    )
+
+
 def target_identity(img: Image, target: int | None) -> dict[str, Any]:
     if target is None:
         return {"target": None, "symbol": None, "demangled": None, "fde": None}
@@ -214,6 +234,7 @@ def resolve_qslot_producer(img: Image) -> dict[str, Any]:
         "connectimpl_fde": [hx(CONNECTIMPL_FDE[0]), hx(CONNECTIMPL_FDE[1])],
         "qslot_producer_callsite": hx(QSLOT_PRODUCER_CALLSITE),
         "handoff": "UNKNOWN",
+        "allocation_size": "UNKNOWN",
     }
     fde = img.containing_fde(CONNECTIMPL_CALLSITE)
     if fde != CONNECTIMPL_FDE:
@@ -242,6 +263,20 @@ def resolve_qslot_producer(img: Image) -> dict[str, Any]:
 
     alloc_index = insns.index(alloc)
     connect_index = insns.index(connect)
+    allocation_size_writers = []
+    for ins in reversed(insns[max(0, alloc_index - 16) : alloc_index]):
+        if ins.mnemonic == "call":
+            break
+        if not explicit_register_write(img, ins, "rdi"):
+            continue
+        allocation_size_writers.append(ins)
+        break
+    if len(allocation_size_writers) == 1:
+        size_writer = allocation_size_writers[0]
+        if len(size_writer.operands) >= 2 and size_writer.operands[1].type == X86_OP_IMM:
+            result["allocation_size"] = hx(int(size_writer.operands[1].imm) & 0xFFFFFFFFFFFFFFFF)
+            result["allocation_size_site"] = hx(int(size_writer.address))
+
     handoffs = []
     for index in range(alloc_index + 1, connect_index):
         ins = insns[index]
@@ -266,16 +301,12 @@ def resolve_qslot_producer(img: Image) -> dict[str, Any]:
         result["intervening_calls"] = [hx(int(ins.address)) for ins in intervening_calls]
         return result
     for ins in insns[alloc_index + 1 : handoff_index]:
-        if not ins.operands or ins.operands[0].type != X86_OP_REG:
-            continue
-        if canonical_reg(img, ins.operands[0].reg) == "rax":
+        if explicit_register_write(img, ins, "rax"):
             result["classification"] = "QSLOT_ALLOCATION_RAX_REDEFINED_BEFORE_HANDOFF"
             result["redefinition_site"] = hx(int(ins.address))
             return result
     for ins in insns[handoff_index + 1 : connect_index]:
-        if not ins.operands or ins.operands[0].type != X86_OP_REG:
-            continue
-        if canonical_reg(img, ins.operands[0].reg) == "r9":
+        if explicit_register_write(img, ins, "r9"):
             result["classification"] = "QSLOT_R9_REDEFINED_BEFORE_CONNECTIMPL"
             result["redefinition_site"] = hx(int(ins.address))
             return result
@@ -312,14 +343,16 @@ def resolve_qslot_construction_window(img: Image, producer: dict[str, Any]) -> d
         for ins in window
     ]
     alloc = instruction_at(insns, QSLOT_PRODUCER_CALLSITE)
+    connect = instruction_at(insns, CONNECTIMPL_CALLSITE)
     handoff_site = int(str(producer["handoff_site"]), 16)
     handoff = instruction_at(insns, handoff_site)
-    if alloc is None or handoff is None:
+    if alloc is None or connect is None or handoff is None:
         result["classification"] = "CONSTRUCTION_BOUNDARY_INSTRUCTION_MISSING"
         return result
     alloc_index = insns.index(alloc)
+    connect_index = insns.index(connect)
     handoff_index = insns.index(handoff)
-    if alloc_index >= handoff_index:
+    if not (alloc_index < handoff_index < connect_index):
         result["classification"] = "CONSTRUCTION_BOUNDARY_ORDER_INVALID"
         return result
 
@@ -328,7 +361,7 @@ def resolve_qslot_construction_window(img: Image, producer: dict[str, Any]) -> d
     object_field_writes: list[dict[str, Any]] = []
     executable_pointer_stores: list[dict[str, Any]] = []
 
-    for ins in insns[alloc_index + 1 : handoff_index]:
+    for ins in insns[alloc_index + 1 : connect_index]:
         if ins.mnemonic == "call":
             result["classification"] = "CONSTRUCTION_WINDOW_HAS_INTERVENING_CALL"
             result["intervening_callsite"] = hx(int(ins.address))
@@ -342,10 +375,7 @@ def resolve_qslot_construction_window(img: Image, producer: dict[str, Any]) -> d
             dst_reg = canonical_reg(img, dst.reg)
             target = rip_target(ins)
             if target is not None and img.is_executable_va(target) and img.containing_fde(target) is not None:
-                code_refs[dst_reg] = {
-                    "reference_site": hx(int(ins.address)),
-                    **target_identity(img, target),
-                }
+                code_refs[dst_reg] = {"reference_site": hx(int(ins.address)), **target_identity(img, target)}
             else:
                 code_refs.pop(dst_reg, None)
             object_aliases.discard(dst_reg)
@@ -367,10 +397,7 @@ def resolve_qslot_construction_window(img: Image, producer: dict[str, Any]) -> d
                 object_aliases.discard(dst_reg)
                 target = int(src.imm) & 0xFFFFFFFFFFFFFFFF
                 if img.is_executable_va(target) and img.containing_fde(target) is not None:
-                    code_refs[dst_reg] = {
-                        "reference_site": hx(int(ins.address)),
-                        **target_identity(img, target),
-                    }
+                    code_refs[dst_reg] = {"reference_site": hx(int(ins.address)), **target_identity(img, target)}
                 else:
                     code_refs.pop(dst_reg, None)
             else:
@@ -420,10 +447,140 @@ def resolve_qslot_construction_window(img: Image, producer: dict[str, Any]) -> d
         "classification": "QSLOT_INLINE_CONSTRUCTION_WINDOW_PROVEN",
         "proven": True,
         "fresh_object_origin": f"operator new return @ {hx(QSLOT_PRODUCER_CALLSITE)}",
+        "allocation_size": producer.get("allocation_size", "UNKNOWN"),
         "handoff_site": hx(handoff_site),
         "object_field_writes": object_field_writes,
         "executable_pointer_stores": executable_pointer_stores,
     })
+    return result
+
+
+def trace_qslot_impl_register(img: Image, construction: dict[str, Any]) -> dict[str, Any]:
+    result: dict[str, Any] = {
+        "proven": False,
+        "store_site": hx(QSLOT_IMPL_STORE_SITE),
+        "register": QSLOT_IMPL_REGISTER,
+        "target": "UNKNOWN",
+        "trace": [],
+    }
+    if not construction.get("proven"):
+        result["classification"] = "QSLOT_CONSTRUCTION_WINDOW_NOT_PROVEN"
+        return result
+    store_rows = [
+        row for row in construction.get("object_field_writes", [])
+        if row.get("store_site") == hx(QSLOT_IMPL_STORE_SITE)
+    ]
+    if len(store_rows) != 1:
+        result["classification"] = "QSLOT_IMPL_STORE_SITE_NOT_UNIQUE"
+        result["store_rows"] = store_rows
+        return result
+    store_row = store_rows[0]
+    result["store"] = store_row
+    if store_row.get("field_offset") != "0x8" or store_row.get("source_kind") != f"REGISTER:{QSLOT_IMPL_REGISTER}":
+        result["classification"] = "QSLOT_IMPL_STORE_SHAPE_MISMATCH"
+        return result
+
+    insns = img.disassemble(*CONNECTIMPL_FDE)
+    store = instruction_at(insns, QSLOT_IMPL_STORE_SITE)
+    if store is None:
+        result["classification"] = "QSLOT_IMPL_STORE_INSTRUCTION_MISSING"
+        return result
+    cursor = insns.index(store)
+    tracked = QSLOT_IMPL_REGISTER
+    caller_saved = {"rax", "rcx", "rdx", "rsi", "rdi", "r8", "r9", "r10", "r11"}
+    hops = 0
+
+    while hops <= MAX_REGISTER_TRANSFER_HOPS:
+        writer = None
+        for index in range(cursor - 1, -1, -1):
+            ins = insns[index]
+            if ins.mnemonic == "call" and tracked in caller_saved:
+                result["classification"] = "QSLOT_IMPL_REGISTER_CLOBBER_BOUNDARY"
+                result["clobber_site"] = hx(int(ins.address))
+                result["tracked_register"] = tracked
+                return result
+            if explicit_register_write(img, ins, tracked):
+                writer = (index, ins)
+                break
+        if writer is None:
+            result["classification"] = "QSLOT_IMPL_REGISTER_ENTRY_VALUE"
+            result["tracked_register"] = tracked
+            return result
+
+        index, ins = writer
+        step: dict[str, Any] = {
+            "address": hx(int(ins.address)),
+            "mnemonic": ins.mnemonic,
+            "op_str": ins.op_str,
+            "register": tracked,
+        }
+        result["trace"].append(step)
+        src = ins.operands[1] if len(ins.operands) > 1 else None
+
+        if ins.mnemonic == "lea" and src is not None and src.type == X86_OP_MEM and src.mem.base == X86_REG_RIP:
+            target = rip_target(ins)
+            step["source_kind"] = "RIP_EXECUTABLE_ADDRESS"
+            step["target"] = hx(target)
+            if target is None or not img.is_executable_va(target) or img.containing_fde(target) is None:
+                result["classification"] = "QSLOT_IMPL_LEA_TARGET_NOT_EXECUTABLE_FDE"
+                return result
+            result.update({
+                "classification": "QSLOT_IMPL_REGISTER_TARGET_PROVEN",
+                "proven": True,
+                "target": hx(target),
+                "target_identity": target_identity(img, target),
+                "source_site": hx(int(ins.address)),
+            })
+            return result
+
+        if ins.mnemonic.startswith("mov") and src is not None and src.type == X86_OP_IMM:
+            target = int(src.imm) & 0xFFFFFFFFFFFFFFFF
+            step["source_kind"] = "IMMEDIATE"
+            step["target"] = hx(target)
+            if not img.is_executable_va(target) or img.containing_fde(target) is None:
+                result["classification"] = "QSLOT_IMPL_IMMEDIATE_TARGET_NOT_EXECUTABLE_FDE"
+                return result
+            result.update({
+                "classification": "QSLOT_IMPL_REGISTER_TARGET_PROVEN",
+                "proven": True,
+                "target": hx(target),
+                "target_identity": target_identity(img, target),
+                "source_site": hx(int(ins.address)),
+            })
+            return result
+
+        if ins.mnemonic.startswith("mov") and src is not None and src.type == X86_OP_MEM and src.mem.base == X86_REG_RIP:
+            pointer_site = rip_target(ins)
+            pointer = img.qword(pointer_site) if pointer_site is not None else None
+            step["source_kind"] = "RIP_POINTER_LOAD"
+            step["pointer_site"] = hx(pointer_site)
+            step["loaded_value"] = hx(pointer)
+            if pointer is None or not img.is_executable_va(pointer) or img.containing_fde(pointer) is None:
+                result["classification"] = "QSLOT_IMPL_RIP_POINTER_TARGET_NOT_EXECUTABLE_FDE"
+                return result
+            result.update({
+                "classification": "QSLOT_IMPL_REGISTER_TARGET_PROVEN",
+                "proven": True,
+                "target": hx(pointer),
+                "target_identity": target_identity(img, pointer),
+                "source_site": hx(int(ins.address)),
+            })
+            return result
+
+        if ins.mnemonic.startswith("mov") and src is not None and src.type == X86_OP_REG:
+            source_reg = canonical_reg(img, src.reg)
+            step["source_kind"] = "REGISTER_TRANSFER"
+            step["source_register"] = source_reg
+            tracked = source_reg
+            cursor = index
+            hops += 1
+            continue
+
+        result["classification"] = "QSLOT_IMPL_REGISTER_WRITER_UNSUPPORTED"
+        result["writer"] = step
+        return result
+
+    result["classification"] = "QSLOT_IMPL_REGISTER_TRANSFER_HOP_LIMIT"
     return result
 
 
@@ -433,7 +590,8 @@ def bounded_target_summary(img: Image, target: int) -> dict[str, Any]:
         return {"classification": "TARGET_FDE_NOT_PROVEN", "target": hx(target)}
     insns = img.disassemble(*fde)
     calls = []
-    for ins in insns[:MAX_SLOT_TARGET_INSTRUCTIONS]:
+    prefix = insns[:MAX_SLOT_TARGET_INSTRUCTIONS]
+    for ins in prefix:
         if ins.mnemonic != "call":
             continue
         call_target = direct_target(ins)
@@ -446,40 +604,65 @@ def bounded_target_summary(img: Image, target: int) -> dict[str, Any]:
         "summary_instruction_limit": MAX_SLOT_TARGET_INSTRUCTIONS,
         "fully_within_limit": len(insns) <= MAX_SLOT_TARGET_INSTRUCTIONS,
         "direct_calls_in_bounded_prefix": calls,
+        "instruction_prefix": [
+            {"address": hx(int(ins.address)), "mnemonic": ins.mnemonic, "op_str": ins.op_str}
+            for ins in prefix
+        ],
     }
 
 
-def resolve_qslot_function(img: Image, construction: dict[str, Any]) -> dict[str, Any]:
+def resolve_qslot_function(
+    img: Image,
+    producer: dict[str, Any],
+    construction: dict[str, Any],
+    impl_provenance: dict[str, Any],
+) -> dict[str, Any]:
     result: dict[str, Any] = {
         "proven": False,
         "function_target": "UNKNOWN",
-        "proof_basis": "fresh operator-new object + unique executable code pointer store before direct r9 handoff to connectImpl",
+        "proof_basis": "fresh 0x20 allocation passed as QSlotObjectBase*; refcount/header/payload stores plus exact +0x8 r13 impl store and bounded r13 provenance",
     }
-    if not construction.get("proven"):
-        result["classification"] = "QSLOT_CONSTRUCTION_WINDOW_NOT_PROVEN"
+    if not producer.get("proven") or not construction.get("proven"):
+        result["classification"] = "QSLOT_OBJECT_CONSTRUCTION_NOT_PROVEN"
         return result
-    stores = list(construction.get("executable_pointer_stores") or [])
-    targets = sorted({
-        str(row.get("executable_target", {}).get("target"))
-        for row in stores
-        if row.get("executable_target", {}).get("target")
-    })
-    result["candidate_store_count"] = len(stores)
-    result["candidate_targets"] = targets
-    result["candidate_stores"] = stores
-    if len(stores) != 1 or len(targets) != 1:
-        result["classification"] = "QSLOT_EXECUTABLE_POINTER_STORE_NOT_UNIQUE"
+    if producer.get("allocation_size") != "0x20":
+        result["classification"] = "QSLOT_ALLOCATION_SIZE_NOT_0X20"
         return result
-    target = int(targets[0], 16)
-    if img.containing_fde(target) is None:
-        result["classification"] = "QSLOT_EXECUTABLE_POINTER_TARGET_FDE_NOT_PROVEN"
+
+    writes = list(construction.get("object_field_writes") or [])
+    refcount = [
+        row for row in writes
+        if row.get("field_offset") == "0x0"
+        and row.get("source_kind") == "IMMEDIATE"
+        and row.get("immediate") == "0x1"
+    ]
+    impl = [
+        row for row in writes
+        if row.get("store_site") == hx(QSLOT_IMPL_STORE_SITE)
+        and row.get("field_offset") == "0x8"
+        and row.get("source_kind") == f"REGISTER:{QSLOT_IMPL_REGISTER}"
+    ]
+    payload = [row for row in writes if row.get("field_offset") == "0x10"]
+    result["layout_cross_check"] = {
+        "allocation_size": producer.get("allocation_size"),
+        "refcount_init_candidates": refcount,
+        "impl_store_candidates": impl,
+        "payload_store_candidates": payload,
+    }
+    if len(refcount) != 1 or len(impl) != 1 or len(payload) < 1:
+        result["classification"] = "QSLOT_OBJECT_LAYOUT_CROSS_CHECK_FAILED"
         return result
+    if not impl_provenance.get("proven"):
+        result["classification"] = str(impl_provenance.get("classification") or "QSLOT_IMPL_REGISTER_TARGET_NOT_PROVEN")
+        return result
+
+    target = int(str(impl_provenance["target"]), 16)
     result.update({
         "classification": "QSLOT_FUNCTION_TARGET_STRUCTURALLY_PROVEN",
         "proven": True,
         "function_target": hx(target),
         "function_target_identity": target_identity(img, target),
-        "function_pointer_store": stores[0],
+        "function_pointer_store": impl[0],
         "function_target_summary": bounded_target_summary(img, target),
     })
     return result
@@ -520,7 +703,8 @@ def analyze(client: Path, output: Path) -> dict[str, Any]:
     try:
         producer = resolve_qslot_producer(img)
         construction = resolve_qslot_construction_window(img, producer)
-        slot = resolve_qslot_function(img, construction)
+        impl_provenance = trace_qslot_impl_register(img, construction)
+        slot = resolve_qslot_function(img, producer, construction, impl_provenance)
         writer = trace_one_writer_edge(img, slot)
         qslot_identity_proven = bool(slot.get("proven"))
 
@@ -530,6 +714,9 @@ def analyze(client: Path, output: Path) -> dict[str, Any]:
         elif not construction.get("proven"):
             terminal_result = "SOURCE_BLOCKER"
             missing = str(construction.get("classification") or "QSLOT_CONSTRUCTION_NOT_PROVEN")
+        elif not impl_provenance.get("proven"):
+            terminal_result = "SOURCE_BLOCKER"
+            missing = str(impl_provenance.get("classification") or "QSLOT_IMPL_REGISTER_TARGET_NOT_PROVEN")
         elif not qslot_identity_proven:
             terminal_result = "SOURCE_BLOCKER"
             missing = str(slot.get("classification") or "QUEUE_SIGNAL_BF_QSLOT_FUNCTION_NOT_UNIQUELY_PROVEN")
@@ -541,7 +728,7 @@ def analyze(client: Path, output: Path) -> dict[str, Any]:
             missing = str(writer.get("classification") or "NEXT_WRITER_EDGE_NOT_UNIQUELY_PROVEN")
 
         result = {
-            "schema": "otclient.track-a.be4f48-queue-signal-bf-qslot-identity.v2",
+            "schema": "otclient.track-a.be4f48-queue-signal-bf-qslot-identity.v3",
             "runtime_access": "none",
             "official_client_executed": False,
             "login_performed": False,
@@ -564,6 +751,7 @@ def analyze(client: Path, output: Path) -> dict[str, Any]:
             "qslot_producer_callsite": hx(QSLOT_PRODUCER_CALLSITE),
             "qslot_object_producer": producer,
             "qslot_construction_window": construction,
+            "qslot_impl_register_provenance": impl_provenance,
             "qslot_function_target": slot.get("function_target", "UNKNOWN"),
             "qslot_identity_proven": qslot_identity_proven,
             "qslot_function_proof": slot,

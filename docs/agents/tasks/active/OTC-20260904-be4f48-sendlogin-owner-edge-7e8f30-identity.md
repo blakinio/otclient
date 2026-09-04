@@ -12,11 +12,21 @@ branch: research/OTC-20260904-be4f48-sendlogin-owner-edge-7e8f30-identity
 base_branch: main
 base_main: 7e67c67783b19575ec7f378c7be49cb69d87f1ce
 created: 2026-09-04T15:44:00+02:00
-updated_at: 2026-09-04T15:59:00+02:00
+updated_at: 2026-09-04T16:01:00+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: chat_github
 runtime_access: none
+runtime_owner_task: NOT_APPLICABLE
+runtime_namespace: NOT_APPLICABLE
+canonical_registration: NOT_APPLICABLE
+canonical_lease_generation: NOT_APPLICABLE
+registration_lease_generation: NOT_APPLICABLE
+gate_a: NOT_APPLICABLE
+generation_rebind: NOT_APPLICABLE
+gate_b: NOT_APPLICABLE
+bootstrap: NOT_APPLICABLE
+target_uniqueness: NOT_APPLICABLE
 mutation_authorized: false
 physical_e2e_required: false
 implementation_authorized: true
@@ -95,11 +105,11 @@ last_completed_step: exact-head qualification on e1cb7e3f981a4176048ea0d67f02174
 next_action: clean coordinator consumption of this terminal negative evidence; do not widen this worker
 recovery:
   policy_version: 1
-  generation: 4
+  generation: 5
   session_id: chat-github-20260904T153700+0200
   session_started_at: 2026-09-04T15:37:00+02:00
-  checkpointed_at: 2026-09-04T15:59:00+02:00
-  last_progress_at: 2026-09-04T15:59:00+02:00
+  checkpointed_at: 2026-09-04T16:01:00+02:00
+  last_progress_at: 2026-09-04T16:01:00+02:00
   phase: integrate
   exact_head: HEAD_CONTAINS_QUALIFICATION_METADATA_ONLY
   pull_request: 894
@@ -171,6 +181,8 @@ QUALIFICATION_ARTIFACT_DIGEST=sha256:dc2fe4c16fd7241ad21e996beeb392055db81e49c1c
 ```
 
 The qualification source run reproduced the same `SOURCE_BLOCKER`, exact fence PASS, sanitized result PASS and `RAW_CLIENT_RETAINED=false`.
+
+The subsequent qualification-metadata compaction was rejected once by Track A governance because mandatory `runtime_access: none` admission companion fields were omitted. This checkpoint restores those exact static/no-runtime fields; no analyzer, workflow or scientific evidence changed in that repair.
 
 # Audit and safety
 

@@ -1,0 +1,61 @@
+{
+  "FIRST_MISSING_BOUNDARY": "CALLEE_INTERNAL_IDENTITY_EDGE_NOT_FOUND",
+  "NEXT_ACTION": "one newly admitted bounded step only if coordinator authorizes it",
+  "complete_sender_receiver_pair_proven": false,
+  "credentials_used": false,
+  "exact_client": {
+    "sha256": "552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1",
+    "size": 52105824,
+    "version": "15.32.be4f48"
+  },
+  "exact_client_fence_proven": true,
+  "field6_value": "UNKNOWN",
+  "login_performed": false,
+  "ocr_vision_used": false,
+  "official_client_executed": false,
+  "official_service_e2e_count": 0,
+  "owner_edge_callee": "0x7e8f30",
+  "owner_edge_callee_fde": [
+    "0x7e8f30",
+    "0x7f06d6"
+  ],
+  "owner_edge_callsite": "0x7c67b8",
+  "owner_identity_evidence": {
+    "callee_local": {
+      "callee_fde": [
+        "0x7e8f30",
+        "0x7f06d6"
+      ],
+      "identity": "UNKNOWN",
+      "missing": "CALLEE_ENTRY_OBJECT_TYPED_VPTR_NOT_FOUND",
+      "proof_classes": [],
+      "proven": false,
+      "same_object_external_calls": [],
+      "typed_vptr_events": [],
+      "types": []
+    },
+    "one_internal_identity_edge": {
+      "candidates": [],
+      "followed_edge": null,
+      "identity": "UNKNOWN",
+      "missing": "CALLEE_INTERNAL_IDENTITY_EDGE_NOT_FOUND",
+      "proven": false
+    }
+  },
+  "owner_identity_proof_classes": [],
+  "owner_object_identity": "UNKNOWN",
+  "owner_object_identity_proven": false,
+  "owner_object_provenance": "ENTRY_ARG:rdi carried by promoted 0x7c67b8->0x7e8f30 edge",
+  "packet_capture": false,
+  "pre_success_send_sequence": "UNKNOWN",
+  "process_memory_access": false,
+  "receiver_typing_disposition": "BLOCKED_BY_OWNER_IDENTITY",
+  "runtime_access": "none",
+  "schema": "otclient.track-a.be4f48-sendlogin-owner-edge-7e8f30-identity.v1",
+  "sendlogin_causal_binding_proven": false,
+  "sendlogin_receiver_identity": "UNKNOWN",
+  "sendlogin_receiver_identity_proven": false,
+  "sendlogin_receiver_provenance": "OBJECT_FIELD:[entry-rdi-derived-rbx+0x88]",
+  "terminal_result": "SOURCE_BLOCKER",
+  "track_b_pr_284_modified": false
+}

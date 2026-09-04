@@ -323,6 +323,9 @@ def trace_paths(raw, start, initial=None, memory=None, symbols=None, max_steps=4
                 if m=='jmp':
                     if isinstance(target,int) and target in insns:
                         pc=target;continue
+                    if isinstance(target,int) and start<=target<start+len(raw):
+                        incomplete_boundaries.append({'kind':'UNDECODED_INTERNAL_JUMP','site':hex(pc),'target':hex(target)})
+                        complete=False;reason='UNDECODED_INTERNAL_JUMP';break
                     tails.append({'site':hex(pc),'target':hex(target) if isinstance(target,int) else target,
                                   'receiver':regs.get('rdi',UNKNOWN),
                                   'arguments':{r:regs.get(r,UNKNOWN) for r in ('rdi','rsi','rdx','rcx','r8','r9')}})
@@ -330,11 +333,12 @@ def trace_paths(raw, start, initial=None, memory=None, symbols=None, max_steps=4
                 taken = zero if m in ('je','jz') else (not zero if zero is not None else None) if m in ('jne','jnz') else None
                 if taken is not False:
                     if not isinstance(target,int) or target not in insns:
-                        incomplete_boundaries.append({'kind':'BRANCH_OUTSIDE_FDE','site':hex(pc),
+                        kind='UNDECODED_INTERNAL_BRANCH' if isinstance(target,int) and start<=target<start+len(raw) else 'BRANCH_OUTSIDE_FDE'
+                        incomplete_boundaries.append({'kind':kind,'site':hex(pc),
                                                       'target':hex(target) if isinstance(target,int) else UNKNOWN,
                                                       'condition':m,'taken':taken,
                                                       'receiver_registers':[r for r,v in regs.items() if v=='registered:receiver']})
-                        complete=False;reason='BRANCH_OUTSIDE_FDE'
+                        complete=False;reason=kind
                     else:
                         pending.append((target,dict(regs),dict(mem),zero,visited))
                 if taken is True:

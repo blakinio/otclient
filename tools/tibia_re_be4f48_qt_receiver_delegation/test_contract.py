@@ -74,4 +74,15 @@ class Contract(unittest.TestCase):
     def test_dependency_discovery_does_not_allow_silent_change(self):
         with self.assertRaisesRegex(ValueError,'FENCE'):self.module().qualify_dependency_fence(self.core())
 
+    def test_internal_undecoded_branch_is_not_external_boundary(self):
+        from static_flow import trace_paths
+        p=trace_paths(bytes.fromhex('85c075fdc3'),0x1000)
+        self.assertFalse(self.module().only_external_branches(p))
+        self.assertEqual(p['incomplete_boundaries'][0]['kind'],'UNDECODED_INTERNAL_BRANCH')
+
+    def test_internal_undecoded_jump_is_incomplete(self):
+        from static_flow import trace_paths
+        p=trace_paths(bytes.fromhex('ebffc3'),0x1000)
+        self.assertFalse(p['complete'])
+
 if __name__=='__main__':unittest.main()

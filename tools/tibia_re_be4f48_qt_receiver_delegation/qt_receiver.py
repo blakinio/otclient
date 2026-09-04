@@ -105,7 +105,8 @@ def analyze(selected,client,core):
         proven=resolved_delegation(path['complete'],list(candidates.values()))
         if proven:
             target=int(next(iter(candidates.values()))['target'],16)
-            proven=bool(img.containing_fde(target) or img.plt_symbol(target))
+            target_fde=img.containing_fde(target)
+            proven=bool((target_fde and target_fde[0]==target) or img.plt_symbol(target))
         result['qtcore_elf_identity']={'class':64,'machine':'EM_X86_64','soname':sonames[0],'symbol_type':'STT_FUNC'}
         result['receiver_delegation_proven']=proven
         result['terminal_result']='SOURCE_BLOCKER' if path['complete'] else 'ANALYSIS_INCOMPLETE'

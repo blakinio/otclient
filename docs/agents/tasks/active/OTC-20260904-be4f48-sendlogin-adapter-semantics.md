@@ -14,7 +14,7 @@ base_branch: main
 base_main: 04a4ca71b658dcc374aaf40dbb8135de43d49cb7
 created: 2026-09-04T22:06:00Z
 updated_at: 2026-09-04T22:06:00Z
-invocation_started_at: 2026-09-04T21:55:00Z
+invocation_started_at: 2026-09-04T22:06:00Z
 last_progress_at: 2026-09-04T22:06:00Z
 policy_version: 2
 prompting_standard_version: 2.1
@@ -80,7 +80,7 @@ blocks:
   - clean coordinator consumption of this exact source result
 cross_repository_task_ids: []
 ownership_released: false
-next_action: prove repository-only RED before implementing the bounded adapter analyzer
+next_action: qualify bounded dataflow on exact client; complete QSlot and adapter control-flow analysis before any source terminal claim
 ---
 
 # Objective and authority
@@ -124,3 +124,5 @@ E2E NOT_APPLICABLE for this static producer: official-client execution is forbid
 
 Resume the existing source task and branch after rechecking live ownership and exact head.
 No source result or programme completion is claimed.
+
+Repository-only RED: five expected failures at 1e5ceb8e45cd74220fe5500e57c8d85266ed5820 because analyzer was absent. Local minimal GREEN: five behavioral tests pass. Initial dataflow probe intentionally reports ANALYSIS_INCOMPLETE, never SOURCE_BLOCKER; full source semantics remain to implement. No client bytes materialized locally.

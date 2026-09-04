@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260904-be4f48-queue-qmeta-index
-status: in_progress
+status: validating
 agent: Codex
 session_id: login-closure-20260904-ae070f034ee4
 session_role: researcher
@@ -8,14 +8,14 @@ project_lane: otclient
 lane: P2-NETWORK
 track_id: official-client-re
 task_kind: implementation
-phase: implement
+phase: validate
 branch: ai/OTC-20260904-be4f48-queue-qmeta-index
 base_branch: main
 base_main: 6439ec169ae6e0dfe8b3893dc136c752001949eb
 created: 2026-09-04T22:38:02Z
-updated_at: 2026-09-04T22:25:59Z
+updated_at: 2026-09-04T22:51:30Z
 invocation_started_at: 2026-09-04T22:06:00Z
-last_progress_at: 2026-09-04T22:25:59Z
+last_progress_at: 2026-09-04T22:51:30Z
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: codex
@@ -79,7 +79,7 @@ blocks:
   - clean coordinator consumption of this exact source result
 cross_repository_task_ids: []
 ownership_released: false
-next_action: repository-only RED then smallest exact QMeta index discriminator and hosted qualification
+next_action: verify evidence-only exact head then clean coordinator promotion, close unmerged and archive
 ---
 
 # Objective
@@ -105,3 +105,20 @@ runtime_access=none; official_client_executed=false; login_performed=false; cred
 # Exact source checkpoint
 
 Repository-only RED 647b7c2854f8e0f4347a83ec0f4a5b26d3490b8c; seven missing-module failures before any client materialization. Current suite18 PASS, regression RED observed for missing image helper, exact revision guard, immutable reads, stack provenance/arithmetic and unsupported stack widths/pop rsp. Parent00f259421c1e5cbdb3e1fc07a2076823f73b4d7d exact run33926925770/job101197364666 traversed20steps to unique tail0xde823a ->0xdd8df0 with same entry receiver. This differs from known signal body0xbd2190 and cannot be relabelled as that body. New candidate is a bounded callee-semantics boundary, not a writer/registration proof. Final stack fix requires new exact-head qualification and independent audit.
+
+# Independent source qualification
+
+Scientific exact head fe80db6ccc6ffd2e2af97fd954a0c18e33446545. Independent Codex reviewer /root/adapter_review, all four changed files,18 tests PASS,0remaining material findings. Exact focused33927127342/job101197974862, CI33927127413,governance33927127300,boundary33927127304 all SUCCESS.
+
+FACT: Exact header revision13 and queue tuple requalified. Conditional numeric inputs esi=0,edx=191 select immutable4-byte table entry0x1da95e0 (base31101668,index191,scale4), then tail0xde823a ->0xdd8df0 in20 modeled steps, preserving entry object. Static metacall0xde76a0..0xdebae6. No further callee followed.
+
+INFERENCE: New exact callable offers a distinct bounded callee-semantics pivot. Numeric operation0 is not assigned an external Qt enum meaning without exact dependency proof.
+
+UNKNOWN: Callee identity/registration role, mapping to known signal body0xbd2190, downstream endpoint, final writer,Field6,ordering,Track B delta. Neither presence nor absence of registration elsewhere is proven.
+
+terminal_result=SOURCE_BLOCKER
+FIRST_MISSING_BOUNDARY=EXACT_INDEX_CALLEE_0_DD8DF0_CONNECTION_REGISTRATION_SEMANTICS_NOT_PROVEN
+
+All earlier incomplete probes remain ANALYSIS_INCOMPLETE. Initial revision10 assumption rejected by qualification; exact revision13 layout taken from qualified PR900 job101069725044 and freshly revalidated. Falsification fixes: immutable reads, missing unmapped-address helper, stack arithmetic/provenance, unsupported stack widths/pop rsp. Focused RED/GREEN observed. Scientific audit PASS only after fixes.
+
+runtime_access=none; official_client_executed=false;login_performed=false;credentials_used=false;process_memory_access=false;packet_capture=false;ocr_vision_used=false;official_service_e2e_count=0;track_b_pr_284_modified=false. Source remains Draft until clean consumption and must close unmerged.

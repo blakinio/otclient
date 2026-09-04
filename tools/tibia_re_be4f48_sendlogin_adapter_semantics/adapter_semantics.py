@@ -145,7 +145,24 @@ def add(a, b):
         return a + b
     if b == 0:
         return a
+    if isinstance(a,str) and a.startswith('add(') and a.endswith(')') and isinstance(b,int):
+        base,sep,off=a[4:-1].rpartition(',')
+        try:
+            return add(base,int(off,0)+b)
+        except ValueError:
+            pass
     return f"add({a},{hex(b) if isinstance(b, int) else b})"
+
+def base_offset(a):
+    if isinstance(a,int):
+        return ('numeric',a)
+    if isinstance(a,str) and a.startswith('add(') and a.endswith(')'):
+        base,_,off=a[4:-1].rpartition(',')
+        try:
+            return base,int(off,0)
+        except ValueError:
+            pass
+    return a,0
 
 def address(md, ins, operand, regs):
     mem = operand.mem
@@ -168,6 +185,8 @@ def value(md, ins, op, regs, memory):
         addr = address(md, ins, op, regs)
         if addr == UNKNOWN:
             return UNKNOWN
+        if op.size==16 and (addr,8) in memory and (add(addr,8),8) in memory:
+            return (memory[(addr,8)],memory[(add(addr,8),8)])
         return memory.get((addr, op.size), f"load{op.size * 8}({hex(addr) if isinstance(addr, int) else addr})")
     return UNKNOWN
 
@@ -224,11 +243,14 @@ def execute(md, ins, regs, memory, calls, stores, symbols=None):
     elif dst.type == X86_OP_MEM:
         addr = address(md,ins,dst,regs)
         if addr != UNKNOWN:
-            # Conservative invalidation of overlapping widths at identical address.
+            base,off=base_offset(addr)
             for key in list(memory):
-                if key[0] == addr:
+                oldbase,oldoff=base_offset(key[0])
+                if base==oldbase and off < oldoff+key[1] and oldoff < off+dst.size:
                     del memory[key]
             memory[(addr,dst.size)] = out
+            if dst.size==16 and isinstance(out,tuple) and len(out)==2:
+                memory[(addr,8)],memory[(add(addr,8),8)]=out
             stores.append({"site":hex(ins.address),"address":addr,"width":dst.size,"value":out})
         else:
             memory.clear()
@@ -247,6 +269,57 @@ def trace_block(raw, start, initial=None, memory=None, symbols=None):
     return {"calls":calls,"stores":stores,"registers":regs,"memory":mem,
             "stop_reason":stop,"stop_site":stop_site,"receiver_identity":UNKNOWN}
 
+def trace_paths(raw, start, initial=None, memory=None, symbols=None, max_steps=4000):
+    """Enumerate only this FDE; loops and undecodable/out-of-range edges fail closed."""
+    md=Cs(CS_ARCH_X86,CS_MODE_64); md.detail=True
+    insns={i.address:i for i in md.disasm(raw,start)}
+    regs={r:f'arg:{r}' for r in ('rdi','rsi','rdx','rcx','r8','r9')}
+    regs['rsp']=0; regs.update(initial or {})
+    pending=[(start,regs,dict(memory or {}),None,frozenset())]
+    calls=[];stores=[];tails=[];steps=0;complete=True;reason='ALL_PATHS_TERMINATED'
+    while pending:
+        pc,regs,mem,zero,visited=pending.pop()
+        while pc in insns:
+            steps+=1
+            if pc in visited or steps>max_steps:
+                complete=False;reason='LOOP_OR_PATH_BUDGET';break
+            visited=visited|{pc}; ins=insns[pc]; nxt=pc+ins.size; m=ins.mnemonic
+            if m.startswith('ret'):
+                break
+            if m.startswith('j'):
+                target=value(md,ins,ins.operands[0],regs,mem)
+                if m=='jmp':
+                    if isinstance(target,int) and target in insns:
+                        pc=target;continue
+                    tails.append({'site':hex(pc),'target':hex(target) if isinstance(target,int) else target,
+                                  'receiver':regs.get('rdi',UNKNOWN),
+                                  'arguments':{r:regs.get(r,UNKNOWN) for r in ('rdi','rsi','rdx','rcx','r8','r9')}})
+                    break
+                taken = zero if m in ('je','jz') else (not zero if zero is not None else None) if m in ('jne','jnz') else None
+                if taken is not False:
+                    if not isinstance(target,int) or target not in insns:
+                        complete=False;reason='BRANCH_OUTSIDE_FDE'
+                    else:
+                        pending.append((target,dict(regs),dict(mem),zero,visited))
+                if taken is True:
+                    break
+                pc=nxt;continue
+            if m in ('cmp','test'):
+                a=value(md,ins,ins.operands[0],regs,mem);b=value(md,ins,ins.operands[1],regs,mem)
+                zero=(a==b if m=='cmp' else (a&b)==0) if isinstance(a,int) and isinstance(b,int) else None
+            elif ins.eflags:
+                zero=None
+            execute(md,ins,regs,mem,calls,stores,symbols)
+            pc=nxt
+        else:
+            complete=False;reason='UNDECODED_FALLTHROUGH'
+        if steps>max_steps:
+            break
+    def unique(rows):
+        return [json.loads(s) for s in sorted({json.dumps(x,sort_keys=True) for x in rows})]
+    return {'complete':complete,'stop_reason':reason,'calls':unique(calls),'stores':unique(stores),
+            'tail_edges':unique(tails),'steps':steps}
+
 def analyze(client, version, output):
     verify_fence(client.read_bytes(),version)
     img=Image(client)
@@ -256,6 +329,19 @@ def analyze(client, version, output):
             raise ValueError("ADAPTER_FDE_NOT_UNIQUE_OR_BOUNDED")
         connection=trace_block(img.read(0x7c6b18,0x7c6b9f-0x7c6b18),0x7c6b18,
                                {"rbx":"promoted:entry_owner"},symbols=img.plt_symbol)
+        slot=connection['registers'].get('r9',UNKNOWN)
+        mem=connection['memory']
+        slot_function=mem.get((add(slot,8),8))
+        member=mem.get((add(slot,16),8))
+        adjustment=mem.get((add(slot,24),8))
+        if not isinstance(slot_function,int) or member!=0xbd3050 or adjustment!=0:
+            raise ValueError('EXACT_QSLOT_CONSTRUCTION_NOT_PROVEN')
+        slot_fde=img.containing_fde(slot_function)
+        if not slot_fde or slot_fde[0]!=slot_function or slot_fde[1]-slot_fde[0]>0x2000:
+            raise ValueError('QSLOT_FUNCTION_NOT_UNIQUE_OR_BOUNDED')
+        dispatch=trace_paths(img.read(slot_fde[0],slot_fde[1]-slot_fde[0]),slot_fde[0],
+                             {'rdi':1,'rsi':slot,'rdx':'qt:receiver','rcx':'qt:argv'},mem,img.plt_symbol)
+        adapter_paths=trace_paths(img.read(adapter_fde[0],adapter_fde[1]-adapter_fde[0]),adapter_fde[0],symbols=img.plt_symbol)
         # This phase intentionally emits evidence without converting an incomplete
         # analyzer traversal into a scientific SOURCE_BLOCKER.
         adapter=trace_block(img.read(*[adapter_fde[0],adapter_fde[1]-adapter_fde[0]]),adapter_fde[0])
@@ -264,6 +350,9 @@ def analyze(client, version, output):
         result={"schema":"otclient.track-a.be4f48-sendlogin-adapter-semantics.v1",
                 "exact_client":{"version":version,"size":EXPECTED_SIZE,"sha256":EXPECTED_SHA256},
                 "connection_prefix":connection,"adapter_entry_block":adapter,
+                "qslot_dispatch_function":hex(slot_function),"qslot_fde":[hex(x) for x in slot_fde],
+                "member_pointer":{"function":hex(member),"this_adjustment":adjustment},
+                "qslot_invocation_operation_1":dispatch,"adapter_paths":adapter_paths,
                 "adapter_fde":[hex(x) for x in adapter_fde],
                 "terminal_result":"ANALYSIS_INCOMPLETE",
                 "FIRST_MISSING_BOUNDARY":"COMPLETE_QSLOT_AND_ADAPTER_CONTROL_FLOW_ANALYSIS_REQUIRED",

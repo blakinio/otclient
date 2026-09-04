@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260904-be4f48-post911-promotion
-status: validating
+status: completed
 agent: Codex
 session_id: login-closure-20260904-ae070f034ee4
 session_role: coordinator
@@ -8,7 +8,7 @@ project_lane: otclient
 lane: P2-NETWORK
 track_id: official-client-re
 task_kind: integration
-phase: validate
+phase: archive
 branch: docs/OTC-20260904-be4f48-post911-promotion
 base_branch: main
 base_main: 7b197b9cbe9a3d7635c1266a3539748749bb720b
@@ -80,8 +80,8 @@ depends_on: []
 blocks:
   - clean coordinator consumption of this exact source result
 cross_repository_task_ids: []
-ownership_released: false
-next_action: clean promotion exact-head audit/checks, squash then source close unmerged and separatearchive
+ownership_released: true
+next_action: ownership released; register bounded continuation successor separately after archive merge
 ---
 
 
@@ -119,3 +119,7 @@ Final focused33929723341/job101205693927; CI33929723527; governance33929723350; 
 Merge clean promotion after exact-head gates and0findings; close911 unmerged as consumed; separatearchive moves coordinator task and explicitly imports historical source record, ownership_released:true. Only after archive register one exact continuation-semantic successor, preferentially first exit0x1d36fb ->0xc6c16. Do not automatically include secondexit0xc6c5c, privatecallee0x1cd220 or queuecallee0xdd8df0 in that source task. This task-local blocker does not establish static-proof exhaustion or programme success.
 
 runtime_access=none; official_client_executed=false;login_performed=false;credentials_used=false;process_memory_access=false;packet_capture=false;ocr_vision_used=false;official_service_e2e_count=0;track_b_pr_284_modified=false.
+
+## Archive closeout
+
+Promotion #912 merged at a2ae1be0f0fc5eeca5bb1200ea3e3ff50637b763. Source #911 exact head a79b6115b9b0f6ebe4b766966c7d7cc11a74392d closed unmerged as consumed. This archive releases ownership; no new source is registered here.

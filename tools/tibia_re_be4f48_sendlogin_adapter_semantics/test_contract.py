@@ -105,6 +105,10 @@ class Contract(unittest.TestCase):
         result=self.module.trace_paths(bytes.fromhex('7402ffd0c3'),0x1000,stop_at_receiver=True)
         self.assertFalse(result.get('all_paths_reach_receiver',True))
 
+    def test_negative_immediate_compare_uses_operand_width(self):
+        result=self.module.trace_paths(bytes.fromhex('83f8ff7402ffd3c3'),0x1000,{'rax':0xffffffff})
+        self.assertEqual(result['calls'],[])
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -332,6 +332,9 @@ def trace_paths(raw, start, initial=None, memory=None, symbols=None, max_steps=4
                 pc=nxt;continue
             if m in ('cmp','test'):
                 a=value(md,ins,ins.operands[0],regs,mem);b=value(md,ins,ins.operands[1],regs,mem)
+                if isinstance(a,int) and isinstance(b,int):
+                    mask=(1 << (ins.operands[0].size*8))-1
+                    a &= mask; b &= mask
                 zero=(a==b if m=='cmp' else (a&b)==0) if isinstance(a,int) and isinstance(b,int) else None
             elif ins.eflags or m=='call':
                 zero=None

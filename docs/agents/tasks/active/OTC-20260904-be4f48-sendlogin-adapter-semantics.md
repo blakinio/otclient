@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260904-be4f48-sendlogin-adapter-semantics
-status: implementing
+status: validating
 agent: Codex
 session_id: login-closure-20260904-ae070f034ee4
 session_role: researcher
@@ -8,14 +8,14 @@ project_lane: otclient
 lane: P2-NETWORK
 track_id: official-client-re
 task_kind: implementation
-phase: implement
+phase: validate
 branch: ai/OTC-20260904-be4f48-sendlogin-adapter-semantics
 base_branch: main
 base_main: 04a4ca71b658dcc374aaf40dbb8135de43d49cb7
 created: 2026-09-04T22:06:00Z
-updated_at: 2026-09-04T22:06:00Z
+updated_at: 2026-09-04T22:25:59Z
 invocation_started_at: 2026-09-04T22:06:00Z
-last_progress_at: 2026-09-04T22:06:00Z
+last_progress_at: 2026-09-04T22:25:59Z
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: codex
@@ -57,7 +57,7 @@ decomposition_reason: one connection construction and one adapter/member boundar
 foreground_runtime_budget_minutes: 120
 foreground_budget_reason: explicit sequential source qualification and clean promotion/archive programme
 ci_checks_for_current_head: 0
-ci_check_generation: red
+ci_check_generation: final_source_qualification
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -80,7 +80,7 @@ blocks:
   - clean coordinator consumption of this exact source result
 cross_repository_task_ids: []
 ownership_released: false
-next_action: qualify bounded dataflow on exact client; complete QSlot and adapter control-flow analysis before any source terminal claim
+next_action: verify final corrected source head and independent audit, then clean coordinator consumption without source merge
 ---
 
 # Objective and authority
@@ -125,4 +125,49 @@ E2E NOT_APPLICABLE for this static producer: official-client execution is forbid
 Resume the existing source task and branch after rechecking live ownership and exact head.
 No source result or programme completion is claimed.
 
-Repository-only RED: five expected failures at 1e5ceb8e45cd74220fe5500e57c8d85266ed5820 because analyzer was absent. Local minimal GREEN: five behavioral tests pass. Initial dataflow probe intentionally reports ANALYSIS_INCOMPLETE, never SOURCE_BLOCKER; full source semantics remain to implement. No client bytes materialized locally.
+# Source qualification checkpoint
+
+Initial repository-only RED: 1e5ceb8e45cd74220fe5500e57c8d85266ed5820,
+five expected failures before client materialization. Minimal GREEN: five pass.
+Subsequent original synthetic regressions cover branching, loops, vector member-pointer copy,
+partial memory overwrite, external-call flags, register widths, memory/SIMD clobbers
+and per-path receiver-edge acceptance. Final local suite: 18 PASS.
+The signed-immediate comparison regression was observed failing before width normalization.
+
+Exact head 2d49f321afcfd87d12d927e0a98801ab7169920d:
+focused run33925254513/job101192252902 SUCCESS; CI33925254694 SUCCESS;
+governance33925254437 SUCCESS; self-hosted boundary33925254470 SUCCESS.
+Result SOURCE_BLOCKER, conditional QSlot ABI complete (10 steps), adapter first receiver
+edge complete (571 steps). No actual receiver class/registered receiver binding promoted.
+This parent result is supporting evidence only; final signed-immediate correction needs exact-head qualification.
+
+# Independent falsification
+
+Reviewer session /root/adapter_review independently reproduced:
+ADP-001 register-width/partial-write unsoundness;
+ADP-002 unknown-call memory/SIMD preservation;
+ADP-003 LOOP fallthrough;
+ADP-004 union-only first-edge acceptance;
+ADP-005 signed-immediate comparison width.
+All have focused regression fixes. Final reviewer recheck remains required.
+Initial path-budget outputs remain ANALYSIS_INCOMPLETE, never scientific blockers.
+
+# Recovery checkpoint
+
+policy_version: 1
+generation: 2
+session_id: login-closure-20260904-ae070f034ee4
+checkpointed_at: 2026-09-04T22:25:59Z
+status: validating
+active_operation: exact-head source qualification and independent audit
+safe_to_resume: true
+resume_condition: current PR904 head and ownership match this source lane
+next_action: inspect current PR904 exact-head qualification and finalize independent source audit before clean promotion
+
+# Track B fence
+
+PR284 exact head62383aded3acbeb5f405a12fe1f93849cd8e35f9 unchanged.
+Latest task explicitly requires current native pre-login outbound sequence.
+Its head has successful CI33154227870 but failures in governance33154227691
+and launcher bootstrap33154227688; no unrelated repair attempted.
+Official-service E2E count in this invocation remains zero.

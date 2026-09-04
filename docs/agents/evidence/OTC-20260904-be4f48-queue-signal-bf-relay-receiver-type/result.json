@@ -1,0 +1,327 @@
+{
+  "FIRST_MISSING_BOUNDARY": "NEXT_RELAY_EDGE_NOT_UNIQUELY_PROVEN_WITHIN_BOUNDED_RECEIVER_TYPE_PROOF",
+  "connectimpl_callsite": "0xbe2eee",
+  "connectimpl_fde": [
+    "0xbe2a50",
+    "0xbe3086"
+  ],
+  "connection_role_evidence": {
+    "classification": "SAME_SIGNAL_OWNER_RECEIVER_AND_PROMOTED_QSLOT_SIGNAL_BODY",
+    "proven": true,
+    "qslot_function_target": "0xbd2190",
+    "receiver_identity": "tibia::protocol::TProtocolMessageQueue",
+    "role": "SIGNAL_RELAY",
+    "signal_name": "clientMessageReadyToProcess",
+    "signal_owner": "tibia::protocol::TProtocolMessageQueue"
+  },
+  "credentials_used": false,
+  "exact_client": {
+    "proven": true,
+    "sha256": "552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1",
+    "size": 52105824,
+    "version": "15.32.be4f48"
+  },
+  "field6_value": "UNKNOWN",
+  "final_queue_writer_identified": false,
+  "final_tcp_writer_identified": false,
+  "final_writer_contract": "UNKNOWN",
+  "login_performed": false,
+  "next_action": "clean coordinator promotion before any Track B decision",
+  "next_endpoint_identity": "UNKNOWN",
+  "next_relay_edge_evidence": {
+    "classification": "NEXT_RELAY_EDGE_NOT_FOLLOWED_WITHOUT_A_NEW_UNIQUE_IDENTITY_PRESERVING_EDGE",
+    "edge": "UNKNOWN",
+    "endpoint_identity": "UNKNOWN",
+    "identity_preserved": "exact GameclientMessage shared pair",
+    "proven": false
+  },
+  "next_unique_relay_edge": "UNKNOWN",
+  "ocr_vision_used": false,
+  "official_client_executed": false,
+  "official_service_e2e_count": 0,
+  "packet_capture": false,
+  "process_memory_access": false,
+  "promoted_receiver_provenance_consumed": true,
+  "qslot_function_target": "0xbd2190",
+  "queue_signal_argv1_identity": "exact GameclientMessage shared pair",
+  "queue_signal_connection_role": "SIGNAL_RELAY",
+  "queue_signal_index": 191,
+  "queue_signal_index_hex": "0xbf",
+  "queue_signal_name": "clientMessageReadyToProcess",
+  "queue_signal_receiver_identity": "tibia::protocol::TProtocolMessageQueue",
+  "queue_signal_receiver_identity_proven": true,
+  "receiver_provenance": "ENTRY_ARG:rdi",
+  "receiver_type_evidence": {
+    "active_root_pointer_store": {
+      "base_register": "rbx",
+      "object_offset": "0x0",
+      "pointer": "0x30ed588",
+      "site": "0xbe2a85",
+      "source_register": "rax",
+      "vptr_decode": {
+        "candidate_type_names": [
+          "tibia::protocol::TProtocolMessageQueue"
+        ],
+        "classification": "PRIMARY_VPTR_RTTI_TYPE_PROVEN",
+        "evidence_sources": [
+          "rtti_name"
+        ],
+        "offset_to_top": 0,
+        "offset_to_top_raw": "0x0",
+        "proven": true,
+        "type_identity": "tibia::protocol::TProtocolMessageQueue",
+        "typeinfo": "0x30ed548",
+        "typeinfo_name_ptr": "0x1d77cc0",
+        "typeinfo_raw_name": "N5tibia8protocol21TProtocolMessageQueueE",
+        "typeinfo_symbols": [],
+        "vptr": "0x30ed588",
+        "vptr_symbols": []
+      }
+    },
+    "classification": "ENTRY_RDI_ACTIVE_VPTR_TYPE_PROVEN",
+    "connectimpl_callsite": "0xbe2eee",
+    "connectimpl_target": {
+      "demangled": "QObject::connectImpl(QObject const*, void**, QObject const*, void**, QtPrivate::QSlotObjectBase*, Qt::ConnectionType, int const*, QMetaObject const*)",
+      "direct_symbols": [],
+      "symbol": "_ZN7QObject11connectImplEPKS_PPvS1_S3_PN9QtPrivate15QSlotObjectBaseEN2Qt14ConnectionTypeEPKiPK11QMetaObject",
+      "target": "0x4d6800"
+    },
+    "connection_fde": [
+      "0xbe2a50",
+      "0xbe3086"
+    ],
+    "entry_object_root_pointer_decodes": [
+      {
+        "base_register": "rbx",
+        "object_offset": "0x0",
+        "pointer": "0x30ed588",
+        "site": "0xbe2a85",
+        "source_register": "rax",
+        "vptr_decode": {
+          "candidate_type_names": [
+            "tibia::protocol::TProtocolMessageQueue"
+          ],
+          "classification": "PRIMARY_VPTR_RTTI_TYPE_PROVEN",
+          "evidence_sources": [
+            "rtti_name"
+          ],
+          "offset_to_top": 0,
+          "offset_to_top_raw": "0x0",
+          "proven": true,
+          "type_identity": "tibia::protocol::TProtocolMessageQueue",
+          "typeinfo": "0x30ed548",
+          "typeinfo_name_ptr": "0x1d77cc0",
+          "typeinfo_raw_name": "N5tibia8protocol21TProtocolMessageQueueE",
+          "typeinfo_symbols": [],
+          "vptr": "0x30ed588",
+          "vptr_symbols": []
+        }
+      }
+    ],
+    "entry_object_root_pointer_stores": [
+      {
+        "base_register": "rbx",
+        "object_offset": "0x0",
+        "pointer": "0x30ed588",
+        "site": "0xbe2a85",
+        "source_register": "rax"
+      }
+    ],
+    "entry_object_trace": {
+      "bounded_direct_calls": [
+        {
+          "demangled": "QObject::QObject(QObject*)",
+          "direct_symbols": [],
+          "site": "0xbe2a6d",
+          "symbol": "_ZN7QObjectC2EPS_",
+          "target": "0x4d6030"
+        },
+        {
+          "demangled": "operator new(unsigned long)",
+          "direct_symbols": [],
+          "site": "0xbe2aa5",
+          "symbol": "_Znwm",
+          "target": "0x4d8670"
+        },
+        {
+          "demangled": "operator new(unsigned long)",
+          "direct_symbols": [],
+          "site": "0xbe2ac7",
+          "symbol": "_Znwm",
+          "target": "0x4d8670"
+        },
+        {
+          "demangled": "operator new(unsigned long)",
+          "direct_symbols": [],
+          "site": "0xbe2b2f",
+          "symbol": "_Znwm",
+          "target": "0x4d8670"
+        },
+        {
+          "demangled": "operator new(unsigned long)",
+          "direct_symbols": [],
+          "site": "0xbe2b51",
+          "symbol": "_Znwm",
+          "target": "0x4d8670"
+        },
+        {
+          "demangled": "QTimer::QTimer(QObject*)",
+          "direct_symbols": [],
+          "site": "0xbe2b9c",
+          "symbol": "_ZN6QTimerC1EP7QObject",
+          "target": "0x4d8920"
+        },
+        {
+          "demangled": "QTimer::QTimer(QObject*)",
+          "direct_symbols": [],
+          "site": "0xbe2bb1",
+          "symbol": "_ZN6QTimerC1EP7QObject",
+          "target": "0x4d8920"
+        },
+        {
+          "demangled": "operator new(unsigned long)",
+          "direct_symbols": [],
+          "site": "0xbe2bce",
+          "symbol": "_Znwm",
+          "target": "0x4d8670"
+        },
+        {
+          "demangled": "operator new(unsigned long)",
+          "direct_symbols": [],
+          "site": "0xbe2c1f",
+          "symbol": "_Znwm",
+          "target": "0x4d8670"
+        },
+        {
+          "demangled": "operator delete(void*, unsigned long)",
+          "direct_symbols": [],
+          "site": "0xbe2c7f",
+          "symbol": "_ZdlPvm",
+          "target": "0x4d7900"
+        },
+        {
+          "demangled": "operator new(unsigned long)",
+          "direct_symbols": [],
+          "site": "0xbe2c8d",
+          "symbol": "_Znwm",
+          "target": "0x4d8670"
+        },
+        {
+          "demangled": "operator new(unsigned long)",
+          "direct_symbols": [],
+          "site": "0xbe2ce7",
+          "symbol": "_Znwm",
+          "target": "0x4d8670"
+        },
+        {
+          "demangled": "operator delete(void*, unsigned long)",
+          "direct_symbols": [],
+          "site": "0xbe2d47",
+          "symbol": "_ZdlPvm",
+          "target": "0x4d7900"
+        },
+        {
+          "demangled": "QTimer::setSingleShot(bool)",
+          "direct_symbols": [],
+          "site": "0xbe2dc1",
+          "symbol": "_ZN6QTimer13setSingleShotEb",
+          "target": "0x4d5ba0"
+        },
+        {
+          "demangled": "QTimer::setInterval(int)",
+          "direct_symbols": [],
+          "site": "0xbe2dd2",
+          "symbol": "_ZN6QTimer11setIntervalEi",
+          "target": "0x4d6910"
+        },
+        {
+          "demangled": "operator new(unsigned long)",
+          "direct_symbols": [],
+          "site": "0xbe2e02",
+          "symbol": "_Znwm",
+          "target": "0x4d8670"
+        },
+        {
+          "demangled": "QObject::connectImpl(QObject const*, void**, QObject const*, void**, QtPrivate::QSlotObjectBase*, Qt::ConnectionType, int const*, QMetaObject const*)",
+          "direct_symbols": [],
+          "site": "0xbe2e54",
+          "symbol": "_ZN7QObject11connectImplEPKS_PPvS1_S3_PN9QtPrivate15QSlotObjectBaseEN2Qt14ConnectionTypeEPKiPK11QMetaObject",
+          "target": "0x4d6800"
+        },
+        {
+          "demangled": "QMetaObject::Connection::~Connection()",
+          "direct_symbols": [],
+          "site": "0xbe2e60",
+          "symbol": "_ZN11QMetaObject10ConnectionD1Ev",
+          "target": "0x4d4cd0"
+        },
+        {
+          "demangled": "QTimer::setSingleShot(bool)",
+          "direct_symbols": [],
+          "site": "0xbe2e6e",
+          "symbol": "_ZN6QTimer13setSingleShotEb",
+          "target": "0x4d5ba0"
+        },
+        {
+          "demangled": "QTimer::setInterval(int)",
+          "direct_symbols": [],
+          "site": "0xbe2e81",
+          "symbol": "_ZN6QTimer11setIntervalEi",
+          "target": "0x4d6910"
+        },
+        {
+          "demangled": "operator new(unsigned long)",
+          "direct_symbols": [],
+          "site": "0xbe2eb1",
+          "symbol": "_Znwm",
+          "target": "0x4d8670"
+        },
+        {
+          "demangled": "QObject::connectImpl(QObject const*, void**, QObject const*, void**, QtPrivate::QSlotObjectBase*, Qt::ConnectionType, int const*, QMetaObject const*)",
+          "direct_symbols": [],
+          "site": "0xbe2eee",
+          "symbol": "_ZN7QObject11connectImplEPKS_PPvS1_S3_PN9QtPrivate15QSlotObjectBaseEN2Qt14ConnectionTypeEPKiPK11QMetaObject",
+          "target": "0x4d6800"
+        }
+      ],
+      "bounded_fde": [
+        "0xbe2a50",
+        "0xbe3086"
+      ],
+      "object_pointer_stores": [
+        {
+          "base_register": "rbx",
+          "object_offset": "0x0",
+          "pointer": "0x30ed588",
+          "site": "0xbe2a85",
+          "source_register": "rax"
+        }
+      ],
+      "promoted_receiver_provenance_consumed": true,
+      "qobject_constructor_calls": [
+        {
+          "demangled": "QObject::QObject(QObject*)",
+          "direct_symbols": [],
+          "site": "0xbe2a6d",
+          "symbol": "_ZN7QObjectC2EPS_",
+          "target": "0x4d6030"
+        }
+      ],
+      "receiver_provenance": "ENTRY_ARG:rdi"
+    },
+    "promoted_receiver_provenance_consumed": true,
+    "proven": true,
+    "receiver_identity": "tibia::protocol::TProtocolMessageQueue",
+    "receiver_matches_signal_owner": true,
+    "receiver_provenance": "ENTRY_ARG:rdi",
+    "signal_owner_cross_check": {
+      "qslot_function_target": "0xbd2190",
+      "queue_signal_owner": "tibia::protocol::TProtocolMessageQueue",
+      "receiver_matches_signal_owner": true
+    }
+  },
+  "runtime_access": "none",
+  "schema": "otclient.track-a.be4f48-queue-signal-bf-relay-receiver-type.source-result.v1",
+  "terminal_result": "QUEUE_SIGNAL_BF_RELAY_RECEIVER_TYPE_PROVEN",
+  "track_b_pr_284_modified": false
+}

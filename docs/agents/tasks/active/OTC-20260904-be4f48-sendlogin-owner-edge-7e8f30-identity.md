@@ -1,18 +1,18 @@
 ---
 task_id: OTC-20260904-be4f48-sendlogin-owner-edge-7e8f30-identity
-status: waiting
+status: validating
 agent: ChatGPT
 session_role: researcher
 project_lane: otclient
 lane: P2-NETWORK
 track_id: official-client-re
 task_kind: discovery
-phase: implement
+phase: validate
 branch: research/OTC-20260904-be4f48-sendlogin-owner-edge-7e8f30-identity
 base_branch: main
 base_main: 7e67c67783b19575ec7f378c7be49cb69d87f1ce
 created: 2026-09-04T15:44:00+02:00
-updated_at: 2026-09-04T15:47:00+02:00
+updated_at: 2026-09-04T15:52:00+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: chat_github
@@ -45,12 +45,12 @@ estimate_confidence: high
 decomposition_decision: single
 decomposition_reason: one exact-current callee-local owner identity discriminator with one static analysis workflow
 invocation_started_at: 2026-09-04T15:37:00+02:00
-last_progress_at: 2026-09-04T15:45:26+02:00
-ci_checks_for_current_head: 2
-ci_check_generation: red_contract
+last_progress_at: 2026-09-04T15:52:00+02:00
+ci_checks_for_current_head: 0
+ci_check_generation: source_checkpoint
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
-unchanged_state_checks: 1
+unchanged_state_checks: 0
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 0
@@ -69,17 +69,17 @@ reuses:
 depends_on: []
 blocks:
   - clean coordinator promotion before any Track B decision
-red_head: 098a143abce3008d30d5c8ca0209695ccf6621a7
-red_run: 33879840472
-red_job: PENDING
-red_result: PENDING_WORKFLOW_COMPLETION
-red_first_error: PENDING
-tdd_red_verified: false
-green_implementation_commit: PENDING
-source_head: PENDING
-source_run: PENDING
-source_job: PENDING
-source_result: PENDING
+red_head: 684e301ada1feef6590fc59b3375a19c547f16a8
+red_run: 33879930241
+red_job: 101045813815
+red_result: expected_failure_before_client_materialization
+red_first_error: "AssertionError: edge_identity.py is missing: expected RED before client materialization"
+tdd_red_verified: true
+green_implementation_commit: 9c68d92657100b054c6d5006ab46ddc5303112ee
+source_head: 9c68d92657100b054c6d5006ab46ddc5303112ee
+source_run: 33880393758
+source_job: 101047349555
+source_result: RUNNING
 source_artifact_id: PENDING
 source_artifact_digest: PENDING
 scientific_terminal_result: PENDING
@@ -96,28 +96,28 @@ pre_success_send_sequence: UNKNOWN
 field6_value: UNKNOWN
 e2e_result: NOT_APPLICABLE
 e2e_reason: source-only static discriminator; official-client execution and official-service E2E are explicitly forbidden
-last_completed_step: branch, task, RED contract and Draft PR #894 were published; first two aggregate observations saw RED run 33879840472 progress from queued to in_progress
-next_action: inspect completed RED workflow run for the expected missing edge_identity.py failure and prove WARP/client materialization was skipped; only then implement the analyzer
+last_completed_step: verified repository-only RED at head 684e301ada1feef6590fc59b3375a19c547f16a8 and added the minimal callee-only analyzer at 9c68d92657100b054c6d5006ab46ddc5303112ee
+next_action: inspect the terminal scientific source run 33880393758 and persist its sanitized exact-current result, then perform whole-diff falsification and exact-head qualification
 recovery:
   policy_version: 1
-  generation: 1
+  generation: 2
   session_id: chat-github-20260904T153700+0200
   session_started_at: 2026-09-04T15:37:00+02:00
-  checkpointed_at: 2026-09-04T15:47:00+02:00
-  last_progress_at: 2026-09-04T15:45:26+02:00
-  phase: implement
-  exact_head: 098a143abce3008d30d5c8ca0209695ccf6621a7
+  checkpointed_at: 2026-09-04T15:52:00+02:00
+  last_progress_at: 2026-09-04T15:52:00+02:00
+  phase: validate
+  exact_head: PENDING_TASK_CHECKPOINT_COMMIT
   pull_request: 894
-  active_operation: repository-only RED workflow run 33879840472
-  external_run_ids: [33879840472, 33879840469, 33879840434, 33879840754]
-  operation_started_at: 2026-09-04T15:45:26+02:00
+  active_operation: scientific source workflow run 33880393758 on 9c68d92657100b054c6d5006ab46ddc5303112ee
+  external_run_ids: [33880393758, 33880394037, 33880393831, 33880394167]
+  operation_started_at: 2026-09-04T15:50:00+02:00
   wait_deadline_at: null
-  check_generation: red_contract
-  checks_used: 2
-  status: waiting
+  check_generation: source_checkpoint
+  checks_used: 0
+  status: active
   safe_to_resume: true
-  resume_condition: RED workflow 33879840472 reaches a terminal conclusion
-  next_action: inspect run 33879840472 and its failed job/log; require the missing-analyzer assertion and skipped materialization before adding edge_identity.py
+  resume_condition: scientific source workflow 33880393758 reaches terminal conclusion
+  next_action: inspect run 33880393758, retrieve sanitized result artifact/log evidence, and persist the scientific boundary without widening scope
 ---
 
 # Objective
@@ -133,6 +133,28 @@ version=15.32.be4f48
 size=52105824
 sha256=552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1
 ```
+
+# TDD RED evidence
+
+At exact head `684e301ada1feef6590fc59b3375a19c547f16a8`, workflow run `33879930241`, job `101045813815` failed exactly at the repository-only contract with:
+
+```text
+AssertionError: edge_identity.py is missing: expected RED before client materialization
+```
+
+The subsequent WARP, client materialization, result validation and artifact steps were all skipped. This satisfies the required RED-before-client boundary.
+
+# GREEN implementation boundary
+
+The implementation at `9c68d92657100b054c6d5006ab46ddc5303112ee`:
+
+- starts only from callee `0x7e8f30` and its containing FDE;
+- binds type evidence only to the same `ENTRY_ARG:rdi` object;
+- accepts exact Itanium RTTI only when tied to an object vptr store;
+- if callee-local proof is absent, enumerates only same-object direct internal calls inside that callee and follows one only when exactly one candidate exists;
+- follows no second internal edge;
+- does not rediscover callers, rescan the connection-owner FDE, or open a global type census;
+- leaves the `+0x88` receiver identity `UNKNOWN` unless the bounded owner proof itself uniquely implies more.
 
 # Starting evidence
 

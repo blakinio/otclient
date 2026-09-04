@@ -9,6 +9,14 @@ from static_flow import Image, trace_paths, verify_fence, EXPECTED_VERSION, EXPE
 
 SYMBOL='_ZN7QObject11connectImplEPKS_PPvS1_S3_PN9QtPrivate15QSlotObjectBaseEN2Qt14ConnectionTypeEPKiPK11QMetaObject'
 
+def qualify_dependency_fence(row):
+    if row['unpackedhash']!='03ac3e4e7356399897ec58d42c81ae5c257072d45d539de1def528a8a04911fa' or row['unpackedsize']!=7354472:
+        raise ValueError('QTCORE_DISCOVERED_EXACT_FENCE_MOVED')
+
+def only_external_branches(path):
+    rows=path.get('incomplete_boundaries',[])
+    return bool(not path['complete'] and rows and all(r['kind']=='BRANCH_OUTSIDE_FDE' and re.fullmatch(r'0x[0-9a-f]+',r['target']) for r in rows))
+
 def safe_row(row):
     keys=('localfile','unpackedhash','unpackedsize','packedhash','packedsize','url')
     out={k:row[k] for k in keys}
@@ -71,6 +79,7 @@ def analyze(selected,client,core):
             'official_service_e2e_count':0,'track_b_pr_284_modified':False,
             'field6_value':'UNKNOWN','final_writer_contract':'UNKNOWN','pre_success_send_sequence':'UNKNOWN'}
     if not selected['qtcore']:return result
+    qualify_dependency_fence(selected['qtcore'])
     verify_member(core.read_bytes(),selected['qtcore'])
     img=Image(core)
     try:
@@ -91,6 +100,8 @@ def analyze(selected,client,core):
                        'qt_connectimpl_symbol_size':size,'analysis_complete':path['complete'],
                        'analysis_stop':path['stop_reason'],'analysis_steps':path['steps'],
                        'receiver_delegations':list(candidates.values()),
+                       'receiver_delegation_scope':'conditional modeled in-FDE paths only; no completeness across external continuations',
+                       'incomplete_boundaries':path['incomplete_boundaries'],
                        'bounded_frontier':path['semantic_trace'][-4:]})
         proven=resolved_delegation(path['complete'],list(candidates.values()))
         if proven:
@@ -100,6 +111,9 @@ def analyze(selected,client,core):
         result['receiver_delegation_proven']=proven
         result['terminal_result']='SOURCE_BLOCKER' if path['complete'] else 'ANALYSIS_INCOMPLETE'
         result['FIRST_MISSING_BOUNDARY']='DELEGATED_QT_RECEIVER_REGISTRATION_STORAGE_AND_DELIVERY_NOT_PROVEN' if proven else 'NO_UNIQUE_PROVEN_QT_RECEIVER_DELEGATION' if path['complete'] else 'COMPLETE_BOUNDED_QT_CONNECTIMPL_FLOW_REQUIRED'
+        if only_external_branches(path):
+            result['terminal_result']='SOURCE_BLOCKER'
+            result['FIRST_MISSING_BOUNDARY']='EXACT_QT_CONNECTIMPL_OUT_OF_FDE_CONDITIONAL_CONTINUATION_SEMANTICS_NOT_PROVEN'
         return result
     finally:img.close()
 

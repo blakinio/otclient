@@ -295,12 +295,13 @@ def trace_paths(raw, start, initial=None, memory=None, symbols=None, max_steps=4
     regs['rsp']=0; regs.update(initial or {})
     pending=[(start,regs,dict(memory or {}),None,frozenset())]
     calls=[];stores=[];tails=[];steps=0;complete=True;reason='ALL_PATHS_TERMINATED'
-    seen=set();trace=[];return_without_receiver=False
+    seen=set();trace=[];return_without_receiver=False;incomplete_boundaries=[]
     while pending:
         pc,regs,mem,zero,visited=pending.pop()
         while pc in insns:
             steps+=1
             if pc in visited or steps>max_steps:
+                incomplete_boundaries.append({'kind':'LOOP_OR_PATH_BUDGET','site':hex(pc)})
                 complete=False;reason='LOOP_OR_PATH_BUDGET';break
             signature=(pc,repr(sorted(regs.items())),repr(sorted(mem.items(),key=repr)),zero)
             if signature in seen:
@@ -312,6 +313,7 @@ def trace_paths(raw, start, initial=None, memory=None, symbols=None, max_steps=4
                           'rcx':regs.get('rcx',UNKNOWN),'r8':regs.get('r8',UNKNOWN),
                           'zero_flag':zero})
             if m.startswith('loop') or m in ('jrcxz','jecxz','jcxz'):
+                incomplete_boundaries.append({'kind':'UNSUPPORTED_CONTROL_FLOW','site':hex(pc)})
                 complete=False;reason='UNSUPPORTED_CONTROL_FLOW';break
             if m.startswith('ret'):
                 return_without_receiver=True
@@ -328,6 +330,10 @@ def trace_paths(raw, start, initial=None, memory=None, symbols=None, max_steps=4
                 taken = zero if m in ('je','jz') else (not zero if zero is not None else None) if m in ('jne','jnz') else None
                 if taken is not False:
                     if not isinstance(target,int) or target not in insns:
+                        incomplete_boundaries.append({'kind':'BRANCH_OUTSIDE_FDE','site':hex(pc),
+                                                      'target':hex(target) if isinstance(target,int) else UNKNOWN,
+                                                      'condition':m,'taken':taken,
+                                                      'receiver_registers':[r for r,v in regs.items() if v=='registered:receiver']})
                         complete=False;reason='BRANCH_OUTSIDE_FDE'
                     else:
                         pending.append((target,dict(regs),dict(mem),zero,visited))
@@ -347,11 +353,12 @@ def trace_paths(raw, start, initial=None, memory=None, symbols=None, max_steps=4
                 break
             pc=nxt
         else:
+            incomplete_boundaries.append({'kind':'UNDECODED_FALLTHROUGH','site':hex(pc)})
             complete=False;reason='UNDECODED_FALLTHROUGH'
         if steps>max_steps:
             break
     def unique(rows):
         return [json.loads(s) for s in sorted({json.dumps(x,sort_keys=True) for x in rows})]
-    return {'complete':complete,'stop_reason':reason,'calls':unique(calls),'stores':unique(stores),
+    return {'complete':complete,'stop_reason':reason,'incomplete_boundaries':unique(incomplete_boundaries),'calls':unique(calls),'stores':unique(stores),
             'tail_edges':unique(tails),'steps':steps,'semantic_trace':unique(trace),
             'all_paths_reach_receiver':bool(stop_at_receiver and complete and not return_without_receiver and not tails and calls)}

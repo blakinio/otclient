@@ -59,4 +59,19 @@ class Contract(unittest.TestCase):
         for v in [(32,'EM_X86_64',['libQt6Core.so.6'],'STT_FUNC'),(64,'EM_AARCH64',['libQt6Core.so.6'],'STT_FUNC'),(64,'EM_X86_64',['libOther.so'],'STT_FUNC'),(64,'EM_X86_64',['libQt6Core.so.6'],'STT_OBJECT')]:
             with self.assertRaises(ValueError):m.qualify_core_identity(*v)
 
+    def test_external_conditional_frontier_is_explicit(self):
+        from static_flow import trace_paths
+        p=trace_paths(bytes.fromhex('85c07510c3'),0x1000,{'rcx':'registered:receiver'})
+        self.assertEqual(p['incomplete_boundaries'][0]['site'],'0x1002')
+        self.assertEqual(p['incomplete_boundaries'][0]['target'],'0x1014')
+        self.assertTrue(self.module().only_external_branches(p))
+
+    def test_loop_is_not_external_source_blocker(self):
+        from static_flow import trace_paths
+        p=trace_paths(bytes.fromhex('ebfe'),0x1000)
+        self.assertFalse(self.module().only_external_branches(p))
+
+    def test_dependency_discovery_does_not_allow_silent_change(self):
+        with self.assertRaisesRegex(ValueError,'FENCE'):self.module().qualify_dependency_fence(self.core())
+
 if __name__=='__main__':unittest.main()

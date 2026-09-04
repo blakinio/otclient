@@ -7,12 +7,12 @@ project_lane: otclient
 lane: P2-NETWORK
 track_id: official-client-re
 task_kind: discovery
-phase: implement
+phase: validate
 branch: research/OTC-20260904-be4f48-sendlogin-connection-owner-type
 base_branch: main
 base_main: e94e6c5764851f9cb62691d90c55f42e9c6253a1
 created: 2026-09-04T14:11:00+02:00
-updated_at: 2026-09-04T14:11:00+02:00
+updated_at: 2026-09-04T14:17:00+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: chat_github
@@ -45,9 +45,9 @@ estimate_confidence: medium
 decomposition_decision: single
 decomposition_reason: one bounded exact-current connection-owner type discriminator with one static analysis workflow
 invocation_started_at: 2026-09-04T14:11:00+02:00
-last_progress_at: 2026-09-04T14:11:00+02:00
+last_progress_at: 2026-09-04T14:17:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: red
+ci_check_generation: green_candidate
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -70,12 +70,12 @@ reuses:
 depends_on: []
 blocks:
   - clean coordinator promotion before any Track B decision
-red_head: PENDING
-red_run: PENDING
-red_job: PENDING
+red_head: 396849b2ce1ae818c3db42ced133f4e1ffca2674
+red_run: 33871893625
+red_job: 101019573417
 red_result: expected_failure_before_client_materialization
 red_first_error: "AssertionError: owner_type.py is missing: expected RED before client materialization"
-tdd_red_verified: false
+tdd_red_verified: true
 green_implementation_commit: PENDING
 source_head: PENDING
 source_run: PENDING
@@ -93,8 +93,8 @@ pre_success_send_sequence: UNKNOWN
 field6_value: UNKNOWN
 e2e_result: NOT_APPLICABLE
 e2e_reason: source-only static discriminator; official-client execution and official-service E2E are explicitly forbidden
-last_completed_step: fresh trusted main and post-886 authority verified; independent non-overlapping source-only branch created
-next_action: record repository-only TDD RED on the draft PR before adding owner_type.py
+last_completed_step: repository-only TDD RED verified on run 33871893625 job 101019573417; WARP and all client-materialization steps were skipped
+next_action: validate the smallest bounded in-FDE/one-edge owner-type analyzer on the exact client fence and consume only its sanitized result
 ---
 
 # Objective
@@ -129,4 +129,4 @@ Forbidden: consumed #884 direct-caller scan, global constructor/caller census, g
 
 # TDD state
 
-This first branch head intentionally omits `owner_type.py`. The PR workflow must fail in the repository-only contract step before WARP/client materialization. Only after that RED is observed may the smallest bounded analyzer be added.
+Repository-only RED is proven at `396849b2ce1ae818c3db42ced133f4e1ffca2674`: workflow run `33871893625`, job `101019573417`, failed in `Validate repository-only connection owner-type contract`. The WARP preparation, transient client materialization, analyzer, result validation and artifact upload steps were all skipped. The analyzer is therefore admitted for the GREEN phase without having touched client bytes during RED.

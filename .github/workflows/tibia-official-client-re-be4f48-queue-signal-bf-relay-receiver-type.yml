@@ -115,7 +115,14 @@ jobs:
           assert d['terminal_result'] in ('QUEUE_SIGNAL_BF_RELAY_RECEIVER_TYPE_PROVEN','NEXT_RELAY_EDGE_PROVEN','SOURCE_BLOCKER')
           print('BE4F48_QUEUE_SIGNAL_BF_RELAY_RECEIVER_TYPE_SANITIZED_RESULT=PASS')
           print(json.dumps(d,sort_keys=True))
+          print('::notice title=BE4F48_RELAY_RECEIVER_RESULT::'+json.dumps(d,sort_keys=True,separators=(',',':')))
           PY
+          {
+            echo '### Sanitized bounded relay receiver result'
+            echo '```json'
+            cat artifacts/be4f48-queue-signal-bf-relay-receiver-type/result.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload sanitized bounded result only
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a

@@ -1,0 +1,108 @@
+{
+  "task_id": "OTC-20260904-be4f48-queue-signal-bf-exact-xref-connect-site",
+  "alias": "OTC-BE4F48-QUEUE-SIGNAL-BF-EXACT-XREF-CONNECT-SITE",
+  "analyzer_head": "1970ea47d785387c43c2ff02372d1c038ff17702",
+  "tdd_red": {
+    "head": "e6b5dbf2c6bcaade6c43687975eb540974bb266a",
+    "run_id": 33886790195,
+    "job_id": 101068426723,
+    "observed_failure": "AssertionError: exact_xref_connect_site.py is missing: expected RED before client materialization",
+    "exact_client_materialization_started": false
+  },
+  "validated_implementation": {
+    "head": "1970ea47d785387c43c2ff02372d1c038ff17702",
+    "run_id": 33887179571,
+    "job_id": 101069725044,
+    "conclusion": "success",
+    "repository_contract": "PASS",
+    "exact_fence": "PASS",
+    "sanitized_result": "PASS",
+    "raw_client_retained": false,
+    "artifact_id": 9942365211,
+    "artifact_sha256": "c8ed008428f2f59c3ae8e168b4faeb7f30964707b7436df849e58eda964b0eb8"
+  },
+  "implementation_head_checks": {
+    "focused_run_id": 33887179571,
+    "focused_conclusion": "success",
+    "ci_run_id": 33887180008,
+    "ci_conclusion": "success",
+    "governance_run_id": 33887179569,
+    "governance_conclusion": "success",
+    "self_hosted_boundary_run_id": 33887179516,
+    "self_hosted_boundary_conclusion": "success"
+  },
+  "exact_client": {
+    "version": "15.32.be4f48",
+    "size": 52105824,
+    "sha256": "552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1"
+  },
+  "promoted_inputs": {
+    "queue_signal": "clientMessageReadyToProcess",
+    "queue_signal_index": "0xbf",
+    "queue_signal_body": "0xbd2190",
+    "queue_signal_argv1_identity": "exact GameclientMessage shared pair",
+    "queue_signal_receiver_identity": "tibia::protocol::TProtocolMessageQueue",
+    "queue_signal_connection_role": "SIGNAL_RELAY",
+    "self_relay_connectimpl_callsite": "0xbe2eee",
+    "consumed_constructor_fde": [
+      "0xbe2a50",
+      "0xbe3086"
+    ]
+  },
+  "derived_exact_signal_identity": {
+    "signal_body_fde": [
+      "0xbd2190",
+      "0xbd2495"
+    ],
+    "qmetaobject_activate_callsite": "0xbd22c2",
+    "resolved_signal_index": 191,
+    "derived_queue_static_metaobject": "0x30b73e0",
+    "static_metaobject_definition_site": "0xbd22ae",
+    "static_metaobject_source_site": "0xbd221d",
+    "queue_metaobject_owner": "tibia::protocol::TProtocolMessageQueue",
+    "signal_method_row": "0x1ce47c0",
+    "signal_name_address": "0x1ceda8e",
+    "signal_name": "clientMessageReadyToProcess",
+    "method_count": 355,
+    "signal_count": 192,
+    "classification": "EXACT_QUEUE_SIGNAL_IDENTITY_DERIVED"
+  },
+  "exact_signal_discriminator": {
+    "connectimpl_target": "0x4d6800",
+    "connectimpl_demangled": "QObject::connectImpl(QObject const*, void**, QObject const*, void**, QtPrivate::QSlotObjectBase*, Qt::ConnectionType, int const*, QMetaObject const*)",
+    "connectimpl_target_verified": true,
+    "exact_signal_reference_count": 1,
+    "exact_signal_reference": {
+      "needle": "signal_body",
+      "reference_kind": "CODE_LEA",
+      "site": "0xbe2e86",
+      "fde": [
+        "0xbe2a50",
+        "0xbe3086"
+      ],
+      "target": "0xbd2190"
+    },
+    "signal_method_or_name_reference_count": 0,
+    "exact_signal_context_reference_count": 402,
+    "class_metaobject_context_is_not_signal_specific": true,
+    "data_wrapper_reference_count": 0,
+    "downstream_exact_signal_connect_candidate_count": 0,
+    "consumed_self_relay_body_reference_role": "QSLOT_CALLABLE_NOT_SOURCE_SIGNAL_DESCRIPTOR"
+  },
+  "exact_client_fence_proven": true,
+  "next_unique_relay_edge": "UNKNOWN",
+  "next_endpoint_identity": "UNKNOWN",
+  "next_relay_identity_preserved": false,
+  "queue_signal_writer_identity": "UNKNOWN",
+  "final_queue_writer_identified": false,
+  "final_tcp_writer_identified": false,
+  "final_writer_contract": "UNKNOWN",
+  "field6_value": "UNKNOWN",
+  "runtime_access": "none",
+  "official_client_executed": false,
+  "official_service_e2e_count": 0,
+  "track_b_pr_284_modified": false,
+  "terminal_result": "SOURCE_BLOCKER",
+  "FIRST_MISSING_BOUNDARY": "NO_DOWNSTREAM_CONNECTIMPL_CAUSALLY_TIED_TO_EXACT_SIGNAL_REFERENCES",
+  "NEXT_ACTION": "clean coordinator promotion of this precise exact-signal source blocker before admitting one new bounded source step"
+}

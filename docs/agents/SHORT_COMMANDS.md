@@ -7,8 +7,8 @@ This registry maps owner-facing programme aliases to repository-owned prompts or
 | `OTCLIENT-TIBIA-RE` | `docs/agents/prompts/OTCLIENT_TIBIA_RE_CANONICAL.md` | Continue Track A: official Linux Tibia client reverse engineering in `blakinio/otclient`. |
 | `OTCLIENT-GLOBAL-LOGIN` | PR `#284`, branch `feat/OTC-20260813-tibia-global-login-lab`, task `docs/agents/tasks/active/OTC-20260813-tibia-global-login-lab.md` on that branch | Continue Track B: make this OTClient fork authenticate to and enter official Tibia Global. |
 | `OTCLIENT-TIBIA-GLOBAL-LOGIN-FINAL-CONTINUE` | `docs/agents/prompts/OTCLIENT_TIBIA_GLOBAL_LOGIN_FINAL_CONTINUE.md` | Single-window Track B coordinator with local Vision/Qwen post-processing when independently legal secret-safe keyframes exist. |
-| `OTC-BE4F48-SENDLOGIN-RECEIVER-FIELD-OWNER` | `docs/agents/prompts/OTC_BE4F48_SENDLOGIN_RECEIVER_FIELD_OWNER.md` | Exact-current Track A source discriminator for the initializer/ownership/type chain of the proved sendLogin receiver field `[entry-rdi-derived-rbx+0x88]`. |
-| `OTC-BE4F48-QUEUE-SIGNAL-BF-QSLOT-IDENTITY` | `docs/agents/prompts/OTC_BE4F48_QUEUE_SIGNAL_BF_QSLOT_IDENTITY.md` | Exact-current Track A source discriminator for the QSlot object/function at the unique `clientMessageReadyToProcess(0xbf) -> connectImpl@0xbe2eee` connection, with at most one unique writer edge. |
+| `OTC-BE4F48-SENDLOGIN-CONNECTION-OWNER-TYPE` | `docs/agents/prompts/OTC_BE4F48_SENDLOGIN_CONNECTION_OWNER_TYPE.md` | Exact-current Track A source discriminator for the class/type identity of the selected sendLogin connection-owner object and, only if uniquely implied, its `+0x88` receiver field. |
+| `OTC-BE4F48-QUEUE-SIGNAL-BF-RELAY-RECEIVER-TYPE` | `docs/agents/prompts/OTC_BE4F48_QUEUE_SIGNAL_BF_RELAY_RECEIVER_TYPE.md` | Exact-current Track A source discriminator for the receiver class/relay role at `clientMessageReadyToProcess(0xbf) -> connectImpl@0xbe2eee`, with at most one next unique relay edge. |
 
 Historical consumed aliases:
 
@@ -18,6 +18,8 @@ Historical consumed aliases:
 - `OTC-BE4F48-QUEUE-DRAIN-CONSUMPTION` was completed by source PR #874 and consumed by coordinator promotion #876. Do not relaunch it.
 - `OTC-BE4F48-SENDLOGIN-RECEIVER-IDENTITY` was completed by source PR #879 and consumed by coordinator promotion #881. Do not relaunch it.
 - `OTC-BE4F48-QUEUE-SIGNAL-BF-RECEIVER` was completed by source PR #880 and consumed by coordinator promotion #881. Do not relaunch it.
+- `OTC-BE4F48-SENDLOGIN-RECEIVER-FIELD-OWNER` was completed by source PR #884 and consumed by coordinator promotion #886. Do not relaunch it.
+- `OTC-BE4F48-QUEUE-SIGNAL-BF-QSLOT-IDENTITY` was completed by source PR #885 and consumed by coordinator promotion #886. Do not relaunch it.
 
 ## Invocation
 
@@ -25,8 +27,8 @@ Historical consumed aliases:
 Uruchom OTCLIENT-TIBIA-RE autonomicznie.
 Uruchom OTCLIENT-GLOBAL-LOGIN autonomicznie.
 Uruchom OTCLIENT-TIBIA-GLOBAL-LOGIN-FINAL-CONTINUE autonomicznie.
-Uruchom OTC-BE4F48-SENDLOGIN-RECEIVER-FIELD-OWNER autonomicznie.
-Uruchom OTC-BE4F48-QUEUE-SIGNAL-BF-QSLOT-IDENTITY autonomicznie.
+Uruchom OTC-BE4F48-SENDLOGIN-CONNECTION-OWNER-TYPE autonomicznie.
+Uruchom OTC-BE4F48-QUEUE-SIGNAL-BF-RELAY-RECEIVER-TYPE autonomicznie.
 ```
 
 The two current `OTC-BE4F48-*` aliases are intentionally independent and may be run in parallel by separate agents. Each worker must create its own task/branch/worktree and verify non-overlapping ownership. Neither alias authorizes Track B #284 mutation, runtime observation, official-client execution, OCR/Vision or official-service E2E.
@@ -54,23 +56,25 @@ The two current `OTC-BE4F48-*` aliases are intentionally independent and may be 
 4. run local Vision/Qwen only when an independently legal Track B E2E already produced accepted secret-safe keyframes;
 5. never trigger an E2E merely to obtain screenshots.
 
-## `OTC-BE4F48-SENDLOGIN-RECEIVER-FIELD-OWNER` resolution
+## `OTC-BE4F48-SENDLOGIN-CONNECTION-OWNER-TYPE` resolution
 
-1. read `docs/agents/prompts/OTC_BE4F48_SENDLOGIN_RECEIVER_FIELD_OWNER.md` from fresh trusted `main`;
-2. read `docs/agents/evidence/OTC-20260904-be4f48-post879-880-promotion/20260904-coordinator-promotion.md` and `result.json`;
+1. read `docs/agents/prompts/OTC_BE4F48_SENDLOGIN_CONNECTION_OWNER_TYPE.md` from fresh trusted `main`;
+2. read `docs/agents/evidence/OTC-20260904-be4f48-post884-885-promotion/20260904-coordinator-promotion.md` and `result.json`;
 3. verify no newer promotion supersedes the exact fence/boundary;
 4. create a new independent source-only Track A task/branch/Draft PR;
-5. start only from `OBJECT_FIELD:[entry-rdi-derived-rbx+0x88]` and resolve the defining initializer/ownership/type chain, stopping at the first non-unique owner/constructor edge;
-6. only after exact receiver type is proven, reconcile the already-proven `TLoginProtocolMessageHandler::sendLoginMessage -> connectImpl@0x7c6b9f -> QSlot(adapter 0xbd3050)` pair/causality.
+5. start only from connection-owner FDE `0x7c6700..0x7cc933`, its `ENTRY_ARG:rdi` object and the promoted `[entry-rdi-derived-rbx+0x88]` receiver field;
+6. use only bounded in-FDE or one unique identity-preserving vtable/RTTI/QMeta/type edge to type the owner; do not repeat #884's zero-result direct-caller scan;
+7. only if owner identity makes the route unique may the `+0x88` receiver type be classified.
 
-## `OTC-BE4F48-QUEUE-SIGNAL-BF-QSLOT-IDENTITY` resolution
+## `OTC-BE4F48-QUEUE-SIGNAL-BF-RELAY-RECEIVER-TYPE` resolution
 
-1. read `docs/agents/prompts/OTC_BE4F48_QUEUE_SIGNAL_BF_QSLOT_IDENTITY.md` from fresh trusted `main`;
-2. read the same post-#879/#880 coordinator promotion evidence;
+1. read `docs/agents/prompts/OTC_BE4F48_QUEUE_SIGNAL_BF_RELAY_RECEIVER_TYPE.md` from fresh trusted `main`;
+2. read the same post-#884/#885 coordinator promotion evidence;
 3. verify no newer promotion supersedes the exact fence/boundary;
 4. create a new independent source-only Track A task/branch/Draft PR;
-5. start only from unique `QObject::connectImpl@0xbe2eee`, FDE `0xbe2a50..0xbe3086`, and the QSlot producer boundary `0xbe2eb1` (`r9 <- rax`), then resolve the exact QSlot object/function identity;
-6. if and only if one QSlot target is uniquely proven, follow at most one additional identity-preserving writer edge.
+5. start only from `connectImpl@0xbe2eee`, receiver `ENTRY_ARG:rdi`, exact QSlot callable `0xbd2190`, and the causally carried exact `GameclientMessage` shared pair;
+6. resolve the receiver object/class and whether the connection is a signal relay; do not redo #885's QSlot construction analysis;
+7. only if unique may one next identity-preserving `clientMessageReadyToProcess` relay edge be followed; no global Qt/socket/writer census.
 
 A fresh worker must not invent a missing Track B task on `main`. While PR #284 is active, its exact branch/task is the durable Track B entry point.
 

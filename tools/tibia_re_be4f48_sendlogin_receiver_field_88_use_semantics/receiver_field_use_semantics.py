@@ -25,8 +25,8 @@ PROMOTED_SENDER = "tibia::authentication::TLoginProtocolMessageHandler"
 PROMOTED_SIGNAL = "sendLoginMessage"
 PROMOTED_RECEIVER_PROVENANCE = "OBJECT_FIELD:[entry-rdi-derived-rbx+0x88]"
 CONNECTIMPL_RECEIVER_REG = "rcx"
+OBJECT_TIED_THIS_REGISTER = "rdi"
 CALLER_SAVED = {"rax", "rcx", "rdx", "rsi", "rdi", "r8", "r9", "r10", "r11"}
-ARG_REGS = ("rdi", "rsi", "rdx", "rcx", "r8", "r9")
 
 
 def hx(value: int | None) -> str | None:
@@ -525,12 +525,8 @@ def find_unique_object_tied_type_edge(
         ins = instructions[i]
         target = direct_target(ins)
         if ins.mnemonic == "call" and target is not None:
-            matching_args: list[dict[str, Any]] = []
-            for reg in ARG_REGS:
-                resolved = resolve_register(img, instructions, i, reg, deltas)
-                if same_receiver_field_value(resolved, load_site):
-                    matching_args.append({"register": reg, "resolution": resolved})
-            if matching_args:
+            resolved_this = resolve_register(img, instructions, i, OBJECT_TIED_THIS_REGISTER, deltas)
+            if same_receiver_field_value(resolved_this, load_site):
                 candidates.append(
                     {
                         "kind": "DIRECT_CALL_WITH_EXACT_RECEIVER_FIELD_VALUE",
@@ -538,7 +534,9 @@ def find_unique_object_tied_type_edge(
                         "target": hx(target),
                         "symbol": img.plt_symbol(target),
                         "demangled": demangle(img.plt_symbol(target)),
-                        "matching_arguments": matching_args,
+                        "matching_arguments": [
+                            {"register": OBJECT_TIED_THIS_REGISTER, "resolution": resolved_this}
+                        ],
                     }
                 )
 
@@ -599,7 +597,7 @@ def find_unique_object_tied_type_edge(
         }
 
     matching_regs = [row["register"] for row in edge.get("matching_arguments", [])]
-    if "rdi" not in matching_regs:
+    if OBJECT_TIED_THIS_REGISTER not in matching_regs:
         return {
             "proven": False,
             "candidate_count": 1,

@@ -1,18 +1,18 @@
 ---
 task_id: OTC-20260904-be4f48-sendlogin-receiver-field-owner
-status: validating
+status: ready
 agent: ChatGPT
 session_role: researcher
 project_lane: otclient
 lane: P2-NETWORK
 track_id: official-client-re
 task_kind: discovery
-phase: validate
+phase: integrate
 branch: research/OTC-20260904-be4f48-sendlogin-receiver-field-owner
 base_branch: main
 base_main: e24462d72942d8381e1a468de84f16b60f1aa8c9
 created: 2026-09-04T12:52:00+02:00
-updated_at: 2026-09-04T13:10:00+02:00
+updated_at: 2026-09-04T13:12:00+02:00
 risk: high
 execution_class: github_hosted
 execution_mode: chat_github
@@ -45,7 +45,7 @@ estimate_confidence: medium
 decomposition_decision: single
 decomposition_reason: one bounded static field-owner discriminator with one exact-current analysis workflow
 invocation_started_at: 2026-09-04T12:52:00+02:00
-last_progress_at: 2026-09-04T13:10:00+02:00
+last_progress_at: 2026-09-04T13:12:00+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: draft
 terminal_ci_wait_started_at: null
@@ -100,9 +100,17 @@ pre_success_send_sequence: UNKNOWN
 field6_value: UNKNOWN
 e2e_result: NOT_APPLICABLE
 e2e_reason: source-only static discriminator; official-client execution and official-service E2E are explicitly forbidden
-audit_result: pending
-last_completed_step: exact-current source run completed on the admitted analyzer and returned SOURCE_BLOCKER because the bounded direct-caller edge from connection-owner FDE 0x7c6700..0x7cc933 has zero candidates; sanitized terminal evidence is now being persisted
-next_action: perform fresh whole-diff falsification and exact-head validation on the terminal-evidence head; if clean, mark this source task ready for coordinator promotion without broadening scope
+audit_result: SELF_FALSIFICATION_PASS
+audit_independent: false
+audit_material_findings_open: 0
+audit_evidence: docs/agents/evidence/OTC-20260904-be4f48-sendlogin-receiver-field-owner/20260904-whole-diff-falsification.md
+qualification_pre_audit_head: 13c93593e652bccd8b6165b6114711d936eb701f
+qualification_pre_audit_focused_run: 33866867773
+qualification_pre_audit_ci_run: 33866867941
+qualification_pre_audit_governance_run: 33866867750
+qualification_pre_audit_self_hosted_boundary_run: 33866867888
+last_completed_step: fresh whole-diff falsification found zero material findings and confirmed the exact-current SOURCE_BLOCKER is fail-closed at the first bounded missing caller edge
+next_action: exact-head qualify this final source-task audit/checkpoint head; then clean coordinator promotion may consume PR #884 together with the independently terminal parallel QSlot source lane
 ---
 
 # Objective
@@ -126,24 +134,7 @@ size=52105824
 sha256=552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1
 ```
 
-# Promoted starting facts
-
-```text
-receiver_field_provenance=OBJECT_FIELD:[entry-rdi-derived-rbx+0x88]
-selected_connection_owner_fde=0x7c6700..0x7cc933
-receiver_field_reads_in_selected_fde=165
-receiver_field_writes_in_selected_fde=0
-receiver_endpoint_identity=UNKNOWN
-FIRST_MISSING_BOUNDARY=RECEIVER_FIELD_DEFINITION_OUTSIDE_SELECTED_CONNECTION_OWNER_FDE
-```
-
-# TDD
-
-Repository-only RED is verified on head `e9e20394fc28bb5caa4332b0baf4458ef1445c9a`: workflow run `33865752388`, job `101000116304`, failed in the first contract step because `receiver_field_owner.py` was deliberately absent. WARP preparation, exact-client materialization, analysis and artifact upload were all skipped. Only after that expected RED was observed, the bounded analyzer was added in commit `bb39f99c8188ec5166eb95b868cfcecfcd9951bf`.
-
 # Terminal source result
-
-Exact-current source head `29d30b7de6a59bfa0a40c619abfbf3f3061692e1` completed the bounded analyzer:
 
 ```text
 EXACT_CLIENT_FENCE_PROVEN=true
@@ -162,11 +153,23 @@ terminal_result=SOURCE_BLOCKER
 FIRST_MISSING_BOUNDARY=CONNECTION_OWNER_FDE_DIRECT_CALLER_NOT_UNIQUE
 ```
 
-The target-specific direct-caller xref for the promoted connection-owner FDE produced zero candidates. Under the bounded search rule, that is a terminal fail-closed boundary: this task does not widen into a global constructor, RTTI, QMeta, QObject, or `+0x88` census to manufacture an owner identity.
+The exact target-specific direct-caller xref for promoted connection-owner FDE `0x7c6700..0x7cc933` produced zero accepted direct caller candidates. Under the task's bounded-search rule, this is the terminal fail-closed boundary. No global constructor, RTTI, QMeta, QObject, or `+0x88` census is opened to manufacture an owner identity.
 
-Exact run evidence:
+# Evidence
+
+TDD RED:
 
 ```text
+RED_HEAD=e9e20394fc28bb5caa4332b0baf4458ef1445c9a
+RED_RUN=33865752388
+RED_JOB=101000116304
+RED_RESULT=expected failure before client materialization
+```
+
+Exact-current source result:
+
+```text
+SOURCE_HEAD=29d30b7de6a59bfa0a40c619abfbf3f3061692e1
 SOURCE_RUN=33866338005 success
 SOURCE_JOB=101001945445 success
 ARTIFACT_ID=9934120718
@@ -177,15 +180,14 @@ SELF_HOSTED_BOUNDARY_RUN=33866338017 success
 RAW_CLIENT_RETAINED=false
 ```
 
-Durable evidence:
+Pre-audit evidence head `13c93593e652bccd8b6165b6114711d936eb701f` also passed focused source `33866867773`, repository CI `33866867941`, governance `33866867750`, and self-hosted boundary `33866867888`.
 
-- `docs/agents/evidence/OTC-20260904-be4f48-sendlogin-receiver-field-owner/result.json`
-- `docs/agents/evidence/OTC-20260904-be4f48-sendlogin-receiver-field-owner/20260904-source-result.md`
+Fresh whole-diff falsification: `docs/agents/evidence/OTC-20260904-be4f48-sendlogin-receiver-field-owner/20260904-whole-diff-falsification.md` = `SELF_FALSIFICATION_PASS`, zero material findings. It is explicitly not represented as an independent closeout audit; independent lifecycle review belongs to the clean coordinator promotion.
 
 # Safety
 
 Source-only static analysis. No official-client execution, login, credentials, process memory, packet capture, OCR/Vision, official-service E2E, runtime Field6 observation, Track B PR #284 mutation, or protocol rewrite.
 
-# Acceptance / stop rule
+# Lifecycle
 
-The field-owner question is scientifically terminal at the first exact non-unique owner edge. Remaining work is only fresh whole-diff falsification, exact-head qualification, and clean coordinator promotion after the independent parallel QSlot lane has its own terminal durable result. This source task must not consume that lane's scope.
+This source task is scientifically terminal and ready for coordinator consumption, not complete/archived. PR #884 remains Draft and must not self-merge. After exact-head qualification, the clean coordinator may promote only sanitized facts together with the parallel QSlot lane, then close this source PR unmerged as consumed. Until then Track B remains unchanged and no current wire delta is proven.

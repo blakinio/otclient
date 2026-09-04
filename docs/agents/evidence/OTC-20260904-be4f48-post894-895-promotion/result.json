@@ -1,0 +1,90 @@
+{
+  "schema": "otclient.track-a.be4f48-post894-895-promotion.v1",
+  "decision": "SOURCE_BLOCKER",
+  "integration_status": "BLOCKED_NO_IMPLEMENTABLE_WIRE_DELTA",
+  "trusted_main": "7e67c67783b19575ec7f378c7be49cb69d87f1ce",
+  "exact_client": {
+    "version": "15.32.be4f48",
+    "size": 52105824,
+    "sha256": "552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1"
+  },
+  "source_894": {
+    "pr": 894,
+    "final_pr_head": "2e8f797ad0230b9a4338bd44ff98fc562010e422",
+    "scientific_source_head": "9c68d92657100b054c6d5006ab46ddc5303112ee",
+    "final_focused_run": 33881287522,
+    "final_ci_run": 33881287951,
+    "final_governance_run": 33881287474,
+    "final_self_hosted_boundary_run": 33881287646,
+    "terminal_result": "SOURCE_BLOCKER",
+    "first_missing_boundary": "CALLEE_INTERNAL_IDENTITY_EDGE_NOT_FOUND"
+  },
+  "source_895": {
+    "pr": 895,
+    "final_pr_head": "6e853a400831431ad3c3489828b34441dab86636",
+    "scientific_source_head": "88e8c05babc856d89892226ad3cd27d6739997ce",
+    "final_focused_run": 33881260048,
+    "final_ci_run": 33881260365,
+    "final_governance_run": 33881260072,
+    "final_self_hosted_boundary_run": 33881260116,
+    "terminal_result": "SOURCE_BLOCKER",
+    "first_missing_boundary": "NO_NEXT_CLIENTMESSAGEREADYTOPROCESS_SOURCE_CONNECTION_IN_BOUNDED_QUEUE_CONSTRUCTOR_FDE"
+  },
+  "promoted_facts": {
+    "sendlogin_owner_edge_callsite": "0x7c67b8",
+    "sendlogin_owner_edge_callee": "0x7e8f30",
+    "sendlogin_owner_edge_callee_fde": ["0x7e8f30", "0x7f06d6"],
+    "sendlogin_owner_object_provenance": "ENTRY_ARG:rdi carried by promoted 0x7c67b8->0x7e8f30 edge",
+    "sendlogin_owner_object_identity": "UNKNOWN",
+    "sendlogin_receiver_provenance": "OBJECT_FIELD:[entry-rdi-derived-rbx+0x88]",
+    "sendlogin_receiver_identity": "UNKNOWN",
+    "queue_signal_name": "clientMessageReadyToProcess",
+    "queue_signal_index": 191,
+    "queue_signal_index_hex": "0xbf",
+    "queue_signal_argv1_identity": "exact GameclientMessage shared pair",
+    "queue_signal_receiver_identity": "tibia::protocol::TProtocolMessageQueue",
+    "queue_signal_connection_role": "SIGNAL_RELAY",
+    "queue_signal_body": "0xbd2190",
+    "qslot_function_target": "0xbd2190",
+    "queue_self_relay_connectimpl_callsite": "0xbe2eee",
+    "queue_constructor_fde": ["0xbe2a50", "0xbe3086"],
+    "queue_constructor_connectimpl_calls": ["0xbe2e54", "0xbe2eee"],
+    "queue_constructor_after_self_relay_connect_count": 0,
+    "queue_constructor_additional_exact_signal_candidate_count": 0
+  },
+  "withheld": {
+    "sendlogin_owner_class": "UNKNOWN",
+    "sendlogin_receiver_class": "UNKNOWN",
+    "complete_sendlogin_sender_receiver_pair": "NOT_PROVEN",
+    "sendlogin_causal_binding": "NOT_PROVEN",
+    "pre_success_send_sequence": "UNKNOWN",
+    "field6_value": "UNKNOWN",
+    "next_unique_relay_edge": "UNKNOWN",
+    "next_queue_signal_endpoint": "UNKNOWN",
+    "final_queue_writer": "UNKNOWN",
+    "final_tcp_writer": "UNKNOWN",
+    "final_writer_contract": "UNKNOWN",
+    "track_b_current_wire_delta": "NOT_PROVEN"
+  },
+  "independent_coordinator_falsification": {
+    "result": "PASS",
+    "material_findings_open": 0,
+    "implementable_delta_count": 0,
+    "source_worker_self_promotion_used": false
+  },
+  "next_source_boundaries": [
+    "OTC-BE4F48-SENDLOGIN-RECEIVER-FIELD-88-USE-SEMANTICS",
+    "OTC-BE4F48-QUEUE-SIGNAL-BF-EXACT-XREF-CONNECT-SITE"
+  ],
+  "safety": {
+    "runtime_access": "none",
+    "official_client_executed": false,
+    "login_performed": false,
+    "credentials_used": false,
+    "process_memory_access": false,
+    "packet_capture": false,
+    "ocr_vision_used": false,
+    "official_service_e2e_count": 0,
+    "track_b_pr_284_modified": false
+  }
+}

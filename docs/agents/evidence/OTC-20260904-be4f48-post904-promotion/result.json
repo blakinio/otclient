@@ -1,0 +1,62 @@
+{
+  "FACT": {
+    "ADAPTER_EDGE_SCOPE": "modeled normal returning paths; same symbolic adapter entry receiver; no resolved dynamic vptr",
+    "ADAPTER_FIRST_RECEIVER_EDGE": "0xbd31e4 -> load64(add(load64(arg:rdi),0x68))",
+    "ADAPTER_INVOCATION_ABI": "Conditional on QSlot entry edi=1 and constructed slot in rsi: entry rdx -> adapter rdi; [entry rcx+8] -> adapter rsi",
+    "CONNECTIMPL_FORMAL_RECEIVER_REGISTER": "rcx",
+    "QSLOT_DISPATCH_FUNCTION": "0x7c4f10",
+    "QSLOT_MEMBER_POINTER": {
+      "function": "0xbd3050",
+      "this_adjustment": 0
+    },
+    "SELECTED_CONNECTIMPL_SYMBOL_DEFINED_IN_EXECUTABLE": false,
+    "SENDLOGIN_ADAPTER_TARGET": "0xbd3050",
+    "SENDLOGIN_CONNECTIMPL_CALLSITE": "0x7c6b9f",
+    "SENDLOGIN_RECEIVER_PROVENANCE": "OBJECT_FIELD:[entry-rdi-derived-rbx+0x88]"
+  },
+  "FIRST_MISSING_BOUNDARY": "CURRENT_QT_REGISTERED_RECEIVER_TO_QSLOT_ENTRY_RDX_NOT_PROVEN",
+  "INFERENCE": {
+    "required_binding_proof": "Exact deployed Qt registration-to-invocation mapping is required before binding conditional adapter ABI to registered receiver"
+  },
+  "UNKNOWN": {
+    "COMPLETE_SENDLOGIN_SENDER_RECEIVER_PAIR": "NOT_PROVEN",
+    "FIELD6_VALUE": "UNKNOWN",
+    "FINAL_QUEUE_WRITER": "UNKNOWN",
+    "FINAL_TCP_WRITER": "UNKNOWN",
+    "FINAL_WRITER_CONTRACT": "UNKNOWN",
+    "NEXT_QUEUE_SIGNAL_ENDPOINT": "UNKNOWN",
+    "PRE_SUCCESS_SEND_SEQUENCE": "UNKNOWN",
+    "SENDLOGIN_CAUSAL_BINDING": "NOT_PROVEN",
+    "SENDLOGIN_RECEIVER_IDENTITY": "UNKNOWN",
+    "TRACK_B_CURRENT_WIRE_DELTA": "NOT_PROVEN"
+  },
+  "credentials_used": false,
+  "exact_client": {
+    "sha256": "552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1",
+    "size": 52105824,
+    "version": "15.32.be4f48"
+  },
+  "login_performed": false,
+  "ocr_vision_used": false,
+  "official_client_executed": false,
+  "official_service_e2e_count": 0,
+  "packet_capture": false,
+  "process_memory_access": false,
+  "runtime_access": "none",
+  "schema": "otclient.track-a.be4f48-post904-promotion.v1",
+  "scientific_source_head": "4d7669970b4dc54829e29887ae6d60c76b73579b",
+  "source_head": "191a8ff86f1b354d313a95e6901e9c7abcd389d8",
+  "source_pr": 904,
+  "terminal_result": "SOURCE_BLOCKER",
+  "track_b_pr_284_modified": false,
+  "qualification": {
+    "focused_run": 33925815752,
+    "focused_job": 101193970658,
+    "ci_run": 33925815918,
+    "governance_run": 33925815751,
+    "boundary_run": 33925815793,
+    "all": "success",
+    "independent_reviewer": "Codex /root/adapter_review",
+    "material_findings": 0
+  }
+}

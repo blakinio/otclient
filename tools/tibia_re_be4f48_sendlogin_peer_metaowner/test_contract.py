@@ -3,6 +3,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 TARGET = ROOT / "peer_metaowner.py"
+V3 = ROOT / "peer_metaowner_v3.py"
+WORKFLOW = Path(".github/workflows/tibia-official-client-re-be4f48-sendlogin-peer-metaowner.yml")
 
 
 def main() -> None:
@@ -22,6 +24,31 @@ def main() -> None:
         '"track_b_pr_284_modified": False',
     ):
         assert token in text, f"missing contract token: {token}"
+
+    # The final bounded follow-up must model the SysV hidden return-object pointer
+    # for QMetaObject::Connection. Without that shift the exported connectImpl
+    # signature is mapped onto the wrong registers and sender/receiver claims are
+    # unsound.
+    assert V3.exists(), "peer_metaowner_v3.py must exist"
+    v3 = V3.read_text(encoding="utf-8")
+    for token in (
+        "CONNECTIMPL_HAS_HIDDEN_SRET = True",
+        '"sender": "rsi"',
+        '"signal": "rdx"',
+        '"receiver": "rcx"',
+        '"slot_ptr": "r8"',
+        '"slot_object": "r9"',
+        '"connection_type": "stack0"',
+        '"types": "stack8"',
+        '"sender_metaobject": "stack16"',
+        "SLOT_OBJECT_ADAPTER_FIELD_OFFSET = 0x10",
+        '"receiver_endpoint_identity": "UNKNOWN"',
+        '"track_b_pr_284_modified": False',
+    ):
+        assert token in v3, f"missing v3 ABI/dataflow token: {token}"
+
+    workflow = WORKFLOW.read_text(encoding="utf-8")
+    assert "peer_metaowner_v3.py" in workflow, "workflow must execute peer_metaowner_v3.py"
     print("BE4F48_SENDLOGIN_PEER_METAOWNER_REPOSITORY_CONTRACT=PASS")
 
 

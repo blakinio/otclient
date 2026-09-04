@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260904-be4f48-post907-promotion
-status: validating
+status: completed
 agent: Codex
 session_id: login-closure-20260904-ae070f034ee4
 session_role: coordinator
@@ -8,7 +8,7 @@ project_lane: otclient
 lane: P2-NETWORK
 track_id: official-client-re
 task_kind: integration
-phase: validate
+phase: archive
 branch: docs/OTC-20260904-be4f48-post907-promotion
 base_branch: main
 base_main: 6439ec169ae6e0dfe8b3893dc136c752001949eb
@@ -76,8 +76,8 @@ depends_on: []
 blocks:
   - clean coordinator consumption of this exact source result
 cross_repository_task_ids: []
-ownership_released: false
-next_action: exact-head clean promotion audit/checks, squash then source-close and separate archive
+ownership_released: true
+next_action: fresh authority and separate successor registration after archive merge
 ---
 
 # Coordinator promotion of source PR #907
@@ -116,3 +116,7 @@ Remaining priority1 blocker is exact external Qt registered-receiver to QSlot en
 The owner explicitly requests a sequential multi-task login-closure programme, rather than a generic autonomy command. Any continued task count beyond the default must be explicitly budgeted in its task record, keeping the original120-minute invocation clock and normal repair/check limits; no silent budget reset.
 
 runtime_access=none; official_client_executed=false; login_performed=false; credentials_used=false; process_memory_access=false; packet_capture=false; ocr_vision_used=false; official_service_e2e_count=0; track_b_pr_284_modified=false.
+
+# Lifecycle closeout
+
+Promotion #908 merge 29a7d602ef4402ae543c712dc82cea8fe3760fe4, exact-head CI33927695689/governance33927695547 SUCCESS, independent whole-diff PASS0 findings. Source907 closed unmerged at08505bec88fd162cbf7de4c3483a869ec3a08f64. ownership_released:true. No runtime/Track B mutation.

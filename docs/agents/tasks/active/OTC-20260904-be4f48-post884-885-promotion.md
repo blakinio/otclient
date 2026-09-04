@@ -16,15 +16,26 @@ risk: high
 execution_class: github_hosted
 execution_mode: chat_github
 runtime_access: none
+runtime_owner_task: NOT_APPLICABLE
+runtime_namespace: NOT_APPLICABLE
+canonical_registration: NOT_APPLICABLE
+canonical_lease_generation: NOT_APPLICABLE
+registration_lease_generation: NOT_APPLICABLE
+gate_a: NOT_APPLICABLE
+generation_rebind: NOT_APPLICABLE
+gate_b: NOT_APPLICABLE
+bootstrap: NOT_APPLICABLE
+target_uniqueness: NOT_APPLICABLE
 mutation_authorized: false
+persistent_session_role: none
 physical_e2e_required: false
 implementation_authorized: false
 source_prs: [884, 885]
 owned_paths:
   - docs/agents/tasks/active/OTC-20260904-be4f48-post884-885-promotion.md
   - docs/agents/evidence/OTC-20260904-be4f48-post884-885-promotion/**
-last_completed_step: independent coordinator audit reconstructed exact-current source state for PRs 884 and 885 and found no implementable Track B wire delta
-next_action: persist sanitized promotion evidence, open one docs-only promotion PR, require exact-head CI/governance and clean review hygiene, then squash-merge with expected-head guard before consuming source PRs
+last_completed_step: independent coordinator audit reconstructed exact-current source state for PRs 884 and 885 and found no implementable Track B wire delta; exact-head governance admission metadata repaired after fail-closed validation
+next_action: require exact-head CI/governance and clean review hygiene, then squash-merge with expected-head guard before consuming source PRs
 ---
 
 # Objective

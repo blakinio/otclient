@@ -17,6 +17,10 @@ def main() -> None:
         "CONNECTIMPL_CALLSITE = 0x7C6B9F",
         "RECEIVER_FIELD_OFFSET = 0x88",
         "ADAPTER_TARGET = 0xBD3050",
+        "CONNECTIMPL_HAS_HIDDEN_SRET = True",
+        "def stack_deltas(",
+        "def resolve_stack_slot(",
+        "def resolve_receiver_argument(",
         '"runtime_access": "none"',
         '"track_b_pr_284_modified": False',
     ):

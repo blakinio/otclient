@@ -1,13 +1,13 @@
 ---
 task_id: OTC-20260904-be4f48-sendlogin-receiver-identity
-status: implementing
+status: validating
 agent: ChatGPT
 session_role: researcher
 project_lane: otclient
 lane: P2-NETWORK
 track_id: official-client-re
 task_kind: discovery
-phase: red_pending
+phase: validate
 branch: research/OTC-20260904-be4f48-sendlogin-receiver-identity
 base_branch: main
 base_main: f7a471c2cc7ab7fd53afacc8a7458eeefb96ad97
@@ -45,13 +45,7 @@ blocks:
 
 # Objective
 
-Resolve only the exact class/ownership identity of the receiver object used by the proved `QObject::connectImpl` call at `0x7c6b9f`:
-
-```text
-receiver provenance = [entry-rdi-derived-rbx+0x88]
-```
-
-Then prove or reject the complete sender/receiver pair and causal binding from `TLoginProtocolMessageHandler::sendLoginMessage` to the QSlot carrying adapter `0xbd3050`.
+Resolve only the exact class/ownership identity of the receiver object used by the proved `QObject::connectImpl` call at `0x7c6b9f` from receiver provenance `[entry-rdi-derived-rbx+0x88]`, then prove or reject the complete sender/receiver causal binding.
 
 # Exact fence
 
@@ -59,6 +53,39 @@ Then prove or reject the complete sender/receiver pair and causal binding from `
 version=15.32.be4f48
 size=52105824
 sha256=552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1
+```
+
+# Terminal source result
+
+```text
+receiver_argument_stack_aware_proven=true
+receiver_endpoint_provenance=OBJECT_FIELD:[entry-rdi-derived-rbx+0x88]
+receiver_field_read_count=165
+receiver_field_write_count=0
+receiver_endpoint_identity=UNKNOWN
+complete_sender_receiver_pair_proven=false
+sendlogin_causal_binding_proven=false
+PRE_SUCCESS_SEND_SEQUENCE=UNKNOWN
+FIELD6_VALUE=UNKNOWN
+terminal_result=SOURCE_BLOCKER
+FIRST_MISSING_BOUNDARY=RECEIVER_FIELD_DEFINITION_OUTSIDE_SELECTED_CONNECTION_OWNER_FDE
+```
+
+The hidden-sret/stack-scratch ambiguity is resolved: the selected receiver argument reaches `connectImpl` from `[rbx+0x88]`. The selected owner FDE `0x7c6700..0x7cc933` contains no write that could define/type that field, so this lane stops here rather than broadening into global constructor/owner discovery.
+
+# TDD / exact-head evidence
+
+Initial repository-only RED run `33853813018` failed before package/client steps. A later stack-aware contract RED also failed before client materialization. Final exact-current run:
+
+```text
+SOURCE_HEAD=12070c649dd2e5e1f237fd524a3c48e7ca8375a0
+SOURCE_RUN=33854810739 success
+SOURCE_JOB=100965538997 success
+ARTIFACT_ID=9929762469
+ARTIFACT_DIGEST=sha256:eb9212da7acc41e0d67fc7c6a85740c846ac961faddf2ea0e79c49cdd684fd72
+CI_RUN=33854811068 success
+GOVERNANCE_RUN=33854810851 success
+SELF_HOSTED_BOUNDARY_RUN=33854810677 success
 ```
 
 # Safety
@@ -75,25 +102,8 @@ official_service_e2e=false
 track_b_pr_284_modified=false
 ```
 
-# Starting authority
+# Anti-loop / next action
 
-Promoted facts from #876:
+Do not extend #879 into a global field-owner/constructor sweep. Preserve the terminal blocker and wait for clean coordinator promotion together with the terminal queue-signal `0xbf` receiver result. Any later receiver-field owner discriminator must be newly admitted and bounded.
 
-```text
-sender=TLoginProtocolMessageHandler
-signal=sendLoginMessage
-connectImpl=0x7c6b9f
-adapter=0xbd3050
-receiver_provenance=[entry-rdi-derived-rbx+0x88]
-receiver_identity=UNKNOWN
-```
-
-# TDD state
-
-Initial head intentionally omits `receiver_identity.py`. The repository-only contract must fail before WARP metadata/client materialization. After RED is proven, add only the minimal exact-fenced bounded analyzer.
-
-# Anti-loop
-
-No global QObject/QMeta/connect sweep, no queue signal `0xbf` scope, no runtime, no Track B mutation. Stop at the first non-unique ownership/type edge.
-
-next_action: open Draft PR and require the task-specific workflow to prove repository-only RED before exact-client materialization.
+next_action: exact-head validate this terminal evidence; after #880 terminalizes, clean coordinator promotion should consume both source lanes and close #879 unmerged as consumed.

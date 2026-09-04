@@ -28,6 +28,7 @@ QUEUE_STATIC_METAOBJECT = 0x30B73E0
 SELF_RELAY_CONNECTIMPL_CALLSITE = 0xBE2EEE
 CONNECTIMPL_FDE = (0xBE2A50, 0xBE3086)
 CONNECTIMPL_TARGET = 0x4D6800
+CONNECTIMPL_ABI_SRET = True
 PROMOTED_RECEIVER_IDENTITY = "tibia::protocol::TProtocolMessageQueue"
 PROMOTED_CONNECTION_ROLE = "SIGNAL_RELAY"
 PROMOTED_ARGV1_IDENTITY = "exact GameclientMessage shared pair"
@@ -259,7 +260,7 @@ def _resolve_reg(img: Image, insns: list[Any], before: int, wanted: str, depth: 
                 return row
         row["classification"] = "UNKNOWN"
         return row
-    return {"classification": f"ENTRY_ARG:{wanted}"}
+    return {"classification": f"UNRESOLVED_FDE_ENTRY_REGISTER:{wanted}"}
 
 
 def _slot_function_candidates(img: Image, insns: list[Any], start: int, stop: int) -> list[dict[str, Any]]:
@@ -305,18 +306,24 @@ def trace_connect_arguments(img: Image, insns: list[Any], call_index: int) -> di
     ]
     if callsite == SELF_RELAY_CONNECTIMPL_CALLSITE:
         slot_candidates = [{"target": hx(PROMOTED_QSLOT_FUNCTION_TARGET), "classification": "PROMOTED_NOT_RECONSTRUCTED"}]
-        receiver = {"classification": "ENTRY_ARG:rdi", "identity": PROMOTED_RECEIVER_IDENTITY, "provenance": "PROMOTED_NOT_RECONSTRUCTED"}
+        receiver = {
+            "classification": "ENTRY_ARG:rdi",
+            "connectimpl_abi_register": "rcx",
+            "identity": PROMOTED_RECEIVER_IDENTITY,
+            "provenance": "PROMOTED_NOT_RECONSTRUCTED",
+        }
     else:
         slot_candidates = _slot_function_candidates(img, insns, local_start, call_index)
         receiver = _resolve_reg(img, insns, call_index, "rcx")
     body_is_slot = any(row.get("target") == hx(QUEUE_SIGNAL_BODY) for row in slot_candidates)
     return {
         "callsite": hx(callsite),
-        "sender_provenance": _resolve_reg(img, insns, call_index, "rdi"),
-        "signal_argument_provenance": _resolve_reg(img, insns, call_index, "rsi"),
-        "method_argument_provenance": _resolve_reg(img, insns, call_index, "rdx"),
+        "connectimpl_abi": "nontrivial QMetaObject::Connection return uses hidden sret in rdi; explicit args shift to rsi/r9",
+        "connection_return_storage_provenance": _resolve_reg(img, insns, call_index, "rdi"),
+        "sender_provenance": _resolve_reg(img, insns, call_index, "rsi"),
+        "signal_argument_provenance": _resolve_reg(img, insns, call_index, "rdx"),
         "receiver_provenance": receiver,
-        "aux_argument_provenance": _resolve_reg(img, insns, call_index, "r8"),
+        "method_argument_provenance": _resolve_reg(img, insns, call_index, "r8"),
         "slot_object_provenance": {"classification": "PROMOTED_NOT_RECONSTRUCTED"} if callsite == SELF_RELAY_CONNECTIMPL_CALLSITE else _resolve_reg(img, insns, call_index, "r9"),
         "queue_signal_body_reference_sites": body_refs,
         "queue_static_metaobject_reference_sites": meta_refs,
@@ -332,6 +339,7 @@ def enumerate_bounded_connect_candidates(img: Image) -> dict[str, Any]:
         "scope": "queue constructor FDE only",
         "expected_fde": [hx(CONNECTIMPL_FDE[0]), hx(CONNECTIMPL_FDE[1])],
         "connectimpl_target": target_identity(img, CONNECTIMPL_TARGET),
+        "connectimpl_nontrivial_return_sret": CONNECTIMPL_ABI_SRET,
         "candidate_count": 0,
         "candidates": [],
     }
@@ -355,6 +363,12 @@ def enumerate_bounded_connect_candidates(img: Image) -> dict[str, Any]:
     result["candidates"] = rows
     self_rows = [row for row in rows if row["relation_to_promoted_self_relay"] == "SELF_RELAY"]
     result["self_relay_present_exactly_once"] = len(self_rows) == 1
+    result["after_self_relay_connect_count"] = sum(row["relation_to_promoted_self_relay"] == "AFTER_SELF_RELAY" for row in rows)
+    result["additional_identity_preserving_candidate_count"] = sum(
+        row["relation_to_promoted_self_relay"] != "SELF_RELAY"
+        and row["arguments"].get("identity_preserving_source_candidate") is True
+        for row in rows
+    )
     result["classification"] = "BOUNDED_QUEUE_CONSTRUCTOR_CONNECTS_ENUMERATED" if len(self_rows) == 1 else "PROMOTED_SELF_RELAY_NOT_EXACT_IN_FDE"
     return result
 
@@ -363,7 +377,7 @@ def _endpoint_identity(row: dict[str, Any]) -> tuple[str, str]:
     args = row["arguments"]
     receiver = args.get("receiver_provenance", {})
     if receiver.get("classification") == "ENTRY_ARG:rdi":
-        return PROMOTED_RECEIVER_IDENTITY, "receiver entry object uses promoted exact type"
+        return PROMOTED_RECEIVER_IDENTITY, "receiver constructor-entry object uses promoted exact type"
     slots = [candidate for candidate in args.get("slot_function_candidates", []) if candidate.get("target") != hx(QUEUE_SIGNAL_BODY)]
     if len(slots) == 1:
         return f"callable:{slots[0]['target']}", "unique bounded callable target"
@@ -388,7 +402,7 @@ def classify_next_relay_edge(connections: dict[str, Any]) -> dict[str, Any]:
     if not rows:
         return {
             "terminal_result": "SOURCE_BLOCKER",
-            "first_missing_boundary": "NO_ADDITIONAL_IDENTITY_PRESERVING_QUEUE_SIGNAL_CONNECT_IN_BOUNDED_CONSTRUCTOR_CONTEXT",
+            "first_missing_boundary": "NO_NEXT_CLIENTMESSAGEREADYTOPROCESS_SOURCE_CONNECTION_IN_BOUNDED_QUEUE_CONSTRUCTOR_FDE",
             "next_unique_relay_edge": "UNKNOWN",
             "next_endpoint_identity": "UNKNOWN",
             "next_relay_identity_preserved": False,
@@ -436,7 +450,7 @@ def analyze(client: Path, output: Path) -> dict[str, Any]:
         endpoint = decision["next_endpoint_identity"]
         writer_like = endpoint != "UNKNOWN" and any(token in endpoint.lower() for token in ("writer", "socket", "network", "transport"))
         result = {
-            "schema": "otclient.track-a.be4f48-queue-signal-bf-next-relay-edge.v1",
+            "schema": "otclient.track-a.be4f48-queue-signal-bf-next-relay-edge.v2",
             "runtime_access": "none",
             "official_client_executed": False,
             "login_performed": False,

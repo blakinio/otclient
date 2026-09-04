@@ -1,4 +1,5 @@
 import unittest
+from types import SimpleNamespace
 
 class Contract(unittest.TestCase):
     def module(self):
@@ -31,6 +32,35 @@ class Contract(unittest.TestCase):
     def test_loop_fails_closed(self):
         r=self.module().walk(bytes.fromhex('ebfe'),0x1000,{})
         self.assertEqual(r['stop'],'LOOP_OR_BUDGET')
+
+    def test_selected_signed_relative_jump_table(self):
+        raw=bytes.fromhex('81fabf0000007710488d05f10f0000486314904801d0ffe0c3')
+        def read(addr,size):
+            self.assertEqual((addr,size),(0x2000+191*4,4))
+            return (-0x1000).to_bytes(4,'little',signed=True)
+        # Selected signed offset jumps back to start; loop must be detected.
+        r=self.module().walk(raw,0x1000,{'rdx':191},read)
+        self.assertEqual(r['stop'],'LOOP_OR_BUDGET')
+
+    def test_out_of_range_table_is_not_read(self):
+        raw=bytes.fromhex('81fabf0000007710488d05f10f0000486314904801d0ffe0c3')
+        def read(addr,size):
+            self.fail('out-of-range index read')
+        r=self.module().walk(raw,0x1000,{'rdx':192},read)
+        self.assertEqual(r['edge'],{'kind':'return','site':'0x1018'})
+
+    def test_unmapped_image_is_value_error(self):
+        with self.assertRaises(ValueError):
+            self.module().Image.loc(SimpleNamespace(sections=[]),0x1000)
+
+    def test_exact_revision_13_layout(self):
+        self.module().qualify_header([13,0,0,0,355,14,0,0,0,0,0,0,0,192])
+        with self.assertRaises(ValueError):
+            self.module().qualify_header([10,0,0,0,355,14,0,0,0,0,0,0,0,192])
+
+    def test_writable_memory_is_not_a_constant(self):
+        img=SimpleNamespace(sections=[(0x1000,0x2000,0,3)],relative_relocations={},read=lambda a,s:b'\0'*s)
+        with self.assertRaises(ValueError):self.module().readonly_read(img,0x1000,4)
 
 if __name__=='__main__':
     unittest.main()

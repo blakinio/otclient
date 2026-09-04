@@ -15,6 +15,20 @@ VERSION='15.32.be4f48'
 SIZE=52105824
 SHA='552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1'
 
+def hx(v):return hex(v) if v is not None else None
+
+def qualify_header(header):
+    # Exact build result from PR900 job101069725044; freshly checked again here.
+    if header!=[13,0,0,0,355,14,0,0,0,0,0,0,0,192]:
+        raise ValueError('UNQUALIFIED_QMETA_LAYOUT')
+
+def readonly_read(img,addr,size):
+    if not 1<=size<=8 or not any(lo<=addr and addr+size<=hi and flags&2 and not flags&1 for lo,hi,off,flags in img.sections):
+        raise ValueError('NON_IMMUTABLE_SELECTED_READ')
+    if any(addr<r+8 and r<addr+size for r in img.relative_relocations):
+        raise ValueError('RELOCATED_SELECTED_READ')
+    return img.read(addr,size)
+
 def verify_fence(raw,version):
     if version!=VERSION or len(raw)!=SIZE or hashlib.sha256(raw).hexdigest()!=SHA:
         raise ValueError('EXACT_CLIENT_FENCE_MISMATCH')
@@ -43,7 +57,7 @@ def walk(raw,start,initial,read=None,max_steps=200):
     md=Cs(CS_ARCH_X86,CS_MODE_64);md.detail=True
     code={i.address:i for i in md.disasm(raw,start)}
     regs={'rdi':'entry:object','rcx':'entry:argv'};regs.update(initial)
-    flags=None;pc=start;seen=set();trace=[]
+    flags=None;pc=start;seen=set();trace=[];reads=[]
     def addr(ins,op):
         m=op.mem
         if m.base==X86_REG_RIP:return ins.address+ins.size+m.disp
@@ -61,10 +75,14 @@ def walk(raw,start,initial,read=None,max_steps=200):
         if op.type==X86_OP_MEM:
             a=addr(ins,op)
             if isinstance(a,int) and read:
-                try:return int.from_bytes(read(a,op.size),'little')
+                try:
+                    data=read(a,op.size)
+                    if len(data)!=op.size:return None
+                    reads.append({'site':hex(ins.address),'address':hex(a),'width':op.size})
+                    return int.from_bytes(data,'little')
                 except ValueError:return None
         return None
-    def result(stop,edge=None):return {'stop':stop,'steps':len(trace),'edge':edge,'path':trace}
+    def result(stop,edge=None):return {'stop':stop,'steps':len(trace),'edge':edge,'path':trace,'immutable_reads':reads}
     while pc in code:
         if pc in seen or len(trace)>=max_steps:return result('LOOP_OR_BUDGET')
         seen.add(pc);i=code[pc];m=i.mnemonic;ops=i.operands;nxt=pc+i.size
@@ -124,14 +142,14 @@ def analyze(img):
         if not 0<length<128 or off>0x100000:raise ValueError('STRING_OUTSIDE_BOUND')
         return img.read(strings+off,length).decode('utf-8')
     header=[u32(data+i*4) for i in range(14)]
-    if header[0]!=10:raise ValueError('UNQUALIFIED_QMETA_REVISION')
+    qualify_header(header)
     row=method_row(data,header[5],191,header[4],header[13])
     owner=string(header[1]);name=string(u32(row))
     if owner!='tibia::protocol::TProtocolMessageQueue' or name!='clientMessageReadyToProcess' or row!=0x1ce47c0:
         raise ValueError('EXACT_QMETA_TUPLE_MISMATCH')
     fde=img.containing_fde(fn)
     if not fde or fde[0]!=fn or fde[1]-fde[0]>65536:raise ValueError('NON_UNIQUE_OR_UNBOUNDED_STATIC_METACALL')
-    path=walk(img.read(fde[0],fde[1]-fde[0]),fde[0],{'rsi':0,'rdx':191},img.read)
+    path=walk(img.read(fde[0],fde[1]-fde[0]),fde[0],{'rsi':0,'rdx':191},lambda a,s:readonly_read(img,a,s))
     edge=path.get('edge') or {}
     proven=path['stop']=='EDGE_REACHED' and edge.get('target')=='0xbd2190' and edge.get('receiver')=='entry:object'
     return {'schema':'otclient.track-a.be4f48-queue-qmeta-index.v1',

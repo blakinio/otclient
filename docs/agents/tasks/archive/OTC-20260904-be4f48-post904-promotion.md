@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260904-be4f48-post904-promotion
-status: validating
+status: completed
 agent: Codex
 session_id: login-closure-20260904-ae070f034ee4
 session_role: coordinator
@@ -8,7 +8,7 @@ project_lane: otclient
 lane: P2-NETWORK
 track_id: official-client-re
 task_kind: integration
-phase: validate
+phase: archive
 branch: docs/OTC-20260904-be4f48-post904-promotion
 base_branch: main
 base_main: 04a4ca71b658dcc374aaf40dbb8135de43d49cb7
@@ -77,8 +77,8 @@ depends_on: []
 blocks:
   - clean coordinator consumption of this exact source result
 cross_repository_task_ids: []
-ownership_released: false
-next_action: exact-head CI/governance and independent whole-diff review, expected-head squash, source close unmerged, separate archive
+ownership_released: true
+next_action: execute existing QMeta alias after this separate archive merge
 ---
 
 # Coordinator promotion of source PR #904
@@ -119,3 +119,7 @@ Source PR904 remains Draft until this clean docs-only promotion merges, then clo
 After archive, execute existing canonical alias OTC-BE4F48-QUEUE-SIGNAL-BF-QMETA-INDEX-CONNECTION sequentially. No duplication of consumed adapter or body/name scans. SOURCE_BLOCKER is task-local and does not exhaust static proof classes or end the login programme.
 
 runtime_access=none; official_client_executed=false; login_performed=false; credentials_used=false; process_memory_access=false; packet_capture=false; ocr_vision_used=false; official_service_e2e_count=0; track_b_pr_284_modified=false.
+
+# Lifecycle closeout
+
+Promotion #905 merged e050f3c21a996607eaf94d5058055316da5b8fbc after independent PASS, CI33926018054 and governance33926017758 success. Source #904 closed unmerged as consumed at191a8ff86f1b354d313a95e6901e9c7abcd389d8. ownership_released: true. No runtime or Track B change.

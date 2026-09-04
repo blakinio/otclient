@@ -62,5 +62,17 @@ class Contract(unittest.TestCase):
         img=SimpleNamespace(sections=[(0x1000,0x2000,0,3)],relative_relocations={},read=lambda a,s:b'\0'*s)
         with self.assertRaises(ValueError):self.module().readonly_read(img,0x1000,4)
 
+    def test_saved_receiver_survives_stack_prologue(self):
+        r=self.module().walk(bytes.fromhex('574831ff5fe9f31f0000'),0x1000,{})
+        self.assertEqual(r['edge']['receiver'],'entry:object')
+
+    def test_stack_store_clobbers_saved_value(self):
+        r=self.module().walk(bytes.fromhex('574831c0488904245fe9f21f0000'),0x1000,{})
+        self.assertEqual(r['edge']['receiver'],0)
+
+    def test_stack_arithmetic_and_frame_copy(self):
+        r=self.module().walk(bytes.fromhex('554889e54883ec084883c4085de9ef1f0000'),0x1000,{})
+        self.assertEqual(r['stop'],'EDGE_REACHED')
+
 if __name__=='__main__':
     unittest.main()

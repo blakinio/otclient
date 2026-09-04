@@ -56,14 +56,17 @@ def reg(md,op):
 def walk(raw,start,initial,read=None,max_steps=200):
     md=Cs(CS_ARCH_X86,CS_MODE_64);md.detail=True
     code={i.address:i for i in md.disasm(raw,start)}
-    regs={'rdi':'entry:object','rcx':'entry:argv'};regs.update(initial)
+    regs={'rdi':'entry:object','rcx':'entry:argv','rsp':0};regs.update(initial)
+    stack={}
     flags=None;pc=start;seen=set();trace=[];reads=[]
     def addr(ins,op):
         m=op.mem
         if m.base==X86_REG_RIP:return ins.address+ins.size+m.disp
         b=regs.get(md.reg_name(m.base)) if m.base else 0
         ix=regs.get(md.reg_name(m.index)) if m.index else 0
-        return b+ix*m.scale+m.disp if isinstance(b,int) and isinstance(ix,int) else None
+        if not isinstance(b,int) or not isinstance(ix,int):return None
+        out=(b+ix*m.scale+m.disp)&((1<<64)-1)
+        return out-(1<<64) if out>=(1<<64)-4096 else out
     def val(ins,op):
         if op.type==X86_OP_IMM:return int(op.imm)
         if op.type==X86_OP_REG:
@@ -74,6 +77,7 @@ def walk(raw,start,initial,read=None,max_steps=200):
             return v if op.size==8 else None
         if op.type==X86_OP_MEM:
             a=addr(ins,op)
+            if isinstance(a,int) and -4096<=a<=0:return stack.get((a,op.size))
             if isinstance(a,int) and read:
                 try:
                     data=read(a,op.size)
@@ -105,7 +109,21 @@ def walk(raw,start,initial,read=None,max_steps=200):
             if m not in choices:return result('UNSUPPORTED_BRANCH')
             target=val(i,ops[0]);trace[-1]['taken']=choices[m]
             pc=target if choices[m] else nxt;continue
-        if m in ('cmp','test'):
+        if m=='push':
+            sp=regs.get('rsp');v=val(i,ops[0])
+            if not isinstance(sp,int) or not -4088<=sp<=0:return result('UNPROVEN_STACK')
+            regs['rsp']=sp-8;stack[(sp-8,8)]=v
+        elif m=='pop' and ops[0].type==X86_OP_REG:
+            sp=regs.get('rsp')
+            if not isinstance(sp,int) or not -4096<=sp<=-8:return result('UNPROVEN_STACK')
+            regs[reg(md,ops[0])]=stack.get((sp,8));regs['rsp']=sp+8
+        elif m=='mov' and ops[0].type==X86_OP_MEM:
+            a=addr(i,ops[0]);size=ops[0].size
+            if not isinstance(a,int) or not -4096<=a<0:return result('UNPROVEN_MEMORY_WRITE')
+            for key in list(stack):
+                if a<key[0]+key[1] and key[0]<a+size:del stack[key]
+            stack[(a,size)]=val(i,ops[1])
+        elif m in ('cmp','test'):
             a,b=val(i,ops[0]),val(i,ops[1]);flags=None
             if isinstance(a,int) and isinstance(b,int):
                 bits=ops[0].size*8;mask=(1<<bits)-1;a&=mask;b&=mask
@@ -123,7 +141,9 @@ def walk(raw,start,initial,read=None,max_steps=200):
                 elif isinstance(old,int) and isinstance(out,int):out=old+out if m=='add' else old-out if m=='sub' else old^out
                 else:out=None
             if ops[0].size<4:out=None
-            elif isinstance(out,int):out&=(1<<(ops[0].size*8))-1
+            elif isinstance(out,int):
+                out&=(1<<(ops[0].size*8))-1
+                if reg(md,ops[0])=='rsp' and out>=(1<<64)-4096:out-=1<<64
             elif ops[0].size<8:out=None
             regs[reg(md,ops[0])]=out
             if i.eflags:flags=None

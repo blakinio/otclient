@@ -1,0 +1,125 @@
+---
+task_id: OTC-20260905-be4f48-post951-promotion
+status: validating
+agent: Codex
+session_id: login-closure-20260905-143731-ae070f034ee4
+session_role: coordinator
+project_lane: otclient
+lane: P2-NETWORK
+track_id: official-client-re
+task_kind: integration
+phase: validate
+branch: docs/OTC-20260905-be4f48-post951-promotion
+base_branch: main
+base_main: a0346f3ac4704bc5f41b75653d7eaca6c5d8655d
+created: 2026-09-05T13:39:46Z
+updated_at: 2026-09-05T14:51:07Z
+invocation_started_at: 2026-09-05T14:37:31Z
+last_progress_at: 2026-09-05T14:51:07Z
+policy_version: 2
+prompting_standard_version: 2.1
+execution_mode: codex
+execution_reason: isolated checkout and deterministic local tests; exact client qualification on GitHub-hosted runner
+execution_class: github_hosted
+routing_contract: docs/agents/programs/OTCLIENT_TIBIA_RE_HYBRID_EXECUTION_ROUTING.md
+runtime_access: none
+runtime_owner_task: NOT_APPLICABLE
+runtime_namespace: NOT_APPLICABLE
+canonical_registration: NOT_APPLICABLE
+canonical_lease_generation: NOT_APPLICABLE
+registration_lease_generation: NOT_APPLICABLE
+gate_a: NOT_APPLICABLE
+generation_rebind: NOT_APPLICABLE
+gate_b: NOT_APPLICABLE
+bootstrap: NOT_APPLICABLE
+target_uniqueness: NOT_APPLICABLE
+mutation_authorized: false
+persistent_session_role: none
+physical_e2e_required: false
+implementation_authorized: false
+feature_scope:
+  type: contract_producer
+  user_facing: false
+  backend_required: false
+  frontend_required: false
+  integration_required: false
+  e2e_required: false
+  completion_claim: internal_only
+run_scope: autonomous_program
+continuation_policy: continue_until_real_stop
+task_completion_policy: finalize_archive_and_continue
+context_pressure: medium
+context_growth: stable
+context_score: 8
+estimate_confidence: medium
+decomposition_decision: single
+decomposition_reason: one symbol-local first-transfer control graph
+max_additional_tasks_after_terminal_entry_task: 1
+additional_task_budget_reason: one additional task permitted after entry951 closeout under current governance
+additional_source_task_ordinal: 0
+foreground_runtime_budget_minutes: 120
+foreground_budget_reason: 120 minutes for resumed source repair qualification and clean lifecycle
+ci_checks_for_current_head: 0
+ci_check_generation: clean_promotion
+terminal_ci_wait_started_at: null
+terminal_ci_checks_for_current_generation: 0
+unchanged_state_checks: 0
+identical_failure_retries: 0
+repair_cycles_for_current_gate: 0
+context_reconstruction_attempts: 0
+stall_warnings: 0
+owned_paths:
+  - docs/agents/tasks/active/OTC-20260905-be4f48-post951-promotion.md
+  - docs/agents/evidence/OTC-20260905-be4f48-post951-promotion/**
+modules_touched: []
+reuses:
+  - docs/agents/prompts/OTC_BE4F48_QT_ACTIVATE_CONTROL_FRONTIER.md
+  - source947 repaired strict package/fence and header-only selected definition identity
+  - docs/agents/evidence/OTC-20260905-be4f48-post947-promotion/result.json
+depends_on: []
+blocks:
+  - clean coordinator consumption of this exact source result
+cross_repository_task_ids: []
+ownership_released: false
+next_action: independent promotion review and exact-head gates then protected squash
+---
+
+# Clean coordinator consumption
+
+# Exact-current QtCore symbol control frontier
+
+## FACT
+
+Scientific 0533b9837f79f9001e3a5629858cb7d934c30522 requalified primary15.32.be4f48/52105824/SHA256552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1 and packagedQtCore7354472/SHA25603ac3e4e7356399897ec58d42c81ae5c257072d45d539de1def528a8a04911fa. Repaired947 identity lookup matches symbol3860,section14,address1d3ff0,size85,name _ZN11QMetaObject8activateEP7QObjectPKS_iPPv.
+
+The selected85byte extent[0x1d3ff0,0x1d4045) has21 reachable instructions in the bounded first-transfer graph. Model graph coverage is complete with an internal cycle: edge0x1d401e->0x1d4010. First-transfer boundaries are direct TAIL_JUMP0x1d4032->0x1dcec0 and TAIL_JUMP0x1d4040->0x1dc610. Branch0x1d4030 has successors0x1d4032 and0x1d4040. No target bytes read and no target implementation/argument identity inferred. Complete graph coverage is not termination or runtime path feasibility proof; both remainfalse. Full sanitized CFG is in result.json.
+
+terminal_result=POSITIVE_EXACT_SYMBOL_CONTROL_FRONTIER. FIRST_MISSING_BOUNDARY=SYMBOL_FRONTIER_TARGET_USE_NOT_PROVEN. The unresolved boundaries are the use/argument semantics of the two external tail targets, plus internal-cycle termination; this task proves neither.
+
+## TDD and falsification
+
+Original RED82df42115d6717a09fdc56c9dabc7f4684cec6a3 had20 unimplemented-stub errors,then67testsGREEN; extent guard RED1/GREEN68. S951-01 found UD0/UD1 ungrouped traps falsely falling through. Original scientific2e29d0fe58a5a91fe33064608ffcb11f2768180e remainsDISQUALIFIED despitegreen33969748852/33969748994/33969748884/33969748834. Interrupted priorinvocation endedROTATE atcheckpointd0c6444e19b539d793594c50cae537ca170fae01, which intentionally skippedCI and was never qualified.
+
+New ownerinvocation14:37:31Z resumed same task. REDafdcc9ff5a01a718c030b1d73384003674231cf3 produced2assertionfailures before minimalUD0/UD1GREEN69. Scientific26fde7e461625aebde7692f823c71c04b6139c2e alsoDISQUALIFIED despitefocused33972569784/job101323568288SUCCESS. Independent S951-02 found ungrouped enclave/system instructions falselyfallingthrough. S951-03 found prefixedJMP andfarreturn mnemonicambiguity. RED080c396acf7feeed79049a87bba7d62bdd1859f9 produced9failures; canonical instruction identity plus explicitunmodeledsystemhandlingGREEN72. Supplemental prefixedfarreturn regression restored oldmnemonicpredicate andproduced3failures,thenrestoredidentitycheckGREEN73. Two repaircycles inthisinvocation,retries0. Independent73tests and44additionalvariant checks pass; exact-head review correspondence mustbeverified beforeconsumption.
+
+## Qualification
+
+Focused33972796888/job101324168813 SUCCESS;CI33972797018/governance33972796884/boundary33972796886SUCCESS. Exact checkout,73tests,strictdualfilefences,rawbytes removal and acquisition-state removal beforeartifact verified from completedlog. Sanitized artifact9971425777,SHA256d17cee26db62608c61d27acbde8936c464d7e71352041349731b6c8c2d9bec5a. This result.json preserves original scientific output. Finaldocumentationhead requiresfresh focused/CI/governance/boundary and identicalsanitizedJSON beforecleanconsumption.
+
+## INFERENCE
+
+None promoted. No claim that either branch executes at runtime,that cycleterminates,or that either target is a queue/TCPwriter. No activation/register/index semantics from mangledname.
+
+## UNKNOWN
+
+Targetuse andtailargumentsemantics,looptermination,pathfeasibility,runtime/provider/versionresolution,logicalargumentvector,activation/index,actualsendLoginreceiver/completecausalbinding,registereddownstreamreceiver/delivery,finalqueue/TCPwriter/contract,Field6value andpre-successordering remainUNKNOWN. TRACK_B_CURRENT_WIRE_DELTA=NOT_PROVEN. TrackB284exact62383aded3acbeb5f405a12fe1f93849cd8e35f9 unchangedblocked; sources939/919remainseparatelyblocked.
+
+## Safety and lifecycle
+
+runtime_access=none;officialclientexecution/login/credentials/memory/capture/OCR/serviceE2E/TrackBmutationszero. E2ENOT_APPLICABLE staticproducer. No rawbytes uploaded/retained asartifact. SourceDraftnevermerges; clean docs-onlypromotion fromfreshmain,expectedheadsquash,sourceclosedunmergedconsumed,separatearchiveownershiprelease beforeonesuccessor. No sourceanalyzer/workflowpromotion. Newinvocation14:37:31Z/120minutes/oneadditionalafterentry951; priorinvocationhistory/counters retained, no CIwaitreset.
+
+## Clean coordinator final-head consumption
+
+Source951 final0c8ab343124727c99224ad3050a5eb29d1a2f10f; finalfocused33972964255/job101324622146,CI33972964359/governance33972964273/boundary33972964265SUCCESS.73tests,exactcheckout/fences,raw/acquisitioncleanupverified; finalJSON identical to repairedscientificoriginal. Artifact9971472641,digest5daf1f80348a6cce416706e5859955baf2e266256a1a88a34fcf4a3ec9bff5af. Independent review bound all11 source/workflow file blobSHAs to exactscientifichead; final3docs/result reviewPASS0; GitHubreviews/threads empty. Coordinator independently read repairedmodel/diff/tests/result/completedlogs and confirms boundedclaims.
+
+Only3documentationfiles promoted fromfreshprotectedmaina0346f3ac4704bc5f41b75653d7eaca6c5d8655d. No analyzer/workflow promoted. Source task's stale current timestamps/checkgeneration are bookkeeping,not scientificauthority; reconciled in this currentcoordinator checkpoint and required separatearchive. Priorinvocation history remainsunchanged. Sourceclosesunmergedconsumed only after this promotion merges; archive releasesownershipbefore successor. TrackBwire deltaNOT_PROVEN and939/919remainblocked.

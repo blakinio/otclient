@@ -1,0 +1,176 @@
+{
+  "FACT": {
+    "packaged_definition": {
+      "address": "0x1d3ff0",
+      "bloom_words": 1,
+      "buckets_read": 1,
+      "candidate_names": 1,
+      "chain_entries": 4,
+      "extent": [
+        "0x1d3ff0",
+        "0x1d4045"
+      ],
+      "hash": 3389874950,
+      "name": "_ZN11QMetaObject8activateEP7QObjectPKS_iPPv",
+      "runtime_resolution_proven": false,
+      "section_index": 14,
+      "selected_dynamic_tags": {
+        "5": "0x3a1d8",
+        "6": "0xd538",
+        "11": "0x18",
+        "1879047925": "0x328"
+      },
+      "size": 85,
+      "symbol_index": 3860,
+      "symbol_version_resolution_proven": false
+    },
+    "symbol_control_frontier": {
+      "boundaries": [
+        {
+          "kind": "TAIL_JUMP",
+          "site": "0x1d4032",
+          "target": "0x1dcec0"
+        },
+        {
+          "kind": "TAIL_JUMP",
+          "site": "0x1d4040",
+          "target": "0x1dc610"
+        }
+      ],
+      "cfg": {
+        "0x1d3ff0": [
+          "0x1d3ff4"
+        ],
+        "0x1d3ff4": [
+          "0x1d3ff7"
+        ],
+        "0x1d3ff7": [
+          "0x1d3ff9"
+        ],
+        "0x1d3ff9": [
+          "0x1d3ffc"
+        ],
+        "0x1d3ffc": [
+          "0x1d3fff"
+        ],
+        "0x1d3fff": [
+          "0x1d4002"
+        ],
+        "0x1d4002": [
+          "0x1d4004",
+          "0x1d4023"
+        ],
+        "0x1d4004": [
+          "0x1d4007"
+        ],
+        "0x1d4007": [
+          "0x1d4010"
+        ],
+        "0x1d4010": [
+          "0x1d4014"
+        ],
+        "0x1d4014": [
+          "0x1d4017"
+        ],
+        "0x1d4017": [
+          "0x1d401b"
+        ],
+        "0x1d401b": [
+          "0x1d401e"
+        ],
+        "0x1d401e": [
+          "0x1d4010",
+          "0x1d4020"
+        ],
+        "0x1d4020": [
+          "0x1d4023"
+        ],
+        "0x1d4023": [
+          "0x1d402a"
+        ],
+        "0x1d402a": [
+          "0x1d402d"
+        ],
+        "0x1d402d": [
+          "0x1d4030"
+        ],
+        "0x1d4030": [
+          "0x1d4032",
+          "0x1d4040"
+        ],
+        "0x1d4032": [],
+        "0x1d4040": []
+      },
+      "complete": true,
+      "cycle_present": true,
+      "limit_reached": false,
+      "reachable_instructions": 21,
+      "runtime_path_feasibility_proven": false,
+      "termination_proven": false
+    }
+  },
+  "FIRST_MISSING_BOUNDARY": "SYMBOL_FRONTIER_TARGET_USE_NOT_PROVEN",
+  "INFERENCE": [],
+  "UNKNOWN": [
+    "symbol_version_resolution",
+    "runtime_import_resolution",
+    "selected_import_implementation_use",
+    "logical_argument_vector",
+    "activation_and_signal_index",
+    "actual_sendlogin_receiver_identity",
+    "complete_sendlogin_causal_binding",
+    "registered_downstream_receiver",
+    "successful_registration_and_delivery",
+    "final_queue_writer",
+    "final_tcp_writer",
+    "final_writer_contract",
+    "field6_value",
+    "pre_success_send_sequence"
+  ],
+  "actual_absence_of_definition_proven": false,
+  "credentials_used": false,
+  "exact_client": {
+    "sha256": "552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1",
+    "size": 52105824,
+    "version": "15.32.be4f48"
+  },
+  "field6_value": "UNKNOWN",
+  "final_writer_contract": "UNKNOWN",
+  "login_performed": false,
+  "ocr_vision_used": false,
+  "official_client_executed": false,
+  "official_service_e2e_count": 0,
+  "packaged_identity_is_runtime_loaded_identity": false,
+  "packaged_qtcore": {
+    "localfile": "bin/lib/libQt6Core.so.6",
+    "packedhash": "3a58482841fbf76f9b09ffd5522efb2c8eeebfc84c011167e8199ac2dd8dca1b",
+    "packedsize": 2215336,
+    "unpackedhash": "03ac3e4e7356399897ec58d42c81ae5c257072d45d539de1def528a8a04911fa",
+    "unpackedsize": 7354472,
+    "url": "bin/lib/libQt6Core.so.6.lzma"
+  },
+  "packet_capture": false,
+  "pre_success_send_sequence": "UNKNOWN",
+  "process_memory_access": false,
+  "runtime_access": "none",
+  "schema": "otclient.track-a.be4f48-qt-frontier.v1",
+  "terminal_result": "POSITIVE_EXACT_SYMBOL_CONTROL_FRONTIER",
+  "track_b_current_wire_delta": "NOT_PROVEN",
+  "track_b_pr_284_modified": false,
+  "source_pr": 951,
+  "source_head": "0c8ab343124727c99224ad3050a5eb29d1a2f10f",
+  "scientific_source_head": "0533b9837f79f9001e3a5629858cb7d934c30522",
+  "TRACK_B_CURRENT_WIRE_DELTA": "NOT_PROVEN",
+  "qualification": {
+    "focused_run": 33972964255,
+    "job": 101324622146,
+    "ci": 33972964359,
+    "governance": 33972964273,
+    "boundary": 33972964265,
+    "artifact": 9971472641,
+    "artifact_sha256": "5daf1f80348a6cce416706e5859955baf2e266256a1a88a34fcf4a3ec9bff5af",
+    "tests": 73,
+    "independent_review": "PASS",
+    "material_findings": 0
+  }
+}

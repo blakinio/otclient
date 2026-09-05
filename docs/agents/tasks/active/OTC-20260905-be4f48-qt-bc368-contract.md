@@ -13,7 +13,7 @@ branch: ai/OTC-20260905-be4f48-qt-bc368-contract
 base_branch: main
 base_main: 05058065a2e433c5f2ad64cdd0f059d5302685e7
 created: 2026-09-05T07:07:00Z
-updated_at: 2026-09-05T07:17:00Z
+updated_at: 2026-09-05T07:38:00Z
 invocation_started_at: 2026-09-05T06:39:00Z
 last_progress_at: 2026-09-05T07:17:00Z
 policy_version: 2
@@ -59,15 +59,19 @@ additional_task_budget_reason: explicit ordered multi-task owner login-closure p
 additional_source_task_ordinal: 1
 foreground_runtime_budget_minutes: 240
 foreground_budget_reason: explicit sequential source qualification and clean promotion/archive programme
-ci_checks_for_current_head: 0
+ci_checks_for_current_head: null
+ci_checks_for_current_head_exact: UNKNOWN
+ci_checks_for_current_head_lower_bound: 3
+ci_limit_exceeded: true
+source_retry_state_observations: 1
 ci_check_generation: final_source_qualification
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
-identical_failure_retries: 0
+identical_failure_retries: 1
 repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 0
-stall_warnings: 0
+stall_warnings: 1
 owned_paths: []
 modules_touched: []
 reuses:
@@ -119,3 +123,15 @@ RuntimeE2E NOT_APPLICABLE because static-only. Rawclient/core and acquisition he
 ## Discoverable unresolved obligation
 
 This active record is intentionally retained after partial source consumption. Full localgraph acceptance remains blocked/ANALYSIS_INCOMPLETE; source code is not promoted. All mutable ownership released; no runtime or other-task claim. Historical archive copy must not replace this record or hide this obligation. Independent programme proof selection does not make this graph complete.
+
+## Invocation checkpoint: ROTATE, not programme completion
+
+At 2026-09-05T07:38:00Z the source qualification is complete, but this clean partial promotion is still Draft and unmerged. Its final documentation head needs independent review and exact-head checks in a fresh invocation. No source closeout or archive of 919 has happened, and no next source task has been registered or started.
+
+The coordinator exceeded the ordinary exact-head CI observation cap while waiting for source 919 attempt 1. The preserved session summary establishes more than two observations; the exact historical count is unavailable and is not invented. The numeric lower bound is 3. This source is additional task 1, not the entry task, so the terminal-entry CI exception did not apply. The concrete WARP failure and the single successful retry do not erase that invocation-level violation. ANTI_STALL_AND_EXECUTION_BUDGET.md requires checkpoint and stop; no new branch, archive or task is created to continue this invocation.
+
+Original invocation started 06:39Z, declared budget 240 minutes, elapsed about 59 minutes; additional source tasks used 1 of the prospectively declared 4. Ordinary historical source-head CI count: UNKNOWN, lower bound 3. Retry count: 1. Retry final-state observations: 1. Terminal-entry exception checks for this source: 0. Stall warnings: 1. No counter was reset to imply compliance.
+
+Invocation result: ROTATE. Coordinator checkpoint status: ready. The existing blocked source obligation remains ANALYSIS_INCOMPLETE. Its candidate released-ownership disposition in this Draft becomes authoritative only if the partial promotion merges. Runtime and Track B authority remain unchanged.
+
+Exactly one next action: refresh live authority and review/qualify the final docs-only head of PR 920 for clean partial promotion. This is an invocation checkpoint, not AUTHORITY_BLOCKER, STATIC_PROOF_EXHAUSTED or a successful login claim.

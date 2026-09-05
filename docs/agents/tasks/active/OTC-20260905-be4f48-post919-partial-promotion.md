@@ -1,8 +1,8 @@
 ---
 task_id: OTC-20260905-be4f48-post919-partial-promotion
-status: ready
+status: validating
 agent: Codex
-session_id: login-closure-20260904-ae070f034ee4
+session_id: login-closure-20260905-084311-ae070f034ee4
 session_role: coordinator
 project_lane: otclient
 lane: P2-NETWORK
@@ -13,9 +13,9 @@ branch: docs/OTC-20260905-be4f48-post919-partial-promotion
 base_branch: main
 base_main: 05058065a2e433c5f2ad64cdd0f059d5302685e7
 created: 2026-09-05T06:39:00Z
-updated_at: 2026-09-05T07:38:00Z
-invocation_started_at: 2026-09-05T06:39:00Z
-last_progress_at: 2026-09-05T07:38:00Z
+updated_at: 2026-09-05T08:48:00Z
+invocation_started_at: 2026-09-05T08:43:11Z
+last_progress_at: 2026-09-05T08:48:00Z
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: codex
@@ -56,7 +56,7 @@ decomposition_decision: single
 decomposition_reason: one exact packaged QtCore symbol and receiver delegation edge
 max_additional_tasks_after_terminal_entry_task: 4
 additional_task_budget_reason: explicit ordered multi-task owner login-closure programme, fresh invocation prospective 240-minute declaration under owner ordered programme request
-additional_source_task_ordinal: 1
+additional_source_task_ordinal: 0
 foreground_runtime_budget_minutes: 240
 foreground_budget_reason: explicit sequential source qualification and clean promotion/archive programme
 ci_checks_for_current_head: 0
@@ -64,15 +64,18 @@ prior_source_head_ci_checks_exact: UNKNOWN
 prior_source_head_ci_checks_lower_bound: 3
 prior_source_head_ci_limit_exceeded: true
 source_retry_state_observations: 1
-ci_check_generation: checkpoint_docs_unobserved
+ci_check_generation: resumed_coordinator_final_docs
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
-identical_failure_retries: 1
+identical_failure_retries: 0
+historical_source_identical_failure_retries: 1
 repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 0
-stall_warnings: 1
+stall_warnings: 0
+historical_invocation_stall_warnings: 1
 owned_paths:
+  - docs/agents/tasks/active/OTC-20260905-be4f48-qt-bc368-contract.md
   - docs/agents/evidence/OTC-20260905-be4f48-post919-partial-promotion/**
   - docs/agents/tasks/active/OTC-20260905-be4f48-post919-partial-promotion.md
 modules_touched: []
@@ -131,3 +134,13 @@ Original invocation started 06:39Z, declared budget 240 minutes, elapsed about 5
 Invocation result: ROTATE. Coordinator checkpoint status: ready. The existing blocked source obligation remains ANALYSIS_INCOMPLETE. Its candidate released-ownership disposition in this Draft becomes authoritative only if the partial promotion merges. Runtime and Track B authority remain unchanged.
 
 Exactly one next action: refresh live authority and review/qualify the final docs-only head of PR 920 for clean partial promotion. This is an invocation checkpoint, not AUTHORITY_BLOCKER, STATIC_PROOF_EXHAUSTED or a successful login claim.
+
+## Explicit owner continuation at 2026-09-05T08:43:11Z
+
+The owner requested continuation after the prior invocation ended. This ready coordinator task is the entry task of the new foreground invocation. The historical 06:39Z invocation and its CI-limit violation above remain recorded; no historical failure, count or incomplete source acceptance is erased.
+
+Prospective budget: 240 minutes and at most 4 additional bounded source tasks, justified by the owner's explicit sequential login-closure programme including separate clean promotions and archives. These declarations precede new source implementation. Entry scope is finish this partial promotion, consume source 919 accurately and separately archive completed coordinator work while retaining the active blocked 919 obligation. Fresh protected main remains 05058065a2e433c5f2ad64cdd0f059d5302685e7; AGENTS, tracks, admission, current fence, active tasks, open PRs and strict ruleset18840974 refreshed; no competing ownership of these documentation paths.
+
+Fresh source-head checks: focused33952124771, CI33952124922, governance33952124764 and boundary33952124777 SUCCESS. Coordinator re-read source analyzer/result and final attempt2 job101271055616: exact checkout confirmed, sanitized JSON equals the committed original, cleanup precedes artifact. Repository-only tests rerun: 27 PASS. Historical coordinator head cc24f9575d0b248878fb2b127814839627862b4f has CI33953109374 and governance33953109231 SUCCESS; this resume amendment requires its own final-head review/checks. Source919 and promotion920 have no submitted reviews or unresolved threads at fresh preflight. Partial scientific/lifecycle review by /root/promotion_review found no material claim error so far; final-head verdict is pending.
+
+Admission remains runtime_access=none, mutation_authorized=false, no official client execution, login, secrets, process memory, packet capture, OCR or service E2E. PR284 remains unchanged at62383aded3acbeb5f405a12fe1f93849cd8e35f9 and blocked for current native pre-login outbound evidence. Its existing unrelated checks are not repaired by this task.

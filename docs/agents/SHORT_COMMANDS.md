@@ -4,7 +4,6 @@ This registry maps owner-facing programme aliases to repository-owned prompts or
 
 | Alias | Canonical entry point | Purpose |
 |---|---|---|
-| `OTC-BE4F48-QUEUE-4D7DC0-IMPORT-BINDING` | `docs/agents/prompts/OTC_BE4F48_QUEUE_4D7DC0_IMPORT_BINDING.md` | Selected queue call target: exact PLT/GOT import binding; source-only. |
 | `OTCLIENT-TIBIA-RE` | `docs/agents/prompts/OTCLIENT_TIBIA_RE_CANONICAL.md` | Continue Track A: official Linux Tibia client reverse engineering in `blakinio/otclient`. |
 | `OTCLIENT-GLOBAL-LOGIN` | PR `#284`, branch `feat/OTC-20260813-tibia-global-login-lab`, task `docs/agents/tasks/active/OTC-20260813-tibia-global-login-lab.md` on that branch | Continue Track B: make this OTClient fork authenticate to and enter official Tibia Global. |
 | `OTCLIENT-TIBIA-GLOBAL-LOGIN-FINAL-CONTINUE` | `docs/agents/prompts/OTCLIENT_TIBIA_GLOBAL_LOGIN_FINAL_CONTINUE.md` | Single-window Track B coordinator with local Vision/Qwen post-processing when independently legal secret-safe keyframes exist. |
@@ -81,3 +80,5 @@ For all aliases, external Oteryn repositories, historical runners and old contai
 - `OTC-BE4F48-QT-1CD26E-CALL-INPUTS`: bounded source #927 completed with `SOURCE_BLOCKER`, consumed by clean promotion #928 and separately archived. Do not repeat this input projection or infer actual receiver absence; select a new bounded proof class after archive.
 
 - `OTC-BE4F48-QUEUE-DD8DF0-ACTIVATION-ARGUMENTS`: source #931 consumed with bounded `SOURCE_BLOCKER` by clean promotion #932; separately archived. Do not repeat the activation scan. Opcode/effect at `0xdd8df9` remains UNKNOWN; a new structural construction proof requires separate registration.
+
+Source #939 / OTC-BE4F48-QUEUE-4D7DC0-IMPORT-BINDING is retired as incompletely consumed by partial promotion #940. Its active blocked relocation frontier remains discoverable with released ownership. Do not relaunch or widen its numeric scan; a new indexed-record proof requires separate registration after coordinator archive.

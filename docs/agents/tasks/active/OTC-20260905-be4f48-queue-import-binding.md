@@ -76,7 +76,7 @@ reuses:
   - docs/agents/evidence/OTC-20260905-be4f48-post935-promotion/result.json
 depends_on: []
 blocks:
-  - clean coordinator consumption of this exact source result
+  - unresolved selected relocation uniqueness and import identity graph
 cross_repository_task_ids: []
 ownership_released: true
 next_action: preserve unresolved relocation uniqueness frontier; new indexed-record class requires separate registration
@@ -133,3 +133,9 @@ Sourcefinal8ed6408722629225884f700615810a5896fab5b7: focused33964673401/job10130
 This is partial consumption only. ANALYSIS_INCOMPLETE/RELOCATION_ROW_LIMIT remains an unresolved sourcegraph obligation; importidentity and relocationuniqueness are notproven. Keep source939 activeblocked and releaseownership afterconsumption, notcompleted/archive. Close939unmergedincompletelyconsumed afterprotectedpromotion; separatecoordinatorarchive/retirealias before successor. Source919 remains independentlyblocked.
 
 A possible distinct proof class would decode the selected PLT stub's encoded selector and inspect one directly indexed dynamic relocation record for correspondence to the proven GOTslot. Selector/opcode/table relationship is currentlyUNKNOWN. No such analysis or authority is granted here; do notincrease65536rowcap or repeatwider numeric scan. Runtime/E2E/TrackBmutationszero. Currentinvocation11:35:52Z/240minutes/4additional,939additional1; laterusercontinuation messages do not resetthisbudget.
+
+## Separate coordinator archive and incomplete-source reconciliation
+
+Partialpromotion940 mergeda61f01adca783567648d0e5703f115c368e93d6b,reviewedhead7144400a2343259da5bc9ad050e8272d25c21376,CI33965449161/governance33965448819SUCCESS,independent source/promotionPASS0. Source939final8ed6408722629225884f700615810a5896fab5b7 closedunmergedincompletelyconsumed. Finalfocused33964673401/job101302580209 plusCI33964673569/governance33964673383/boundary33964673340SUCCESS,36tests,exactfences/sanitizedresult/cleanupverified.
+
+Coordinator partialpromotion lifecycle completed; source939 is NOTcompleted and remainsactiveblocked withownershipreleased. Relocationuniqueness/importidentityfrontier remainsUNKNOWN/ANALYSIS_INCOMPLETE. RetireonlyOTC-BE4F48-QUEUE-4D7DC0-IMPORT-BINDING; no relaunch or largerrow scan. Source919 remains separatelyblocked. Registernewproofclassonlyafterthisarchive. No analyzer/workflow/runtime/E2E/TrackBchanges. Invocation11:35:52Z/240minutes/4additional,939additional1.

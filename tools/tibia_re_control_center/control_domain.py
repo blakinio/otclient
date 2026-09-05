@@ -36,6 +36,7 @@ from .model import (
     ValidationError,
     validate_opaque_id,
 )
+from .native_login_lifecycle import NativeLoginLifecycle, NativeLoginLifecycleError
 from .persistent_store import (
     RequestLedgerRecord,
     SQLitePersistentStore,
@@ -119,7 +120,14 @@ def _error_body(code: str, message: str, request_id: str | None, resource_id: st
 class ControlDomainService:
     """Single Package B semantic path. The only mutating adapter admitted here is FakeAdapter."""
 
-    def __init__(self, data_root: str, *, backend_epoch: str | None = None, event_retention: int = 4096) -> None:
+    def __init__(
+        self,
+        data_root: str,
+        *,
+        backend_epoch: str | None = None,
+        event_retention: int = 4096,
+        native_login_lifecycle: NativeLoginLifecycle | None = None,
+    ) -> None:
         self.clock = RuntimeMonotonicClock()
         self.adapter = FakeAdapter(self.clock, allow_mutation=True)
         for capability in ACTION_KINDS:
@@ -129,6 +137,7 @@ class ControlDomainService:
         self.store = SQLitePersistentStore(data_root, event_retention=event_retention)
         self.coordinator = MutationCoordinator(self.adapter, self.store, self.clock, backend_epoch=backend_epoch)
         self.agent = AgentSessionCoordinator(self.store, self.coordinator)
+        self.native_login_lifecycle = native_login_lifecycle or NativeLoginLifecycle()
         self._request_stripes = tuple(threading.RLock() for _ in range(64))
         self._test_faults: dict[str, int] = {}
 
@@ -229,6 +238,7 @@ class ControlDomainService:
             "AGENT_TASK": "agent-task",
             "AGENT_CHAT": "agent-chat",
             "AGENT_CONTROL": "agent-control",
+            "NATIVE_LOGIN_START": "native-login",
         }[operation]
 
     def _new_resource_id(self, operation: str) -> str:
@@ -458,9 +468,13 @@ class ControlDomainService:
         if resource.get("result") is None:
             return None
         result = copy.deepcopy(resource["result"])
-        code = 201 if resource.get("operation") in {
-            "CREATE_RUN", "ONE_STEP_EXPERIMENT", "AGENT_TASK",
-        } else 200
+        operation = resource.get("operation")
+        if operation in {"CREATE_RUN", "ONE_STEP_EXPERIMENT", "AGENT_TASK"}:
+            code = 201
+        elif operation == "NATIVE_LOGIN_START":
+            code = 202
+        else:
+            code = 200
         return DomainReply(code, result, "COMPLETED", str(result.get("status", "UNKNOWN")), resource["resource_id"])
 
     def _recover_incomplete_run(self, resource_id: str, request_id: str, operation: str, normalized: dict[str, Any]) -> DomainReply | None:
@@ -545,6 +559,30 @@ class ControlDomainService:
 
     def one_step(self, resource_id: str, request_id: str, normalized: dict[str, Any]) -> DomainReply:
         return self._execute_scenario(resource_id, request_id, normalized, "ONE_STEP_EXPERIMENT")
+
+    def native_login_start(self, resource_id: str, request_id: str, normalized: dict[str, Any]) -> DomainReply:
+        resource = self.store.ensure_resource(resource_id, request_id, "NATIVE_LOGIN_START", normalized)
+        prior = self._resource_reply(resource)
+        if prior is not None:
+            return prior
+        try:
+            payload = dict(self.native_login_lifecycle.start(resource_id))
+        except NativeLoginLifecycleError as exc:
+            raise ControlDomainError(
+                exc.code,
+                exc.safe_message,
+                http_status=409,
+            ) from exc
+        if payload.get("operation_id") != resource_id:
+            raise ControlDomainError(
+                "NATIVE_LOGIN_OPERATION_ID_MISMATCH",
+                "native login runtime returned a mismatched operation identity",
+                http_status=500,
+            )
+        ensure_no_secret_material(payload, key_path="native_login_start_result")
+        _ensure_persistable(payload, key_path="native_login_start_result")
+        self.store.finish_resource(resource_id, "COMPLETED", payload)
+        return DomainReply(202, payload, "COMPLETED", str(payload.get("state", "UNKNOWN")), resource_id)
 
     def _transition_payload(self, state: ControlState, resource_id: str) -> dict[str, Any]:
         return {

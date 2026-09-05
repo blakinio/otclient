@@ -565,6 +565,12 @@ class ControlDomainService:
         prior = self._resource_reply(resource)
         if prior is not None:
             return prior
+        if self.coordinator.control_state.stop_latched:
+            raise ControlDomainError(
+                "NATIVE_LOGIN_STOP_LATCHED",
+                "native login is blocked while global STOP is latched",
+                http_status=409,
+            )
         try:
             payload = dict(self.native_login_lifecycle.start(resource_id))
         except NativeLoginLifecycleError as exc:
@@ -605,8 +611,24 @@ class ControlDomainService:
             if not self.coordinator.stop_all(transition_id=resource_id, reason_code="CONTROL_API_STOP_ALL"):
                 raise ControlDomainError("CONTROL_STOP_DURABILITY_FAILED", "STOP could not be durably committed", http_status=503)
             historical = self.store.load_control_transition(resource_id)
-        if historical is None:
+        if historical is None or not historical.stop_latched:
             raise ControlDomainError("CONTROL_STATE_CONTRADICTION", "STOP transition history is missing", http_status=500)
+        try:
+            native_stop = dict(self.native_login_lifecycle.stop(resource_id))
+        except NativeLoginLifecycleError as exc:
+            raise ControlDomainError(
+                exc.code,
+                exc.safe_message,
+                http_status=503,
+            ) from exc
+        if native_stop.get("operation_id") != resource_id:
+            raise ControlDomainError(
+                "NATIVE_LOGIN_OPERATION_ID_MISMATCH",
+                "native login runtime returned a mismatched operation identity",
+                http_status=500,
+            )
+        ensure_no_secret_material(native_stop, key_path="native_login_stop_result")
+        _ensure_persistable(native_stop, key_path="native_login_stop_result")
         payload = self._transition_payload(historical, resource_id)
         self.store.finish_resource(resource_id, "COMPLETED", payload)
         return DomainReply(200, payload, "COMPLETED", "STOPPED", resource_id)

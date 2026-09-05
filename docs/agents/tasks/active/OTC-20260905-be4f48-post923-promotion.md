@@ -13,9 +13,9 @@ branch: docs/OTC-20260905-be4f48-post923-promotion
 base_branch: main
 base_main: b1d5e32978b3b2fd1f960378d4f61c4bb85508a9
 created: 2026-09-05T08:54:00Z
-updated_at: 2026-09-05T08:54:00Z
+updated_at: 2026-09-05T09:16:05Z
 invocation_started_at: 2026-09-05T08:43:11Z
-last_progress_at: 2026-09-05T08:54:00Z
+last_progress_at: 2026-09-05T09:16:05Z
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: codex
@@ -60,12 +60,13 @@ additional_source_task_ordinal: 1
 foreground_runtime_budget_minutes: 240
 foreground_budget_reason: explicit sequential source qualification and clean promotion/archive programme
 ci_checks_for_current_head: 0
-ci_check_generation: source_claim
+ci_check_generation: clean_promotion_final_docs
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 1
+repair_cycles_for_current_gate: 0
+source_gate_repair_cycles: 1
 context_reconstruction_attempts: 0
 stall_warnings: 0
 owned_paths:

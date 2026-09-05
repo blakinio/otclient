@@ -13,9 +13,9 @@ branch: ai/OTC-20260905-be4f48-queue-dd8df0-activation
 base_branch: main
 base_main: 67ff445fc0f961afe2ba74e03a2524fe885a0395
 created: 2026-09-05T10:10:00Z
-updated_at: 2026-09-05T10:20:45Z
+updated_at: 2026-09-05T10:28:51Z
 invocation_started_at: 2026-09-05T09:51:56Z
-last_progress_at: 2026-09-05T10:20:45Z
+last_progress_at: 2026-09-05T10:28:51Z
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: codex
@@ -64,7 +64,7 @@ ci_check_generation: source_claim
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
-identical_failure_retries: 0
+identical_failure_retries: 1
 repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 0
 stall_warnings: 0
@@ -121,3 +121,9 @@ TRACK_B_CURRENT_WIRE_DELTA=NOT_PROVEN
 Independent /root/promotion_review scientificwhole-diff PASS0materialfindings;31tests plusindependent width/address/PLT rejection cases. SupplementalPLT tests first observedGREEN disclosed;20coretests observedRED beforeimplementation. Final evidence-head source gates/result review remain required. This is boundedSOURCE_BLOCKER acceptance, not programmeexhaustion. SourceDraft/unmerged, clean docs-only promotion then separatearchiveownershiprelease. Source919 remains separatelyblocked; TrackB284 exact62383aded3acbeb5f405a12fe1f93849cd8e35f9 unchanged.
 runtime_access=none;official_client_executed=false;login_performed=false;credentials_used=false;process_memory_access=false;packet_capture=false;ocr_vision_used=false;official_service_e2e_count=0;track_b_pr_284_modified=false.
 RuntimeE2E NOT_APPLICABLE: static contract producer. Invocation09:51:56Z/240minutes/4additional; thisadditional1.
+
+## Exact final qualification transport failure and one retry
+
+Evidencehead3471d747d6adb29d797650e00cfe2b33ea9d07ba focused33960408883/job101291201601 failed at Prepare exact public client package through WARP readiness, exit1 at2026-09-05T10:27:05Z, before client/core materialization or analyzer.31testsPASS; CI33960408966,governance33960408887,boundary33960408886 SUCCESS. Scientific98eb20c completed qualification proves the unchanged pipeline can succeed; failure is isolated to public tunnel readiness. No source result is taken from failedfinaljob.
+
+This required failure-evidence commit triggers the single permitted identical transient retry on a fresh hosted runner; identical_failure_retries=1 is not reset by the new documentation head. No manual rerun in addition, no analyzer/workflow/fence change. Priorfinalhead had two ordinary observations, with failure materially isolated atsecond; counters retained here, not concealed. This invocation remains09:51:56Z; sourceadditional1. If the identical failure repeats, do not retry without a genuinely new bounded hypothesis/isolation. Independent sourcecontent review must inspect this failure record before clean promotion.

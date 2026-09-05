@@ -6,8 +6,8 @@ on:
     paths:
       - .github/workflows/tibia-re-be4f48-qt-c6c16.yml
       - tools/tibia_re_be4f48_qt_c6c16/**
-      - docs/agents/tasks/active/OTC-20260904-be4f48-qt-c6c16.md
-      - docs/agents/evidence/OTC-20260904-be4f48-qt-c6c16/**
+      - docs/agents/tasks/active/OTC-20260905-be4f48-qt-c6c16-continuation.md
+      - docs/agents/evidence/OTC-20260905-be4f48-qt-c6c16-continuation/**
 
 permissions:
   contents: read

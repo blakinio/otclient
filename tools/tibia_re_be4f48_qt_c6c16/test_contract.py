@@ -47,6 +47,15 @@ class Contract(unittest.TestCase):
         self.assertTrue(result['complete'])
         self.assertEqual(result['reachable_instructions'],1)
 
+    def test_loop_is_not_a_fallthrough_proof(self):
+        self.require(first_transfers)
+        result=first_transfers(bytes.fromhex('e2fec3'),0x1000,0x1000)
+        self.assertFalse(result['complete'])
+
+    def test_segment_override_is_not_plain_got_binding(self):
+        self.require(plt_binding)
+        self.assertIsNone(plt_binding(bytes.fromhex('64ff2509000000'),0x1000,{0x1010:'synthetic_import'}))
+
     def test_plt_only_actual_first_jump(self):
         self.require(plt_binding)
         self.assertEqual(plt_binding(bytes.fromhex('ff250a000000'),0x1000,{0x1010:'synthetic_import'}),'synthetic_import')

@@ -48,7 +48,7 @@ def first_transfers(raw,base,entry):
         if ins.group(CS_GRP_RET): boundary('RETURN',pc); continue
         if ins.group(CS_GRP_INT) or ins.group(CS_GRP_IRET) or ins.mnemonic in ('ud2','hlt','syscall','sysenter','sysret','sysexit','xbegin'):
             boundary('UNMODELED_CONTROL',pc); complete=False; continue
-        if ins.group(CS_GRP_JUMP):
+        if ins.group(CS_GRP_JUMP) or ins.mnemonic in ('loop','loope','loopne','jcxz','jecxz','jrcxz'):
             if len(ins.operands)!=1 or ins.operands[0].type!=X86_OP_IMM:
                 boundary('INDIRECT_BRANCH',pc); complete=False; continue
             targets=[ins.operands[0].imm]
@@ -80,5 +80,5 @@ def plt_binding(raw,base,relocations):
     ins=rows[0]
     if ins.mnemonic!='jmp' or len(ins.operands)!=1: return None
     op=ins.operands[0]
-    if op.type!=X86_OP_MEM or op.mem.base!=X86_REG_RIP or op.mem.index!=0: return None
+    if op.type!=X86_OP_MEM or op.mem.base!=X86_REG_RIP or op.mem.index!=0 or op.mem.segment!=0: return None
     return relocations.get(ins.address+ins.size+op.mem.disp)

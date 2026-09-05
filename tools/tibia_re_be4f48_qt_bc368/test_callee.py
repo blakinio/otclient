@@ -29,6 +29,12 @@ class CalleeContract(unittest.TestCase):
         self.assertEqual(d['exits'],[{'kind':'DIRECT_TAIL','site':'0x1000','target':'0x1010'}])
         self.assertEqual(d['reachable_instructions'],1)
 
+    def test_call_at_fde_end_is_explicit_return_frontier(self):
+        self.require(callee_graph)
+        d=callee_graph(bytes.fromhex('e80b000000'),0x1000)
+        self.assertEqual(d['exits'],[{'kind':'CALL_RETURN_OUTSIDE_FDE','site':'0x1000','target':'0x1005'}])
+        self.assertFalse(d['runtime_return_or_throw_semantics_proven'])
+
     def test_loop_has_two_edges_and_no_termination_claim(self):
         self.require(callee_graph)
         d=callee_graph(bytes.fromhex('e2fec3'),0x1000)

@@ -65,7 +65,7 @@ terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 0
+repair_cycles_for_current_gate: 1
 context_reconstruction_attempts: 0
 stall_warnings: 0
 owned_paths:
@@ -101,3 +101,7 @@ Invocation11:35:52Z,240minutes,4additional; this additional3. No reset. Ordinary
 ## Repository-only RED/GREEN
 
 RED 1c8103a3686f5d714fd614622e49683c851b80b4: 30 tests errored at the explicit unimplemented lookup before implementation. Minimal GREEN39 tests including9 package guards. Root prequalification falsification added two controls for complete selected-section file bounds and hash-chain-area width; RED2 failures, GREEN41 tests. No scientific head or client qualification existed during these repairs. Direct fixed-width metadata and bounded selected-name reads only, no eager symbol/string lookup. Independent whole-diff review and exact qualification pending; no result claimed.
+
+## S947-01 mapping ambiguity repair
+
+Scientific e77b565b109feb0e42b32812f4b04d502cc33a74 disqualified regardless of workflow outcome. Independent review reproduced partial allocated section overlaps being ignored by full-containment-only owner counting. Regression RED 36451a1f947114fe8d91edd4c87dc5f9a3d4d6b1: four failing tests for overlap inside/start/end of function extent and selected metadata overlap. GREEN checks every allocated section intersection before selected metadata reads and definition acceptance; sole owner must contain full extent and match section identity/flags/file bounds.45 tests PASS. Repaircycle1,retries0. Fresh scientific qualification and independent repair-family review required. No claims consumed from disqualified head.

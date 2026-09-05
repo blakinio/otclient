@@ -12,7 +12,7 @@ phase: implementation
 branch: feat/OTC-20260905-control-center-native-login-start
 base_branch: main
 created: 2026-09-05T17:54:29Z
-updated_at: 2026-09-05T19:10:00Z
+updated_at: 2026-09-05T19:20:00Z
 base_main: b6cf7402b4dbde59b2086f0982c7dcc711c3b5fc
 policy_version: 2
 prompting_standard_version: 2.1
@@ -50,6 +50,7 @@ owned_paths:
   - tools/tibia_re_control_center/control_domain.py
   - tools/tibia_re_control_center/control_api.py
   - tools/tibia_re_control_center/control_ui.py
+  - tools/tibia_re_control_center/persistent_store.py
   - tools/tibia_runtime_bridge/current_sha_native_login_gate.py
   - tools/tibia_runtime_bridge/experimental_auth.cpp
   - tools/tibia_runtime_bridge/experimental_character_control_current.cpp
@@ -71,7 +72,7 @@ reuses:
 depends_on: []
 blocks: []
 cross_repository_task_ids: []
-next_action: add durable STOP dominance and single-session lifecycle semantics, then rederive be4f48 native-login semantic bindings
+next_action: enforce durable single-session native-login claim across duplicate, concurrent and restarted Control Center execution
 ---
 
 # OTC-20260905 — Control Center native login START
@@ -145,5 +146,6 @@ physical_runtime_touched: false
 track_b_touched: false
 portal_api: GREEN
 portal_ui: GREEN
-next_action: durable STOP dominance and single-session lifecycle TDD, then be4f48 semantic rebind
+stop_dominance: GREEN
+next_action: durable single-session claim TDD, then be4f48 semantic rebind
 ```

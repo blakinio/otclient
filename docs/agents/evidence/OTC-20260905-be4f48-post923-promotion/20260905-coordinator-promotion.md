@@ -18,8 +18,8 @@ terminal_result=SOURCE_BLOCKER
 FIRST_MISSING_BOUNDARY=NO_SYMBOLIC_DESTINATION_RECEIVER_STORE_PROVEN_IN_BOUNDED_MUST_MODEL
 
 ## Falsification and gates
-S923-01 implicit-stack stale identity and S923-02 prefixed/privileged false fallthrough were independently reproduced RED/GREEN. Unknown destination and call-return provenance cannot imply memory region/unique dynamic instance. Old011a source head is disqualified. Independent repair audit PASS0remaining material findings on scientificfe7b67543d8a88038d9c685239fae53f598a44f4; final source evidence and this clean promotion require final review.
-Final source evidence-head qualification/checks are PENDING at draft preparation. Do not merge this promotion until exact source qualification matches the committed original result and final source/promotion checks and independent review pass.
+S923-01 implicit-stack stale identity and S923-02 prefixed/privileged false fallthrough were independently reproduced RED/GREEN. Unknown destination and call-return provenance cannot imply memory region/unique dynamic instance. Old011a source head is disqualified. Independent /root/promotion_review final-source audit PASS,0material findings on cd952996c4952a1dce710d3c9e6d48bc693438f5, including original result versus completed scientific job. This clean promotion requires its own whole-diff review.
+Final exact source head cd952996c4952a1dce710d3c9e6d48bc693438f5: focused33957343673/job101282954906,CI33957343794,governance33957343679,boundary33957343670 all SUCCESS. Final job sanitized JSON equals committed original and acquisition state deletion precedes upload. Only clean-promotion exact-head review/checks remain before merge.
 
 ## Lifecycle and safety
 After protected expected-head squash, close source923 unmerged as consumed; separately archive its historical source task and completed coordinator task with ownershipreleased. Only then select/register one next bounded proof. This ordinary SOURCE_BLOCKER does not end the programme or establish static exhaustion.

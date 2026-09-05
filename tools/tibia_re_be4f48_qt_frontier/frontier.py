@@ -1,7 +1,7 @@
 """Bounded symbol-local first-transfer CFG, no target traversal."""
 from capstone import (Cs, CS_ARCH_X86, CS_MODE_64, CS_GRP_CALL, CS_GRP_RET,
                       CS_GRP_JUMP, CS_GRP_INT, CS_GRP_IRET, CS_GRP_PRIVILEGE)
-from capstone.x86_const import X86_OP_IMM
+from capstone.x86_const import X86_OP_IMM, X86_INS_JMP
 
 def selected_body(raw,sections,record):
     if any(record.get(k)!=v for k,v in dict(address='0x1d3ff0',size=85,section_index=14,symbol_index=3860).items()):
@@ -38,8 +38,9 @@ def frontier(raw, base, instruction_limit=64):
         if any(lo<pc+ins.size and pc<hi for lo,hi in decoded.items()):
             boundary('OVERLAPPING_DECODE',pc,known=False);continue
         decoded[pc]=pc+ins.size;edges[pc]=[]
-        if ins.group(CS_GRP_INT) or ins.group(CS_GRP_IRET) or ins.group(CS_GRP_PRIVILEGE) or ins.mnemonic in (
-                'ud0','ud1','ud2','hlt','syscall','sysenter','sysret','sysexit','xbegin','xabort','xend','retf','retfq','lcall','ljmp'):
+        if ins.group(CS_GRP_INT) or ins.group(CS_GRP_IRET) or ins.group(CS_GRP_PRIVILEGE) or ins.insn_name() in (
+                'ud0','ud1','ud2','hlt','syscall','sysenter','sysret','sysexit','xbegin','xabort','xend','retf','retfq','lcall','ljmp',
+                'enclu','encls','enclv','pconfig','setssbsy'):
             boundary('UNMODELED_CONTROL',pc,known=False);continue
         if ins.group(CS_GRP_CALL):
             if len(ins.operands)==1 and ins.operands[0].type==X86_OP_IMM:
@@ -52,8 +53,8 @@ def frontier(raw, base, instruction_limit=64):
                 boundary('INDIRECT_BRANCH',pc,known=False);continue
             target=ins.operands[0].imm
             if base<=target<base+len(raw):edges[pc].append(target);pending.append(target)
-            else:boundary('TAIL_JUMP' if ins.mnemonic=='jmp' else 'CONDITIONAL_EXIT',pc,target)
-            if ins.mnemonic=='jmp':continue
+            else:boundary('TAIL_JUMP' if ins.id==X86_INS_JMP else 'CONDITIONAL_EXIT',pc,target)
+            if ins.id==X86_INS_JMP:continue
         fall=pc+ins.size
         if fall>=base+len(raw):boundary('FALLTHROUGH_OUTSIDE_SYMBOL',pc,fall,known=False)
         else:edges[pc].append(fall);pending.append(fall)

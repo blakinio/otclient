@@ -54,6 +54,12 @@ class FrontierTests(unittest.TestCase):
                 self.assertTrue(r['complete'])
                 self.assertEqual(r['cfg'],{'0x1000':['0x1005'],'0x1005':[]})
     def test_far_return(self): self.assertFalse(self.f('cb')['complete'])
+    def test_prefixed_far_returns_remain_unmodeled(self):
+        for code in ('f2cb','f2ca0000','f248cb'):
+            with self.subTest(code=code):
+                r=self.f(code)
+                self.assertFalse(r['complete'])
+                self.assertEqual(r['boundaries'],[dict(kind='UNMODELED_CONTROL',site='0x1000')])
     def test_transaction(self): self.assertFalse(self.f('c7f800000000')['complete'])
     def test_truncated(self): self.assertFalse(self.f('e8')['complete'])
     def test_fallthrough(self): self.assertFalse(self.f('90')['complete'])

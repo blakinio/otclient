@@ -65,7 +65,7 @@ terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 1
+repair_cycles_for_current_gate: 2
 context_reconstruction_attempts: 0
 stall_warnings: 0
 owned_paths:
@@ -143,3 +143,9 @@ Freshmain a0346f3ac4704bc5f41b75653d7eaca6c5d8655d/sourcehead d0c6444e19b539d793
 ## S951-01 repair candidate
 
 Regression RED afdcc9ff5a01a718c030b1d73384003674231cf3: two assertion failures for UD0/UD1 complete=true. Minimal GREEN explicitly classifies ud0/ud1 with existing undefined-trap handling, stops before fallthrough and retains no posttrap nodes. All69tests pass locally; no unrelated source change. Repaircycle1,retries0. Independent full-diff/finding-family audit and fresh exact qualification required; prior2e29d0fe remains disqualified.
+
+## S951-02 / S951-03 consolidated repair
+
+Scientific26fde7e461625aebde7692f823c71c04b6139c2e is DISQUALIFIED despite completed focused33972569784/job101323568288,69tests and artifact9971359699 digestb11834ea7253c73fad6d3ff180db320b06eac6f5cf808e7a50ce1fc8da814249. No facts consumed. Independent reviewer found ungrouped ENCLU/ENCLS/ENCLV/PCONFIG/SETSSBSY accepted as ordinary fallthrough and prefix-sensitive JMP/far-return classification. Root reproduced them.
+
+Regression RED080c396acf7feeed79049a87bba7d62bdd1859f9:9 failures across ungrouped-system and prefixed internal/external JMP variants. Minimal GREEN adds explicit unmodeled system IDs via Capstone canonical insn_name() and identifies unconditional JMP by X86_INS_JMP, eliminating prefixed mnemonic ambiguity. Supplemental far-return family regression: temporarily restoring old mnemonic check yielded3 failures for prefixed far returns; restored canonical identity check yielded73testsPASS. No body/extent/scope expansion. Independent VM-family probes already failclosed; no runtime semantics inferred. Repaircycle2,retries0. Fresh independent review and exact scientific qualification required.

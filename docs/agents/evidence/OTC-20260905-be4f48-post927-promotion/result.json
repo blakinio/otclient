@@ -1,0 +1,205 @@
+{
+  "FACT": {
+    "callee_entry": "0x142e30",
+    "caller_fde": [
+      "0x1cd220",
+      "0x1cd2a7"
+    ],
+    "caller_site": "0x1cd26e",
+    "conditional_input_model": {
+      "boundaries": [],
+      "call_return_dynamic_instance_and_memory_region": "UNKNOWN",
+      "call_return_tokens_are_callsite_provenance_only": true,
+      "cfg": {
+        "0x1cd220": [
+          "0x1cd221"
+        ],
+        "0x1cd221": [
+          "0x1cd222"
+        ],
+        "0x1cd222": [
+          "0x1cd229"
+        ],
+        "0x1cd229": [
+          "0x1cd22d"
+        ],
+        "0x1cd22d": [
+          "0x1cd234"
+        ],
+        "0x1cd234": [
+          "0x1cd236"
+        ],
+        "0x1cd236": [
+          "0x1cd238",
+          "0x1cd248"
+        ],
+        "0x1cd238": [
+          "0x1cd23c"
+        ],
+        "0x1cd23c": [
+          "0x1cd23f"
+        ],
+        "0x1cd23f": [
+          "0x1cd240"
+        ],
+        "0x1cd240": [
+          "0x1cd241"
+        ],
+        "0x1cd241": [],
+        "0x1cd248": [
+          "0x1cd24f"
+        ],
+        "0x1cd24f": [
+          "0x1cd256"
+        ],
+        "0x1cd256": [
+          "0x1cd259"
+        ],
+        "0x1cd259": [
+          "0x1cd25e"
+        ],
+        "0x1cd25e": [
+          "0x1cd260"
+        ],
+        "0x1cd260": [
+          "0x1cd238",
+          "0x1cd262"
+        ],
+        "0x1cd262": [
+          "0x1cd264"
+        ],
+        "0x1cd264": [
+          "0x1cd26b"
+        ],
+        "0x1cd26b": [
+          "0x1cd26e"
+        ],
+        "0x1cd26e": [
+          "0x1cd273"
+        ],
+        "0x1cd273": [
+          "0x1cd27a"
+        ],
+        "0x1cd27a": [
+          "0x1cd27d"
+        ],
+        "0x1cd27d": [
+          "0x1cd284"
+        ],
+        "0x1cd284": [
+          "0x1cd289"
+        ],
+        "0x1cd289": [
+          "0x1cd28c"
+        ],
+        "0x1cd28c": [
+          "0x1cd291"
+        ],
+        "0x1cd291": [
+          "0x1cd295"
+        ],
+        "0x1cd295": [
+          "0x1cd298"
+        ],
+        "0x1cd298": [
+          "0x1cd299"
+        ],
+        "0x1cd299": [
+          "0x1cd29a"
+        ],
+        "0x1cd29a": []
+      },
+      "conditional_on_calls_returning_under_sysv_abi": true,
+      "coverage_complete": true,
+      "exceptional_control_not_modeled": true,
+      "fixedpoint_reached": true,
+      "memory_loads_outside_private_stack": "UNKNOWN",
+      "reachable_instructions": 33,
+      "resource_limit_hit": false,
+      "runtime_registration_or_delivery_proven": false,
+      "scope": "modeled normal prefixes inside this FDE; no reentry from excluded continuations",
+      "selected_call": {
+        "captured": true,
+        "receiver_carriers": [],
+        "registers": {
+          "r8": "UNKNOWN",
+          "r9": "UNKNOWN",
+          "rcx": "UNKNOWN",
+          "rdi": "UNKNOWN",
+          "rdx": "UNKNOWN",
+          "rsi": "UNKNOWN"
+        },
+        "site": "0x1cd26e",
+        "stack_slots": {
+          "stack+0": "UNKNOWN",
+          "stack+16": "UNKNOWN",
+          "stack+8": "UNKNOWN"
+        },
+        "target": "0x142e30"
+      },
+      "state_updates": 38,
+      "termination_proven": false
+    },
+    "receiver_input": "entry:rcx, conditional promoted #912 carrier",
+    "target_fde_metadata_only": [
+      "0x142e30",
+      "0x142e87"
+    ],
+    "target_unique_exact_dynsym_owner": null
+  },
+  "FIRST_MISSING_BOUNDARY": "SELECTED_CALL_RECEIVER_IDENTITY_NOT_PROVEN_IN_BOUNDED_INPUT_MODEL",
+  "INFERENCE": [
+    "No receiver carrier is proven at this selected call by the qualified must-value model; actual absence or irrelevance is not proven."
+  ],
+  "TRACK_B_CURRENT_WIRE_DELTA": "NOT_PROVEN",
+  "UNKNOWN": [
+    "runtime_loaded_qtcore",
+    "actual_sendlogin_receiver_identity",
+    "callee_formal_parameter_names_and_hidden_return_roles",
+    "successful_registration_and_delivery",
+    "complete_sendlogin_causal_binding",
+    "final_queue_writer",
+    "final_tcp_writer",
+    "final_writer_contract",
+    "field6_value",
+    "pre_success_send_sequence"
+  ],
+  "absence_of_real_receiver_input_proven": false,
+  "credentials_used": false,
+  "exact_client": {
+    "sha256": "552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1",
+    "size": 52105824,
+    "version": "15.32.be4f48"
+  },
+  "login_performed": false,
+  "ocr_vision_used": false,
+  "official_client_executed": false,
+  "official_service_e2e_count": 0,
+  "packaged_qtcore": {
+    "localfile": "bin/lib/libQt6Core.so.6",
+    "packedhash": "3a58482841fbf76f9b09ffd5522efb2c8eeebfc84c011167e8199ac2dd8dca1b",
+    "packedsize": 2215336,
+    "unpackedhash": "03ac3e4e7356399897ec58d42c81ae5c257072d45d539de1def528a8a04911fa",
+    "unpackedsize": 7354472,
+    "url": "bin/lib/libQt6Core.so.6.lzma"
+  },
+  "packet_capture": false,
+  "process_memory_access": false,
+  "qualified_head": "5540873a8aa3bf975db9f4ad1907a359e3c8168f",
+  "runtime_access": "none",
+  "schema": "otclient.track-a.be4f48-post927.v1",
+  "source_head": "b0be0655fa4ed13c726f8c47ce0e32ab805f210f",
+  "source_pr": 927,
+  "terminal_result": "SOURCE_BLOCKER",
+  "track_b_pr_284_modified": false,
+  "qualification": {
+    "focused_run": 33959338455,
+    "focused_job": 101288333122,
+    "ci_run": 33959338703,
+    "governance_run": 33959338459,
+    "boundary_run": 33959338412,
+    "all": "success",
+    "independent_review": "/root/promotion_review PASS",
+    "material_findings": 0
+  }
+}

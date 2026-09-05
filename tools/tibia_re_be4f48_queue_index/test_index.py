@@ -1,5 +1,6 @@
 import struct
 import unittest
+from io import BytesIO
 from index import selector, dynamic_tags, indexed_record
 
 PLT={'name':'.plt','lo':0x400,'hi':0x500,'flags':6,'entsize':16}
@@ -27,7 +28,7 @@ class Rela(Sec):
     def iter_relocations(self): raise AssertionError('RETIRED_RELOCATION_SCAN')
 class Sym(dict):
     name='_ZN4Test4callEv'
-    def __init__(self): super().__init__(st_shndx='SHN_UNDEF',st_info={'type':'STT_FUNC','bind':'STB_GLOBAL'})
+    def __init__(self): super().__init__(st_name=0,st_shndx='SHN_UNDEF',st_info={'type':'STT_FUNC','bind':'STB_GLOBAL'})
 class Syms(Sec):
     def __init__(self):
         super().__init__('.dynsym','SHT_DYNSYM',0x2000,240,24,3)
@@ -41,10 +42,35 @@ class Elf:
     def __init__(self):
         self.rela=Rela();self.syms=Syms();self.strings=Sec('.dynstr','SHT_STRTAB',0x3000,512,0)
         self.sections=[self.rela,self.syms,self.strings]
+        self.reads=[];self.name_bytes_override=None
+    @property
+    def stream(self):
+        owner=self
+        class Stream(BytesIO):
+            def read(self,n=-1):
+                owner.reads.append((self.tell(),n));return super().read(n)
+        data=bytearray(0x4000);s=self.syms.symbol
+        typ={'STT_FUNC':2,'STT_OBJECT':1}[s['st_info']['type']]
+        bind={'STB_GLOBAL':1,'STB_WEAK':2,'STB_LOCAL':0}[s['st_info']['bind']]
+        section=0 if s['st_shndx']=='SHN_UNDEF' else s['st_shndx']
+        struct.pack_into('<IBBHQQ',data,0x2000+3*24,s['st_name'],bind*16+typ,0,section,0,0)
+        name=self.name_bytes_override if self.name_bytes_override is not None else s.name.encode('utf-8')+b'\0'
+        start=0x3000+s['st_name'];data[start:start+len(name)]=name
+        return Stream(data)
     def iter_sections(self): return iter(self.sections)
     def get_section(self,idx): return {2:self.syms,3:self.strings}.get(idx)
 
 class IndexTests(unittest.TestCase):
+    def test_name_offset_outside_declared_string_section(self):
+        e=Elf();e.strings['sh_size']=4;e.syms.symbol['st_name']=4
+        with self.assertRaises(ValueError): indexed_record(e,TAGS,3,0x900)
+    def test_name_must_terminate_within_string_section(self):
+        e=Elf();e.strings['sh_size']=8;e.name_bytes_override=b'_Zxxxxxx'
+        with self.assertRaises(ValueError): indexed_record(e,TAGS,3,0x900)
+    def test_name_input_read_cap(self):
+        e=Elf();e.strings['sh_size']=1024;e.name_bytes_override=b'_Z'+b'x'*600+b'\0'
+        with self.assertRaises(ValueError): indexed_record(e,TAGS,3,0x900)
+        self.assertTrue(all(n<=513 for _,n in e.reads))
     def test_real_section_mapping_interface(self):
         class Proxy:
             def __init__(self, section): self.section=section

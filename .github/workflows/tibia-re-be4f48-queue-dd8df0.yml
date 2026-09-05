@@ -1,0 +1,133 @@
+name: Track A be4f48 queue dd8df0 activation arguments
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - .github/workflows/tibia-re-be4f48-queue-dd8df0.yml
+      - tools/tibia_re_be4f48_queue_dd8df0/**
+      - docs/agents/tasks/active/OTC-20260905-be4f48-queue-dd8df0-activation.md
+      - docs/agents/evidence/OTC-20260905-be4f48-queue-dd8df0-activation/**
+
+permissions:
+  contents: read
+
+jobs:
+  static-receiver-field-use-semantics:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact research head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Validate repository-only Qt package contract
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 -m pip install --user --break-system-packages capstone==5.0.6 pyelftools==0.32
+          python3 -m unittest discover -s tools/tibia_re_be4f48_queue_dd8df0 -p 'test*.py'
+          python3 -m py_compile tools/tibia_re_be4f48_queue_dd8df0/test_activation.py
+          python3 -m py_compile tools/tibia_re_be4f48_queue_dd8df0/analyze.py
+          git diff --check "${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}"
+
+      - name: Prepare exact public client package through WARP
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends curl python3-capstone python3-pyelftools binutils
+          r="$RUNNER_TEMP/be4f48-queue-dd8df0"
+          mkdir -p "$r/bin" "$r/state" "$r/pkg"
+          curl -fsSL -o "$r/bin/wgcf" https://github.com/ViRb3/wgcf/releases/download/v2.2.32/wgcf_2.2.32_linux_amd64
+          echo '2ff97f2201972ce582a424455d50a3719a380eef0cd1f3144f7779348e122a2c  '"$r"'/bin/wgcf' | sha256sum -c - >/dev/null
+          curl -fsSL -o "$r/bin/wireproxy.tgz" https://github.com/windtf/wireproxy/releases/download/v1.1.3/wireproxy_linux_amd64.tar.gz
+          echo 'e88c1d090740373fc606c1bafd81d9a5eadc642cce5667616e20e9d7a444f51c  '"$r"'/bin/wireproxy.tgz' | sha256sum -c - >/dev/null
+          mkdir "$r/bin/wp" && tar -xzf "$r/bin/wireproxy.tgz" -C "$r/bin/wp"
+          cp "$(find "$r/bin/wp" -type f -name wireproxy -print -quit)" "$r/bin/wireproxy"
+          chmod 755 "$r/bin/wgcf" "$r/bin/wireproxy"
+          cd "$r/state"
+          "$r/bin/wgcf" register --accept-tos >/dev/null
+          "$r/bin/wgcf" generate >/dev/null
+          printf 'WGConfig = %s\n\n[Socks5]\nBindAddress = 127.0.0.1:25349\n' "$r/state/wgcf-profile.conf" > wireproxy.conf
+          nohup "$r/bin/wireproxy" -c wireproxy.conf >"$r/wireproxy.log" 2>&1 </dev/null &
+          echo "$!" >"$r/wireproxy.pid"
+          for _ in $(seq 1 30); do
+            curl --socks5-hostname 127.0.0.1:25349 -fsS --max-time 10 https://www.cloudflare.com/cdn-cgi/trace >"$r/trace" 2>/dev/null && grep -Eq '^warp=(on|plus)$' "$r/trace" && break
+            sleep 2
+          done
+          grep -Eq '^warp=(on|plus)$' "$r/trace"
+          base=https://static.tibia.com/launcher/tibiaclient-linux-current
+          curl --socks5-hostname 127.0.0.1:25349 --compressed -fL "$base/package.json" -o "$r/pkg/package.json"
+          python3 "$GITHUB_WORKSPACE/tools/tibia_re_be4f48_queue_dd8df0/analyze.py" --manifest "$r/pkg/package.json" --selection "$r/selected.json"
+          echo "RE_ROOT=$r" >>"$GITHUB_ENV"
+          echo BE4F48_QUEUE_DD8DF0_EXACT_PACKAGE_FENCE=PASS
+
+      - name: Materialize only exact client and selected QtCore
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          trap 'rm -f "$RE_ROOT/pkg/client" "$RE_ROOT/pkg/qtcore" "$RE_ROOT/pkg/"*.lzma' EXIT
+          python3 - "$RE_ROOT" <<'PY'
+          import hashlib,json,lzma,pathlib,subprocess,sys
+          root=pathlib.Path(sys.argv[1]); selected=json.loads((root/'selected.json').read_text())
+          for key in ('client','qtcore'):
+              row=selected[key]
+              if row is None: continue
+              packed_path=root/'pkg'/f'{key}.lzma'
+              subprocess.run(['curl','--socks5-hostname','127.0.0.1:25349','--compressed','-fL','--max-time','120','https://static.tibia.com/launcher/tibiaclient-linux-current/'+row['url'],'-o',str(packed_path)],check=True,timeout=130)
+              packed=packed_path.read_bytes()
+              if len(packed)!=row['packedsize'] or hashlib.sha256(packed).hexdigest()!=row['packedhash']:raise SystemExit('packed member fence mismatch')
+              prop=packed[32];lc=prop%9;z=prop//9;lp=z%5;pb=z//5;ds=int.from_bytes(packed[33:37],'little')
+              raw=lzma.decompress(packed[45:],format=lzma.FORMAT_RAW,filters=[{'id':lzma.FILTER_LZMA1,'dict_size':ds,'lc':lc,'lp':lp,'pb':pb}])
+              if len(raw)!=row['unpackedsize'] or hashlib.sha256(raw).hexdigest()!=row['unpackedhash']:raise SystemExit('unpacked member fence mismatch')
+              (root/'pkg'/key).write_bytes(raw)
+              packed_path.unlink()
+          PY
+          python3 tools/tibia_re_be4f48_queue_dd8df0/analyze.py --selection "$RE_ROOT/selected.json" --client "$RE_ROOT/pkg/client" --qtcore "$RE_ROOT/pkg/qtcore" --output artifacts/be4f48-queue-dd8df0/result.json
+          rm -f "$RE_ROOT/pkg/client" "$RE_ROOT/pkg/qtcore" "$RE_ROOT/pkg/"*.lzma
+          echo RAW_OFFICIAL_BYTES_RETAINED=false
+
+      - name: Validate sanitized Qt receiver result
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          import json
+          p='artifacts/be4f48-queue-dd8df0/result.json'; d=json.load(open(p,encoding='utf-8'))
+          assert d['runtime_access']=='none' and d['official_client_executed'] is False and d['track_b_pr_284_modified'] is False
+          assert d['official_service_e2e_count']==0
+          assert d['exact_client']['version']=='15.32.be4f48' and d['exact_client']['size']==52105824
+          assert d['exact_client']['sha256']=='552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1'
+          assert d['terminal_result'] in ('POSITIVE_EXACT_ACTIVATION_ARGUMENTS','SOURCE_BLOCKER','ANALYSIS_INCOMPLETE')
+          assert d['track_b_current_wire_delta']=='NOT_PROVEN'
+          assert d['packaged_identity_is_runtime_loaded_identity'] is False
+          assert d['pre_success_send_sequence']=='UNKNOWN' and d['field6_value']=='UNKNOWN'
+          print('BE4F48_QUEUE_DD8DF0_SANITIZED_RESULT=PASS')
+          print(json.dumps(d,sort_keys=True))
+          PY
+
+      - name: Delete all acquisition state before artifact
+        shell: bash
+        run: |
+          if test -f "$RE_ROOT/wireproxy.pid"; then kill "$(cat "$RE_ROOT/wireproxy.pid")" || true; fi
+          rm -rf "$RE_ROOT"
+          test ! -e "$RE_ROOT"
+          echo ACQUISITION_STATE_REMOVED_BEFORE_ARTIFACT=true
+
+      - name: Upload sanitized bounded result only
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: be4f48-queue-dd8df0-${{ github.sha }}
+          path: artifacts/be4f48-queue-dd8df0/result.json
+          if-no-files-found: error
+          retention-days: 3
+
+      - name: Remove all transient acquisition state
+        if: always()
+        shell: bash
+        run: |
+          rm -rf "$RUNNER_TEMP/be4f48-queue-dd8df0"

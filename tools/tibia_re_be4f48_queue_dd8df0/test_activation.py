@@ -1,5 +1,5 @@
 import unittest
-from activation import project, qualify_tail, classify, ACTIVATE
+from activation import project, qualify_tail, classify, ACTIVATE, import_binding
 
 
 class ActivationContract(unittest.TestCase):
@@ -80,6 +80,17 @@ class ActivationContract(unittest.TestCase):
 
     def test_unknown_instruction_cannot_support_activation(self):
         self.assertEqual(classify(self.p('9c'), ACTIVATE)[0], 'SOURCE_BLOCKER')
+
+    def test_exact_unique_undefined_plt_binding(self):
+        row = {'offset': 0x1006, 'type': 7, 'name': ACTIVATE, 'undefined': True}
+        raw = bytes.fromhex('ff2500000000')
+        self.assertEqual(import_binding(raw, 0x1000, [row]), ACTIVATE)
+        self.assertIsNone(import_binding(raw, 0x1000, [row, row]))
+        self.assertIsNone(import_binding(raw, 0x1000, [dict(row, undefined=False)]))
+
+    def test_non_plt_first_instruction_is_not_searched_past(self):
+        row = {'offset': 0x1007, 'type': 7, 'name': ACTIVATE, 'undefined': True}
+        self.assertIsNone(import_binding(bytes.fromhex('90ff2500000000'), 0x1000, [row]))
 
 
 if __name__ == '__main__':

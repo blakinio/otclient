@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260905-be4f48-queue-dd8df0-activation
-status: implementing
+status: validating
 agent: Codex
 session_id: login-closure-20260905-095156-ae070f034ee4
 session_role: researcher
@@ -8,14 +8,14 @@ project_lane: otclient
 lane: P2-NETWORK
 track_id: official-client-re
 task_kind: implementation
-phase: implement
+phase: validate
 branch: ai/OTC-20260905-be4f48-queue-dd8df0-activation
 base_branch: main
 base_main: 67ff445fc0f961afe2ba74e03a2524fe885a0395
 created: 2026-09-05T10:10:00Z
-updated_at: 2026-09-05T10:10:00Z
+updated_at: 2026-09-05T10:16:58Z
 invocation_started_at: 2026-09-05T09:51:56Z
-last_progress_at: 2026-09-05T10:10:00Z
+last_progress_at: 2026-09-05T10:16:58Z
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: codex
@@ -84,7 +84,7 @@ blocks:
   - clean coordinator consumption of this exact source result
 cross_repository_task_ids: []
 ownership_released: false
-next_action: repository-only RED then minimal activation argument analyzer and exact source qualification
+next_action: exact-client qualification and independent whole-diff review
 ---
 
 # Bounded source claim
@@ -96,3 +96,7 @@ Exact primary15.32.be4f48/52105824/552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86
 Repository-onlyTDD RED/GREEN, exactqualification, materialfinding-familyregressions, independentwhole-diff review and focused/CI/governance/boundary gates. SourceDraft/unmerged; clean docs promotion then separatearchive. No transfer ofQMeta enum/index/signal identity or finalwriter authority from numericaldata alone.
 
 Invocation09:51:56Z/240minutes/4additional; thisadditional1, entry927fullyclosedout. Preserve ordinaryCI<=2/head, oneidenticaltransientretry,3repaircycles,15minnoprogress. No terminal-entry exception for additional source. RuntimeE2ENOT_APPLICABLE staticproducer. Fullnoneadmissionabove. Runtime/clientexecution/login/credentials/memory/capture/OCR/serviceE2E/TrackBmutation zero. Rawofficialbytes/helperstate transientdeletedbefore sanitizedartifact; alwayscleanupfailure. No owner-fundedexternalmodelcalls.
+
+## TDD and minimal implementation
+
+Repository-onlyREDf25ac120ce63d0003d80250986edc73f3d7d75cc:20explicitunimplementedbehaviorerrors observed before implementation. MinimalGREEN31testsPASS (20projection/tail/classification tests plus2PLTbinding controls and9inheritedpackageguards). No officialbytes in localtests. The2PLT controls were added alongside binding implementation and first observedGREEN; no earlierRED is claimed for those supplemental guards. git diff --check PASS. Newminimal linearprefix semantics and selecteduniquePLTrelocation check; strictpackage/Image reused, no source927finiteinputscan. Numeric/staticarguments remain linktime/rawregisterfacts, noQMetaindex/delivery/writer inference. Independentfull-diff and exactfencequalification remain required. No scope/cap/runtimemutation.

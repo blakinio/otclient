@@ -53,6 +53,23 @@ class StorageContract(unittest.TestCase):
         p = self.flow('6748890fc3')
         self.assertEqual(p['receiver_stores'][0]['destination'], 'UNKNOWN')
 
+    def test_unknown_destination_is_not_a_nonstack_proof(self):
+        p = self.flow('48890bc3')
+        self.assertEqual(p['receiver_stores'][0]['destination_provenance'], 'UNKNOWN')
+
+    def test_implicit_pushfq_cannot_leave_old_receiver_spill(self):
+        self.assertEqual(self.writes('488d5c24f848890b9c488b03488907c3'), [])
+
+    def test_bnd_jump_has_no_unreachable_store_fallthrough(self):
+        p = self.flow('f2eb0348890fc3')
+        self.assertEqual(p['receiver_stores'], [])
+        self.assertEqual(p['cfg']['0x1000'], ['0x1006'])
+
+    def test_privileged_resume_cannot_fall_through_to_store(self):
+        p = self.flow('0faa48890fc3')
+        self.assertEqual(p['receiver_stores'], [])
+        self.assertFalse(p['coverage_complete'])
+
     def test_unknown_memory_alias_invalidates_stack_spill(self):
         self.assertEqual(self.writes('4883ec1048890c24488916488b0424488907c3'), [])
 

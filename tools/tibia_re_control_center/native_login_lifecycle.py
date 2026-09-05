@@ -41,5 +41,28 @@ class NativeLoginLifecycle:
             )
         return dict(self._executor.start(operation_id))
 
+    def stop(self, operation_id: str | None = None) -> dict[str, object]:
+        if operation_id is None:
+            raise NativeLoginLifecycleError(
+                "NATIVE_LOGIN_OPERATION_ID_REQUIRED",
+                "native login operation identity is required",
+            )
+        if self._executor is None:
+            return {
+                "state": "UNBOUND",
+                "bound": False,
+                "current": False,
+                "physical_effect": False,
+                "reason": "NATIVE_LOGIN_RUNTIME_NOT_BOUND",
+                "operation_id": operation_id,
+            }
+        stop = getattr(self._executor, "stop", None)
+        if stop is None:
+            raise NativeLoginLifecycleError(
+                "NATIVE_LOGIN_STOP_UNSUPPORTED",
+                "native login runtime does not expose safe stop",
+            )
+        return dict(stop(operation_id))
+
 
 __all__ = ("NativeLoginLifecycle", "NativeLoginLifecycleError")

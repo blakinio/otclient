@@ -6,6 +6,7 @@ import unittest
 from tools.tibia_re_control_center.control_api import ControlApiServer
 from tools.tibia_re_control_center.control_cli import ControlApiClient, ControlClientError
 from tools.tibia_re_control_center.control_domain import ControlDomainService
+from tools.tibia_re_control_center.control_ui import render_control_ui
 from tools.tibia_re_control_center.native_login_lifecycle import NativeLoginLifecycle
 
 
@@ -128,6 +129,17 @@ class NativeLoginApiTests(unittest.TestCase):
                 self.assertEqual("NATIVE_LOGIN_UNBOUND", caught.exception.payload["code"])
             finally:
                 server.close()
+
+    def test_portal_exposes_secret_free_native_login_start_and_status(self) -> None:
+        page = render_control_ui("0" * 64, "native-login-ui-csp")
+        self.assertIn('id="nativeLoginStart"', page)
+        self.assertIn('id="nativeLoginStatus"', page)
+        self.assertIn("api('/v1/native-login/status')", page)
+        self.assertIn("api('/v1/native-login/start',{method:'POST',body:{}", page)
+        self.assertEqual(1, page.count("/v1/native-login/start"))
+        self.assertNotIn('type="password"', page)
+        for forbidden_id in ('id="password"', 'id="username"', 'id="email"', 'id="credential"'):
+            self.assertNotIn(forbidden_id, page)
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260905-be4f48-qt-1cd220-storage
-status: investigating
+status: validating
 agent: Codex
 session_id: login-closure-20260905-084311-ae070f034ee4
 session_role: researcher
@@ -8,7 +8,7 @@ project_lane: otclient
 lane: P2-NETWORK
 track_id: official-client-re
 task_kind: implementation
-phase: investigate
+phase: validate
 branch: ai/OTC-20260905-be4f48-qt-1cd220-storage
 base_branch: main
 base_main: b1d5e32978b3b2fd1f960378d4f61c4bb85508a9
@@ -83,7 +83,7 @@ blocks:
   - clean coordinator consumption of this exact source result
 cross_repository_task_ids: []
 ownership_released: false
-next_action: repository-only RED for exact receiver storage dataflow then minimal GREEN
+next_action: exact-client qualification and independent whole-diff falsification
 ---
 
 # Source claim
@@ -97,3 +97,7 @@ TDD: repository-only RED for must-identity writes, aliases/joins/stack overlap/p
 New owner invocation08:43:11Z/240minutes, at most4additional sources prospectively declared on reviewed920. This is additional1; no terminal-entry CI exception applies. Historical invocation violation remains archived, not repeated or erased. Runtime E2E NOT_APPLICABLE because static contract producer. Source remains Draft/unmerged; clean coordinator promotion and separate archive required after terminal/partial result.
 
 runtime_access=none; official_client_executed=false; login_performed=false; credentials_used=false; process_memory_access=false; packet_capture=false; ocr_vision_used=false; official_service_e2e_count=0; track_b_pr_284_modified=false.
+
+## Repository-only validation
+
+RED e35987fc2f3d266f174a12b5fdafb9331cc4cf3d:18 required behavior tests fail on explicit unimplemented scaffold, no client bytes involved. Minimal finite must-value implementation now passes39tests including copied audited package/identity controls. One synthetic loop fixture had an incorrect backward branch to0x1004 (mid-instruction); decoded and corrected to0x1003 before GREEN. Self-falsification found 32-bit address override falsely reusing64-bit destination identity; added failing regression, then conservative base-width rejection restored GREEN. No semantic cap widened. git diff --check PASS; all new files are task-local source/tests/workflow. Whole-diff review and hosted qualification still required.

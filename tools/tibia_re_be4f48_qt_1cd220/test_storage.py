@@ -49,6 +49,10 @@ class StorageContract(unittest.TestCase):
         self.assertEqual(p['receiver_stores'], [])
         self.assertIn('SEGMENTED_MEMORY', [x['kind'] for x in p['boundaries']])
 
+    def test_address_size_override_does_not_preserve_64bit_destination(self):
+        p = self.flow('6748890fc3')
+        self.assertEqual(p['receiver_stores'][0]['destination'], 'UNKNOWN')
+
     def test_unknown_memory_alias_invalidates_stack_spill(self):
         self.assertEqual(self.writes('4883ec1048890c24488916488b0424488907c3'), [])
 
@@ -63,7 +67,7 @@ class StorageContract(unittest.TestCase):
         self.assertFalse(p['termination_proven'])
 
     def test_loop_join_does_not_emit_transient_store(self):
-        p = self.flow('4889cb48891f85c0740431dbebf6c3')
+        p = self.flow('4889cb48891f85c0740431dbebf5c3')
         self.assertEqual(p['receiver_stores'], [])
 
     def test_update_budget_does_not_emit_transient_store(self):

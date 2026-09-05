@@ -24,6 +24,14 @@ class FrontierTests(unittest.TestCase):
     def test_indirect_jump(self):
         r=self.f('ffe0');self.assertFalse(r['complete']);self.assertEqual(r['boundaries'][0]['kind'],'INDIRECT_BRANCH')
     def test_trap(self): self.assertFalse(self.f('0f0b')['complete'])
+    def test_ungrouped_undefined_traps_have_no_fallthrough(self):
+        for code in ('0fff c3', '0fb9 c3'):
+            with self.subTest(code=code):
+                r=self.f(code)
+                self.assertFalse(r['complete'])
+                self.assertEqual(r['reachable_instructions'],1)
+                self.assertEqual(r['cfg'],{'0x1000':[]})
+                self.assertEqual(r['boundaries'],[dict(kind='UNMODELED_CONTROL',site='0x1000')])
     def test_syscall(self): self.assertFalse(self.f('0f05')['complete'])
     def test_far_return(self): self.assertFalse(self.f('cb')['complete'])
     def test_transaction(self): self.assertFalse(self.f('c7f800000000')['complete'])

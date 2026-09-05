@@ -1,8 +1,8 @@
 ---
 task_id: OTC-20260905-be4f48-qt-activate-frontier
-status: blocked
+status: implementing
 agent: Codex
-session_id: login-closure-20260905-113552-ae070f034ee4
+session_id: login-closure-20260905-143731-ae070f034ee4
 session_role: researcher
 project_lane: otclient
 lane: P2-NETWORK
@@ -13,8 +13,8 @@ branch: ai/OTC-20260905-be4f48-qt-activate-frontier
 base_branch: main
 base_main: a0346f3ac4704bc5f41b75653d7eaca6c5d8655d
 created: 2026-09-05T13:39:46Z
-updated_at: 2026-09-05T14:32:00Z
-invocation_started_at: 2026-09-05T11:35:52Z
+updated_at: 2026-09-05T14:41:00Z
+invocation_started_at: 2026-09-05T14:37:31Z
 last_progress_at: 2026-09-05T13:44:01Z
 policy_version: 2
 prompting_standard_version: 2.1
@@ -54,10 +54,10 @@ context_score: 8
 estimate_confidence: medium
 decomposition_decision: single
 decomposition_reason: one symbol-local first-transfer control graph
-max_additional_tasks_after_terminal_entry_task: 4
+max_additional_tasks_after_terminal_entry_task: 1
 additional_task_budget_reason: explicit ordered multi-task owner login-closure programme, fresh invocation prospective 240-minute declaration under owner ordered programme request
-additional_source_task_ordinal: 4
-foreground_runtime_budget_minutes: 240
+additional_source_task_ordinal: 0
+foreground_runtime_budget_minutes: 120
 foreground_budget_reason: explicit sequential source qualification and clean promotion/archive programme
 ci_checks_for_current_head: 1
 ci_check_generation: scientific_2e29d0fe
@@ -67,7 +67,7 @@ unchanged_state_checks: 0
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 0
-stall_warnings: 1
+stall_warnings: 0
 owned_paths:
   - tools/tibia_re_be4f48_qt_frontier/**
   - .github/workflows/tibia-re-be4f48-qt-frontier.yml
@@ -113,3 +113,29 @@ Checkpoint commit intentionally uses GitHub's skip-CI marker to avoid re-running
 No implementation changes after the interrupted review. Runtime/clientexecution/login/credentials/memory/capture/OCR/serviceE2E/TrackBmutation remainzero. Source947consumed948 andarchived949; latest registeredclass950. TrackB284 unchanged at62383aded3acbeb5f405a12fe1f93849cd8e35f9; Field6,writercontract,pre-successordering remainUNKNOWN andwire deltaNOT_PROVEN. Sources939/919remainblocked. No programme terminal condition has been proven.
 
 Recent lifecycle ledger: registration946 merge67e6030ac3a94d3e5241749c2f8332353b3a46df; source947 finalaaedca05eefe9aab4adae53c3529e6e28ec0b2a2 closedunmergedconsumed948; promotion948 mergeb1dbd23b123c63c6cc43876113b6634bdbeb3a53; archive949 merge30dea42ada0ef0a3904096a0b090e67f3fe2b910; registration950 mergea0346f3ac4704bc5f41b75653d7eaca6c5d8655d; source951 remainsopenDraft with unresolvedS951-01. Earlier invocation ledger is preserved in promotions936/940/944 andarchives937/941/945.
+
+## Recovery checkpoint — new owner invocation after terminal ROTATE
+
+The prior owner invocation ended with its explicit ROTATE final response; a status answer followed, then the owner explicitly requested autonomous work again. This is a new foreground invocation starting14:37:31Z, not a silent reset during CI waiting. Entry task951 is unchanged. Prior invocation4/4 additional tasks,stall1 and disqualified scientifichead remain historical facts. Current budget120minutes justified by trap-family repair, exact-client qualification, independent review and cleanpromotion/archive; at most1 additional task after entrycloseout. Existing repair/retry history remains0/0; no active wait/deadline to reset.
+
+recovery:
+  policy_version: 1
+  generation: 2
+  session_id: login-closure-20260905-143731-ae070f034ee4
+  session_started_at: 2026-09-05T14:37:31Z
+  checkpointed_at: 2026-09-05T14:41:00Z
+  phase: S951-01 regression repair
+  exact_head: d0c6444e19b539d793594c50cae537ca170fae01
+  pull_request: 951
+  active_operation: none
+  external_run_ids: []
+  operation_started_at: null
+  wait_deadline_at: null
+  check_generation: repair_RED
+  checks_used: 0
+  status: active
+  safe_to_resume: true
+  resume_condition: same exact source ownership and bounded authority
+  next_action: implement minimal UD0/UD1 rejection after observed two regression failures
+
+Freshmain a0346f3ac4704bc5f41b75653d7eaca6c5d8655d/sourcehead d0c6444e19b539d793594c50cae537ca170fae01 match durable checkpoint. No overlapping open source writer; TrackB284 still62383aded3acbeb5f405a12fe1f93849cd8e35f9. Fullnoneadmission retained. Repository-only RED now reproduces two assertion failures at complete=true for UD0/UD1, using real Capstone and analyzer. No official client acquisition or runtime used by this resume checkpoint.

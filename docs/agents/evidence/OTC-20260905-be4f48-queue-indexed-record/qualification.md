@@ -1,0 +1,33 @@
+# Exact-current indexed import record qualification
+
+## FACT
+
+Registered942 on main eee302d67fc24437922ed96d811c9b9ad3bc7510. Repaired scientific b04dc170c9472f387513c41a9c34b2ceca391715 qualifies primary15.32.be4f48/52105824/SHA256552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1 and packagedQtCore7354472/SHA25603ac3e4e7356399897ec58d42c81ae5c257072d45d539de1def528a8a04911fa.
+
+Promoted CALL0xdd8e10->0x4d7dc0 and first .plt JMP/GOTslot0x31756c8 requalified. Contiguousselectedstub contains literalPUSH1241 at0x4d7dc6 and directtailJMP0x4d7dcb->0x4d3020; tailtarget nottraversed and unresolvedpath execution notproven. DynamicDT_JMPREL=0x4c8f78,DT_PLTRELSZ=0x9330,DT_PLTREL=7,DT_SYMTAB=0x5b0,DT_SYMENT=0x18,DT_STRTAB=0xca90 agree with selectedlinkedmetadata.
+
+Exactlyone indexedRELArecord1241 of1570,24bytesperrow,address0x4d03d0,has r_offset0x31756c8,R_X86_64_JUMP_SLOT,addend0. Selectedsymbolindex1621 is undefinedGLOBAL function with boundedASCII name _ZN11QMetaObject8activateEP7QObjectPKS_iPPv. One24byteheader and one boundedsection-localname read; no eagerget_symbol or unrelatedname/relocationiteration. terminal_result=POSITIVE_EXACT_INDEXED_IMPORT_RECORD. FIRST_MISSING_BOUNDARY=INDEXED_IMPORT_RECORD_IMPLEMENTATION_USE_NOT_PROVEN.
+
+This is staticrecord correspondence only: globalrelocationuniqueness=false,runtime_resolution_proven=false. It does not resolve source939's retired65536row uniqueness frontier. Source939/919remainseparatelyblocked.
+
+## TDD and falsification
+
+RED711aa5717414815d21e5fbeb2bb8a00452302f02:27assertionfailures beforeminimalGREEN. Initial36tests include9reusedpackageguards. Beforequalification, correctedsection-interfacefixture produced regressionRED fordict(Section), then explicitfieldcomparisonGREEN37tests; initialproxy forwardedkeys and firstpassed, disclosedintask.
+
+S943-01 independentlyfound eagerget_symbol name lookup could read beyonddeclared.dynstr. Scientific860bdce2afda7bc1c019f5121843874204054428 is disqualified despitegreenqualification33966150461/job101306536201; nofactsconsumed. RegressionRED919b9d1edcfb118b5d6b299a10eab95d5b95ddcd3failures; GREENdirectsymbolheader, validatedst_name,<=min(513,remainingsection)read, mandatoryNUL<=512ASCIIcharacters. Repaired40testsPASS; independentfinding-familychecks rejectout-of-section/missingtermination/nonASCII/513charname,accept512. Full9filediffreviewPASS0materialfindings.
+
+## Exact qualification
+
+Repairedfocused33966421798/job101307244701 SUCCESS;CI33966421872/governance33966421781/boundary33966421780 SUCCESS.40tests,exactcheckout/fences,rawremoval and fullacquisitionstate removalbefore sanitizedartifact verified independently. Artifact9969567618SHA25666142817d48526ad1ce7bc832ddb4873fc590cfe286f15f789db883f91178343. OriginalsanitizedJSON inresult.json. Finaldocumentationhead requires freshqualification/checks/resultcomparison beforeconsumption. Repaircycle1,retries0.
+
+## INFERENCE
+
+None promoted. Literalcandidateindex and matchingrecord do not prove lazy-resolutionexecution,globalrelocationuniqueness,actualprovider/interposition,activationargumentsemantics,signal delivery orlogicalvectoridentity. Mangledname is a link-time recordfact only.
+
+## UNKNOWN
+
+Indexedrecordimplementation/use,globalrelocationuniqueness,runtimeimportresolution,activation/signalindex/logicalarguments,sendLoginreceiver andcompletecausalbinding,registeredreceiver/delivery,finalqueue/TCPwriter/contract,Field6 andpre-successordering remainUNKNOWN. TRACK_B_CURRENT_WIRE_DELTA=NOT_PROVEN. TrackB284 exact62383aded3acbeb5f405a12fe1f93849cd8e35f9 unchangedblocked.
+
+## Lifecycle and safety
+
+SourceDraftunmerged; clean docs-onlypromotion fromfreshmain after independentfinalreview, protectedexpected-headsquash,sourceclosedunmergedconsumed,separatearchiveownershiprelease,thenone newproofclass. No sourceanalyzer/workflowpromotion. Existing939/919incompleteobligations notcompleted. runtime_access=none;clientexecution/login/credentials/memory/capture/OCR/serviceE2E/TrackBmutationszero. E2ENOT_APPLICABLE staticcontractproducer. Rawofficialbytes onlytransient,neverartifact. Invocation11:35:52Z/240minutes/4additional,thisadditional2; repaircycle1/retries0 preserved.

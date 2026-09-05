@@ -7,7 +7,8 @@ class MetadataTests(unittest.TestCase):
     def test_analyzer_never_constructs_eager_sections(self):
         class Elf:
             elfclass=64; little_endian=True
-            def __getitem__(self,k): return 'EM_X86_64'
+            stream_len=4096
+            def __getitem__(self,k): return {'e_machine':'EM_X86_64','e_shentsize':64,'e_shoff':2048}[k]
             def num_sections(self): return 0
             def iter_sections(self): raise AssertionError('eager GNU hash arrays')
         class Path:
@@ -17,6 +18,8 @@ class MetadataTests(unittest.TestCase):
             self.assertEqual(analyze.analyze({'version':'fixture','qtcore':{}},Path(),Path())['terminal_result'],'POSITIVE_EXACT_PACKAGED_DYNAMIC_DEFINITION')
     def test_metadata_never_constructs_section_objects(self):
         class Elf:
+            stream_len=4096
+            def __getitem__(self,k): return {'e_shentsize':64,'e_shoff':2048}[k]
             def num_sections(self): return 1
             def _get_section_header(self,i):
                 return dict(sh_type='SHT_GNU_HASH',sh_addr=256,sh_offset=256,

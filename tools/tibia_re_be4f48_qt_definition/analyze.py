@@ -8,6 +8,22 @@ from fence import verify_fence, EXPECTED_VERSION, EXPECTED_SIZE, EXPECTED_SHA256
 from package import select_package, qualify_dependency_fence, verify_member
 
 
+def section_metadata(elf):
+    count=elf.num_sections()
+    if elf['e_shentsize']!=64 or not 0<=elf['e_shoff']<=elf['e_shoff']+count*64<=elf.stream_len:
+        raise ValueError('ELF_SECTION_HEADER_TABLE_BOUNDS')
+    sections=[]
+    for i in range(count):
+        # iter_sections/get_section instantiate GNUHashSection and eagerly read
+        # all bloom words and buckets. Only the fixed-width header is allowed.
+        s=elf._get_section_header(i)
+        if s is None: raise ValueError('ELF_SECTION_HEADER_MISSING')
+        sections.append(dict(index=i, type=s['sh_type'], addr=int(s['sh_addr']),
+                             off=int(s['sh_offset']), size=int(s['sh_size']), flags=int(s['sh_flags']),
+                             entsize=int(s['sh_entsize']), link=int(s['sh_link'])))
+    return sections
+
+
 def analyze(selected, client, core):
     raw = client.read_bytes()
     verify_fence(raw, selected['version'])
@@ -18,10 +34,7 @@ def analyze(selected, client, core):
         elf = ELFFile(handle)
         if elf.elfclass != 64 or not elf.little_endian or elf['e_machine'] != 'EM_X86_64':
             raise ValueError('QTCORE_ELF_IDENTITY_CHANGED')
-        sections = [dict(index=i, type=s['sh_type'], addr=int(s['sh_addr']),
-                         off=int(s['sh_offset']), size=int(s['sh_size']), flags=int(s['sh_flags']),
-                         entsize=int(s['sh_entsize']), link=int(s['sh_link']))
-                    for i,s in enumerate(elf.iter_sections())]
+        sections = section_metadata(elf)
         try:
             facts['packaged_definition'] = lookup(core.read_bytes(), sections)
             terminal, missing = 'POSITIVE_EXACT_PACKAGED_DYNAMIC_DEFINITION', 'PACKAGED_DEFINITION_BODY_USE_NOT_PROVEN'

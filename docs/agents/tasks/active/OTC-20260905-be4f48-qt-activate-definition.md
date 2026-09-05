@@ -65,7 +65,7 @@ terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 1
+repair_cycles_for_current_gate: 2
 context_reconstruction_attempts: 0
 stall_warnings: 0
 owned_paths:
@@ -105,3 +105,9 @@ RED 1c8103a3686f5d714fd614622e49683c851b80b4: 30 tests errored at the explicit u
 ## S947-01 mapping ambiguity repair
 
 Scientific e77b565b109feb0e42b32812f4b04d502cc33a74 disqualified regardless of workflow outcome. Independent review reproduced partial allocated section overlaps being ignored by full-containment-only owner counting. Regression RED 36451a1f947114fe8d91edd4c87dc5f9a3d4d6b1: four failing tests for overlap inside/start/end of function extent and selected metadata overlap. GREEN checks every allocated section intersection before selected metadata reads and definition acceptance; sole owner must contain full extent and match section identity/flags/file bounds.45 tests PASS. Repaircycle1,retries0. Fresh scientific qualification and independent repair-family review required. No claims consumed from disqualified head.
+
+## S947-02 eager library construction repair
+
+Root independently inspected pyelftools0.32 constructors: ELFFile.iter_sections -> GNUHashSection -> GNUHashTable parses arrays of all bloom words and buckets. Scientific dae0651276fdb31a44ea5e9edd2d7e14e640a72f therefore disqualified even though bounded lookup itself passed S947-01 review. Reviewer independently confirmed this missed issue. No facts consumed.
+
+Regression RED c085856330293f22a16d6e8a9cffba78abbc138f: two failures including analyzer entry calling forbidden iter_sections. GREEN uses only fixed-width _get_section_header metadata after section-table width/count/file bounds, never constructs section objects or reads names.47 tests PASS. Fresh qualification and independent real-library guarded-fixture review required. Repaircycle2,retries0; no further unbounded header helpers.

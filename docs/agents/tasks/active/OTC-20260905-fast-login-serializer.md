@@ -11,6 +11,10 @@ task_kind: implementation
 phase: design
 branch: ai/OTC-20260905-fast-login-serializer
 base_branch: main
+created: 2026-09-05T15:33:15Z
+updated_at: 2026-09-05T15:35:00Z
+invocation_started_at: 2026-09-05T15:20:00Z
+last_progress_at: 2026-09-05T15:33:15Z
 base_main: bca9df65c4cf42f02216402dc12ade84548c5858
 policy_version: 2
 prompting_standard_version: 2.1
@@ -86,6 +90,8 @@ next_action: independently validate and merge this docs-only registration, then 
 Owner FAST TRACK invocation authorizes at most three new high-value static source tasks,
 sequentially, with clean promotion and separate archive between tasks. Stop early on an
 implementable promoted wire delta. No fourth source. Runtime remains separately forbidden.
+
+Invocation start is conservatively budgeted from15:20Z, before the first recorded registration; this is a budget lower bound, not a claimed exact session timestamp.
 
 ## Live evidence basis
 

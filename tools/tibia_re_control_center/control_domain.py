@@ -38,9 +38,9 @@ from .model import (
 )
 from .native_login_lifecycle import NativeLoginLifecycle, NativeLoginLifecycleError
 from .persistent_store import (
+    _ensure_persistable,
     RequestLedgerRecord,
     SQLitePersistentStore,
-    _ensure_persistable,
 )
 from .recorder import Recorder, ensure_no_secret_material
 from .scenario import ACTION_KINDS, ValidatedScenario, validate_scenario

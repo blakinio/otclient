@@ -61,6 +61,13 @@ class Contract(unittest.TestCase):
         result=first_transfers(bytes.fromhex('90e80a000000c3'),0x1000,0x1000)
         self.assertEqual(result.get('cfg'),{'0x1000':['0x1001'],'0x1001':[]})
 
+    def test_last_eight_byte_plt_entry_is_admissible(self):
+        import continuation
+        f=getattr(continuation,'plt_extent',None); self.require(f)
+        self.assertEqual(f([('.plt.got',0x1000,0x1010)],0x1008),8)
+        self.assertIsNone(f([('.text',0x1000,0x1010)],0x1008))
+        self.assertIsNone(f([('.plt',0x1000,0x1010)]*2,0x1008))
+
     def test_plt_only_actual_first_jump(self):
         self.require(plt_binding)
         self.assertEqual(plt_binding(bytes.fromhex('ff250a000000'),0x1000,{0x1010:'synthetic_import'}),'synthetic_import')

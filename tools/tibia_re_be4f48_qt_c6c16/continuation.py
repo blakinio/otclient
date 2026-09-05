@@ -75,6 +75,11 @@ def first_transfers(raw,base,entry):
             'boundaries':sorted(unique.values(),key=lambda r:(int(r['site'],16),r['kind'],r.get('target','')))}
 
 
+def plt_extent(sections,target):
+    rows=[(lo,hi) for name,lo,hi in sections if name in ('.plt','.plt.sec','.plt.got') and lo<=target<hi]
+    return min(16,rows[0][1]-target) if len(rows)==1 else None
+
+
 def plt_binding(raw,base,relocations):
     rows=list(decoder().disasm(raw,base,count=2))
     if rows and rows[0].mnemonic=='endbr64': rows=rows[1:]

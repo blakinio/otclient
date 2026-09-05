@@ -5,7 +5,7 @@ from pathlib import Path
 from package import (select_package, verify_member, qualify_dependency_fence,
                      qualify_core_identity, unique_definition, SYMBOL)
 from static_flow import Image, verify_fence, EXPECTED_VERSION, EXPECTED_SIZE, EXPECTED_SHA256
-from continuation import qualify_branch, bounded_region, first_transfers, plt_binding
+from continuation import qualify_branch, bounded_region, first_transfers, plt_binding, plt_extent
 
 
 def analyze(selected,client,core):
@@ -36,8 +36,8 @@ def analyze(selected,client,core):
         for edge in flow['boundaries']:
             if edge['kind']!='CALL': continue
             target=int(edge['target'],16)
-            section=next((s for s in img.elf.iter_sections() if s.name in ('.plt','.plt.sec','.plt.got') and int(s['sh_addr'])<=target and target+16<=int(s['sh_addr'])+int(s['sh_size'])),None)
-            edge['static_import_symbol']=plt_binding(img.read(target,16),target,img.symbol_relocations) if section else None
+            extent=plt_extent([(s.name,int(s['sh_addr']),int(s['sh_addr'])+int(s['sh_size'])) for s in img.elf.iter_sections()],target)
+            edge['static_import_symbol']=plt_binding(img.read(target,extent),target,img.symbol_relocations) if extent else None
             edge['callee_implementation_semantics']='UNKNOWN'
         return {
             'schema':'otclient.track-a.be4f48-qt-c6c16.v1',

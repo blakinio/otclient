@@ -4,6 +4,17 @@ import importlib.util
 import unittest
 
 
+class _SyntheticExecutor:
+    def status(self) -> dict[str, object]:
+        return {
+            "state": "READY",
+            "bound": True,
+            "current": True,
+            "physical_effect": False,
+            "reason": "NATIVE_LOGIN_RUNTIME_READY",
+        }
+
+
 class NativeLoginLifecycleTests(unittest.TestCase):
     def test_01_native_login_lifecycle_module_exists(self) -> None:
         spec = importlib.util.find_spec(
@@ -42,6 +53,21 @@ class NativeLoginLifecycleTests(unittest.TestCase):
         )
         self.assertFalse(caught.exception.physical_effect)
         self.assertFalse(lifecycle.status()["physical_effect"])
+
+    def test_04_bound_lifecycle_projects_executor_status(self) -> None:
+        from tools.tibia_re_control_center.native_login_lifecycle import NativeLoginLifecycle
+
+        lifecycle = NativeLoginLifecycle(executor=_SyntheticExecutor())
+        self.assertEqual(
+            lifecycle.status(),
+            {
+                "state": "READY",
+                "bound": True,
+                "current": True,
+                "physical_effect": False,
+                "reason": "NATIVE_LOGIN_RUNTIME_READY",
+            },
+        )
 
 
 if __name__ == "__main__":

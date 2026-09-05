@@ -2,6 +2,7 @@ local ClientAssetsReleaseSelector = {}
 
 local ARCHIVE_EXTENSIONS = { '.zip', '.rar' }
 local DEFAULT_REPOSITORY = 'dudantas/tibia-client'
+local SHA256_HEX_LENGTH = 64
 
 local function endsWith(value, suffix)
     return type(value) == 'string' and suffix ~= '' and value:sub(-#suffix) == suffix
@@ -11,6 +12,29 @@ local function normalizedUrlRoot(url)
     url = tostring(url or ''):lower()
     url = url:gsub('[?#].*$', '')
     return url:gsub('/+$', '')
+end
+
+function ClientAssetsReleaseSelector.normalizeSha256Digest(value)
+    value = tostring(value or ''):match('^%s*(.-)%s*$'):lower()
+    local algorithm, digest = value:match('^([%w_-]+):(.+)$')
+    if algorithm then
+        if algorithm ~= 'sha256' then
+            return nil
+        end
+        value = digest
+    end
+
+    if #value ~= SHA256_HEX_LENGTH or not value:match('^%x+$') then
+        return nil
+    end
+    return value
+end
+
+function ClientAssetsReleaseSelector.assetSha256(asset)
+    if type(asset) ~= 'table' then
+        return nil
+    end
+    return ClientAssetsReleaseSelector.normalizeSha256Digest(asset.digest or asset.sha256)
 end
 
 function ClientAssetsReleaseSelector.isArchivePath(path)

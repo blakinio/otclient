@@ -97,3 +97,7 @@ Spec: docs/agents/prompts/OTC_BE4F48_QT_ACTIVATE_GNUHASH_DEFINITION.md. Exact pr
 Full none admission above. Official client execution, login, credentials, memory, capture, OCR, service E2E and TrackB mutations remain zero. E2E NOT_APPLICABLE: static contract producer. Raw acquisition/helper material transient and removed before sanitized artifact and on failure. No external model services. Source PR remains Draft and never merges.
 
 Invocation11:35:52Z,240minutes,4additional; this additional3. No reset. Ordinary CI2/head,one identical transient retry,three repairs,15min no-progress. Registration merge is latest measurable progress. Fields6/order/writers/wire delta remain UNKNOWN/NOT_PROVEN.
+
+## Repository-only RED/GREEN
+
+RED 1c8103a3686f5d714fd614622e49683c851b80b4: 30 tests errored at the explicit unimplemented lookup before implementation. Minimal GREEN39 tests including9 package guards. Root prequalification falsification added two controls for complete selected-section file bounds and hash-chain-area width; RED2 failures, GREEN41 tests. No scientific head or client qualification existed during these repairs. Direct fixed-width metadata and bounded selected-name reads only, no eager symbol/string lookup. Independent whole-diff review and exact qualification pending; no result claimed.

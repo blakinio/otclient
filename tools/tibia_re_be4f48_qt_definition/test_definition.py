@@ -56,6 +56,8 @@ class DefinitionTests(unittest.TestCase):
     def test_wrong_dynamic_pointer(self): self.rejects(lambda d,s:struct.pack_into('<Q',d,136,0x10101),'SECTION_MAPPING')
     def test_wrong_syment(self): self.rejects(lambda d,s:struct.pack_into('<Q',d,168,16),'DYNAMIC_TAGS')
     def test_wrong_link(self): self.rejects(lambda d,s:s[3].update(link=2),'SECTION_LINK')
+    def test_selected_table_file_bounds(self): self.rejects(lambda d,s:s[4].update(size=5000),'SECTION_FILE_BOUNDS')
+    def test_hash_chain_width(self): self.rejects(lambda d,s:s[2].update(size=63),'HASH_HEADER')
     def test_chain_cap(self):
         d,s=fixture();struct.pack_into('<I',d,284,H)
         with self.assertRaisesRegex(ValueError,'HASH_CHAIN_LIMIT'):lookup(d,s,chain_limit=1)

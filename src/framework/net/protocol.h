@@ -82,6 +82,8 @@ protected:
     virtual void onError(const std::error_code& err);
     virtual void onSend() {};
 
+    bool isXteaEncryptionEnabled() const { return m_xteaEncryptionEnabled; }
+
     void onProxyPacket(const std::shared_ptr<std::vector<uint8_t>>& packet);
     void onPlayerPacket(const std::shared_ptr<std::vector<uint8_t>>& packet);
     void onLocalDisconnected(std::error_code ec);

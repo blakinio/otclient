@@ -4,6 +4,7 @@ This registry maps owner-facing programme aliases to repository-owned prompts or
 
 | Alias | Canonical entry point | Purpose |
 |---|---|---|
+| `OTC-BE4F48-QT-1CD26E-CALL-INPUTS` | `docs/agents/prompts/OTC_BE4F48_QT_1CD26E_CALL_INPUTS.md` | One exact Qt callsite: bounded receiver input projection; source-only. |
 | `OTCLIENT-TIBIA-RE` | `docs/agents/prompts/OTCLIENT_TIBIA_RE_CANONICAL.md` | Continue Track A: official Linux Tibia client reverse engineering in `blakinio/otclient`. |
 | `OTCLIENT-GLOBAL-LOGIN` | PR `#284`, branch `feat/OTC-20260813-tibia-global-login-lab`, task `docs/agents/tasks/active/OTC-20260813-tibia-global-login-lab.md` on that branch | Continue Track B: make this OTClient fork authenticate to and enter official Tibia Global. |
 | `OTCLIENT-TIBIA-GLOBAL-LOGIN-FINAL-CONTINUE` | `docs/agents/prompts/OTCLIENT_TIBIA_GLOBAL_LOGIN_FINAL_CONTINUE.md` | Single-window Track B coordinator with local Vision/Qwen post-processing when independently legal secret-safe keyframes exist. |

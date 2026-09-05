@@ -14,7 +14,12 @@ class NativeLoginLifecycleError(RuntimeError):
 class NativeLoginLifecycle:
     """Authority-free default lifecycle until trusted runtime composition binds it."""
 
+    def __init__(self, *, executor: object | None = None) -> None:
+        self._executor = executor
+
     def status(self) -> dict[str, object]:
+        if self._executor is not None:
+            return dict(self._executor.status())
         return {
             "state": "UNBOUND",
             "bound": False,

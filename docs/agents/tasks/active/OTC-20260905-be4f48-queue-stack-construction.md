@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260905-be4f48-queue-stack-construction
-status: implementing
+status: validating
 agent: Codex
 session_id: login-closure-20260905-095156-ae070f034ee4
 session_role: researcher
@@ -8,14 +8,14 @@ project_lane: otclient
 lane: P2-NETWORK
 track_id: official-client-re
 task_kind: implementation
-phase: implement
+phase: validate
 branch: ai/OTC-20260905-be4f48-queue-stack-construction
 base_branch: main
 base_main: 1f8501614e6a3efa275451f2f9c8c1a6dd86d09b
 created: 2026-09-05T10:41:00Z
-updated_at: 2026-09-05T10:41:00Z
+updated_at: 2026-09-05T10:46:22Z
 invocation_started_at: 2026-09-05T09:51:56Z
-last_progress_at: 2026-09-05T10:41:00Z
+last_progress_at: 2026-09-05T10:46:22Z
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: codex
@@ -83,7 +83,7 @@ blocks:
   - clean coordinator consumption of this exact source result
 cross_repository_task_ids: []
 ownership_released: false
-next_action: repository-only RED then minimal stack construction proof and exact qualification
+next_action: exact-client qualification and independent full-diff review
 ---
 
 # Independent construction proof claim
@@ -95,3 +95,7 @@ Questionis liveprivate-stack full8bytecellconstruction and rawargumentregisterpo
 Primary15.32.be4f48/52105824/552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1; packagedQtCore7354472/03ac3e4e7356399897ec58d42c81ae5c257072d45d539de1def528a8a04911fa. Freshqualificationmandatory; raw/helperstate removedbefore sanitizedartifact,alwayscleanupfailure.
 
 TDDRED/GREEN,exactqualification,materialfindingfamilyregressions,independentwhole-diff/result0materialfindings,exactfocused/CI/governance/boundary. SourceDraftunmerged; cleanpromotion then separatearchive. Invocation09:51:56Z/240minutes/4additional; thisadditional2. OrdinaryCI<=2/head,1identicaltransientretry,3repaircycles,15minnoprogress; nohiddenreset. Fullnoneadmissionabove. Runtime/clientexecution/login/credentials/memory/capture/OCR/serviceE2E/TrackBmutationszero; E2ENOT_APPLICABLE staticproducer. No externalmodelcalls.
+
+## Repository-only RED and minimal GREEN
+
+RED8853b691b53d7c9973a970af9325fae248146cbb:21explicitunimplementedconstruction/tailtest errors observed beforeimplementation. GREEN30testsPASS including9reusedpackageguards. Cases cover liveframe/cells/entryargs/constantzero/pointerrelativeoffsets, overlap/partialstore/unknownalias/deallocation/callerframe/segmented/truncatedaddresses, copiedpointer, sourcepartialwidth, cap/controlstops. Minimalnewconstructionmodel replacesactivation/importcriterion entirely; no callee/importread. Strictpackage/Image reused. git diff --check PASS. Localtests containonlysyntheticbytes; exactqualification and independentreview remainrequired.

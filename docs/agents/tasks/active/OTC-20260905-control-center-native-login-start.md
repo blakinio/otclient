@@ -12,7 +12,7 @@ phase: implementation
 branch: feat/OTC-20260905-control-center-native-login-start
 base_branch: main
 created: 2026-09-05T17:54:29Z
-updated_at: 2026-09-05T21:35:00Z
+updated_at: 2026-09-05T21:41:00Z
 base_main: b6cf7402b4dbde59b2086f0982c7dcc711c3b5fc
 policy_version: 2
 prompting_standard_version: 2.1
@@ -53,6 +53,7 @@ owned_paths:
   - tools/tibia_re_control_center/control_ui.py
   - tools/tibia_re_control_center/persistent_store.py
   - tools/tibia_runtime_bridge/current_sha_native_login_gate.py
+  - tools/tibia_runtime_bridge/native_login_rebind_core.py
   - tools/tibia_runtime_bridge/rebind_native_login_current.py
   - tools/tibia_runtime_bridge/experimental_auth.cpp
   - tools/tibia_runtime_bridge/experimental_character_control_current.cpp
@@ -75,7 +76,7 @@ reuses:
 depends_on: []
 blocks: []
 cross_repository_task_ids: []
-next_action: run hosted exact be4f48 native-login semantic rebind, then bind helper constants and lifecycle executor
+next_action: prove exact be4f48 QMeta/RTTI rebind on hosted runner, then bind helper constants and lifecycle executor
 ---
 
 # OTC-20260905 — Control Center native login START
@@ -151,10 +152,11 @@ portal_api: GREEN
 portal_ui: GREEN
 stop_dominance: GREEN
 durable_single_session: GREEN
-package_b_regression: 598/598_GREEN
-package_b_mandatory: 39/39_GREEN
-browser_cli_e2e: GREEN
-falsification: GREEN
-known_ci_issue: Ruff_I001_import_order_only
-next_action: hosted exact be4f48 native-login semantic rebind, then exact helper/runtime composition
+package_b_regression: prior_598_of_598_GREEN_plus_new_recovery_race_regressions_pending_exact_head
+package_b_mandatory: prior_39_of_39_GREEN
+browser_cli_e2e: prior_GREEN
+falsification: prior_GREEN
+ruff_import_order: corrected_on_branch_pending_exact_head
+be4f48_rebind: structural_qmeta_discriminator_running
+next_action: exact be4f48 hosted rebind, then exact helper/runtime composition
 ```

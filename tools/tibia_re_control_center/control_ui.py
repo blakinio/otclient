@@ -33,7 +33,7 @@ section[data-tab]{display:none}section[data-tab].active{display:block}.toolbar{d
 <nav id="tabs">__TAB_BUTTONS__</nav>
 <main>
 <section data-tab="Main" class="active">
-<p class="warn">Package B is FAKE_TEST-only. Official Tibia access: <strong>NONE</strong>. Official mutation authority: <strong>UNSUPPORTED</strong>.</p>
+<p class="warn">Package B is FAKE_TEST-only. Official Tibia access: <strong>NONE</strong>. Official mutation authority: <strong>UNSUPPORTED</strong>. Native login is a separate trusted lifecycle and remains fail-closed until explicitly bound to current admitted runtime authority.</p>
 <div class="grid">
 <div class="card"><h3>Runtime</h3><div id="runtime" class="state">UNKNOWN</div></div>
 <div class="card"><h3>Authority</h3><div id="authority" class="state">UNKNOWN</div></div>
@@ -41,8 +41,9 @@ section[data-tab]{display:none}section[data-tab].active{display:block}.toolbar{d
 <div class="card"><h3>Evidence</h3><div id="evidence" class="state">NOT_PROVEN</div></div>
 <div class="card"><h3>Freshness</h3><div id="freshness" class="state">UNKNOWN</div></div>
 <div class="card"><h3>Session</h3><div id="session" class="state">UNKNOWN</div></div>
+<div class="card"><h3>Native login lifecycle</h3><div id="nativeLoginStatus" class="state">UNBOUND</div></div>
 </div>
-<div class="toolbar"><button id="refresh">Refresh read views</button><button id="runExperiment">Run fake one-step experiment</button></div>
+<div class="toolbar"><button id="refresh">Refresh read views</button><button id="nativeLoginStart">START OFFICIAL CLIENT</button><button id="runExperiment">Run fake one-step experiment</button></div>
 <pre id="lastResult">No mutating request has been sent.</pre>
 </section>
 <section data-tab="Agent">
@@ -92,11 +93,12 @@ async function api(path,{method='GET',body=null,requestIdValue=null}={}){
 function showError(error){document.getElementById('lastResult').textContent=json(error.payload||{code:'CONTROL_UI_ERROR',safe_message:'request failed'});}
 async function refresh(){
   try{
-    const [status,caps]=await Promise.all([api('/v1/status'),api('/v1/capabilities')]);
+    const [status,caps,nativeLogin]=await Promise.all([api('/v1/status'),api('/v1/capabilities'),api('/v1/native-login/status')]);
     document.getElementById('backendEpoch').textContent=`backend: ${status.backend.epoch}`;
     for(const key of ['runtime','authority','capability','evidence','freshness','session'])document.getElementById(key).textContent=json(status[key]);
     document.getElementById('statusJson').textContent=json(status);
     document.getElementById('capability').textContent=json({summary:status.capability,items:caps.items});
+    document.getElementById('nativeLoginStatus').textContent=json(nativeLogin);
   }catch(error){showError(error)}
 }
 async function scenarios(){try{const value=await api('/v1/scenarios');document.getElementById('scenariosJson').textContent=json(value);return value}catch(error){showError(error)}}
@@ -136,6 +138,7 @@ async function agentControl(command){
 }
 document.getElementById('tabs').addEventListener('click',(event)=>{if(event.target.tagName!=='BUTTON')return;const name=event.target.dataset.tab;document.querySelectorAll('section[data-tab]').forEach((section)=>section.classList.toggle('active',section.dataset.tab===name));});
 document.getElementById('refresh').onclick=refresh;document.getElementById('refreshScenarios').onclick=scenarios;document.getElementById('refreshRuns').onclick=runs;document.getElementById('refreshEvents').onclick=events;
+document.getElementById('nativeLoginStart').onclick=async()=>{try{const value=await api('/v1/native-login/start',{method:'POST',body:{},requestIdValue:requestId('ui-native-login')});document.getElementById('lastResult').textContent=json(value);await refresh()}catch(error){showError(error)}};
 document.getElementById('stopAll').onclick=async()=>{try{document.getElementById('lastResult').textContent=json(await api('/v1/stop-all',{method:'POST',body:{},requestIdValue:requestId('ui-stop')}));await refresh()}catch(error){showError(error)}};
 document.getElementById('resetStop').onclick=async()=>{try{document.getElementById('lastResult').textContent=json(await api('/v1/reset-stop',{method:'POST',body:{},requestIdValue:requestId('ui-reset')}));await refresh()}catch(error){showError(error)}};
 document.getElementById('runExperiment').onclick=async()=>{try{const list=await scenarios();const scenario=list.items[0].scenario;const value=await api('/v1/experiments/one-step',{method:'POST',body:{scenario},requestIdValue:requestId('ui-exp')});document.getElementById('lastResult').textContent=json(value);await Promise.all([refresh(),runs(),events()])}catch(error){showError(error)}};

@@ -13,9 +13,9 @@ branch: ai/OTC-20260905-be4f48-queue-stack-construction
 base_branch: main
 base_main: 1f8501614e6a3efa275451f2f9c8c1a6dd86d09b
 created: 2026-09-05T10:41:00Z
-updated_at: 2026-09-05T10:51:24Z
+updated_at: 2026-09-05T10:59:39Z
 invocation_started_at: 2026-09-05T09:51:56Z
-last_progress_at: 2026-09-05T10:51:24Z
+last_progress_at: 2026-09-05T10:59:39Z
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: codex
@@ -83,7 +83,7 @@ blocks:
   - clean coordinator consumption of this exact source result
 cross_repository_task_ids: []
 ownership_released: false
-next_action: exact-client qualification and independent full-diff review
+next_action: final exact-head checks and independent evidence review before clean coordinator consumption
 ---
 
 # Independent construction proof claim
@@ -103,3 +103,9 @@ RED8853b691b53d7c9973a970af9325fae248146cbb:21explicitunimplementedconstruction/
 ## S935-01 scope repair
 
 Initialscientificd049b49ef73278751fc645523b32a63e814100ed is disqualified. Independentreview found reusedImage constructor traversed relocation/symbol imports despite the new task's explicit prohibition. RegressionREDc64b1ffd284a3ea12293a08242d40b71db6a62ea: syntheticforbiddenrelocation fixture raisedFORBIDDEN_IMPORT_METADATA_TRAVERSAL. GREEN removes relocation/symbol map initialization and unusedsymbol/PLT/qword/string lookup methods; disables DWARF relocationprocessing to avoid hiddenlinked-symbol resolution. Necessarysection/FDE and exacthash/size guards remain.31testsPASS,gitdiffcheckPASS. Repaircycle1; no proof consumed from disqualifiedhead. Constructionmodel unchanged; freshscope/family/full-diff review and exactqualification required.
+
+## Exact-current source qualification
+
+Scientific head e85fce0a9b370bde294e7347954374398e8497de: focused33961765839/job101294753595, CI33961765973, governance33961765904 and boundary33961765868 SUCCESS. Artifact9968160929 SHA256761058680cdcf7cd63cda906cd34920d010c373735885f9ef685bed2bdde9a36.31testsPASS; exactcheckout/fences/cleanup-before-upload verified independently,0materialfindings.
+
+Terminal source result POSITIVE_EXACT_STACK_CONSTRUCTION_ESCAPE. At first direct call dd8e10->4d7dc0, two known full8byte cells in allocated ENTRY_RSP[-24,0):[-24]=0,[-16]=symbolic entry rsi; rcx points to -24. These are not a fully initialized frame or a named object/parameter vector. Calleeidentity/use, activation, downstreamdelivery, writers, Field6 and order remainUNKNOWN; wire delta NOT_PROVEN. FIRST_MISSING_BOUNDARY=ESCAPED_STACK_REGION_CALLEE_USE_NOT_PROVEN. Final documentation head requires fresh exact-head gates/result comparison; source remainsDraftunmerged. Current scientifichead ordinaryCI observations1; evidencehead starts newgategeneration, retries0,repaircycle1 retained.

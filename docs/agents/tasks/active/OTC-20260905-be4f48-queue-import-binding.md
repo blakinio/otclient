@@ -12,10 +12,10 @@ phase: validate
 branch: ai/OTC-20260905-be4f48-queue-import-binding
 base_branch: main
 base_main: 54c8750da04d504025840b8a987cd9b3222ecf4a
-created: 2026-09-05T11:35:52Z
-updated_at: 2026-09-05T11:35:52Z
+created: 2026-09-05T11:47:00Z
+updated_at: 2026-09-05T11:52:51Z
 invocation_started_at: 2026-09-05T11:35:52Z
-last_progress_at: 2026-09-05T11:35:52Z
+last_progress_at: 2026-09-05T11:52:51Z
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: codex
@@ -97,3 +97,7 @@ Bounded design: binding.py decodes only the five-byte selected CALL and first st
 Exactfences and allsource boundaries are in registeredprompt; runtime_access=none and fullnoneadmission above. Clientexecution/login/credentials/memory/capture/OCR/serviceE2E/TrackBmutationzero. E2ENOT_APPLICABLE staticproducer. Rawofficialbytes/helperstate transientonly,deletedbefore sanitizedartifact/alwayscleanupfailure. No owner-funded externalmodelcalls. SourceDraftunmerged, clean docs-onlypromotion then sourcecloseunmerged and separatearchiveownershiprelease before successor.
 
 Freshinvocation11:35:52Z/240minutes/4additional, thisadditional1. OrdinaryCI<=2/head,oneidenticaltransientretry,3repaircycles,15minnoprogress retained. No resetting counters to repeat a failedhypothesis.
+
+## Repository-only RED and minimal GREEN
+
+RED822f1fdc31b769024f733215d80994dcd593d4f9:27 expected assertion failures observed before implementation. Initial test scaffolding had2None-indexing errors; assertions were corrected before the recorded27failureRED. MinimalGREEN36testsPASS:27selectedbinding guards plus9reusedpackageguards. Strictprimaryfence helper reused; no eager symbol map/FDE traversal. gitdiffcheckPASS after removing one generated trailing blankline in copied fencehelper; no semanticrepair. Only syntheticbytes locally. Exact-client qualification and independentwhole-diff/result review required. Scientifichead gategeneration ordinaryobservations0,retries0,repaircycles0.

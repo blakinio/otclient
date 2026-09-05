@@ -33,8 +33,20 @@ class InputContract(unittest.TestCase):
         p = self.project('4883ec1048890c24c64424040031c9')['selected_call']
         self.assertEqual(p['receiver_carriers'], [])
 
+    def test_movq_write_cannot_leave_stale_receiver_stack_argument(self):
+        p = self.project('4883ec1048890c24660fd6042431c9')['selected_call']
+        self.assertEqual(p['receiver_carriers'], [])
+
+    def test_cmpxchg_possible_write_cannot_leave_must_receiver_argument(self):
+        p = self.project('4883ec1048890c244831c0480fb1142431c9')['selected_call']
+        self.assertEqual(p['receiver_carriers'], [])
+
     def test_conflicting_branch_join_loses_receiver(self):
         self.assertEqual(self.project('85c0740231c9')['selected_call']['receiver_carriers'], [])
+
+    def test_branch_successors_do_not_replace_selected_call_target(self):
+        p = self.project('85c0740231c9')['selected_call']
+        self.assertEqual(p['target'], '0x100b')
 
     def test_partial_register_write_is_unknown(self):
         self.assertEqual(self.project('b101')['selected_call']['registers']['rcx'], 'UNKNOWN')

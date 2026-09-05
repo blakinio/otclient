@@ -12,7 +12,7 @@ phase: implementation
 branch: feat/OTC-20260905-control-center-native-login-start
 base_branch: main
 created: 2026-09-05T17:54:29Z
-updated_at: 2026-09-05T17:56:00Z
+updated_at: 2026-09-05T19:10:00Z
 base_main: b6cf7402b4dbde59b2086f0982c7dcc711c3b5fc
 policy_version: 2
 prompting_standard_version: 2.1
@@ -54,6 +54,8 @@ owned_paths:
   - tools/tibia_runtime_bridge/experimental_auth.cpp
   - tools/tibia_runtime_bridge/experimental_character_control_current.cpp
   - tests/tools/tibia_re_control_center/test_native_login_lifecycle.py
+  - tests/tools/tibia_re_control_center/test_native_login_control.py
+  - tests/tools/tibia_re_control_center/test_native_login_api.py
   - tests/tools/tibia_re_control_center/test_package_b.py
   - docs/agents/tasks/active/OTC-20260905-control-center-native-login-start.md
 modules_touched:
@@ -69,7 +71,7 @@ reuses:
 depends_on: []
 blocks: []
 cross_repository_task_ids: []
-next_action: observe lifecycle seam TDD RED, implement fail-closed seam, then rederive be4f48 native-login semantic bindings
+next_action: add durable STOP dominance and single-session lifecycle semantics, then rederive be4f48 native-login semantic bindings
 ---
 
 # OTC-20260905 — Control Center native login START
@@ -141,5 +143,7 @@ status: IMPLEMENTING_STATIC
 runtime_access: none
 physical_runtime_touched: false
 track_b_touched: false
-next_action: observe lifecycle seam TDD RED, implement fail-closed seam, then rederive be4f48 native-login semantic bindings
+portal_api: GREEN
+portal_ui: GREEN
+next_action: durable STOP dominance and single-session lifecycle TDD, then be4f48 semantic rebind
 ```

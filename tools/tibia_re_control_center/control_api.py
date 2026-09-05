@@ -46,6 +46,7 @@ def _allowed_methods(path: str) -> frozenset[str]:
         "/v1/agent/session",
         "/v1/agent/events",
         "/v1/agent/result",
+        "/v1/native-login/status",
     } or _RUN_ARTIFACT_RE.fullmatch(path) or _RUN_RE.fullmatch(path) or _ACTION_RE.fullmatch(path):
         methods.add("GET")
     if path in {
@@ -56,6 +57,7 @@ def _allowed_methods(path: str) -> frozenset[str]:
         "/v1/agent/tasks",
         "/v1/agent/chat",
         "/v1/agent/control",
+        "/v1/native-login/start",
     } or _RUN_CONTROL_RE.fullmatch(path):
         methods.add("POST")
     return frozenset(methods)
@@ -336,6 +338,10 @@ class ControlRequestHandler(BaseHTTPRequestHandler):
                 if query:
                     raise ControlDomainError("CONTROL_QUERY_INVALID", "status does not accept query parameters")
                 payload = self.control.domain.status()
+            elif path == "/v1/native-login/status":
+                if query:
+                    raise ControlDomainError("CONTROL_QUERY_INVALID", "native login status does not accept query parameters")
+                payload = self.control.domain.native_login_lifecycle.status()
             elif path == "/v1/capabilities":
                 if query:
                     raise ControlDomainError("CONTROL_QUERY_INVALID", "capabilities does not accept query parameters")
@@ -413,6 +419,8 @@ class ControlRequestHandler(BaseHTTPRequestHandler):
                 operation, handler = "STOP_ALL", self.control.domain.stop_all
             elif path == "/v1/reset-stop":
                 operation, handler = "RESET_STOP", self.control.domain.reset_stop
+            elif path == "/v1/native-login/start":
+                operation, handler = "NATIVE_LOGIN_START", self.control.domain.native_login_start
             elif path == "/v1/agent/tasks":
                 operation, handler = "AGENT_TASK", self.control.domain.agent_submit_task
             elif path == "/v1/agent/chat":

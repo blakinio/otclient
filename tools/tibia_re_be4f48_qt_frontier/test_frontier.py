@@ -33,6 +33,26 @@ class FrontierTests(unittest.TestCase):
                 self.assertEqual(r['cfg'],{'0x1000':[]})
                 self.assertEqual(r['boundaries'],[dict(kind='UNMODELED_CONTROL',site='0x1000')])
     def test_syscall(self): self.assertFalse(self.f('0f05')['complete'])
+    def test_ungrouped_enclave_instructions_are_unmodeled(self):
+        for code in ('0f01d7c3','0f01cfc3','0f01c0c3','0f01c5c3','f30f01e8c3'):
+            with self.subTest(code=code):
+                r=self.f(code)
+                self.assertFalse(r['complete'])
+                self.assertEqual(r['cfg'],{'0x1000':[]})
+                self.assertEqual(r['boundaries'],[dict(kind='UNMODELED_CONTROL',site='0x1000')])
+    def test_prefixed_external_jumps_have_no_fallthrough(self):
+        for prefix in ('f2','3e'):
+            with self.subTest(prefix=prefix):
+                r=self.f(prefix+'eb20c3')
+                self.assertTrue(r['complete'])
+                self.assertEqual(r['reachable_instructions'],1)
+                self.assertEqual(r['boundaries'],[dict(kind='TAIL_JUMP',site='0x1000',target='0x1023')])
+    def test_prefixed_internal_jump_skips_trap(self):
+        for prefix in ('f2','3e'):
+            with self.subTest(prefix=prefix):
+                r=self.f(prefix+'eb02 0f0b c3')
+                self.assertTrue(r['complete'])
+                self.assertEqual(r['cfg'],{'0x1000':['0x1005'],'0x1005':[]})
     def test_far_return(self): self.assertFalse(self.f('cb')['complete'])
     def test_transaction(self): self.assertFalse(self.f('c7f800000000')['complete'])
     def test_truncated(self): self.assertFalse(self.f('e8')['complete'])

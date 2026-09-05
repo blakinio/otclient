@@ -1,0 +1,36 @@
+{
+  "source_pr": 919,
+  "source_head": "2770706995853903426b18afcac65ae0d3b13dda",
+  "owner_qualification": "PROVEN",
+  "FACT": {
+    "caller_site": "0xc6c3e",
+    "callee_entry": "0xbc368",
+    "fde": [
+      "0xbc368",
+      "0xbc4fb"
+    ],
+    "exact_dynsym": "_ZNK14QMessageLogger7warningEPKcz"
+  },
+  "INFERENCE": [],
+  "UNKNOWN": [
+    "runtime_loaded_qtcore",
+    "callee_runtime_return_throw_behavior",
+    "sendlogin_receiver",
+    "sendlogin_causal_binding",
+    "final_queue_writer",
+    "final_tcp_writer",
+    "final_writer_contract",
+    "field6_value",
+    "pre_success_send_sequence"
+  ],
+  "source_terminal_result": "ANALYSIS_INCOMPLETE",
+  "full_source_contract_completed": false,
+  "local_graph_qualification": "ANALYSIS_INCOMPLETE",
+  "model_frontier": {
+    "kind": "INSTRUCTION_LIMIT",
+    "site": "0xbc469",
+    "cap": 64
+  },
+  "TRACK_B_CURRENT_WIRE_DELTA": "NOT_PROVEN",
+  "official_service_e2e_count": 0
+}

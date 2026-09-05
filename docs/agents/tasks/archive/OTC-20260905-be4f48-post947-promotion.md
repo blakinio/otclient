@@ -75,8 +75,7 @@ reuses:
   - source943 strict package/fence and bounded string reads only
   - docs/agents/evidence/OTC-20260905-be4f48-post943-promotion/result.json
 depends_on: []
-blocks:
-  - clean coordinator consumption of this exact source result
+blocks: []
 cross_repository_task_ids: []
 ownership_released: true
 next_action: none; bounded source consumed and ownership released

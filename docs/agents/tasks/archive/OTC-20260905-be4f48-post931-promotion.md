@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260905-be4f48-post931-promotion
-status: validating
+status: completed
 agent: Codex
 session_id: login-closure-20260905-095156-ae070f034ee4
 session_role: coordinator
@@ -8,7 +8,7 @@ project_lane: otclient
 lane: P2-NETWORK
 track_id: official-client-re
 task_kind: integration
-phase: validate
+phase: archive
 branch: docs/OTC-20260905-be4f48-post931-promotion
 base_branch: main
 base_main: 67ff445fc0f961afe2ba74e03a2524fe885a0395
@@ -68,20 +68,17 @@ identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 0
 stall_warnings: 0
-owned_paths:
-  - docs/agents/tasks/active/OTC-20260905-be4f48-post931-promotion.md
-  - docs/agents/evidence/OTC-20260905-be4f48-post931-promotion/**
+owned_paths: []
 modules_touched: []
 reuses:
   - docs/agents/prompts/OTC_BE4F48_QT_1CD26E_CALL_INPUTS.md
   - docs/agents/evidence/OTC-20260904-be4f48-post911-promotion/result.json
   - source911 finite must-identity design and source919 exact package and ELF guards
 depends_on: []
-blocks:
-  - clean coordinator consumption of this exact source result
+blocks: []
 cross_repository_task_ids: []
-ownership_released: false
-next_action: verify clean promotion exact-head review and gates before protected squash merge
+ownership_released: true
+next_action: ownership released; new proof registration only after archive merge
 ---
 
 # Clean coordinator promotion of source #931
@@ -112,3 +109,8 @@ Opcode/effect at0xdd8df9 remainsUNKNOWN; private-stack construction is only a hy
 Aftermerge, close931unmergedconsumed; separatearchive completedsourcehistoricalrecord/coordinatoractive task,ownershipreleased; onlythenregisterone newproof. Source919 remains separatelyblocked/discoverable; previous928facts retainedinmain.
 All runtime/E2E/TrackBmutationszero. TrackB284 exact62383aded3acbeb5f405a12fe1f93849cd8e35f9 unchangedblocked. RuntimeE2ENOT_APPLICABLE staticproducer.
 Invocation09:51:56Z/240minutes/4additional;931additional1. SOURCE_BLOCKER is boundedtaskterminal, notprogrammeexhaustion.
+
+## Separate archive closeout
+
+Promotion932 merged7ff636081dced79e59c67b18c90830922d9e3d6d, reviewedhead688afc3182a063823c6a7fd8c3c7d5ccfa01c859,CI33960888832/governance33960888695SUCCESS, independent/root/promotion_reviewPASS0. Source931final5ca408d235748194aa30fceb2d0c88c5f78aee40closedunmergedconsumed; focused33960773538/job101292162691,CI33960773562,governance33960773403,boundary33960773447SUCCESS. FullfailedWARP/one-retry history retained. BoundedSOURCE_BLOCKER complete, notactivation/body/logincompatibility.
+Ownershipreleased. Historicalsourceimportarchiveonly, completedcoordinatoractive→archive; noanalyzer/workflow promoted. Source919remainsseparatelyblocked. Aliasretired; newproofregistrationonlyafterthisarchive. Runtime/E2E/TrackBmutationszero; E2ENOT_APPLICABLE staticproducer. Invocation09:51:56Z/240minutes/4additional, completedadditional1.

@@ -44,13 +44,13 @@ def analyze(selected, client, core):
                 if int(s['st_value']) == lo]
         owner = exact_owner(rows, lo, (lo, hi))
         flow = receiver_storage(img.read(lo, hi - lo), lo)
-        writes = [s for s in flow['receiver_stores'] if not s['private_stack']]
+        writes = [s for s in flow['receiver_stores'] if s['destination_provenance'] == 'SYMBOLIC_VALUE_RELATIVE']
         if flow['resource_limit_hit']:
             terminal, boundary = 'ANALYSIS_INCOMPLETE', 'RECEIVER_STORAGE_RESOURCE_FRONTIER'
         elif writes:
             terminal, boundary = 'POSITIVE_EXACT_CONDITIONAL_RECEIVER_STORAGE', 'STORED_RECEIVER_DESTINATION_OWNER_AND_DELIVERY_NOT_PROVEN'
         else:
-            terminal, boundary = 'SOURCE_BLOCKER', 'NO_NONSTACK_RECEIVER_STORE_PROVEN_IN_BOUNDED_MUST_MODEL'
+            terminal, boundary = 'SOURCE_BLOCKER', 'NO_SYMBOLIC_DESTINATION_RECEIVER_STORE_PROVEN_IN_BOUNDED_MUST_MODEL'
         return {
             'schema': 'otclient.track-a.be4f48-qt-1cd220.v1',
             'exact_client': {'version': EXPECTED_VERSION, 'size': EXPECTED_SIZE, 'sha256': EXPECTED_SHA256},

@@ -5,12 +5,21 @@ fall through conditionally under the modeled SysV ABI. No callee is analyzed.
 """
 from collections import deque
 from capstone import (Cs, CS_ARCH_X86, CS_MODE_64, CS_GRP_JUMP,
-                      CS_GRP_CALL, CS_GRP_RET, CS_GRP_INT, CS_GRP_IRET)
-from capstone.x86_const import X86_OP_REG, X86_OP_MEM, X86_OP_IMM
+                      CS_GRP_CALL, CS_GRP_RET, CS_GRP_INT, CS_GRP_IRET,
+                      CS_GRP_PRIVILEGE)
+from capstone.x86_const import X86_OP_REG, X86_OP_MEM, X86_OP_IMM, X86_INS_JMP
 
 ARGS = ('rdi', 'rsi', 'rdx', 'rcx', 'r8', 'r9')
 VOLATILE = ('rax', 'rcx', 'rdx', 'rsi', 'rdi', 'r8', 'r9', 'r10', 'r11')
 RECEIVER = ('entry:rcx', 0)
+# These normal instructions conservatively lose their written values and all
+# stack-memory knowledge. Anything else without an explicit rule stops the path.
+NORMAL_CLOBBERS = frozenset(('xor', 'and', 'or', 'shl', 'shr', 'sar', 'sal',
+                            'inc', 'dec', 'neg', 'not', 'imul', 'mul', 'idiv', 'div',
+                            'adc', 'sbb', 'xchg', 'xadd', 'cmpxchg',
+                            'movzx', 'movsx', 'movsxd', 'cdqe', 'cqo',
+                            'pxor', 'xorps', 'xorpd', 'movd', 'movq',
+                            'movdqa', 'movdqu', 'movaps', 'movups', 'movapd', 'movupd'))
 
 
 def register(md, number):
@@ -128,7 +137,7 @@ def receiver_storage(raw, base, max_instructions=2048, max_updates=20000):
 
         if i.group(CS_GRP_RET):
             continue
-        if (i.group(CS_GRP_INT) or i.group(CS_GRP_IRET) or
+        if (i.group(CS_GRP_INT) or i.group(CS_GRP_IRET) or i.group(CS_GRP_PRIVILEGE) or
                 m in ('ud2', 'hlt', 'syscall', 'sysenter', 'sysret', 'sysexit',
                       'xbegin', 'xabort', 'loop', 'loope', 'loopne', 'jcxz', 'jecxz', 'jrcxz')):
             boundary('UNMODELED_CONTROL', pc)
@@ -137,7 +146,7 @@ def receiver_storage(raw, base, max_instructions=2048, max_updates=20000):
             if len(ops) != 1 or ops[0].type != X86_OP_IMM:
                 boundary('INDIRECT_BRANCH', pc)
                 continue
-            targets = [int(ops[0].imm)] + ([] if m == 'jmp' else [nxt])
+            targets = [int(ops[0].imm)] + ([] if i.id == X86_INS_JMP else [nxt])
             cfg[pc] = targets
             for target in targets:
                 submit(target, (regs, memory), pc)
@@ -186,10 +195,12 @@ def receiver_storage(raw, base, max_instructions=2048, max_updates=20000):
             token = offset(regs.get(name), int(ops[1].imm) * (1 if m == 'add' else -1)) if ops[0].size == 8 and ops[1].type == X86_OP_IMM else None
             assign(name, token)
         elif m not in ('cmp', 'test', 'nop', 'endbr64'):
+            if m not in NORMAL_CLOBBERS and not m.startswith(('cmov', 'set')):
+                boundary('UNMODELED_INSTRUCTION', pc)
+                continue
             for r in i.regs_access()[1]:
                 regs.pop(register(md, r), None)
-            if any(o.type == X86_OP_MEM and o.access & 2 for o in ops):
-                memory.clear()
+            memory.clear()
         cfg[pc] = [nxt]
         submit(nxt, (regs, memory), pc)
 
@@ -209,6 +220,7 @@ def receiver_storage(raw, base, max_instructions=2048, max_updates=20000):
             stores.append({'site': hex(pc), 'width': 8, 'value': 'entry:rcx',
                            'destination': {'base': token[0], 'offset': token[1]} if token else 'UNKNOWN',
                            'private_stack': stack_address(token) is not None,
+                           'destination_provenance': 'PROVEN_STACK_RELATIVE' if stack_address(token) is not None else 'SYMBOLIC_VALUE_RELATIVE' if token else 'UNKNOWN',
                            'destination_owner': 'UNKNOWN'})
     rows = [boundaries[k] for k in sorted(boundaries, key=repr)]
     return {'fixedpoint_reached': converged, 'resource_limit_hit': resource_limit,
@@ -221,6 +233,9 @@ def receiver_storage(raw, base, max_instructions=2048, max_updates=20000):
             'conditional_on_calls_returning_under_sysv_abi': True,
             'exceptional_control_not_modeled': True, 'termination_proven': False,
             'runtime_registration_or_delivery_proven': False,
+            'private_stack_false_means_only_not_proven_stack_relative': True,
+            'call_return_tokens_are_callsite_provenance_only': True,
+            'call_return_dynamic_instance_and_memory_region': 'UNKNOWN',
             'memory_loads_outside_private_stack': 'UNKNOWN'}
 
 

@@ -65,7 +65,7 @@ terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 0
+repair_cycles_for_current_gate: 1
 context_reconstruction_attempts: 0
 stall_warnings: 0
 owned_paths:
@@ -101,3 +101,7 @@ runtime_access=none; official_client_executed=false; login_performed=false; cred
 ## Repository-only validation
 
 RED e35987fc2f3d266f174a12b5fdafb9331cc4cf3d:18 required behavior tests fail on explicit unimplemented scaffold, no client bytes involved. Minimal finite must-value implementation now passes39tests including copied audited package/identity controls. One synthetic loop fixture had an incorrect backward branch to0x1004 (mid-instruction); decoded and corrected to0x1003 before GREEN. Self-falsification found 32-bit address override falsely reusing64-bit destination identity; added failing regression, then conservative base-width rejection restored GREEN. No semantic cap widened. git diff --check PASS; all new files are task-local source/tests/workflow. Whole-diff review and hosted qualification still required.
+
+## Independent finding-family repair
+
+Head011a3d8d350d2faa5e62444bceb1ddee5b937698 is disqualified from promotion. Reviewer /root/promotion_review found S923-01 implicit PUSHFQ stack write leaving a stale receiver spill, and S923-02 BND-prefixed JMP / privileged RSM false fallthrough. Root also rejected unknown-destination classification as proof of non-stack storage. Regression RED 8208c42b1de22d8d285eecfaa78684b18b30eebb:3behavior failures and1missing destination-provenance field, reproduced locally. GREEN uses instruction-ID unconditional JMP, privilege boundaries, fail-closed unknown instructions and conservative clobbering for an explicit ordinary-instruction set; destination provenance distinguishes proven stack, symbolic scalar and UNKNOWN. Call-return tokens expressly do not prove dynamic instance or memory region.43tests PASS; git diff --check PASS. Scope/caps unchanged. This is repair cycle1; independent final repair review and new exact-head qualification required. Earlier source head results cannot be promoted.

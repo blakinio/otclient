@@ -41,6 +41,10 @@ class InputContract(unittest.TestCase):
         p = self.project('4883ec1048890c244831c0480fb1142431c9')['selected_call']
         self.assertEqual(p['receiver_carriers'], [])
 
+    def test_cmpxchg_implicit_rax_write_cannot_preserve_receiver(self):
+        p = self.project('4889c8480fb1d74889c631c9')['selected_call']
+        self.assertEqual(p['receiver_carriers'], [])
+
     def test_conflicting_branch_join_loses_receiver(self):
         self.assertEqual(self.project('85c0740231c9')['selected_call']['receiver_carriers'], [])
 

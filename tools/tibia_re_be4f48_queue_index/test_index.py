@@ -115,7 +115,9 @@ class IndexTests(unittest.TestCase):
         elf=Elf();r=indexed_record(elf,TAGS,3,0x900);self.assertIsNotNone(r)
         self.assertEqual(r['symbol'],'_ZN4Test4callEv')
         self.assertEqual(r['record_address'],'0x1048')
-        self.assertEqual(elf.rela.queries,[3]);self.assertEqual(elf.syms.queries,[3])
+        self.assertEqual(elf.rela.queries,[3]);self.assertEqual(elf.syms.queries,[])
+        self.assertEqual([r for r in elf.reads if r[0]==0x2048],[(0x2048,24)])
+        self.assertTrue(all(n<=513 for _,n in elf.reads))
         self.assertFalse(r['global_relocation_uniqueness_proven'])
     def test_index_out_of_range(self):
         with self.assertRaises(ValueError): indexed_record(Elf(),TAGS,100,0x900)

@@ -73,17 +73,42 @@ def indexed_record(elf, tags, index, got):
     if not row.is_RELA() or int(row['r_offset'])!=got or int(row['r_info_type'])!=7 or int(row['r_addend'])!=0:
         raise ValueError('INDEXED_RECORD_GOT_OR_TYPE_DISAGREES')
     symidx=int(row['r_info_sym'])
-    if not 0<symidx<syms.num_symbols():
+    if syms['sh_size']%24 or not 0<symidx<syms['sh_size']//24:
         raise ValueError('INDEXED_SYMBOL_INDEX_INVALID')
-    symbol=syms.get_symbol(symidx)
-    if symbol['st_shndx']!='SHN_UNDEF' or symbol['st_info']['type']!='STT_FUNC' or symbol['st_info']['bind'] not in ('STB_GLOBAL','STB_WEAK'):
+    stream=elf.stream
+    symbol_offset=int(syms['sh_offset'])+24*symidx
+    if symbol_offset<0:
+        raise ValueError('INDEXED_SYMBOL_FILE_OFFSET_INVALID')
+    stream.seek(symbol_offset)
+    header=stream.read(24)
+    if len(header)!=24:
+        raise ValueError('INDEXED_SYMBOL_HEADER_TRUNCATED')
+    name_offset,info,other,shndx,value,size=struct.unpack('<IBBHQQ',header)
+    if shndx!=0 or info&15!=2 or info>>4 not in (1,2):
         raise ValueError('INDEXED_SYMBOL_NOT_UNDEFINED_FUNCTION')
-    name=symbol.name
-    if not isinstance(name,str) or not 1<=len(name)<=512 or not re.fullmatch(r'_Z[A-Za-z0-9_.$]+',name):
+    if not 0<=name_offset<strings['sh_size']:
+        raise ValueError('INDEXED_SYMBOL_NAME_OFFSET_OUTSIDE_SECTION')
+    name_file_offset=int(strings['sh_offset'])+name_offset
+    if name_file_offset<0:
+        raise ValueError('INDEXED_SYMBOL_STRING_FILE_OFFSET_INVALID')
+    limit=min(513,int(strings['sh_size'])-name_offset)
+    stream.seek(name_file_offset)
+    encoded=stream.read(limit)
+    if len(encoded)!=limit:
+        raise ValueError('INDEXED_SYMBOL_STRING_FILE_TRUNCATED')
+    nul=encoded.find(b'\0')
+    if not 0<nul<=512:
+        raise ValueError('INDEXED_SYMBOL_NAME_TERMINATOR_OUTSIDE_BOUND')
+    try:
+        name=encoded[:nul].decode('ascii')
+    except UnicodeDecodeError:
+        raise ValueError('INDEXED_SYMBOL_NAME_NOT_ASCII') from None
+    if not re.fullmatch(r'_Z[A-Za-z0-9_.$]+',name):
         raise ValueError('INDEXED_SYMBOL_NAME_INVALID')
+    binding='STB_GLOBAL' if info>>4==1 else 'STB_WEAK'
     return {'record_index':index,'record_address':hex(tags[23]+24*index),
             'table_address':hex(tags[23]),'table_row_count':count,'table_entry_width':24,
             'got_slot':hex(got),'relocation_type':'R_X86_64_JUMP_SLOT','addend':0,
-            'symbol':name,'symbol_index':symidx,'symbol_binding':symbol['st_info']['bind'],
+            'symbol':name,'symbol_index':symidx,'symbol_binding':binding,
             'symbol_defined':False,'relocation_records_read':1,'symbol_names_resolved':1,
             'global_relocation_uniqueness_proven':False,'runtime_resolution_proven':False}

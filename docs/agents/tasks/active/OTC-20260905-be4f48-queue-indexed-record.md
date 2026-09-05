@@ -65,7 +65,7 @@ terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 0
+repair_cycles_for_current_gate: 1
 context_reconstruction_attempts: 0
 stall_warnings: 0
 owned_paths:
@@ -101,3 +101,9 @@ Invocation11:35:52Z/240minutes/4additional, thisadditional2. OrdinaryCI2/head,1i
 Repository-onlyRED711aa5717414815d21e5fbeb2bb8a00452302f02:27assertionfailures before implementation. MinimalGREEN36tests including9reusedpackageguards. Rootfound a real-library interface risk: dict(section) assumes a mapping method absent from pyelftools Section. Initial supplementalproxy test incorrectly forwarded dict.keys and firstpassed; correctedfixture blocks that non-real method. Actual regressionRED failed INVALID_SECTION_ITERATION, thenGREEN compares explicit sectionmetadata fields. Final37testsPASS,py_compile/gitdiffcheckPASS. This was repaired before any exact-clientqualification/scientifichead, no disqualified sourceproof or failedofficialrun.
 
 Dynamicentries are unpacked directly with fixedELF64width to avoid Dynamic.get_tag hiddenstringtable lookup. Selectedrecords use get_relocation(index), noiter_relocations; oneget_symbol only after metadata and GOT/type checks. Eagerretiredscan notincluded. Independentwhole-diff and exactqualification required; retries0,repaircycles0 at scientificgate. SourceDraft/unmerged,939/919 remainblocked.
+
+## S943-01 selected string-table bounds repair
+
+Scientific860bdce2afda7bc1c019f5121843874204054428 is disqualified despite completedfocused33966150461/job101306536201 and CI33966150503/governance33966150533/boundary33966150427SUCCESS. Independentreview showed pyelftools get_symbol reads a selectedname beyond declared.dynstr bounds before post-validation, violating boundedname authority. No scientificfacts consumed from thishead.
+
+RegressionRED919b9d1edcfb118b5d6b299a10eab95d5b95ddcd:3assertionfailures for out-of-sectionst_name, missingin-sectionNUL and readcap. GREEN directly reads exactlyone24byteElf64Sym header, validatesindex/type/binding/undefinedsection, validatesst_name withinlinked.dynstr, reads at mostmin(513,remainingsection)bytes, and requiresNULwithin512ASCIIcharacters before nameacceptance. No get_symbol/stringtable.get_string. Existingselectedrecord test now verifiesoneheaderread andzeroeagerget_symbol calls.40testsPASS,gitdiffcheckPASS. Repaircycle1,retries0; freshscope/full-diff/familyreview and exactqualification required.

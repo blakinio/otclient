@@ -1,0 +1,175 @@
+name: One-time Synology OTClient runner migration
+
+on:
+  push:
+    branches:
+      - ci/dedicated-ot-runners
+    paths:
+      - .github/workflows/otclient-runner-synology-migrate.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: otclient-runner-synology-migrate
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    name: Deploy synology-otclient-01
+    # One-time infrastructure bridge only. Live Tibia experiments must never run
+    # here; PR #48 consumes the new dedicated OTClient runner after registration.
+    runs-on: [self-hosted, oteryn-staging]
+    timeout-minutes: 30
+    steps:
+      - name: Checkout runner infrastructure
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Deploy dedicated OTClient runner on the Synology Docker host
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+
+          command -v docker >/dev/null
+          test -S /var/run/docker.sock
+          docker info >/dev/null
+          docker compose version >/dev/null
+          command -v curl >/dev/null
+          command -v python3 >/dev/null
+
+          tmp_env="${RUNNER_TEMP}/ot-runners.env"
+          tmp_response="${RUNNER_TEMP}/runner-api.json"
+          : >"${tmp_env}"
+          chmod 600 "${tmp_env}"
+
+          cleanup() {
+            rm -f "${tmp_env}" "${tmp_response}"
+            unset selected_token token || true
+          }
+          trap cleanup EXIT
+
+          validate_token() {
+            token="$1"
+            [[ -n "${token}" ]] || return 1
+            local status
+            status="$(curl --silent --show-error --output "${tmp_response}" --write-out '%{http_code}' \
+              --request POST \
+              --header "Accept: application/vnd.github+json" \
+              --header "Authorization: Bearer ${token}" \
+              --header "X-GitHub-Api-Version: 2022-11-28" \
+              https://api.github.com/repos/blakinio/otclient/actions/runners/registration-token || true)"
+            [[ "${status}" == "201" ]]
+          }
+
+          selected_token=""
+
+          # Prefer the already dedicated local runner env when a previous partial
+          # deployment created it. Read secret values only into shell variables;
+          # never print them or persist them in Git.
+          while IFS= read -r token; do
+            [[ -n "${token}" ]] || continue
+            if validate_token "${token}"; then
+              selected_token="${token}"
+              break
+            fi
+          done < <(
+            docker run --rm \
+              -v /volume1/docker:/host:ro \
+              alpine:3.20 \
+              sh -euc '
+                find /host -xdev -type f -name .env 2>/dev/null | while IFS= read -r f; do
+                  sed -n "s/^GITHUB_RUNNER_PAT=//p" "$f" | head -n 1
+                done
+              '
+          )
+
+          # Some historical runner stacks supplied the registration credential
+          # directly as container environment rather than a host .env file.
+          if [[ -z "${selected_token}" ]]; then
+            while IFS= read -r cid; do
+              token="$(docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "${cid}" \
+                | sed -n 's/^GITHUB_RUNNER_PAT=//p' | head -n 1)"
+              [[ -n "${token}" ]] || continue
+              if validate_token "${token}"; then
+                selected_token="${token}"
+                break
+              fi
+            done < <(docker ps --quiet)
+          fi
+
+          if [[ -z "${selected_token}" ]]; then
+            echo '::error title=Runner migration credential unavailable::No existing Synology runner credential could mint a repository runner registration token for blakinio/otclient.'
+            exit 1
+          fi
+
+          printf 'GITHUB_RUNNER_PAT=%s\nOTCLIENT_RUNNER_NAME=synology-otclient-01\nOTS_RUNNER_NAME=synology-ots-01\n' \
+            "${selected_token}" >"${tmp_env}"
+
+          # Persist the reviewed stack on the NAS. The real .env remains local to
+          # the NAS and is created with mode 0600; its contents never enter logs.
+          tar -C infra/ot-runners -cf - Dockerfile entrypoint.sh compose.yaml README.md .env.example \
+            | docker run --rm -i -v /volume1/docker/ot-runners:/target alpine:3.20 \
+                sh -euc 'tar -xf - -C /target; chmod 0755 /target/entrypoint.sh'
+          cat "${tmp_env}" \
+            | docker run --rm -i -v /volume1/docker/ot-runners:/target alpine:3.20 \
+                sh -euc 'umask 077; cat > /target/.env; chmod 0600 /target/.env'
+
+          docker compose \
+            --project-directory infra/ot-runners \
+            --env-file "${tmp_env}" \
+            -f infra/ot-runners/compose.yaml \
+            build --pull otclient-runner
+
+          docker compose \
+            --project-directory infra/ot-runners \
+            --env-file "${tmp_env}" \
+            -f infra/ot-runners/compose.yaml \
+            up -d otclient-runner
+
+          # Fail closed until GitHub reports the exact runner online with the
+          # required dedicated labels. Do not infer success from container state.
+          ready=false
+          for _ in $(seq 1 30); do
+            http="$(curl --silent --show-error --output "${tmp_response}" --write-out '%{http_code}' \
+              --header "Accept: application/vnd.github+json" \
+              --header "Authorization: Bearer ${selected_token}" \
+              --header "X-GitHub-Api-Version: 2022-11-28" \
+              'https://api.github.com/repos/blakinio/otclient/actions/runners?per_page=100' || true)"
+            if [[ "${http}" == "200" ]] && python3 - "${tmp_response}" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          payload = json.loads(Path(sys.argv[1]).read_text())
+          required = {"self-hosted", "Linux", "X64", "otclient", "synology", "tibia-re"}
+          for runner in payload.get("runners", []):
+              if runner.get("name") != "synology-otclient-01":
+                  continue
+              labels = {entry.get("name") for entry in runner.get("labels", [])}
+              if runner.get("status") == "online" and required <= labels:
+                  raise SystemExit(0)
+          raise SystemExit(1)
+          PY
+            then
+              ready=true
+              break
+            fi
+            sleep 2
+          done
+
+          if [[ "${ready}" != "true" ]]; then
+            echo '::error title=Dedicated OTClient runner not online::synology-otclient-01 did not become online with the required labels.'
+            docker ps --filter name=otclient-runner --format 'container={{.Names}} status={{.Status}}'
+            exit 1
+          fi
+
+          docker run --rm -v /volume1/docker/ot-runners:/target:ro alpine:3.20 \
+            sh -euc 'test -s /target/.env; test "$(stat -c %a /target/.env)" = 600'
+
+          echo 'DEDICATED_OTCLIENT_RUNNER_DEPLOYED=true'
+          echo 'RUNNER_NAME=synology-otclient-01'
+          echo 'RUNNER_LABELS_VERIFIED=self-hosted,Linux,X64,otclient,synology,tibia-re'
+          echo 'HOST_STACK_PATH=/volume1/docker/ot-runners'

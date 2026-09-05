@@ -12,7 +12,7 @@ phase: implementation
 branch: feat/OTC-20260905-control-center-native-login-start
 base_branch: main
 created: 2026-09-05T17:54:29Z
-updated_at: 2026-09-05T19:20:00Z
+updated_at: 2026-09-05T21:35:00Z
 base_main: b6cf7402b4dbde59b2086f0982c7dcc711c3b5fc
 policy_version: 2
 prompting_standard_version: 2.1
@@ -46,18 +46,21 @@ estimate_confidence: medium
 decomposition_decision: sequential_static_then_physical
 decomposition_reason: current-build semantic rebind must precede any secret-bearing native login execution
 owned_paths:
+  - .github/workflows/track-a-native-login-be4f48-rebind.yml
   - tools/tibia_re_control_center/native_login_lifecycle.py
   - tools/tibia_re_control_center/control_domain.py
   - tools/tibia_re_control_center/control_api.py
   - tools/tibia_re_control_center/control_ui.py
   - tools/tibia_re_control_center/persistent_store.py
   - tools/tibia_runtime_bridge/current_sha_native_login_gate.py
+  - tools/tibia_runtime_bridge/rebind_native_login_current.py
   - tools/tibia_runtime_bridge/experimental_auth.cpp
   - tools/tibia_runtime_bridge/experimental_character_control_current.cpp
   - tests/tools/tibia_re_control_center/test_native_login_lifecycle.py
   - tests/tools/tibia_re_control_center/test_native_login_control.py
   - tests/tools/tibia_re_control_center/test_native_login_api.py
   - tests/tools/tibia_re_control_center/test_package_b.py
+  - docs/agents/evidence/OTC-20260905-control-center-native-login-start/**
   - docs/agents/tasks/active/OTC-20260905-control-center-native-login-start.md
 modules_touched:
   - TIBIA RE Control Center
@@ -72,7 +75,7 @@ reuses:
 depends_on: []
 blocks: []
 cross_repository_task_ids: []
-next_action: enforce durable single-session native-login claim across duplicate, concurrent and restarted Control Center execution
+next_action: run hosted exact be4f48 native-login semantic rebind, then bind helper constants and lifecycle executor
 ---
 
 # OTC-20260905 — Control Center native login START
@@ -147,5 +150,11 @@ track_b_touched: false
 portal_api: GREEN
 portal_ui: GREEN
 stop_dominance: GREEN
-next_action: durable single-session claim TDD, then be4f48 semantic rebind
+durable_single_session: GREEN
+package_b_regression: 598/598_GREEN
+package_b_mandatory: 39/39_GREEN
+browser_cli_e2e: GREEN
+falsification: GREEN
+known_ci_issue: Ruff_I001_import_order_only
+next_action: hosted exact be4f48 native-login semantic rebind, then exact helper/runtime composition
 ```

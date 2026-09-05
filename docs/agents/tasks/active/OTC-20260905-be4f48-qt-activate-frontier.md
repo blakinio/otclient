@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260905-be4f48-qt-activate-frontier
-status: implementing
+status: blocked
 agent: Codex
 session_id: login-closure-20260905-113552-ae070f034ee4
 session_role: researcher
@@ -13,9 +13,9 @@ branch: ai/OTC-20260905-be4f48-qt-activate-frontier
 base_branch: main
 base_main: a0346f3ac4704bc5f41b75653d7eaca6c5d8655d
 created: 2026-09-05T13:39:46Z
-updated_at: 2026-09-05T13:39:46Z
+updated_at: 2026-09-05T14:32:00Z
 invocation_started_at: 2026-09-05T11:35:52Z
-last_progress_at: 2026-09-05T13:39:46Z
+last_progress_at: 2026-09-05T13:44:01Z
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: codex
@@ -59,15 +59,15 @@ additional_task_budget_reason: explicit ordered multi-task owner login-closure p
 additional_source_task_ordinal: 4
 foreground_runtime_budget_minutes: 240
 foreground_budget_reason: explicit sequential source qualification and clean promotion/archive programme
-ci_checks_for_current_head: 0
-ci_check_generation: source_claim
+ci_checks_for_current_head: 1
+ci_check_generation: scientific_2e29d0fe
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 0
-stall_warnings: 0
+stall_warnings: 1
 owned_paths:
   - tools/tibia_re_be4f48_qt_frontier/**
   - .github/workflows/tibia-re-be4f48-qt-frontier.yml
@@ -83,7 +83,7 @@ blocks:
   - clean coordinator consumption of this exact source result
 cross_repository_task_ids: []
 ownership_released: false
-next_action: repository-only RED then bounded symbol-local control frontier implementation
+next_action: resume this same task with RED/GREEN for S951-01 UD0/UD1 trap rejection, then fresh independent review and exact qualification
 ---
 
 # Bounded symbol-local control frontier
@@ -101,3 +101,15 @@ Invocation11:35:52Z/240minutes/4additionalsources,thisadditional4. No budgetrese
 ## Repository-only RED/GREEN
 
 RED82df42115d6717a09fdc56c9dabc7f4684cec6a3:20 errors at unimplemented frontier before minimalGREEN67tests including47 inherited identity/package/header controls. Extent guard added with RED1 missing-helper failure thenGREEN68. Guard accepts only promoted address/size/index/section and reads precisely85bytes, rejects partial mapping overlaps. First-transfer graph stops at calls/returns/external branches, records cycles without termination claims and rejects overlapping/unmodeled/truncated decode. No sourcequalification yet. Independent whole-diff falsification and exactqualification required; repaircycles0/retries0.
+
+## Interrupted invocation checkpoint — no source result promoted
+
+At 2026-09-05T14:30:10Z the foreground resumed after a long interruption. Live protected main remains a0346f3ac4704bc5f41b75653d7eaca6c5d8655d; source951 remains Draft at scientific2e29d0fe58a5a91fe33064608ffcb11f2768180e, last PR update13:44:01Z. The original11:35:52Z/240minute/four-additional invocation is not reset. The15minute no-progress limit was exceeded during the interruption, so this is a required ROTATE checkpoint under ANTI_STALL_AND_EXECUTION_BUDGET.md, not a programme-level SOURCE_BLOCKER, AUTHORITY_BLOCKER or static-exhaustion claim. Additional sources used4/4. Repaircycles0/retries0 for951; no further source acquisition authorized merely by this checkpoint.
+
+S951-01 remains OPEN: independent reviewer found Capstone5.0.6 UD0/UD1 have no control groups and were absent from the explicit trap list. Root reproduced both locally with synthetic inputs: analyzer incorrectly returned complete=true, two reachable instructions, and RETURN at0x1002 after the trap at0x1000. Required repair must reject both as UNMODELED_CONTROL and test no fallthrough/posttrap decoding, plus related ungrouped-control family. Scientific2e29d0fe58a5a91fe33064608ffcb11f2768180e is DISQUALIFIED regardless of focused33969748852,CI33969748994,governance33969748884,boundary33969748834 SUCCESS. No result has been consumed/promoted; no success inferred from these checks. Original68tests did not cover this defect.
+
+Checkpoint commit intentionally uses GitHub's skip-CI marker to avoid re-running proprietary public-package acquisition for unchanged, disqualified analyzer code solely because task metadata changed. This is NOT validation, NOT a passing gate, and NOT merge authority. The checkpoint head remains unqualified and Draft. The next actual repair requires fresh full exact-head focused/CI/governance/boundary checks, independent PASS0 and normal clean consumption/archive; never merge this source.
+
+No implementation changes after the interrupted review. Runtime/clientexecution/login/credentials/memory/capture/OCR/serviceE2E/TrackBmutation remainzero. Source947consumed948 andarchived949; latest registeredclass950. TrackB284 unchanged at62383aded3acbeb5f405a12fe1f93849cd8e35f9; Field6,writercontract,pre-successordering remainUNKNOWN andwire deltaNOT_PROVEN. Sources939/919remainblocked. No programme terminal condition has been proven.
+
+Recent lifecycle ledger: registration946 merge67e6030ac3a94d3e5241749c2f8332353b3a46df; source947 finalaaedca05eefe9aab4adae53c3529e6e28ec0b2a2 closedunmergedconsumed948; promotion948 mergeb1dbd23b123c63c6cc43876113b6634bdbeb3a53; archive949 merge30dea42ada0ef0a3904096a0b090e67f3fe2b910; registration950 mergea0346f3ac4704bc5f41b75653d7eaca6c5d8655d; source951 remainsopenDraft with unresolvedS951-01. Earlier invocation ledger is preserved in promotions936/940/944 andarchives937/941/945.

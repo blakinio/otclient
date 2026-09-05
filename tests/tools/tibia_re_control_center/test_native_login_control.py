@@ -6,7 +6,10 @@ import unittest
 from concurrent.futures import ThreadPoolExecutor
 
 from tools.tibia_re_control_center.control_domain import ControlDomainService
-from tools.tibia_re_control_center.native_login_lifecycle import NativeLoginLifecycle
+from tools.tibia_re_control_center.native_login_lifecycle import (
+    NativeLoginLifecycle,
+    NativeLoginLifecycleError,
+)
 
 
 class _SyntheticLoginExecutor:
@@ -49,6 +52,41 @@ class _SyntheticLoginExecutor:
         }
 
 
+class _FailingLoginExecutor(_SyntheticLoginExecutor):
+    def __init__(self, *, physical_effect: bool) -> None:
+        super().__init__()
+        self.physical_effect = physical_effect
+
+    def start(self, operation_id: str) -> dict[str, object]:
+        self.start_calls.append(operation_id)
+        raise NativeLoginLifecycleError(
+            "NATIVE_LOGIN_SYNTHETIC_FAILURE",
+            "synthetic native login failure",
+            physical_effect=self.physical_effect,
+        )
+
+
+class _BlockingLoginExecutor(_SyntheticLoginExecutor):
+    def __init__(self) -> None:
+        super().__init__()
+        self.start_entered = threading.Event()
+        self.release_start = threading.Event()
+
+    def start(self, operation_id: str) -> dict[str, object]:
+        self.start_calls.append(operation_id)
+        self.start_entered.set()
+        if not self.release_start.wait(timeout=5):
+            raise AssertionError("synthetic start release timed out")
+        return {
+            "state": "STARTING",
+            "bound": True,
+            "current": True,
+            "physical_effect": False,
+            "reason": "NATIVE_LOGIN_START_ACCEPTED",
+            "operation_id": operation_id,
+        }
+
+
 class NativeLoginControlTests(unittest.TestCase):
     @staticmethod
     def _post(domain: ControlDomainService, *, path: str, operation: str, request_id: str, handler):
@@ -68,6 +106,26 @@ class NativeLoginControlTests(unittest.TestCase):
             operation="NATIVE_LOGIN_START",
             request_id=request_id,
             handler=domain.native_login_start,
+        )
+
+    @classmethod
+    def _stop(cls, domain: ControlDomainService, request_id: str):
+        return cls._post(
+            domain,
+            path="/v1/stop-all",
+            operation="STOP_ALL",
+            request_id=request_id,
+            handler=domain.stop_all,
+        )
+
+    @classmethod
+    def _reset(cls, domain: ControlDomainService, request_id: str):
+        return cls._post(
+            domain,
+            path="/v1/reset-stop",
+            operation="RESET_STOP",
+            request_id=request_id,
+            handler=domain.reset_stop,
         )
 
     def test_native_login_start_uses_durable_resource_identity_and_replays_once(self) -> None:
@@ -169,17 +227,8 @@ class NativeLoginControlTests(unittest.TestCase):
                 started = self._start(domain, "native-login-before-stop")
                 self.assertEqual(202, started.code)
 
-                def invoke_stop():
-                    return self._post(
-                        domain,
-                        path="/v1/stop-all",
-                        operation="STOP_ALL",
-                        request_id="native-login-stop-1",
-                        handler=domain.stop_all,
-                    )
-
-                first = invoke_stop()
-                replay = invoke_stop()
+                first = self._stop(domain, "native-login-stop-1")
+                replay = self._stop(domain, "native-login-stop-1")
                 self.assertEqual(200, first.code)
                 self.assertEqual(first.body, replay.body)
                 self.assertTrue(first.body["stop_latched"])
@@ -196,13 +245,7 @@ class NativeLoginControlTests(unittest.TestCase):
                 native_login_lifecycle=NativeLoginLifecycle(executor=executor),
             )
             try:
-                stopped = self._post(
-                    domain,
-                    path="/v1/stop-all",
-                    operation="STOP_ALL",
-                    request_id="stop-before-native-login",
-                    handler=domain.stop_all,
-                )
+                stopped = self._stop(domain, "stop-before-native-login")
                 self.assertEqual(200, stopped.code)
                 self.assertTrue(domain.coordinator.control_state.stop_latched)
 
@@ -211,6 +254,114 @@ class NativeLoginControlTests(unittest.TestCase):
                 self.assertEqual("NATIVE_LOGIN_STOP_LATCHED", rejected.body["code"])
                 self.assertEqual([], executor.start_calls)
             finally:
+                domain.close()
+
+    def test_pre_effect_failure_releases_claim_for_a_fresh_start(self) -> None:
+        with tempfile.TemporaryDirectory() as root:
+            failing = _FailingLoginExecutor(physical_effect=False)
+            domain = ControlDomainService(
+                root,
+                native_login_lifecycle=NativeLoginLifecycle(executor=failing),
+            )
+            try:
+                failed = self._start(domain, "native-login-preeffect-failure")
+                self.assertEqual(409, failed.code)
+                self.assertEqual("NATIVE_LOGIN_SYNTHETIC_FAILURE", failed.body["code"])
+
+                succeeding = _SyntheticLoginExecutor()
+                domain.native_login_lifecycle = NativeLoginLifecycle(executor=succeeding)
+                retried = self._start(domain, "native-login-after-preeffect-failure")
+                self.assertEqual(202, retried.code)
+                self.assertEqual([retried.body["operation_id"]], succeeding.start_calls)
+            finally:
+                domain.close()
+
+    def test_physical_effect_failure_retains_claim_across_restart(self) -> None:
+        with tempfile.TemporaryDirectory() as root:
+            failing = _FailingLoginExecutor(physical_effect=True)
+            first_domain = ControlDomainService(
+                root,
+                native_login_lifecycle=NativeLoginLifecycle(executor=failing),
+            )
+            failed = self._start(first_domain, "native-login-physical-failure")
+            self.assertEqual(409, failed.code)
+            self.assertEqual("NATIVE_LOGIN_SYNTHETIC_FAILURE", failed.body["code"])
+            self.assertTrue(first_domain.close())
+
+            succeeding = _SyntheticLoginExecutor()
+            second_domain = ControlDomainService(
+                root,
+                native_login_lifecycle=NativeLoginLifecycle(executor=succeeding),
+            )
+            try:
+                rejected = self._start(second_domain, "native-login-after-physical-failure")
+                self.assertEqual(409, rejected.code)
+                self.assertEqual("NATIVE_LOGIN_ALREADY_ACTIVE", rejected.body["code"])
+                self.assertEqual([], succeeding.start_calls)
+            finally:
+                second_domain.close()
+
+    def test_stop_reset_releases_claim_and_allows_one_fresh_start(self) -> None:
+        with tempfile.TemporaryDirectory() as root:
+            executor = _SyntheticLoginExecutor()
+            domain = ControlDomainService(
+                root,
+                native_login_lifecycle=NativeLoginLifecycle(executor=executor),
+            )
+            try:
+                first = self._start(domain, "native-login-before-stop-reset")
+                self.assertEqual(202, first.code)
+                stopped = self._stop(domain, "native-login-stop-reset-stop")
+                self.assertEqual(200, stopped.code)
+                self.assertTrue(stopped.body["stop_latched"])
+                reset = self._reset(domain, "native-login-stop-reset-reset")
+                self.assertEqual(200, reset.code)
+                self.assertFalse(reset.body["stop_latched"])
+                second = self._start(domain, "native-login-after-stop-reset")
+                self.assertEqual(202, second.code)
+                self.assertEqual(2, len(executor.start_calls))
+                self.assertEqual(second.body["operation_id"], executor.start_calls[-1])
+            finally:
+                domain.close()
+
+    def test_inflight_start_and_stop_are_linearized_by_stop_operation_lock(self) -> None:
+        with tempfile.TemporaryDirectory() as root:
+            executor = _BlockingLoginExecutor()
+            domain = ControlDomainService(
+                root,
+                native_login_lifecycle=NativeLoginLifecycle(executor=executor),
+            )
+            executor.stop_latched_probe = lambda: domain.coordinator.control_state.stop_latched
+            start_reply: list[object] = []
+            stop_reply: list[object] = []
+
+            def invoke_start() -> None:
+                start_reply.append(self._start(domain, "native-login-race-start"))
+
+            def invoke_stop() -> None:
+                stop_reply.append(self._stop(domain, "native-login-race-stop"))
+
+            try:
+                start_thread = threading.Thread(target=invoke_start)
+                start_thread.start()
+                self.assertTrue(executor.start_entered.wait(timeout=5))
+
+                stop_thread = threading.Thread(target=invoke_stop)
+                stop_thread.start()
+                self.assertFalse(domain.coordinator.control_state.stop_latched)
+
+                executor.release_start.set()
+                start_thread.join(timeout=5)
+                stop_thread.join(timeout=5)
+                self.assertFalse(start_thread.is_alive())
+                self.assertFalse(stop_thread.is_alive())
+                self.assertEqual(202, start_reply[0].code)
+                self.assertEqual(200, stop_reply[0].code)
+                self.assertTrue(domain.coordinator.control_state.stop_latched)
+                self.assertEqual([True], executor.stop_latch_observations)
+                self.assertEqual([stop_reply[0].body["resource_id"]], executor.stop_calls)
+            finally:
+                executor.release_start.set()
                 domain.close()
 
 

@@ -1,0 +1,90 @@
+{
+  "source_pr": 915,
+  "source_head": "f91d77bcf016885795a019a9e571f60c33a74c5a",
+  "FACT": {
+    "branch_kind": "jne",
+    "branch_site": "0x1d36fb",
+    "branch_target": "0xc6c16",
+    "containing_fde": [
+      "0xc6c16",
+      "0xc6c64"
+    ],
+    "entry_equals_fde_start": true,
+    "first_transfer_flow": {
+      "boundaries": [
+        {
+          "callee_implementation_semantics": "UNKNOWN",
+          "kind": "CALL",
+          "site": "0xc6c3e",
+          "static_import_symbol": null,
+          "target": "0xbc368"
+        }
+      ],
+      "cfg": {
+        "0xc6c16": [
+          "0xc6c1a"
+        ],
+        "0xc6c1a": [
+          "0xc6c1e"
+        ],
+        "0xc6c1e": [
+          "0xc6c25"
+        ],
+        "0xc6c25": [
+          "0xc6c29"
+        ],
+        "0xc6c29": [
+          "0xc6c2d"
+        ],
+        "0xc6c2d": [
+          "0xc6c34"
+        ],
+        "0xc6c34": [
+          "0xc6c38"
+        ],
+        "0xc6c38": [
+          "0xc6c3a"
+        ],
+        "0xc6c3a": [
+          "0xc6c3e"
+        ],
+        "0xc6c3e": []
+      },
+      "complete": true,
+      "reachable_instructions": 10
+    }
+  },
+  "exact_client": {
+    "sha256": "552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1",
+    "size": 52105824,
+    "version": "15.32.be4f48"
+  },
+  "qtcore": {
+    "localfile": "bin/lib/libQt6Core.so.6",
+    "packedhash": "3a58482841fbf76f9b09ffd5522efb2c8eeebfc84c011167e8199ac2dd8dca1b",
+    "packedsize": 2215336,
+    "unpackedhash": "03ac3e4e7356399897ec58d42c81ae5c257072d45d539de1def528a8a04911fa",
+    "unpackedsize": 7354472,
+    "url": "bin/lib/libQt6Core.so.6.lzma"
+  },
+  "INFERENCE": [
+    "exact callee0xbc368 is a bounded successor candidate only"
+  ],
+  "UNKNOWN": [
+    "cold_partition_semantic_owner",
+    "runtime_loaded_qtcore",
+    "callee_implementation_semantics",
+    "sendlogin_receiver",
+    "sendlogin_causal_binding",
+    "final_queue_writer",
+    "final_tcp_writer",
+    "final_writer_contract",
+    "field6_value",
+    "pre_success_send_sequence"
+  ],
+  "TRACK_B_CURRENT_WIRE_DELTA": "NOT_PROVEN",
+  "FIRST_MISSING_BOUNDARY": "QT_CONTINUATION_FIRST_TRANSFER_CALLEE_SEMANTICS_NOT_PROVEN",
+  "track_b_pr": 284,
+  "track_b_head": "62383aded3acbeb5f405a12fe1f93849cd8e35f9",
+  "official_service_e2e_count": 0
+}

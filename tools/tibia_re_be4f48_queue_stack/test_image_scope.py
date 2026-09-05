@@ -21,7 +21,8 @@ class SectionAndFdeOnly:
     def get_section(self, _):
         raise AssertionError('FORBIDDEN_LINKED_SYMBOL_TABLE_READ')
 
-    def get_dwarf_info(self):
+    def get_dwarf_info(self, **kwargs):
+        assert kwargs.get('relocate_dwarf_sections') is False
         return self
 
     def EH_CFI_entries(self):

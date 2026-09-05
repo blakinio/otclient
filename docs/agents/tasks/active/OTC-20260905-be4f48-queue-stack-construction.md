@@ -13,9 +13,9 @@ branch: ai/OTC-20260905-be4f48-queue-stack-construction
 base_branch: main
 base_main: 1f8501614e6a3efa275451f2f9c8c1a6dd86d09b
 created: 2026-09-05T10:41:00Z
-updated_at: 2026-09-05T10:46:22Z
+updated_at: 2026-09-05T10:51:24Z
 invocation_started_at: 2026-09-05T09:51:56Z
-last_progress_at: 2026-09-05T10:46:22Z
+last_progress_at: 2026-09-05T10:51:24Z
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: codex
@@ -65,7 +65,7 @@ terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 0
+repair_cycles_for_current_gate: 1
 context_reconstruction_attempts: 0
 stall_warnings: 0
 owned_paths:
@@ -99,3 +99,7 @@ TDDRED/GREEN,exactqualification,materialfindingfamilyregressions,independentwhol
 ## Repository-only RED and minimal GREEN
 
 RED8853b691b53d7c9973a970af9325fae248146cbb:21explicitunimplementedconstruction/tailtest errors observed beforeimplementation. GREEN30testsPASS including9reusedpackageguards. Cases cover liveframe/cells/entryargs/constantzero/pointerrelativeoffsets, overlap/partialstore/unknownalias/deallocation/callerframe/segmented/truncatedaddresses, copiedpointer, sourcepartialwidth, cap/controlstops. Minimalnewconstructionmodel replacesactivation/importcriterion entirely; no callee/importread. Strictpackage/Image reused. git diff --check PASS. Localtests containonlysyntheticbytes; exactqualification and independentreview remainrequired.
+
+## S935-01 scope repair
+
+Initialscientificd049b49ef73278751fc645523b32a63e814100ed is disqualified. Independentreview found reusedImage constructor traversed relocation/symbol imports despite the new task's explicit prohibition. RegressionREDc64b1ffd284a3ea12293a08242d40b71db6a62ea: syntheticforbiddenrelocation fixture raisedFORBIDDEN_IMPORT_METADATA_TRAVERSAL. GREEN removes relocation/symbol map initialization and unusedsymbol/PLT/qword/string lookup methods; disables DWARF relocationprocessing to avoid hiddenlinked-symbol resolution. Necessarysection/FDE and exacthash/size guards remain.31testsPASS,gitdiffcheckPASS. Repaircycle1; no proof consumed from disqualifiedhead. Constructionmodel unchanged; freshscope/family/full-diff review and exactqualification required.

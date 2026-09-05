@@ -5,6 +5,9 @@ import unittest
 
 
 class _SyntheticExecutor:
+    def __init__(self) -> None:
+        self.start_calls: list[str] = []
+
     def status(self) -> dict[str, object]:
         return {
             "state": "READY",
@@ -12,6 +15,17 @@ class _SyntheticExecutor:
             "current": True,
             "physical_effect": False,
             "reason": "NATIVE_LOGIN_RUNTIME_READY",
+        }
+
+    def start(self, operation_id: str) -> dict[str, object]:
+        self.start_calls.append(operation_id)
+        return {
+            "state": "STARTING",
+            "bound": True,
+            "current": True,
+            "physical_effect": False,
+            "reason": "NATIVE_LOGIN_START_ACCEPTED",
+            "operation_id": operation_id,
         }
 
 
@@ -66,6 +80,25 @@ class NativeLoginLifecycleTests(unittest.TestCase):
                 "current": True,
                 "physical_effect": False,
                 "reason": "NATIVE_LOGIN_RUNTIME_READY",
+            },
+        )
+
+    def test_05_bound_start_delegates_only_durable_operation_identity(self) -> None:
+        from tools.tibia_re_control_center.native_login_lifecycle import NativeLoginLifecycle
+
+        executor = _SyntheticExecutor()
+        lifecycle = NativeLoginLifecycle(executor=executor)
+        result = lifecycle.start("native-login-start-0001")
+        self.assertEqual(executor.start_calls, ["native-login-start-0001"])
+        self.assertEqual(
+            result,
+            {
+                "state": "STARTING",
+                "bound": True,
+                "current": True,
+                "physical_effect": False,
+                "reason": "NATIVE_LOGIN_START_ACCEPTED",
+                "operation_id": "native-login-start-0001",
             },
         )
 

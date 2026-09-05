@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260905-be4f48-post935-promotion
-status: validating
+status: completed
 agent: Codex
 session_id: login-closure-20260905-113552-ae070f034ee4
 session_role: coordinator
@@ -8,7 +8,7 @@ project_lane: otclient
 lane: P2-NETWORK
 track_id: official-client-re
 task_kind: integration
-phase: validate
+phase: archive
 branch: docs/OTC-20260905-be4f48-post935-promotion
 base_branch: main
 base_main: 1f8501614e6a3efa275451f2f9c8c1a6dd86d09b
@@ -68,19 +68,16 @@ identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 0
 stall_warnings: 0
-owned_paths:
-  - docs/agents/tasks/active/OTC-20260905-be4f48-post935-promotion.md
-  - docs/agents/evidence/OTC-20260905-be4f48-post935-promotion/**
+owned_paths: []
 modules_touched: []
 reuses:
   - source935 exact qualification and sanitized result
   - docs/agents/evidence/OTC-20260905-be4f48-post931-promotion/result.json
 depends_on: []
-blocks:
-  - clean coordinator consumption of this exact source result
+blocks: []
 cross_repository_task_ids: []
-ownership_released: false
-next_action: independent clean promotion review and exact-head gates then protected squash
+ownership_released: true
+next_action: ownership released; successor registration only after this archive merge
 ---
 
 # Clean coordinator promotion of source #935
@@ -116,3 +113,8 @@ Only sanitized documentation is promoted, never source analyzer/workflow. Indepe
 Next possible proof class is selected target binding at0x4d7dc0; no import/callee analysis or successor registration occurs in this promotion. RuntimeE2E NOT_APPLICABLE: static contract producer. runtime_access=none; official_client_executed=false; login_performed=false; credentials_used=false; process_memory_access=false; packet_capture=false; ocr_vision_used=false; official_service_e2e_count=0; track_b_pr_284_modified=false.
 
 Fresh continuation began2026-09-05T11:35:52Z; entrytask935 and required promotion/archive. Prospective240minutes and4additional bounded source tasks are declared under the explicit ordered owner login-closure programme; ordinary CI2/head, terminalentry wait45minutes/3minuteinterval/12checks,3repaircycles and1identicalretry retained. Prior invocation and failure counters are historical evidence, not rewritten.
+
+## Separate archive closeout
+
+Cleanpromotion936 merged802ddd0179764a5f79369fc700cea039675d29bb, reviewedheade5587c87a368171ffd7d53ceae31d6e304d289ed;CI33963943139/governance33963942937SUCCESS,independent source/promotionPASS0. Source935 exact12b45b0b417dd4b9bc0b02749fca2866e7f549d0 closedunmergedconsumed. Focused33962381439/job101296386625,CI33962381826,governance33962381480,boundary33962381528SUCCESS;31tests,exactfences,deterministicJSON,cleanupbeforeartifact. Finalartifact9968340173 SHA256982c6bb02a429107bffddd9f40e084215a4bbc4d4f2f9df57dd805502c679e1a.
+Sourcepositive construction/escape accepted, no completeinitialization/logicalvector/activation/calleeuse/writer/logincompatibility. Failed94285 WARP and overlappingcheckpointqualification preserved as described inpromotion; notmanualretry. Historicalsource taskimportarchiveonly; completedcoordinatoractive->archive; ownershipreleased. Source919staysseparatelyblocked. Retireonlysource935alias; registersuccessor afterthisarchive. Runtime/E2E/TrackBmutationszero; E2ENOT_APPLICABLE staticproducer. Freshinvocation11:35:52Z/240minutes/4additional,935entrytasklifecycle.

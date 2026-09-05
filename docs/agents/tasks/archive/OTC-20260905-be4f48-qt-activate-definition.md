@@ -1,15 +1,15 @@
 ---
-task_id: OTC-20260905-be4f48-post947-promotion
-status: validating
+task_id: OTC-20260905-be4f48-qt-activate-definition
+status: completed
 agent: Codex
 session_id: login-closure-20260905-113552-ae070f034ee4
-session_role: coordinator
+session_role: researcher
 project_lane: otclient
 lane: P2-NETWORK
 track_id: official-client-re
-task_kind: integration
-phase: validate
-branch: docs/OTC-20260905-be4f48-post947-promotion
+task_kind: implementation
+phase: archive
+branch: ai/OTC-20260905-be4f48-qt-activate-definition
 base_branch: main
 base_main: 67e6030ac3a94d3e5241749c2f8332353b3a46df
 created: 2026-09-05T13:12:48Z
@@ -36,7 +36,7 @@ target_uniqueness: NOT_APPLICABLE
 mutation_authorized: false
 persistent_session_role: none
 physical_e2e_required: false
-implementation_authorized: false
+implementation_authorized: true
 feature_scope:
   type: contract_producer
   user_facing: false
@@ -65,26 +65,47 @@ terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 0
+repair_cycles_for_current_gate: 2
 context_reconstruction_attempts: 0
 stall_warnings: 0
-owned_paths:
-  - docs/agents/tasks/active/OTC-20260905-be4f48-post947-promotion.md
-  - docs/agents/evidence/OTC-20260905-be4f48-post947-promotion/**
+owned_paths: []
 modules_touched: []
 reuses:
   - docs/agents/prompts/OTC_BE4F48_QT_ACTIVATE_GNUHASH_DEFINITION.md
   - source943 strict package/fence and bounded string reads only
   - docs/agents/evidence/OTC-20260905-be4f48-post943-promotion/result.json
 depends_on: []
-blocks:
-  - clean coordinator consumption of this exact source result
+blocks: []
 cross_repository_task_ids: []
-ownership_released: false
-next_action: independent promotion review and exact-head checks then protected squash
+ownership_released: true
+next_action: none; bounded source consumed and ownership released
 ---
 
-# Clean coordinator promotion
+# Selected packaged QtCore definition lookup
+
+Registration946 merged 67e6030ac3a94d3e5241749c2f8332353b3a46df; protected main read back, current active tasks and open PRs inspected. No owned-path overlap. Source939 and919 remain blocked with released ownership. TrackB284 unchanged at 62383aded3acbeb5f405a12fe1f93849cd8e35f9. Authority is the registered prompt and current main governance; this task cannot expand it.
+
+Plan: synthetic RED for selected GNU hash header, bloom, bucket, masked chain hashes, termination/caps/collisions, direct bounded symbol/name reads and definition extent. Minimal GREEN; strict dual-file exact qualification on disposable hosted runner; independent whole-diff falsification and exact-head checks. Then clean docs-only promotion and separate archive. No body/FDE/relocation/global census or runtime resolution claims. Reuse package/fence code and bounded-name repair from943; no product abstractions.
+
+Spec: docs/agents/prompts/OTC_BE4F48_QT_ACTIVATE_GNUHASH_DEFINITION.md. Exact primary15.32.be4f48 and packagedQtCore fences reverified before lookup. Positive means only POSITIVE_EXACT_PACKAGED_DYNAMIC_DEFINITION; caps are ANALYSIS_INCOMPLETE and malformed/negative selected lookup is a precise SOURCE_BLOCKER, never global absence proof.
+
+Full none admission above. Official client execution, login, credentials, memory, capture, OCR, service E2E and TrackB mutations remain zero. E2E NOT_APPLICABLE: static contract producer. Raw acquisition/helper material transient and removed before sanitized artifact and on failure. No external model services. Source PR remains Draft and never merges.
+
+Invocation11:35:52Z,240minutes,4additional; this additional3. No reset. Ordinary CI2/head,one identical transient retry,three repairs,15min no-progress. Registration merge is latest measurable progress. Fields6/order/writers/wire delta remain UNKNOWN/NOT_PROVEN.
+
+## Repository-only RED/GREEN
+
+RED 1c8103a3686f5d714fd614622e49683c851b80b4: 30 tests errored at the explicit unimplemented lookup before implementation. Minimal GREEN39 tests including9 package guards. Root prequalification falsification added two controls for complete selected-section file bounds and hash-chain-area width; RED2 failures, GREEN41 tests. No scientific head or client qualification existed during these repairs. Direct fixed-width metadata and bounded selected-name reads only, no eager symbol/string lookup. Independent whole-diff review and exact qualification pending; no result claimed.
+
+## S947-01 mapping ambiguity repair
+
+Scientific e77b565b109feb0e42b32812f4b04d502cc33a74 disqualified regardless of workflow outcome. Independent review reproduced partial allocated section overlaps being ignored by full-containment-only owner counting. Regression RED 36451a1f947114fe8d91edd4c87dc5f9a3d4d6b1: four failing tests for overlap inside/start/end of function extent and selected metadata overlap. GREEN checks every allocated section intersection before selected metadata reads and definition acceptance; sole owner must contain full extent and match section identity/flags/file bounds.45 tests PASS. Repaircycle1,retries0. Fresh scientific qualification and independent repair-family review required. No claims consumed from disqualified head.
+
+## S947-02 eager library construction repair
+
+Root independently inspected pyelftools0.32 constructors: ELFFile.iter_sections -> GNUHashSection -> GNUHashTable parses arrays of all bloom words and buckets. Scientific dae0651276fdb31a44ea5e9edd2d7e14e640a72f therefore disqualified even though bounded lookup itself passed S947-01 review. Reviewer independently confirmed this missed issue. No facts consumed.
+
+Regression RED c085856330293f22a16d6e8a9cffba78abbc138f: two failures including analyzer entry calling forbidden iter_sections. GREEN uses only fixed-width _get_section_header metadata after section-table width/count/file bounds, never constructs section objects or reads names.47 tests PASS. Fresh qualification and independent real-library guarded-fixture review required. Repaircycle2,retries0; no further unbounded header helpers.
 
 # Exact-current packaged QtCore dynamic definition
 
@@ -120,8 +141,8 @@ Packaged definition body/use,version/runtime resolution,logical argument vector,
 
 SourceDraft nevermerges. Clean docs-only coordinator consumption after exact final gates,expected-head squash,sourceclosedunmergedconsumed,separatearchiveownershiprelease before successor. No analyzer/workflow promotion. Runtime/clientexecution/login/credentials/memory/capture/OCR/serviceE2E/TrackBmutationzero. E2ENOT_APPLICABLE staticproducer. Rawofficialbytes transientonly,neverartifact. Invocation11:35:52Z/240minutes/4additionalsources,thisadditional3,repaircycles2/retries0; no budgetreset.
 
-## Coordinator final-head consumption
+## Separate archive closeout
 
-Final source947 aaedca05eefe9aab4adae53c3529e6e28ec0b2a2; focused33968928146/job101313865824,CI33968928345/governance33968928125/boundary33968928111 SUCCESS. Exact checkout,47tests,strictfences and cleanup verified again. Final sanitized JSON equals scientific original. Artifact9970318202,digest9dcf46c1cb31144d574ae661d1f51082499af809fa40d415902805ad8e259b68. Independent final source/doc review PASS0; GitHub reviews/threads empty. Both disqualified heads remain excluded. Coordinator independently inspected analyzer,library constructor chain,tests,diff,result and logs rather than relying on green workflows.
+Promotion948 mergedb1dbd23b123c63c6cc43876113b6634bdbeb3a53,reviewedhead66f612700a8c4eea66202d148a54ac1e68b0640b,CI33969038215/governance33969037956SUCCESS,independent source/promotion PASS0. Source947finalaaedca05eefe9aab4adae53c3529e6e28ec0b2a2 closedunmergedconsumed; focused33968928146/job101313865824,CI33968928345/governance33968928125/boundary33968928111SUCCESS,47tests,exactfences/equalJSON/cleanup. S94701/S94702 disqualification and regression history preserved.
 
-Promote only sanitized facts in three documentation files from fresh protectedmain67e6030ac3a94d3e5241749c2f8332353b3a46df; no source analyzer/workflow. After protected expected-head merge,close source947unmergedconsumed; separatearchive releases ownership before any successor. Source939/919remainblocked. Packaged definition proof does not unlock TrackB.
+Completed only bounded packaged dynamic definition and coordinator lifecycle,notlogincompatibility. Source historical task imported directly toarchive; coordinator active->archive. Ownershipreleased; selectedGNUhash alias retired after successful consumption. Source939/919remainactiveblocked. Register one newproofclass only after archive merge. Runtime/E2E/TrackBmutationzero; E2ENOT_APPLICABLE staticproducer. Invocation11:35:52Z/240minutes/4additional,947additional3.

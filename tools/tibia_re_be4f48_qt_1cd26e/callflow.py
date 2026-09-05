@@ -157,8 +157,8 @@ def selected_inputs(raw, base, site, target, max_instructions=2048, max_updates=
                 continue
             targets = [int(ops[0].imm)] + ([] if i.id == X86_INS_JMP else [nxt])
             cfg[pc] = targets
-            for target in targets:
-                submit(target, (regs, memory), pc)
+            for successor in targets:
+                submit(successor, (regs, memory), pc)
             continue
         if any(o.type == X86_OP_MEM and o.mem.segment for o in ops):
             boundary('SEGMENTED_MEMORY', pc)
@@ -208,7 +208,11 @@ def selected_inputs(raw, base, site, target, max_instructions=2048, max_updates=
                 continue
             for r in i.regs_access()[1]:
                 regs.pop(register(md, r), None)
-            if any(o.type == X86_OP_MEM and o.access & 2 for o in ops):
+            if m == 'cmpxchg':
+                regs.pop('rax', None)  # Decoder omits conditional accumulator write.
+            # Capstone5.0.6 omits WRITE for some admitted MOVQ/CMPXCHG
+            # memory operands. Lose memory for any generic MEM operand.
+            if any(o.type == X86_OP_MEM for o in ops):
                 memory.clear()
         cfg[pc] = [nxt]
         submit(nxt, (regs, memory), pc)

@@ -13,9 +13,9 @@ branch: ai/OTC-20260905-be4f48-qt-1cd26e-inputs
 base_branch: main
 base_main: 981a64151d219341f175597027e676be0f52068a
 created: 2026-09-05T09:24:28Z
-updated_at: 2026-09-05T09:29:40Z
+updated_at: 2026-09-05T09:34:46Z
 invocation_started_at: 2026-09-05T08:43:11Z
-last_progress_at: 2026-09-05T09:29:40Z
+last_progress_at: 2026-09-05T09:34:46Z
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: codex
@@ -65,7 +65,7 @@ terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 0
+repair_cycles_for_current_gate: 1
 context_reconstruction_attempts: 0
 stall_warnings: 0
 owned_paths:
@@ -99,3 +99,7 @@ Invocation08:43:11Z/240minutes/4additional, this is additional2. No terminal-ent
 ## Repository-only RED/GREEN
 
 RED 4b357ec1574ea177e9df68485f5de23dc0ab50ff:18behavior tests fail on explicit unimplemented selected-call scaffold, no official bytes involved. GREEN38testsPASS includes inherited package/identity tests and precise register/stack-slot projection. The first minimal implementation conservatively lost stack arguments after known register-only XOR; TDD exposed this, then explicit known ordinary instruction effects preserve memory when no memory-write operand exists. Unknown instructions still stop, privilege/BND/implicit-stack/segment/address-size regression families pass; exact setcc/cmov condition whitelist prevents admission by broad mnemonic prefix. Source923 storage enumeration is removed entirely from the new analyzer; only one selected call is projected. Python compileall and git diff --check PASS. No callee body inspected, no cap widened. Independent review and hosted exact qualification remain required.
+
+## Independent finding-family repair
+
+Scientific head d89190a7b90ef4380d25e2749f40bc345be86c0c is disqualified from promotion. Root found S927-01 selected target parameter shadowing by branch successor traversal. Independent reviewer found S927-02 Capstone5.0.6 write metadata omits MOVQ/CMPXCHG memory writes and CMPXCHG implicit RAX write. Regression RED7907f7ca656e5f8cc79cb951364d95060181a55e demonstrated three failures; sibling RED5ad1acceda3647ff3283b85af871e378d502b9f1 adds the independently reproduced implicit RAX failure. GREEN renames the traversal variable, invalidates memory on any generic MEM operand, and explicitly invalidates RAX for CMPXCHG. Register-only ordinary operations preserve stack values; unknown instructions still stop.42testsPASS and git diff --check PASS. This is repair cycle1, no cap/scope expansion. Source923 promoted only model/no-positive-store and CFG facts, not a positive affected scalar carrier. Fresh independent repair review and exact-head qualification are required before consumption.

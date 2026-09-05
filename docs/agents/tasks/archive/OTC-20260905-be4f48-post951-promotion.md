@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260905-be4f48-post951-promotion
-status: validating
+status: completed
 agent: Codex
 session_id: login-closure-20260905-143731-ae070f034ee4
 session_role: coordinator
@@ -8,14 +8,14 @@ project_lane: otclient
 lane: P2-NETWORK
 track_id: official-client-re
 task_kind: integration
-phase: validate
+phase: archive
 branch: docs/OTC-20260905-be4f48-post951-promotion
 base_branch: main
 base_main: a0346f3ac4704bc5f41b75653d7eaca6c5d8655d
 created: 2026-09-05T13:39:46Z
-updated_at: 2026-09-05T14:51:07Z
+updated_at: 2026-09-05T14:55:00Z
 invocation_started_at: 2026-09-05T14:37:31Z
-last_progress_at: 2026-09-05T14:51:07Z
+last_progress_at: 2026-09-05T14:55:00Z
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: codex
@@ -55,12 +55,12 @@ estimate_confidence: medium
 decomposition_decision: single
 decomposition_reason: one symbol-local first-transfer control graph
 max_additional_tasks_after_terminal_entry_task: 1
-additional_task_budget_reason: one additional task permitted after entry951 closeout under current governance
+additional_task_budget_reason: one additional task after entry closeout under current invocation governance
 additional_source_task_ordinal: 0
 foreground_runtime_budget_minutes: 120
 foreground_budget_reason: 120 minutes for resumed source repair qualification and clean lifecycle
 ci_checks_for_current_head: 0
-ci_check_generation: clean_promotion
+ci_check_generation: consumed_final_source
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -68,20 +68,17 @@ identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 0
 stall_warnings: 0
-owned_paths:
-  - docs/agents/tasks/active/OTC-20260905-be4f48-post951-promotion.md
-  - docs/agents/evidence/OTC-20260905-be4f48-post951-promotion/**
+owned_paths: []
 modules_touched: []
 reuses:
   - docs/agents/prompts/OTC_BE4F48_QT_ACTIVATE_CONTROL_FRONTIER.md
   - source947 repaired strict package/fence and header-only selected definition identity
   - docs/agents/evidence/OTC-20260905-be4f48-post947-promotion/result.json
 depends_on: []
-blocks:
-  - clean coordinator consumption of this exact source result
+blocks: []
 cross_repository_task_ids: []
-ownership_released: false
-next_action: independent promotion review and exact-head gates then protected squash
+ownership_released: true
+next_action: none; consumed bounded proof archived and ownership released
 ---
 
 # Clean coordinator consumption
@@ -123,3 +120,9 @@ runtime_access=none;officialclientexecution/login/credentials/memory/capture/OCR
 Source951 final0c8ab343124727c99224ad3050a5eb29d1a2f10f; finalfocused33972964255/job101324622146,CI33972964359/governance33972964273/boundary33972964265SUCCESS.73tests,exactcheckout/fences,raw/acquisitioncleanupverified; finalJSON identical to repairedscientificoriginal. Artifact9971472641,digest5daf1f80348a6cce416706e5859955baf2e266256a1a88a34fcf4a3ec9bff5af. Independent review bound all11 source/workflow file blobSHAs to exactscientifichead; final3docs/result reviewPASS0; GitHubreviews/threads empty. Coordinator independently read repairedmodel/diff/tests/result/completedlogs and confirms boundedclaims.
 
 Only3documentationfiles promoted fromfreshprotectedmaina0346f3ac4704bc5f41b75653d7eaca6c5d8655d. No analyzer/workflow promoted. Source task's stale current timestamps/checkgeneration are bookkeeping,not scientificauthority; reconciled in this currentcoordinator checkpoint and required separatearchive. Priorinvocation history remainsunchanged. Sourceclosesunmergedconsumed only after this promotion merges; archive releasesownershipbefore successor. TrackBwire deltaNOT_PROVEN and939/919remainblocked.
+
+## Separate archive closeout
+
+Promotion952 mergedb8c66514c542c22f332b408ac0c5d4327f69347c; reviewedhead017ee8fd80c73694fa9eebf197df3fcdfa26d7b3,CI33973093727/governance33973093556SUCCESS,independentPASS0. Source951final0c8ab343124727c99224ad3050a5eb29d1a2f10f closedunmergedconsumed with focused33972964255/job101324622146,CI33972964359/governance33972964273/boundary33972964265SUCCESS,73tests,exactfences/equalJSON/cleanup. S95101/02/03 and disqualifiedheads retained. Current bookkeeping reconciled atarchive, without changing historicalevents.
+
+Complete only bounded symbol-local controlfrontier and coordinatorlifecycle,notlogincompatibility. Archive source task directly from its consumedhead and movecoordinatoractive->archive; ownershipreleased andresolvedblocks cleared. Retire onlycontrolfrontieralias. Sources939/919remainactiveblocked. Newboundedclass mayberegistered onlyafter thisarchive. Runtime/E2E/TrackBmutationzero. Currentinvocation14:37:31Z/120minutes,entry951,oneadditionalavailable aftercloseout.

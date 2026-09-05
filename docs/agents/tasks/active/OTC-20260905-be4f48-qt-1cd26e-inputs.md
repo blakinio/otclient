@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260905-be4f48-qt-1cd26e-inputs
-status: validating
+status: waiting
 agent: Codex
 session_id: login-closure-20260905-084311-ae070f034ee4
 session_role: researcher
@@ -13,7 +13,7 @@ branch: ai/OTC-20260905-be4f48-qt-1cd26e-inputs
 base_branch: main
 base_main: 981a64151d219341f175597027e676be0f52068a
 created: 2026-09-05T09:24:28Z
-updated_at: 2026-09-05T09:34:46Z
+updated_at: 2026-09-05T09:42:00Z
 invocation_started_at: 2026-09-05T08:43:11Z
 last_progress_at: 2026-09-05T09:34:46Z
 policy_version: 2
@@ -59,8 +59,8 @@ additional_task_budget_reason: explicit ordered multi-task owner login-closure p
 additional_source_task_ordinal: 2
 foreground_runtime_budget_minutes: 240
 foreground_budget_reason: explicit sequential source qualification and clean promotion/archive programme
-ci_checks_for_current_head: 0
-ci_check_generation: source_claim
+ci_checks_for_current_head: 2
+ci_check_generation: repaired_scientific_31fc5ef
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -83,7 +83,7 @@ blocks:
   - clean coordinator consumption of this exact source result
 cross_repository_task_ids: []
 ownership_released: false
-next_action: exact qualification and independent whole-diff review
+next_action: inspect completed focused run33958371182 for scientific head31fc5ef868bfb016d66b5a1b7c5be8558fd4e0f6 and consume only its sanitized result or isolate its exact failure
 ---
 
 # Source claim
@@ -103,3 +103,11 @@ RED 4b357ec1574ea177e9df68485f5de23dc0ab50ff:18behavior tests fail on explicit u
 ## Independent finding-family repair
 
 Scientific head d89190a7b90ef4380d25e2749f40bc345be86c0c is disqualified from promotion. Root found S927-01 selected target parameter shadowing by branch successor traversal. Independent reviewer found S927-02 Capstone5.0.6 write metadata omits MOVQ/CMPXCHG memory writes and CMPXCHG implicit RAX write. Regression RED7907f7ca656e5f8cc79cb951364d95060181a55e demonstrated three failures; sibling RED5ad1acceda3647ff3283b85af871e378d502b9f1 adds the independently reproduced implicit RAX failure. GREEN renames the traversal variable, invalidates memory on any generic MEM operand, and explicitly invalidates RAX for CMPXCHG. Register-only ordinary operations preserve stack values; unknown instructions still stop.42testsPASS and git diff --check PASS. This is repair cycle1, no cap/scope expansion. Source923 promoted only model/no-positive-store and CFG facts, not a positive affected scalar carrier. Fresh independent repair review and exact-head qualification are required before consumption.
+
+## Durable ordinary-CI waiting checkpoint
+
+STATUS: WAITING. Scientific exact head 31fc5ef868bfb016d66b5a1b7c5be8558fd4e0f6. Independent /root/promotion_review repair and whole-diff audit PASS,0material findings,42testsPASS plus independent MOVQ/CMPXCHG width variants. CI33958371291,governance33958371188,boundary33958371219 SUCCESS. Focused33958371182/job101285712072 remains in progress at Prepare exact public client package through WARP; materialization and analyzer steps have not run in the last observation. There is no current source terminal result or exact-client qualification claim.
+
+Two ordinary CI observations used for this scientific head; no third check, rerun, or invented terminal-entry exception. Source927 is additional source2, so terminal-entry continuation does not apply. This task-only checkpoint does not reset the unchanged scientific-generation observation counter or authorize waiting on a newly triggered run. No failed-run retry has been used; repaircycle1 is complete. Last material progress was independent repair review PASS at approximately09:40:39Z. Invocation08:43:11Z/240minutes; foreground approximately59minutes. Runtime NONE and all safety counters above remain unchanged. Source remains Draft/unmerged; no promotion/archive is permissible until qualified terminal evidence. Source919 remains a distinct blocked obligation.
+
+One next action: inspect the completed focused run33958371182 for scientific head31fc5ef868bfb016d66b5a1b7c5be8558fd4e0f6, consume only its sanitized result after checking cleanup and exact checkout, or isolate the exact failure before any permitted retry. Then finish final evidence-head qualification, clean promotion, unmerged source consumption and separate archive. The scientific analyzer/workflow scope is unchanged; this operational checkpoint is neither AUTHORITY_BLOCKER nor STATIC_PROOF_EXHAUSTED.

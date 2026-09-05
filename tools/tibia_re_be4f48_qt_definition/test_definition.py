@@ -77,6 +77,14 @@ class DefinitionTests(unittest.TestCase):
     def test_ambiguous_extent(self):
         def change(d,s):s.append(dict(s[5],index=6))
         self.rejects(change,'DEFINITION_EXTENT')
+    def test_partial_extent_overlap_inside(self):
+        self.rejects(lambda d,s:s.append(dict(s[5],index=6,addr=0x10808,size=8,off=3000)), 'DEFINITION_EXTENT')
+    def test_partial_extent_overlap_end(self):
+        self.rejects(lambda d,s:s.append(dict(s[5],index=6,addr=0x10818,size=32,off=3000)), 'DEFINITION_EXTENT')
+    def test_partial_extent_overlap_start(self):
+        self.rejects(lambda d,s:s.append(dict(s[5],index=6,addr=0x107f8,size=16,off=3000)), 'DEFINITION_EXTENT')
+    def test_partial_metadata_overlap(self):
+        self.rejects(lambda d,s:s.append(dict(s[5],index=6,addr=0x10308,size=8,off=3000)), 'SECTION_MAPPING')
     def test_no_function_content_reads(self):
         d,s=fixture()
         class Guard:

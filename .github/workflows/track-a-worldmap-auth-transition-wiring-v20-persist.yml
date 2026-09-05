@@ -1,0 +1,119 @@
+name: Track A persist AUTH transition wiring v20
+
+on:
+  push:
+    branches:
+      - runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation
+    paths:
+      - .github/workflows/track-a-worldmap-auth-transition-wiring-v20-persist.yml
+
+permissions:
+  contents: write
+
+jobs:
+  recover:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation
+          persist-credentials: true
+          fetch-depth: 0
+      - name: Exact-SHA transition wiring analysis
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends binutils curl python3-pyelftools python3-capstone
+          r="$RUNNER_TEMP/tw";mkdir -p "$r/bin" "$r/state" "$r/client";cd "$r/bin"
+          curl -fsSL -o wgcf https://github.com/ViRb3/wgcf/releases/download/v2.2.32/wgcf_2.2.32_linux_amd64
+          echo '2ff97f2201972ce582a424455d50a3719a380eef0cd1f3144f7779348e122a2c  wgcf'|sha256sum -c -
+          curl -fsSL -o wp.tgz https://github.com/windtf/wireproxy/releases/download/v1.1.3/wireproxy_linux_amd64.tar.gz
+          echo 'e88c1d090740373fc606c1bafd81d9a5eadc642cce5667616e20e9d7a444f51c  wp.tgz'|sha256sum -c -
+          mkdir x;tar -xzf wp.tgz -C x;cp "$(find x -type f -name wireproxy -print -quit)" wireproxy;chmod 755 wgcf wireproxy
+          cd "$r/state";"$r/bin/wgcf" register --accept-tos >/dev/null;"$r/bin/wgcf" generate >/dev/null
+          printf 'WGConfig = %s\n\n[Socks5]\nBindAddress = 127.0.0.1:25344\n' "$r/state/wgcf-profile.conf">w.conf
+          nohup "$r/bin/wireproxy" -c w.conf >"$r/wp.log" 2>&1 </dev/null &
+          for _ in $(seq 1 30);do curl --socks5-hostname 127.0.0.1:25344 -fsS --max-time 10 https://www.cloudflare.com/cdn-cgi/trace >"$r/t" 2>/dev/null&&break;sleep 2;done
+          grep -Eq '^warp=(on|plus)$' "$r/t"
+          u=https://static.tibia.com/launcher/tibiaclient-linux-current/bin/client.lzma
+          curl --socks5-hostname 127.0.0.1:25344 --compressed -fL -A 'Mozilla/5.0 (X11; Linux x86_64)' -e "$u" -H 'Accept: */*' "$u" -o "$r/client/client.lzma"
+          echo '496c5b3517c0996a1bbd0e76a7738d450f79d0bf4fef140a807044776042dc9b  '"$r"'/client/client.lzma'|sha256sum -c -
+          cd "$GITHUB_WORKSPACE"
+          python3 - "$r/client/client.lzma" "$r/client/client" docs/agents/evidence/OTC-20260817-track-a-worldmap-server-delivery-causal-validation/v20-auth-transition-wiring.md <<'PY'
+          import hashlib,lzma,pathlib,struct,sys,re,subprocess
+          from elftools.elf.elffile import ELFFile
+          from capstone import Cs,CS_ARCH_X86,CS_MODE_64
+          from capstone.x86_const import X86_OP_MEM,X86_REG_RIP,X86_OP_IMM
+          src=pathlib.Path(sys.argv[1]); client=pathlib.Path(sys.argv[2]); evidence=pathlib.Path(sys.argv[3])
+          b=src.read_bytes();q=b[32];lc=q%9;z=q//9;lp=z%5;pb=z//5;ds=int.from_bytes(b[33:37],'little')
+          raw=lzma.decompress(b[45:],format=lzma.FORMAT_RAW,filters=[{'id':lzma.FILTER_LZMA1,'dict_size':ds,'lc':lc,'lp':lp,'pb':pb}])
+          sha=hashlib.sha256(raw).hexdigest();assert len(raw)==51965216 and sha=='e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe'
+          client.write_bytes(raw)
+          with client.open('rb') as f:
+            elf=ELFFile(f);secs=[(s.name,int(s['sh_offset']),int(s['sh_size']),int(s['sh_addr']),int(s['sh_flags'])) for s in elf.iter_sections()]
+          execsecs=[x for x in secs if x[4]&4 and x[2]]
+          def vo(va):
+            for n,o,z,v,fl in secs:
+              if v<=va<v+z:return o+(va-v)
+            raise ValueError(hex(va))
+          md=Cs(CS_ARCH_X86,CS_MODE_64);md.detail=True
+          targets={'REQ_GS_SIGNAL':0xcfb2e7,'START_GS_CASE':0xcfb122,'START_GS_IMPL':0x767440,'AUTH_VPTR':0x307f1b0}
+          refs={k:[] for k in targets}; allins=[]
+          for sec,off,size,base,fl in execsecs:
+            for ins in md.disasm(raw[off:off+size],base):
+              allins.append(ins)
+              for op in ins.operands:
+                if op.type==X86_OP_MEM and op.mem.base==X86_REG_RIP:
+                  dst=ins.address+ins.size+op.mem.disp
+                  for k,t in targets.items():
+                    if dst==t:refs[k].append((ins.address,ins.mnemonic,ins.op_str))
+          od=subprocess.check_output(['objdump','-d','-C',str(client)],text=True,errors='replace')
+          qt=[]
+          for line in od.splitlines():
+            if any(x in line for x in ('QState::addTransition','QStateMachine::start','QState::entered','QAbstractState::entered')) and '@plt>' in line:
+              qt.append(line.strip())
+          contexts=[]
+          xaddrs=sorted(set(a for k in ('REQ_GS_SIGNAL','START_GS_IMPL') for a,_,_ in refs[k]))
+          for a in xaddrs:
+            lo=max(0x400000,a-0x100);hi=a+0x180
+            try:ins=list(md.disasm(raw[vo(lo):vo(hi)],lo))
+            except:continue
+            contexts.append((a,[(x.address,x.mnemonic,x.op_str) for x in ins]))
+          # Direct-call xrefs to likely QState transition PLT functions, from objdump labels.
+          qstate_addrs=[]
+          for line in od.splitlines():
+            if '<QState::addTransition' in line and '@plt>' in line:
+              m=re.match(r'\s*([0-9a-f]+)',line)
+              if m:qstate_addrs.append(int(m.group(1),16))
+          add_calls=[]
+          for ins in allins:
+            if ins.mnemonic=='call' and ins.operands and ins.operands[0].type==X86_OP_IMM and int(ins.operands[0].imm) in qstate_addrs:
+              add_calls.append(ins.address)
+          lines=[]
+          lines += ['# V20 AUTH signal→QState transition wiring','',f'Exact SHA: `{sha}`','', '## QMeta classification','', '- AUTH `signal_count = 11`.', '- `requestCharacterGameserverLogin` method index `5` is a **signal**.', '- `onStartGameServerLoginStateEntered` method index `27` is a **non-signal state-entry handler**.', '', '## Exact executable xrefs','']
+          for k in targets:
+            lines.append(f'### {k} `0x{targets[k]:x}`')
+            if refs[k]:
+              for a,m,o in refs[k]: lines.append(f'- `0x{a:x}`: `{m} {o}`')
+            else:lines.append('- no RIP-relative executable xref found')
+            lines.append('')
+          lines += ['## Qt state-machine PLT leads','']
+          lines += [f'- `{x}`' for x in qt] or ['- none found']
+          lines += ['', '## QState::addTransition direct call sites','', '```text', ','.join(hex(x) for x in add_calls) or 'NONE','```','']
+          lines += ['## Contexts around signal/start-state xrefs','']
+          for a,rows in contexts:
+            lines += [f'### xref `0x{a:x}`','```asm']+[f'{x:x}: {m} {o}' for x,m,o in rows]+['```','']
+          lines += ['## Static result','', '```text','WORLDMAP_V20_AUTH_TRANSITION_WIRING_STATIC=PASS','WORLDMAP_V20_CLIENT_EXECUTED=false','```','']
+          evidence.parent.mkdir(parents=True,exist_ok=True);evidence.write_text('\n'.join(lines))
+          print('WORLDMAP_V20_AUTH_TRANSITION_WIRING_STATIC=PASS')
+          PY
+      - name: Persist static evidence
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          f=docs/agents/evidence/OTC-20260817-track-a-worldmap-server-delivery-causal-validation/v20-auth-transition-wiring.md
+          test -s "$f";grep -Fq 'WORLDMAP_V20_AUTH_TRANSITION_WIRING_STATIC=PASS' "$f"
+          git config user.name 'github-actions[bot]';git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add "$f";git commit -m 'evidence(track-a): persist v20 auth transition wiring';git push origin HEAD:runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation

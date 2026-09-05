@@ -1,0 +1,75 @@
+name: Track A v17 embedded GDB generator validation
+
+on:
+  push:
+    branches:
+      - runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation
+    paths:
+      - .github/workflows/track-a-worldmap-v17-generator-static.yml
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Compose and execute embedded GDB generator
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout task head
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Compose exact v17 helper and validate generator Python
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 -m py_compile .github/scripts/track-a-worldmap-native-semantic-v17-repair.py
+          python3 .github/scripts/track-a-worldmap-causal-gdb-env-repair.py .github/scripts/track-a-worldmap-causal-ephemeral-baseline.sh "$RUNNER_TEMP/v17-gdb.sh"
+          python3 .github/scripts/track-a-worldmap-causal-ui-geometry-repair.py "$RUNNER_TEMP/v17-gdb.sh" "$RUNNER_TEMP/v17-v2.sh"
+          python3 .github/scripts/track-a-worldmap-causal-ui-field-discriminator-v3-repair.py "$RUNNER_TEMP/v17-v2.sh" "$RUNNER_TEMP/v17-v3.sh"
+          python3 .github/scripts/track-a-worldmap-causal-ui-field-discriminator-v4-repair.py "$RUNNER_TEMP/v17-v3.sh" "$RUNNER_TEMP/v17-v4.sh"
+          python3 .github/scripts/track-a-worldmap-causal-ui-field-final-roi-v5-repair.py "$RUNNER_TEMP/v17-v4.sh" "$RUNNER_TEMP/v17-v5.sh"
+          python3 .github/scripts/track-a-worldmap-causal-baseline-login-v6-repair.py "$RUNNER_TEMP/v17-v5.sh" "$RUNNER_TEMP/v17-v6.sh"
+          python3 .github/scripts/track-a-worldmap-causal-character-selection-v7-repair.py "$RUNNER_TEMP/v17-v6.sh" "$RUNNER_TEMP/v17-v7.sh"
+          python3 .github/scripts/track-a-worldmap-causal-auth-submit-v9-anchor-adapter.py .github/scripts/track-a-worldmap-causal-auth-submit-v9-repair.py "$RUNNER_TEMP/v17-v7.sh" "$RUNNER_TEMP/v17-v9.sh"
+          python3 .github/scripts/track-a-worldmap-causal-press-cancel-v10-repair.py "$RUNNER_TEMP/v17-v9.sh" "$RUNNER_TEMP/v17-v10.sh"
+          python3 .github/scripts/track-a-worldmap-causal-auth-state-v11-repair.py "$RUNNER_TEMP/v17-v10.sh" "$RUNNER_TEMP/v17-v11.sh"
+          python3 .github/scripts/track-a-worldmap-causal-transport-visual-v12-repair.py "$RUNNER_TEMP/v17-v11.sh" "$RUNNER_TEMP/v17-v12.sh"
+          python3 .github/scripts/track-a-worldmap-causal-pinned-login-v13-repair.py "$RUNNER_TEMP/v17-v12.sh" "$RUNNER_TEMP/v17-v13.sh"
+          python3 .github/scripts/track-a-worldmap-causal-character-activation-v14-repair.py "$RUNNER_TEMP/v17-v13.sh" "$RUNNER_TEMP/v17-v14.sh"
+          python3 .github/scripts/track-a-worldmap-native-semantic-v17-repair.py "$RUNNER_TEMP/v17-v14.sh" "$RUNNER_TEMP/v17.sh"
+          bash -n "$RUNNER_TEMP/v17.sh"
+
+          python3 - "$RUNNER_TEMP/v17.sh" "$RUNNER_TEMP/gdb-generator.py" <<'PY'
+          from pathlib import Path
+          import sys
+          helper=Path(sys.argv[1]).read_text()
+          start='python3 - "$GCMD" "$PID" "$bias" "$EVENTS" "$STRIPS" <<\'PY\'\n'
+          a=helper.find(start)
+          assert a >= 0, 'embedded generator start missing'
+          a += len(start)
+          b=helper.find('\nPY\nchmod 600 "$GCMD"',a)
+          assert b > a, 'embedded generator end missing'
+          src=helper[a:b]
+          compile(src,'<v17-embedded-gdb-generator>','exec')
+          Path(sys.argv[2]).write_text(src)
+          print('WORLDMAP_V17_EMBEDDED_GENERATOR_COMPILE=PASS')
+          PY
+
+          python3 "$RUNNER_TEMP/gdb-generator.py" \
+            "$RUNNER_TEMP/generated.gdb" 12345 0 \
+            "$RUNNER_TEMP/events" "$RUNNER_TEMP/strips"
+          test -s "$RUNNER_TEMP/generated.gdb"
+          grep -Fq 'WORLDMAP_V17_POSTAUTH_CHARSEL_INSTANCE_COUNT=' "$RUNNER_TEMP/generated.gdb"
+          grep -Fq 'WORLDMAP_V17_NATIVE_CHARACTER_QMETA_INVOCATION=PASS' "$RUNNER_TEMP/generated.gdb"
+          grep -Fq 'WORLDMAP_V17_SEMANTIC_RESULT=PASS' "$RUNNER_TEMP/generated.gdb"
+          test "$(grep -Fc "M(0xd47300,'RequestCharacterLogin')" "$RUNNER_TEMP/generated.gdb" || true)" -eq 0
+          test "$(grep -Fc "M(0xd47130,'CharacterSelectionConfirmed')" "$RUNNER_TEMP/generated.gdb" || true)" -eq 0
+          echo 'WORLDMAP_V17_EMBEDDED_GENERATOR_EXECUTION=PASS'
+          echo 'WORLDMAP_V17_GENERATOR_STATIC=PASS'
+          echo 'WORLDMAP_V17_GENERATOR_CLIENT_EXECUTED=false'
+          echo 'WORLDMAP_V17_GENERATOR_SECRET_USED=false'

@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260905-be4f48-qt-1cd26e-inputs
-status: investigating
+status: validating
 agent: Codex
 session_id: login-closure-20260905-084311-ae070f034ee4
 session_role: researcher
@@ -8,14 +8,14 @@ project_lane: otclient
 lane: P2-NETWORK
 track_id: official-client-re
 task_kind: implementation
-phase: investigate
+phase: validate
 branch: ai/OTC-20260905-be4f48-qt-1cd26e-inputs
 base_branch: main
 base_main: 981a64151d219341f175597027e676be0f52068a
 created: 2026-09-05T09:24:28Z
-updated_at: 2026-09-05T09:24:28Z
+updated_at: 2026-09-05T09:29:40Z
 invocation_started_at: 2026-09-05T08:43:11Z
-last_progress_at: 2026-09-05T09:24:28Z
+last_progress_at: 2026-09-05T09:29:40Z
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: codex
@@ -83,7 +83,7 @@ blocks:
   - clean coordinator consumption of this exact source result
 cross_repository_task_ids: []
 ownership_released: false
-next_action: repository-only RED for one selected call input projection
+next_action: exact qualification and independent whole-diff review
 ---
 
 # Source claim
@@ -95,3 +95,7 @@ Fresh governance/track/admission/currentfence and active/openPR roster unchanged
 Reuse source923 repaired finite must-value core, replacing store enumeration with selected-call incoming values. TDDRED/GREEN, conservative aliases/implicit memory/prefixed control, exact qualification, independent whole-diff, final exact focused/CI/governance/boundary. Unknown inputs are not actual absence; call-return tokens are provenance only. RuntimeE2E NOT_APPLICABLE because static-only producer. SourceDraft/unmerged; cleanpromotion and separatearchive before a nextproofclass.
 
 Invocation08:43:11Z/240minutes/4additional, this is additional2. No terminal-entry CI exception; max2ordinary observations/head and1identicaltransient retry,3repaircycles,15minute no-progress. Runtimeadmissionnone complete above; no client execution/login/credentials/memory/capture/OCR/serviceE2E/TrackB change. Rawclient/core and acquisition state transient, deleted before sanitized JSON artifacts.
+
+## Repository-only RED/GREEN
+
+RED 4b357ec1574ea177e9df68485f5de23dc0ab50ff:18behavior tests fail on explicit unimplemented selected-call scaffold, no official bytes involved. GREEN38testsPASS includes inherited package/identity tests and precise register/stack-slot projection. The first minimal implementation conservatively lost stack arguments after known register-only XOR; TDD exposed this, then explicit known ordinary instruction effects preserve memory when no memory-write operand exists. Unknown instructions still stop, privilege/BND/implicit-stack/segment/address-size regression families pass; exact setcc/cmov condition whitelist prevents admission by broad mnemonic prefix. Source923 storage enumeration is removed entirely from the new analyzer; only one selected call is projected. Python compileall and git diff --check PASS. No callee body inspected, no cap widened. Independent review and hosted exact qualification remain required.

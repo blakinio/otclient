@@ -1,15 +1,15 @@
 ---
-task_id: OTC-20260905-be4f48-post943-promotion
-status: validating
+task_id: OTC-20260905-be4f48-queue-indexed-record
+status: completed
 agent: Codex
 session_id: login-closure-20260905-113552-ae070f034ee4
-session_role: coordinator
+session_role: researcher
 project_lane: otclient
 lane: P2-NETWORK
 track_id: official-client-re
-task_kind: integration
-phase: validate
-branch: docs/OTC-20260905-be4f48-post943-promotion
+task_kind: implementation
+phase: archive
+branch: ai/OTC-20260905-be4f48-queue-indexed-record
 base_branch: main
 base_main: eee302d67fc24437922ed96d811c9b9ad3bc7510
 created: 2026-09-05T12:22:18Z
@@ -36,7 +36,7 @@ target_uniqueness: NOT_APPLICABLE
 mutation_authorized: false
 persistent_session_role: none
 physical_e2e_required: false
-implementation_authorized: false
+implementation_authorized: true
 feature_scope:
   type: contract_producer
   user_facing: false
@@ -60,33 +60,48 @@ additional_source_task_ordinal: 2
 foreground_runtime_budget_minutes: 240
 foreground_budget_reason: explicit sequential source qualification and clean promotion/archive programme
 ci_checks_for_current_head: 0
-ci_check_generation: clean_promotion
+ci_check_generation: source_claim
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 0
+repair_cycles_for_current_gate: 1
 context_reconstruction_attempts: 0
 stall_warnings: 0
-owned_paths:
-  - docs/agents/tasks/active/OTC-20260905-be4f48-post943-promotion.md
-  - docs/agents/evidence/OTC-20260905-be4f48-post943-promotion/**
+owned_paths: []
 modules_touched: []
 reuses:
   - docs/agents/prompts/OTC_BE4F48_QUEUE_PLT_INDEXED_RECORD.md
   - source939 strict package/fence and selected PLT guards only
   - docs/agents/evidence/OTC-20260905-be4f48-post939-partial-promotion/result.json
 depends_on: []
-blocks:
-  - clean coordinator consumption of this exact source result
+blocks: []
 cross_repository_task_ids: []
-ownership_released: false
-next_action: independent clean promotion review and exact-head checks then protected squash
+ownership_released: true
+next_action: ownership released; successor registration only after archive merge
 ---
 
-# Clean coordinator promotion of source #943
+# Selected indexed-record proof and plan
 
-Fresh protectedmaineee302d67fc24437922ed96d811c9b9ad3bc7510,sourcefinalc5ac6d0a9482287b5acebe3b7bc35465924803c6. Coordinator independently inspected fullsource/model/tests/result andfinalcompletedqualification. Onlythree sanitizeddocumentationfiles promoted; no analyzer/workflow.
+Registration942 mergeeee302d67fc24437922ed96d811c9b9ad3bc7510, freshprotectedmain. Prior939partialconsumed940 andcoordarchived941, source939/919 remainblockedreleased withno pathoverlap. AGENTS/tracks/admission/fence hashes unchanged; currentSHORT_COMMANDSregisterednewclass. TrackB284 exact62383aded3acbeb5f405a12fe1f93849cd8e35f9 unchangedblocked. Isolatedqueue-indexworktree and source-onlyownedpaths, no productmodule/API.
+
+Plan: index.py qualifies contiguous16byte selectedstub JMP/PUSHliteral/JMP, parses <=512 raw ELF64 dynamicentries without Dynamic.get_tag hiddenstringlookup, validates exact table/symbol/stringmetadata and directlyreadsoneindexedRELA row. Reuseonlysource939 call/stub guards/package/fence; numericrelocation scan excluded. analyze.py applies exactdualfilefences and deterministic sanitizedoutput. Synthetictests exercise stub/layout/index/dynamic/table/symbol rejection and forbiditer_relocations/unrelatedgetsymbol. RED before minimalGREEN; fresh exactqualification, independentfull-diff/resultPASS0, exactfocused/CI/governance/boundary, cleanpromotion then separatearchive.
+
+Spec is docs/agents/prompts/OTC_BE4F48_QUEUE_PLT_INDEXED_RECORD.md; positive onlyselfconsistentselectedrecord, notglobalrelocationuniqueness/runtime/importimplementationuse. Existing939graph notcompleted. Runtime/clientexecution/login/credentials/memory/capture/OCR/serviceE2E/TrackBmutationzero; fullnoneadmissionabove. E2ENOT_APPLICABLE staticproducer; raw/helperstate deletedbefore sanitizedartifact andfailurecleanup. Noexternalmodelservices.
+
+Invocation11:35:52Z/240minutes/4additional, thisadditional2. OrdinaryCI2/head,1identicaltransientretry,3repaircycles,15minnoprogress retained. SourceDraftunmerged. No newauthority from sourceedits.
+
+## RED/GREEN and pre-qualification interface falsification
+
+Repository-onlyRED711aa5717414815d21e5fbeb2bb8a00452302f02:27assertionfailures before implementation. MinimalGREEN36tests including9reusedpackageguards. Rootfound a real-library interface risk: dict(section) assumes a mapping method absent from pyelftools Section. Initial supplementalproxy test incorrectly forwarded dict.keys and firstpassed; correctedfixture blocks that non-real method. Actual regressionRED failed INVALID_SECTION_ITERATION, thenGREEN compares explicit sectionmetadata fields. Final37testsPASS,py_compile/gitdiffcheckPASS. This was repaired before any exact-clientqualification/scientifichead, no disqualified sourceproof or failedofficialrun.
+
+Dynamicentries are unpacked directly with fixedELF64width to avoid Dynamic.get_tag hiddenstringtable lookup. Selectedrecords use get_relocation(index), noiter_relocations; oneget_symbol only after metadata and GOT/type checks. Eagerretiredscan notincluded. Independentwhole-diff and exactqualification required; retries0,repaircycles0 at scientificgate. SourceDraft/unmerged,939/919 remainblocked.
+
+## S943-01 selected string-table bounds repair
+
+Scientific860bdce2afda7bc1c019f5121843874204054428 is disqualified despite completedfocused33966150461/job101306536201 and CI33966150503/governance33966150533/boundary33966150427SUCCESS. Independentreview showed pyelftools get_symbol reads a selectedname beyond declared.dynstr bounds before post-validation, violating boundedname authority. No scientificfacts consumed from thishead.
+
+RegressionRED919b9d1edcfb118b5d6b299a10eab95d5b95ddcd:3assertionfailures for out-of-sectionst_name, missingin-sectionNUL and readcap. GREEN directly reads exactlyone24byteElf64Sym header, validatesindex/type/binding/undefinedsection, validatesst_name withinlinked.dynstr, reads at mostmin(513,remainingsection)bytes, and requiresNULwithin512ASCIIcharacters before nameacceptance. No get_symbol/stringtable.get_string. Existingselectedrecord test now verifiesoneheaderread andzeroeagerget_symbol calls.40testsPASS,gitdiffcheckPASS. Repaircycle1,retries0; freshscope/full-diff/familyreview and exactqualification required.
 
 # Exact-current indexed import record qualification
 
@@ -122,9 +137,8 @@ Indexedrecordimplementation/use,globalrelocationuniqueness,runtimeimportresoluti
 
 SourceDraftunmerged; clean docs-onlypromotion fromfreshmain after independentfinalreview, protectedexpected-headsquash,sourceclosedunmergedconsumed,separatearchiveownershiprelease,thenone newproofclass. No sourceanalyzer/workflowpromotion. Existing939/919incompleteobligations notcompleted. runtime_access=none;clientexecution/login/credentials/memory/capture/OCR/serviceE2E/TrackBmutationszero. E2ENOT_APPLICABLE staticcontractproducer. Rawofficialbytes onlytransient,neverartifact. Invocation11:35:52Z/240minutes/4additional,thisadditional2; repaircycle1/retries0 preserved.
 
+## Separate archive closeout
 
-## Final source gates and coordinator consumption
+Promotion944 merged9328e0e63c95733083c0439a47caccf24021c556,reviewedheade29c64b9bfd8b145ce34263773964c622ddce662,CI33966749572/governance33966749433SUCCESS,independent source/promotionPASS0. Source943finalc5ac6d0a9482287b5acebe3b7bc35465924803c6 closedunmergedconsumed; focused33966624789/job101307779802,CI33966624968/governance33966624792/boundary33966624980SUCCESS,40tests,exactfences/originalJSON/cleanupverified. S94301disqualifiedhead/regressionrepairhistory preserved.
 
-Sourcefinalc5ac6d0a9482287b5acebe3b7bc35465924803c6: focused33966624789/job101307779802,CI33966624968,governance33966624792,boundary33966624980 allSUCCESS.40tests,exactcheckout/fences,originalsanitizedJSONidentical,raw/helperstateremoval beforeupload verified. Finalartifact9969632298 SHA2567e908923dfa3c66738899d1518bd87aa46d60d15a9dcfe724aa1e2978852f203. Independent sourcefull-diff/finding-family/documentationreviewsPASS0; finalcompletedresult andthispromotionreview mustPASS0 beforemerge.
-
-Promote selectedindexedrecord correspondence and boundedname only. Do notupgrade toglobalrelocationuniqueness,runtimeprovider,activationarguments,registeredreceiver/writer or wirecompatibility. Existing939/919blockedobligations remainunchanged. No implementation is identified insidepackagedQtCore bythisresult. Afterprotectedmerge close943unmergedconsumed, separatearchiveownershiprelease andretirealias, thenregisterone newboundedmode. No runtime/E2E/TrackBchanges.
+Completedonlyselectedindexedrecordproof anditscoordinatorlifecycle,notwholelogincompatibility. Import historicalsource directlytoarchive; movecompletedcoordinatoractive->archive; releaseownership andretireonlyindexedrecordalias. Existing939/919activeblockedobligations remainuntouched. Registernewclassonlyafterthisarchive. Runtime/E2E/TrackBmutationszero; E2ENOT_APPLICABLE staticproducer. Invocation11:35:52Z/240minutes/4additional,943additional2.

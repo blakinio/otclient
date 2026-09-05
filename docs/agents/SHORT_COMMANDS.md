@@ -4,12 +4,13 @@ This registry maps owner-facing programme aliases to repository-owned prompts or
 
 | Alias | Canonical entry point | Purpose |
 |---|---|---|
-| `OTC-BE4F48-QT-C6C16-CONTINUATION` | `docs/agents/prompts/OTC_BE4F48_QT_C6C16_CONTINUATION.md` | Exact first QtCore continuation 0x1d36fb to 0xc6c16; source-only, one semantic boundary. |
 | `OTCLIENT-TIBIA-RE` | `docs/agents/prompts/OTCLIENT_TIBIA_RE_CANONICAL.md` | Continue Track A: official Linux Tibia client reverse engineering in `blakinio/otclient`. |
 | `OTCLIENT-GLOBAL-LOGIN` | PR `#284`, branch `feat/OTC-20260813-tibia-global-login-lab`, task `docs/agents/tasks/active/OTC-20260813-tibia-global-login-lab.md` on that branch | Continue Track B: make this OTClient fork authenticate to and enter official Tibia Global. |
 | `OTCLIENT-TIBIA-GLOBAL-LOGIN-FINAL-CONTINUE` | `docs/agents/prompts/OTCLIENT_TIBIA_GLOBAL_LOGIN_FINAL_CONTINUE.md` | Single-window Track B coordinator with local Vision/Qwen post-processing when independently legal secret-safe keyframes exist. |
 
 Historical consumed aliases:
+
+- `OTC-BE4F48-QT-C6C16-CONTINUATION` completed in source #915, consumed by promotion #916; this separate archive releases ownership. Do not relaunch.
 
 - `OTC-BE4F48-QT-CONNECTIMPL-RECEIVER-DELEGATION` completed in source #911, consumed by promotion #912; this separate archive releases ownership. Do not relaunch it.
 
@@ -39,7 +40,7 @@ Uruchom OTCLIENT-GLOBAL-LOGIN autonomicznie.
 Uruchom OTCLIENT-TIBIA-GLOBAL-LOGIN-FINAL-CONTINUE autonomicznie.
 ```
 
-The bounded successor OTC-BE4F48-QT-C6C16-CONTINUATION is registered after merged archive #913. Read its exact prompt before claiming. No alias authorizes runtime, Track B mutation or official-service E2E without its own explicit authority.
+No bounded successor is registered by this archive. Register one exact QtCore0xbc368 callee-semantic successor only after this archive merges. No alias authorizes runtime, Track B mutation or official-service E2E without its own explicit authority.
 
 ## `OTCLIENT-TIBIA-RE` resolution
 

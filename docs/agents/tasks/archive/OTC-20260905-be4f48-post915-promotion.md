@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260905-be4f48-post915-promotion
-status: validating
+status: completed
 agent: Codex
 session_id: login-closure-20260904-ae070f034ee4
 session_role: coordinator
@@ -8,7 +8,7 @@ project_lane: otclient
 lane: P2-NETWORK
 track_id: official-client-re
 task_kind: integration
-phase: validate
+phase: archive
 branch: docs/OTC-20260905-be4f48-post915-promotion
 base_branch: main
 base_main: d460606e8814bb3edc6928bdac3c754684561fdc
@@ -80,8 +80,8 @@ depends_on: []
 blocks:
   - clean coordinator consumption of this exact source result
 cross_repository_task_ids: []
-ownership_released: false
-next_action: exact-head review/checks then clean squash promotion and separate archive
+ownership_released: true
+next_action: ownership released; register exact0xbc368 callee semantics after archive merge
 ---
 
 # Clean coordinator promotion of source #915
@@ -116,3 +116,7 @@ Final source focused33951200835/job101266209889; CI33951200973; governance339512
 After independent clean-diff review and exact-head gates, expected-head squash this promotion; close source915 unmerged as consumed; separate archive moves coordinator active task and explicitly imports historical source task (never onmain), both ownership_released:true. Only after archive register one exact0xbc368 callee semantic successor. Do not automatically include0xc6c5c,0x1cd220 or0xdd8df0. Continue programme after source-local positive/blocker; no programme success or static exhaustion claimed.
 
 runtime_access=none; official_client_executed=false; login_performed=false; credentials_used=false; process_memory_access=false; packet_capture=false; ocr_vision_used=false; official_service_e2e_count=0; track_b_pr_284_modified=false.
+
+## Archive closeout
+
+Promotion916 merged atd2684b9949fa23d66cd2a4ab4eca7f28603ff01d. Source915 exactheadf91d77bcf016885795a019a9e571f60c33a74c5a closed unmerged as consumed. Both ownerships released. No successor registered until this archive merges. Original invocation06:39Z/240minutes remains unchanged; firstsource complete, additionaltasks0.

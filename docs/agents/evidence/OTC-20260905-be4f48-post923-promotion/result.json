@@ -1,0 +1,172 @@
+{
+  "schema": "otclient.track-a.be4f48-post923.v1",
+  "source_pr": 923,
+  "source_head": "cd952996c4952a1dce710d3c9e6d48bc693438f5",
+  "exact_client": {
+    "sha256": "552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1",
+    "size": 52105824,
+    "version": "15.32.be4f48"
+  },
+  "packaged_qtcore": {
+    "localfile": "bin/lib/libQt6Core.so.6",
+    "packedhash": "3a58482841fbf76f9b09ffd5522efb2c8eeebfc84c011167e8199ac2dd8dca1b",
+    "packedsize": 2215336,
+    "unpackedhash": "03ac3e4e7356399897ec58d42c81ae5c257072d45d539de1def528a8a04911fa",
+    "unpackedsize": 7354472,
+    "url": "bin/lib/libQt6Core.so.6.lzma"
+  },
+  "FACT": {
+    "caller_site": "0x1d36e8",
+    "callee_entry": "0x1cd220",
+    "containing_fde": [
+      "0x1cd220",
+      "0x1cd2a7"
+    ],
+    "normal_model": {
+      "reachable_instructions": 33,
+      "state_updates": 38,
+      "fixedpoint_reached": true,
+      "coverage_complete": true,
+      "resource_limit_hit": false
+    },
+    "conditional_direct_calls": [
+      {
+        "site": "0x1cd259",
+        "target": "0xba600"
+      },
+      {
+        "site": "0x1cd26e",
+        "target": "0x142e30"
+      },
+      {
+        "site": "0x1cd284",
+        "target": "0xbaeb0"
+      },
+      {
+        "site": "0x1cd28c",
+        "target": "0xba930"
+      }
+    ],
+    "cfg": {
+      "0x1cd220": [
+        "0x1cd221"
+      ],
+      "0x1cd221": [
+        "0x1cd222"
+      ],
+      "0x1cd222": [
+        "0x1cd229"
+      ],
+      "0x1cd229": [
+        "0x1cd22d"
+      ],
+      "0x1cd22d": [
+        "0x1cd234"
+      ],
+      "0x1cd234": [
+        "0x1cd236"
+      ],
+      "0x1cd236": [
+        "0x1cd238",
+        "0x1cd248"
+      ],
+      "0x1cd238": [
+        "0x1cd23c"
+      ],
+      "0x1cd23c": [
+        "0x1cd23f"
+      ],
+      "0x1cd23f": [
+        "0x1cd240"
+      ],
+      "0x1cd240": [
+        "0x1cd241"
+      ],
+      "0x1cd241": [],
+      "0x1cd248": [
+        "0x1cd24f"
+      ],
+      "0x1cd24f": [
+        "0x1cd256"
+      ],
+      "0x1cd256": [
+        "0x1cd259"
+      ],
+      "0x1cd259": [
+        "0x1cd25e"
+      ],
+      "0x1cd25e": [
+        "0x1cd260"
+      ],
+      "0x1cd260": [
+        "0x1cd238",
+        "0x1cd262"
+      ],
+      "0x1cd262": [
+        "0x1cd264"
+      ],
+      "0x1cd264": [
+        "0x1cd26b"
+      ],
+      "0x1cd26b": [
+        "0x1cd26e"
+      ],
+      "0x1cd26e": [
+        "0x1cd273"
+      ],
+      "0x1cd273": [
+        "0x1cd27a"
+      ],
+      "0x1cd27a": [
+        "0x1cd27d"
+      ],
+      "0x1cd27d": [
+        "0x1cd284"
+      ],
+      "0x1cd284": [
+        "0x1cd289"
+      ],
+      "0x1cd289": [
+        "0x1cd28c"
+      ],
+      "0x1cd28c": [
+        "0x1cd291"
+      ],
+      "0x1cd291": [
+        "0x1cd295"
+      ],
+      "0x1cd295": [
+        "0x1cd298"
+      ],
+      "0x1cd298": [
+        "0x1cd299"
+      ],
+      "0x1cd299": [
+        "0x1cd29a"
+      ],
+      "0x1cd29a": []
+    }
+  },
+  "INFERENCE": [
+    "Bounded must-value model proves no symbolic-destination receiver storage site; this does not prove absence of actual storage/delegation."
+  ],
+  "UNKNOWN": [
+    "runtime_loaded_qtcore",
+    "actual_sendlogin_receiver_identity",
+    "destination_dynamic_owner_type",
+    "successful_registration_and_delivery",
+    "complete_sendlogin_causal_binding",
+    "final_queue_writer",
+    "final_tcp_writer",
+    "final_writer_contract",
+    "field6_value",
+    "pre_success_send_sequence",
+    "callee_symbol_owner",
+    "callee_call_input_receiver_binding"
+  ],
+  "terminal_result": "SOURCE_BLOCKER",
+  "FIRST_MISSING_BOUNDARY": "NO_SYMBOLIC_DESTINATION_RECEIVER_STORE_PROVEN_IN_BOUNDED_MUST_MODEL",
+  "absence_of_real_receiver_stores_proven": false,
+  "TRACK_B_CURRENT_WIRE_DELTA": "NOT_PROVEN",
+  "official_service_e2e_count": 0
+}

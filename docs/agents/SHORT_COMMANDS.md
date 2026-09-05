@@ -4,7 +4,6 @@ This registry maps owner-facing programme aliases to repository-owned prompts or
 
 | Alias | Canonical entry point | Purpose |
 |---|---|---|
-| `OTC-BE4F48-QT-ACTIVATE-1D3FF0-CONTROL-FRONTIER` | `docs/agents/prompts/OTC_BE4F48_QT_ACTIVATE_CONTROL_FRONTIER.md` | Bounded symbol-local first-transfer CFG for exact packaged QtCore1d3ff0/85bytes; source-only. |
 | `OTCLIENT-TIBIA-RE` | `docs/agents/prompts/OTCLIENT_TIBIA_RE_CANONICAL.md` | Continue Track A: official Linux Tibia client reverse engineering in `blakinio/otclient`. |
 | `OTCLIENT-GLOBAL-LOGIN` | PR `#284`, branch `feat/OTC-20260813-tibia-global-login-lab`, task `docs/agents/tasks/active/OTC-20260813-tibia-global-login-lab.md` on that branch | Continue Track B: make this OTClient fork authenticate to and enter official Tibia Global. |
 | `OTCLIENT-TIBIA-GLOBAL-LOGIN-FINAL-CONTINUE` | `docs/agents/prompts/OTCLIENT_TIBIA_GLOBAL_LOGIN_FINAL_CONTINUE.md` | Single-window Track B coordinator with local Vision/Qwen post-processing when independently legal secret-safe keyframes exist. |
@@ -85,3 +84,5 @@ For all aliases, external Oteryn repositories, historical runners and old contai
 Source #939 / OTC-BE4F48-QUEUE-4D7DC0-IMPORT-BINDING is retired as incompletely consumed by partial promotion #940. Its active blocked relocation frontier remains discoverable with released ownership. Do not relaunch or widen its numeric scan; a new indexed-record proof requires separate registration after coordinator archive.
 
 Retired `OTC-BE4F48-QT-ACTIVATE-GNUHASH-DEFINITION`: source947 consumed unmerged by948; separate archive releases ownership. Packaged definition1d3ff0/85bytes proven; body/runtime/version UNKNOWN. Do not repeat selected GNU hash lookup as a new proof mode. Sources939/919 remain blocked.
+
+Retired `OTC-BE4F48-QT-ACTIVATE-1D3FF0-CONTROL-FRONTIER`: source951 consumed unmerged by952; separatearchive releasesownership. Exact21nodeCFG/internalcycle/tails proven; targetuse/argument/termination/runtime UNKNOWN. Do not repeat samefrontierscan. Sources939/919remainblocked.

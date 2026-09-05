@@ -70,7 +70,9 @@ def first_transfers(raw,base,entry):
         return found
     if cyclic(entry): boundary('CYCLE_UNPROVEN',entry); complete=False
     unique={tuple(sorted(r.items())):r for r in boundaries}
-    return {'complete':complete,'reachable_instructions':len(seen),'boundaries':sorted(unique.values(),key=lambda r:(int(r['site'],16),r['kind'],r.get('target','')))}
+    return {'complete':complete,'reachable_instructions':len(seen),
+            'cfg':{hex(pc):[hex(n) for n in sorted(set(edges[pc]))] for pc in sorted(edges)},
+            'boundaries':sorted(unique.values(),key=lambda r:(int(r['site'],16),r['kind'],r.get('target','')))}
 
 
 def plt_binding(raw,base,relocations):

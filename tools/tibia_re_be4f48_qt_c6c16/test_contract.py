@@ -56,6 +56,11 @@ class Contract(unittest.TestCase):
         self.require(plt_binding)
         self.assertIsNone(plt_binding(bytes.fromhex('64ff2509000000'),0x1000,{0x1010:'synthetic_import'}))
 
+    def test_bounded_path_evidence_reaches_call(self):
+        self.require(first_transfers)
+        result=first_transfers(bytes.fromhex('90e80a000000c3'),0x1000,0x1000)
+        self.assertEqual(result.get('cfg'),{'0x1000':['0x1001'],'0x1001':[]})
+
     def test_plt_only_actual_first_jump(self):
         self.require(plt_binding)
         self.assertEqual(plt_binding(bytes.fromhex('ff250a000000'),0x1000,{0x1010:'synthetic_import'}),'synthetic_import')

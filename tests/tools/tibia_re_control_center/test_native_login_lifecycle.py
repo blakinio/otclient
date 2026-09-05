@@ -26,6 +26,23 @@ class NativeLoginLifecycleTests(unittest.TestCase):
             },
         )
 
+    def test_03_start_fails_closed_when_runtime_is_unbound(self) -> None:
+        from tools.tibia_re_control_center.native_login_lifecycle import (
+            NativeLoginLifecycle,
+            NativeLoginLifecycleError,
+        )
+
+        lifecycle = NativeLoginLifecycle()
+        with self.assertRaises(NativeLoginLifecycleError) as caught:
+            lifecycle.start()
+        self.assertEqual(caught.exception.code, "NATIVE_LOGIN_UNBOUND")
+        self.assertEqual(
+            caught.exception.safe_message,
+            "native login runtime is not bound",
+        )
+        self.assertFalse(caught.exception.physical_effect)
+        self.assertFalse(lifecycle.status()["physical_effect"])
+
 
 if __name__ == "__main__":
     unittest.main()

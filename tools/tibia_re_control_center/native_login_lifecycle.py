@@ -28,11 +28,18 @@ class NativeLoginLifecycle:
             "reason": "NATIVE_LOGIN_RUNTIME_NOT_BOUND",
         }
 
-    def start(self) -> dict[str, object]:
-        raise NativeLoginLifecycleError(
-            "NATIVE_LOGIN_UNBOUND",
-            "native login runtime is not bound",
-        )
+    def start(self, operation_id: str | None = None) -> dict[str, object]:
+        if self._executor is None:
+            raise NativeLoginLifecycleError(
+                "NATIVE_LOGIN_UNBOUND",
+                "native login runtime is not bound",
+            )
+        if operation_id is None:
+            raise NativeLoginLifecycleError(
+                "NATIVE_LOGIN_OPERATION_ID_REQUIRED",
+                "native login operation identity is required",
+            )
+        return dict(self._executor.start(operation_id))
 
 
 __all__ = ("NativeLoginLifecycle", "NativeLoginLifecycleError")

@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260905-be4f48-post927-promotion
-status: validating
+status: completed
 agent: Codex
 session_id: login-closure-20260905-095156-ae070f034ee4
 session_role: coordinator
@@ -8,7 +8,7 @@ project_lane: otclient
 lane: P2-NETWORK
 track_id: official-client-re
 task_kind: integration
-phase: validate
+phase: archive
 branch: docs/OTC-20260905-be4f48-post927-promotion
 base_branch: main
 base_main: 981a64151d219341f175597027e676be0f52068a
@@ -68,20 +68,17 @@ identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 0
 stall_warnings: 0
-owned_paths:
-  - docs/agents/tasks/active/OTC-20260905-be4f48-post927-promotion.md
-  - docs/agents/evidence/OTC-20260905-be4f48-post927-promotion/**
+owned_paths: []
 modules_touched: []
 reuses:
   - docs/agents/prompts/OTC_BE4F48_QT_1CD26E_CALL_INPUTS.md
   - docs/agents/evidence/OTC-20260904-be4f48-post911-promotion/result.json
   - source911 finite must-identity design and source919 exact package and ELF guards
 depends_on: []
-blocks:
-  - clean coordinator consumption of this exact source result
+blocks: []
 cross_repository_task_ids: []
-ownership_released: false
-next_action: verify clean promotion exact-head review and gates before protected squash merge
+ownership_released: true
+next_action: ownership released; new proof registration only after this archive merges
 ---
 
 # Clean coordinator promotion of source #927
@@ -114,3 +111,9 @@ After protected squash, close source927 unmerged as consumed; separately archive
 Fresh owner invocation09:51:56Z,240minutes/4additional sources;927 entrytask. All previous invocation failures/counters retained in source record. No ownership overlap found; main/fence/admission and TrackB284 unchanged.
 runtime_access=none;official_client_executed=false;login_performed=false;credentials_used=false;process_memory_access=false;packet_capture=false;ocr_vision_used=false;official_service_e2e_count=0;track_b_pr_284_modified=false.
 RuntimeE2E NOT_APPLICABLE: static contract producer. TrackB284 head62383aded3acbeb5f405a12fe1f93849cd8e35f9 remains blocked; TRACK_B_CURRENT_WIRE_DELTA=NOT_PROVEN.
+
+## Separate archive closeout
+
+Clean promotion#928 merged 41232abbffc6ba955f2ca0346c3ac615acf3aea9, reviewed head3b00e13e41094b8c01fc40234d84dbe80b435f89, exact CI33959540716/governance33959540551 SUCCESS, independent /root/promotion_review PASS0. Source927 exactb0be0655fa4ed13c726f8c47ce0e32ab805f210f closed unmerged as consumed. Final focused33959338455/job101288333122,CI33959338703,governance33959338459,boundary33959338412 SUCCESS; identical sanitized result and cleanup verified. Bounded SOURCE_BLOCKER acceptance complete; login/writer compatibility is not proven.
+
+Ownership released. Source919 remains independently blocked/discoverable. Source historical record imported only into archive, no source analyzer/workflow promotion. Coordinator active record moved to archive. Retire source927 alias; choose/register a new proof class only after this separate archive merges. RuntimeE2E NOT_APPLICABLE staticproducer; runtime/serviceE2E/TrackB mutation zero. Current invocation09:51:56Z,240minutes/4additional;927entry lifecycle, no additional source yet.

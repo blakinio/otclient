@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260905-be4f48-queue-indexed-record
-status: investigating
+status: validating
 agent: Codex
 session_id: login-closure-20260905-113552-ae070f034ee4
 session_role: researcher
@@ -12,10 +12,10 @@ phase: validate
 branch: ai/OTC-20260905-be4f48-queue-indexed-record
 base_branch: main
 base_main: eee302d67fc24437922ed96d811c9b9ad3bc7510
-created: 2026-09-05T11:47:00Z
-updated_at: 2026-09-05T11:52:51Z
+created: 2026-09-05T12:22:18Z
+updated_at: 2026-09-05T12:28:04Z
 invocation_started_at: 2026-09-05T11:35:52Z
-last_progress_at: 2026-09-05T11:52:51Z
+last_progress_at: 2026-09-05T12:28:04Z
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: codex
@@ -95,3 +95,9 @@ Plan: index.py qualifies contiguous16byte selectedstub JMP/PUSHliteral/JMP, pars
 Spec is docs/agents/prompts/OTC_BE4F48_QUEUE_PLT_INDEXED_RECORD.md; positive onlyselfconsistentselectedrecord, notglobalrelocationuniqueness/runtime/importimplementationuse. Existing939graph notcompleted. Runtime/clientexecution/login/credentials/memory/capture/OCR/serviceE2E/TrackBmutationzero; fullnoneadmissionabove. E2ENOT_APPLICABLE staticproducer; raw/helperstate deletedbefore sanitizedartifact andfailurecleanup. Noexternalmodelservices.
 
 Invocation11:35:52Z/240minutes/4additional, thisadditional2. OrdinaryCI2/head,1identicaltransientretry,3repaircycles,15minnoprogress retained. SourceDraftunmerged. No newauthority from sourceedits.
+
+## RED/GREEN and pre-qualification interface falsification
+
+Repository-onlyRED711aa5717414815d21e5fbeb2bb8a00452302f02:27assertionfailures before implementation. MinimalGREEN36tests including9reusedpackageguards. Rootfound a real-library interface risk: dict(section) assumes a mapping method absent from pyelftools Section. Initial supplementalproxy test incorrectly forwarded dict.keys and firstpassed; correctedfixture blocks that non-real method. Actual regressionRED failed INVALID_SECTION_ITERATION, thenGREEN compares explicit sectionmetadata fields. Final37testsPASS,py_compile/gitdiffcheckPASS. This was repaired before any exact-clientqualification/scientifichead, no disqualified sourceproof or failedofficialrun.
+
+Dynamicentries are unpacked directly with fixedELF64width to avoid Dynamic.get_tag hiddenstringtable lookup. Selectedrecords use get_relocation(index), noiter_relocations; oneget_symbol only after metadata and GOT/type checks. Eagerretiredscan notincluded. Independentwhole-diff and exactqualification required; retries0,repaircycles0 at scientificgate. SourceDraft/unmerged,939/919 remainblocked.

@@ -45,6 +45,19 @@ class Elf:
     def get_section(self,idx): return {2:self.syms,3:self.strings}.get(idx)
 
 class IndexTests(unittest.TestCase):
+    def test_real_section_mapping_interface(self):
+        class Proxy:
+            def __init__(self, section): self.section=section
+            def __getitem__(self, key): return self.section[key]
+            def __getattr__(self, key):
+                if key=='keys': raise AttributeError(key)
+                return getattr(self.section,key)
+        elf=Elf(); original=elf.get_section
+        elf.iter_sections=lambda: iter([Proxy(s) for s in elf.sections])
+        elf.get_section=lambda idx: Proxy(original(idx))
+        try: result=indexed_record(elf,TAGS,3,0x900)['symbol']
+        except KeyError: result='INVALID_SECTION_ITERATION'
+        self.assertEqual(result,'_ZN4Test4callEv')
     def test_contiguous_selector(self):
         r=selector(STUB,0x400,[PLT,GOT],0x900);self.assertIsNotNone(r)
         self.assertEqual((r['candidate_index'],r['push_site'],r['tail_target']),(3,'0x406','0x300'))

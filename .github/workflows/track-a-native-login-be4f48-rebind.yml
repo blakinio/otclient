@@ -6,6 +6,7 @@ on:
     types: [opened, synchronize, reopened]
     paths:
       - .github/workflows/track-a-native-login-be4f48-rebind.yml
+      - tools/tibia_runtime_bridge/native_login_rebind_core.py
       - tools/tibia_runtime_bridge/rebind_native_login_current.py
       - tools/tibia_runtime_bridge/current_sha_native_login_gate.py
       - tools/tibia_runtime_bridge/experimental_auth.cpp
@@ -32,7 +33,9 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          python3 -m py_compile tools/tibia_runtime_bridge/rebind_native_login_current.py
+          python3 -m py_compile \
+            tools/tibia_runtime_bridge/native_login_rebind_core.py \
+            tools/tibia_runtime_bridge/rebind_native_login_current.py
           python3 .github/scripts/test_track_a_agent_runtime_governance.py \
             --changed-from "${{ github.event.pull_request.base.sha }}" \
             --expected-branch "$GITHUB_HEAD_REF"

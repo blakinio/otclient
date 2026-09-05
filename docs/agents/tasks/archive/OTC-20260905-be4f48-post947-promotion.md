@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260905-be4f48-post947-promotion
-status: validating
+status: completed
 agent: Codex
 session_id: login-closure-20260905-113552-ae070f034ee4
 session_role: coordinator
@@ -8,7 +8,7 @@ project_lane: otclient
 lane: P2-NETWORK
 track_id: official-client-re
 task_kind: integration
-phase: validate
+phase: archive
 branch: docs/OTC-20260905-be4f48-post947-promotion
 base_branch: main
 base_main: 67e6030ac3a94d3e5241749c2f8332353b3a46df
@@ -68,9 +68,7 @@ identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 0
 stall_warnings: 0
-owned_paths:
-  - docs/agents/tasks/active/OTC-20260905-be4f48-post947-promotion.md
-  - docs/agents/evidence/OTC-20260905-be4f48-post947-promotion/**
+owned_paths: []
 modules_touched: []
 reuses:
   - docs/agents/prompts/OTC_BE4F48_QT_ACTIVATE_GNUHASH_DEFINITION.md
@@ -80,8 +78,8 @@ depends_on: []
 blocks:
   - clean coordinator consumption of this exact source result
 cross_repository_task_ids: []
-ownership_released: false
-next_action: independent promotion review and exact-head checks then protected squash
+ownership_released: true
+next_action: none; bounded source consumed and ownership released
 ---
 
 # Clean coordinator promotion
@@ -125,3 +123,9 @@ SourceDraft nevermerges. Clean docs-only coordinator consumption after exact fin
 Final source947 aaedca05eefe9aab4adae53c3529e6e28ec0b2a2; focused33968928146/job101313865824,CI33968928345/governance33968928125/boundary33968928111 SUCCESS. Exact checkout,47tests,strictfences and cleanup verified again. Final sanitized JSON equals scientific original. Artifact9970318202,digest9dcf46c1cb31144d574ae661d1f51082499af809fa40d415902805ad8e259b68. Independent final source/doc review PASS0; GitHub reviews/threads empty. Both disqualified heads remain excluded. Coordinator independently inspected analyzer,library constructor chain,tests,diff,result and logs rather than relying on green workflows.
 
 Promote only sanitized facts in three documentation files from fresh protectedmain67e6030ac3a94d3e5241749c2f8332353b3a46df; no source analyzer/workflow. After protected expected-head merge,close source947unmergedconsumed; separatearchive releases ownership before any successor. Source939/919remainblocked. Packaged definition proof does not unlock TrackB.
+
+## Separate archive closeout
+
+Promotion948 mergedb1dbd23b123c63c6cc43876113b6634bdbeb3a53,reviewedhead66f612700a8c4eea66202d148a54ac1e68b0640b,CI33969038215/governance33969037956SUCCESS,independent source/promotion PASS0. Source947finalaaedca05eefe9aab4adae53c3529e6e28ec0b2a2 closedunmergedconsumed; focused33968928146/job101313865824,CI33968928345/governance33968928125/boundary33968928111SUCCESS,47tests,exactfences/equalJSON/cleanup. S94701/S94702 disqualification and regression history preserved.
+
+Completed only bounded packaged dynamic definition and coordinator lifecycle,notlogincompatibility. Source historical task imported directly toarchive; coordinator active->archive. Ownershipreleased; selectedGNUhash alias retired after successful consumption. Source939/919remainactiveblocked. Register one newproofclass only after archive merge. Runtime/E2E/TrackBmutationzero; E2ENOT_APPLICABLE staticproducer. Invocation11:35:52Z/240minutes/4additional,947additional3.

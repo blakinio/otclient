@@ -14,8 +14,8 @@ class MetadataTests(unittest.TestCase):
         class Path:
             def read_bytes(self): return b'fixture'
             def open(self,mode): return io.BytesIO(b'fixture')
-        with patch.object(analyze,'ELFFile',return_value=Elf()), patch.object(analyze,'verify_fence'), patch.object(analyze,'qualify_dependency_fence'), patch.object(analyze,'verify_member'), patch.object(analyze,'lookup',return_value={}):
-            self.assertEqual(analyze.analyze({'version':'fixture','qtcore':{}},Path(),Path())['terminal_result'],'POSITIVE_EXACT_PACKAGED_DYNAMIC_DEFINITION')
+        with patch.object(analyze,'ELFFile',return_value=Elf()), patch.object(analyze,'verify_fence'), patch.object(analyze,'qualify_dependency_fence'), patch.object(analyze,'verify_member'), patch.object(analyze,'lookup',return_value={}), patch.object(analyze,'selected_body',return_value=b'\xc3'), patch.object(analyze,'frontier',return_value={'complete':True,'limit_reached':False}):
+            self.assertEqual(analyze.analyze({'version':'fixture','qtcore':{}},Path(),Path())['terminal_result'],'POSITIVE_EXACT_SYMBOL_CONTROL_FRONTIER')
     def test_metadata_never_constructs_section_objects(self):
         class Elf:
             stream_len=4096

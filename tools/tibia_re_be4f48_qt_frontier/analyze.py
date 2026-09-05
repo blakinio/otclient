@@ -1,9 +1,10 @@
-"""Exact packaged definition metadata; no body or runtime lookup."""
+"""Exact symbol-local control frontier; no target traversal or runtime lookup."""
 import argparse
 import json
 from pathlib import Path
 from elftools.elf.elffile import ELFFile
 from definition import lookup
+from frontier import frontier, selected_body
 from fence import verify_fence, EXPECTED_VERSION, EXPECTED_SIZE, EXPECTED_SHA256
 from package import select_package, qualify_dependency_fence, verify_member
 
@@ -37,11 +38,19 @@ def analyze(selected, client, core):
         sections = section_metadata(elf)
         try:
             facts['packaged_definition'] = lookup(core.read_bytes(), sections)
-            terminal, missing = 'POSITIVE_EXACT_PACKAGED_DYNAMIC_DEFINITION', 'PACKAGED_DEFINITION_BODY_USE_NOT_PROVEN'
+            body=selected_body(core.read_bytes(),sections,facts['packaged_definition'])
+            graph=frontier(body,0x1d3ff0)
+            facts['symbol_control_frontier']=graph
+            if graph['limit_reached']:
+                terminal,missing='ANALYSIS_INCOMPLETE','SYMBOL_INSTRUCTION_LIMIT'
+            elif not graph['complete']:
+                terminal,missing='SOURCE_BLOCKER','SYMBOL_CONTROL_FRONTIER_UNRESOLVED'
+            else:
+                terminal,missing='POSITIVE_EXACT_SYMBOL_CONTROL_FRONTIER','SYMBOL_FRONTIER_TARGET_USE_NOT_PROVEN'
         except ValueError as error:
             missing = str(error)
             terminal = 'ANALYSIS_INCOMPLETE' if missing in ('DYNAMIC_ENTRY_LIMIT','HASH_CHAIN_LIMIT','HASH_CANDIDATE_LIMIT') else 'SOURCE_BLOCKER'
-    return {'schema':'otclient.track-a.be4f48-qt-definition.v1',
+    return {'schema':'otclient.track-a.be4f48-qt-frontier.v1',
             'exact_client':{'version':EXPECTED_VERSION,'size':EXPECTED_SIZE,'sha256':EXPECTED_SHA256},
             'packaged_qtcore':selected['qtcore'],'packaged_identity_is_runtime_loaded_identity':False,
             'FACT':facts,'INFERENCE':[],

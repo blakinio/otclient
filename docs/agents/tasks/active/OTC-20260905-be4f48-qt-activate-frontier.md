@@ -97,3 +97,7 @@ Positive only bounded first-transfer CFG,notruntime/pathfeasibility/termination/
 Fullnoneadmission above. Runtime/clientexecution/login/credentials/memory/capture/OCR/serviceE2E/TrackBmutationzero. E2ENOT_APPLICABLE staticproducer. Raw/helperstate transientremovedbeforeartifact/failurecleanup. Noexternalmodelservices. SourceDraftnevermerges; cleanpromotion/separatearchivebeforeone successor action.
 
 Invocation11:35:52Z/240minutes/4additionalsources,thisadditional4. No budgetreset; ordinaryCI2/head,oneidenticaltransientretry,three repairs,15minnoprogress. Writer/Field6/order/wire delta remainUNKNOWN/NOT_PROVEN.
+
+## Repository-only RED/GREEN
+
+RED82df42115d6717a09fdc56c9dabc7f4684cec6a3:20 errors at unimplemented frontier before minimalGREEN67tests including47 inherited identity/package/header controls. Extent guard added with RED1 missing-helper failure thenGREEN68. Guard accepts only promoted address/size/index/section and reads precisely85bytes, rejects partial mapping overlaps. First-transfer graph stops at calls/returns/external branches, records cycles without termination claims and rejects overlapping/unmodeled/truncated decode. No sourcequalification yet. Independent whole-diff falsification and exactqualification required; repaircycles0/retries0.

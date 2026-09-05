@@ -39,7 +39,7 @@ def frontier(raw, base, instruction_limit=64):
             boundary('OVERLAPPING_DECODE',pc,known=False);continue
         decoded[pc]=pc+ins.size;edges[pc]=[]
         if ins.group(CS_GRP_INT) or ins.group(CS_GRP_IRET) or ins.group(CS_GRP_PRIVILEGE) or ins.mnemonic in (
-                'ud2','hlt','syscall','sysenter','sysret','sysexit','xbegin','xabort','xend','retf','retfq','lcall','ljmp'):
+                'ud0','ud1','ud2','hlt','syscall','sysenter','sysret','sysexit','xbegin','xabort','xend','retf','retfq','lcall','ljmp'):
             boundary('UNMODELED_CONTROL',pc,known=False);continue
         if ins.group(CS_GRP_CALL):
             if len(ins.operands)==1 and ins.operands[0].type==X86_OP_IMM:

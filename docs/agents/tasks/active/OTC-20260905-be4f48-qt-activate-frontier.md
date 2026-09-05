@@ -65,7 +65,7 @@ terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 0
+repair_cycles_for_current_gate: 1
 context_reconstruction_attempts: 0
 stall_warnings: 0
 owned_paths:
@@ -139,3 +139,7 @@ recovery:
   next_action: implement minimal UD0/UD1 rejection after observed two regression failures
 
 Freshmain a0346f3ac4704bc5f41b75653d7eaca6c5d8655d/sourcehead d0c6444e19b539d793594c50cae537ca170fae01 match durable checkpoint. No overlapping open source writer; TrackB284 still62383aded3acbeb5f405a12fe1f93849cd8e35f9. Fullnoneadmission retained. Repository-only RED now reproduces two assertion failures at complete=true for UD0/UD1, using real Capstone and analyzer. No official client acquisition or runtime used by this resume checkpoint.
+
+## S951-01 repair candidate
+
+Regression RED afdcc9ff5a01a718c030b1d73384003674231cf3: two assertion failures for UD0/UD1 complete=true. Minimal GREEN explicitly classifies ud0/ud1 with existing undefined-trap handling, stops before fallthrough and retains no posttrap nodes. All69tests pass locally; no unrelated source change. Repaircycle1,retries0. Independent full-diff/finding-family audit and fresh exact qualification required; prior2e29d0fe remains disqualified.

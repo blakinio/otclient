@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260905-be4f48-post923-promotion
-status: validating
+status: completed
 agent: Codex
 session_id: login-closure-20260905-084311-ae070f034ee4
 session_role: coordinator
@@ -8,14 +8,14 @@ project_lane: otclient
 lane: P2-NETWORK
 track_id: official-client-re
 task_kind: integration
-phase: validate
+phase: archive
 branch: docs/OTC-20260905-be4f48-post923-promotion
 base_branch: main
 base_main: b1d5e32978b3b2fd1f960378d4f61c4bb85508a9
 created: 2026-09-05T08:54:00Z
-updated_at: 2026-09-05T09:16:05Z
+updated_at: 2026-09-05T09:18:32Z
 invocation_started_at: 2026-09-05T08:43:11Z
-last_progress_at: 2026-09-05T09:16:05Z
+last_progress_at: 2026-09-05T09:18:32Z
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: codex
@@ -69,9 +69,7 @@ repair_cycles_for_current_gate: 0
 source_gate_repair_cycles: 1
 context_reconstruction_attempts: 0
 stall_warnings: 0
-owned_paths:
-  - docs/agents/tasks/active/OTC-20260905-be4f48-post923-promotion.md
-  - docs/agents/evidence/OTC-20260905-be4f48-post923-promotion/**
+owned_paths: []
 modules_touched: []
 reuses:
   - docs/agents/prompts/OTC_BE4F48_QT_1CD220_RECEIVER_STORAGE.md
@@ -81,8 +79,8 @@ depends_on: []
 blocks:
   - clean coordinator consumption of this exact source result
 cross_repository_task_ids: []
-ownership_released: false
-next_action: clean promotion final whole-diff review and exact-head gates
+ownership_released: true
+next_action: ownership released; select/register one new bounded proof only after archive merge
 ---
 
 # Clean coordinator promotion of source #923
@@ -112,3 +110,9 @@ Final exact source head cd952996c4952a1dce710d3c9e6d48bc693438f5: focused3395734
 After protected expected-head squash, close source923 unmerged as consumed; separately archive its historical source task and completed coordinator task with ownershipreleased. Only then select/register one next bounded proof. This ordinary SOURCE_BLOCKER does not end the programme or establish static exhaustion.
 Invocation08:43:11Z/240minutes/4additional sources; source923 is additional1. No source self-merge. Runtime E2E NOT_APPLICABLE: static evidence producer.
 runtime_access=none;official_client_executed=false;login_performed=false;credentials_used=false;process_memory_access=false;packet_capture=false;ocr_vision_used=false;official_service_e2e_count=0;track_b_pr_284_modified=false.
+
+## Separate archive closeout
+
+Promotion #924 merged atefb6820f6d798b9f38b34d2a97729da3947ac09c, exact reviewed head1c3ca04970e955693067b7737f5dd00fd9fbcb35; CI33957522817/governance33957522564 SUCCESS, independent /root/promotion_review PASS0materialfindings. Source #923 exactcd952996c4952a1dce710d3c9e6d48bc693438f5 closed unmerged as consumed; final focused33957343673/job101282954906,CI33957343794,governance33957343679,boundary33957343670 SUCCESS. Bounded SOURCE_BLOCKER acceptance is fulfilled, not login/receiver/writer compatibility. Source919's distinct active blocked record remains unchanged.
+
+All mutable ownership released. This separate archive includes the historical source task that was never promoted as active on main, and moves the completed coordinator task out of active. No source analyzer/workflow is merged. Alias retired; next registration only after archive merge. Invocation08:43:11Z/240minutes continues; additional sources used1of4. Runtime E2E NOT_APPLICABLE for static contract producer; no runtime/serviceE2E/TrackB mutation.

@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260905-be4f48-post919-partial-promotion
-status: validating
+status: completed
 agent: Codex
 session_id: login-closure-20260905-084311-ae070f034ee4
 session_role: coordinator
@@ -8,7 +8,7 @@ project_lane: otclient
 lane: P2-NETWORK
 track_id: official-client-re
 task_kind: integration
-phase: validate
+phase: archive
 branch: docs/OTC-20260905-be4f48-post919-partial-promotion
 base_branch: main
 base_main: 05058065a2e433c5f2ad64cdd0f059d5302685e7
@@ -74,10 +74,7 @@ repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 0
 stall_warnings: 0
 historical_invocation_stall_warnings: 1
-owned_paths:
-  - docs/agents/tasks/active/OTC-20260905-be4f48-qt-bc368-contract.md
-  - docs/agents/evidence/OTC-20260905-be4f48-post919-partial-promotion/**
-  - docs/agents/tasks/active/OTC-20260905-be4f48-post919-partial-promotion.md
+owned_paths: []
 modules_touched: []
 reuses:
   - docs/agents/prompts/OTC_BE4F48_QT_C6C16_CONTINUATION.md
@@ -87,8 +84,8 @@ depends_on: []
 blocks:
   - clean coordinator consumption of this exact source result
 cross_repository_task_ids: []
-ownership_released: false
-next_action: refresh live authority and review/qualify the final docs-only head of PR 920 for clean partial promotion
+ownership_released: true
+next_action: after this archive merges, select and register one independent bounded proof class
 ---
 
 # Clean partial evidence promotion of source919
@@ -144,3 +141,7 @@ Prospective budget: 240 minutes and at most 4 additional bounded source tasks, j
 Fresh source-head checks: focused33952124771, CI33952124922, governance33952124764 and boundary33952124777 SUCCESS. Coordinator re-read source analyzer/result and final attempt2 job101271055616: exact checkout confirmed, sanitized JSON equals the committed original, cleanup precedes artifact. Repository-only tests rerun: 27 PASS. Historical coordinator head cc24f9575d0b248878fb2b127814839627862b4f has CI33953109374 and governance33953109231 SUCCESS; this resume amendment requires its own final-head review/checks. Source919 and promotion920 have no submitted reviews or unresolved threads at fresh preflight. Partial scientific/lifecycle review by /root/promotion_review found no material claim error so far; final-head verdict is pending.
 
 Admission remains runtime_access=none, mutation_authorized=false, no official client execution, login, secrets, process memory, packet capture, OCR or service E2E. PR284 remains unchanged at62383aded3acbeb5f405a12fe1f93849cd8e35f9 and blocked for current native pre-login outbound evidence. Its existing unrelated checks are not repaired by this task.
+
+## Verified partial-promotion closeout
+
+Promotion #920 merged at 193b3bd761109602f7bd6900ac1c4afb734e086f, exact reviewed head b8148392502dbf355ff97796bed9da6e8aa1b883. Independent /root/promotion_review PASS with zero material findings; CI33956173164 and governance33956173111 SUCCESS. Source #919 exact2770706995853903426b18afcac65ae0d3b13dda is closed unmerged as consumed partial/superseded. Its full graph remains ANALYSIS_INCOMPLETE and its active blocked record is retained unchanged on main. Only this coordinator documentation task is completed and moved to archive; all its mutable ownership is released. Historical checkpoint statements above retain their stated timestamp, not current status. No successor is registered until this separate archive merges. New owner invocation08:43:11Z remains active; no additional source task started yet.

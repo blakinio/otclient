@@ -4,7 +4,6 @@ This registry maps owner-facing programme aliases to repository-owned prompts or
 
 | Alias | Canonical entry point | Purpose |
 |---|---|---|
-| `OTC-BE4F48-QT-BC368-CALLEE-CONTRACT` | `docs/agents/prompts/OTC_BE4F48_QT_BC368_CALLEE_CONTRACT.md` | Exact callee0xbc368 ownership and bounded conditional local call contract; source-only. |
 | `OTCLIENT-TIBIA-RE` | `docs/agents/prompts/OTCLIENT_TIBIA_RE_CANONICAL.md` | Continue Track A: official Linux Tibia client reverse engineering in `blakinio/otclient`. |
 | `OTCLIENT-GLOBAL-LOGIN` | PR `#284`, branch `feat/OTC-20260813-tibia-global-login-lab`, task `docs/agents/tasks/active/OTC-20260813-tibia-global-login-lab.md` on that branch | Continue Track B: make this OTClient fork authenticate to and enter official Tibia Global. |
 | `OTCLIENT-TIBIA-GLOBAL-LOGIN-FINAL-CONTINUE` | `docs/agents/prompts/OTCLIENT_TIBIA_GLOBAL_LOGIN_FINAL_CONTINUE.md` | Single-window Track B coordinator with local Vision/Qwen post-processing when independently legal secret-safe keyframes exist. |
@@ -41,7 +40,7 @@ Uruchom OTCLIENT-GLOBAL-LOGIN autonomicznie.
 Uruchom OTCLIENT-TIBIA-GLOBAL-LOGIN-FINAL-CONTINUE autonomicznie.
 ```
 
-The bounded successor OTC-BE4F48-QT-BC368-CALLEE-CONTRACT is registered after merged archive #917. Read its exact scope before claiming. No alias authorizes runtime, Track B mutation or official-service E2E without its own explicit authority.
+Source #919 / OTC-BE4F48-QT-BC368-CALLEE-CONTRACT is retired as incompletely consumed by partial promotion #920. Do not relaunch it or treat it as completed; its active blocked graph obligation remains discoverable. After the separate #920 coordinator archive merges, fresh programme selection may register a genuinely independent bounded proof class. No alias authorizes runtime, Track B mutation or official-service E2E without its own explicit authority.
 
 ## `OTCLIENT-TIBIA-RE` resolution
 
@@ -73,3 +72,5 @@ Read post-#904 and post-#907 coordinator promotion evidence and archived task re
 A fresh worker must not invent a missing Track B task on `main`. While PR #284 is active, its exact branch/task is the durable Track B entry point.
 
 For all aliases, external Oteryn repositories, historical runners and old containers are not normal continuation sources. If a required fact is absent from current OTClient durable state, classify it as `UNKNOWN` and research it inside the owning track.
+
+- `OTC-BE4F48-QT-BC368-CALLEE-CONTRACT`: source #919 closed unmerged as consumed partial by #920; graph remains `ANALYSIS_INCOMPLETE`, active blocked record retained with ownership released. No automatic successor unlock.

@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260906-native-login-shm-bind-relay
-status: implementing
+status: validating
 agent: ChatGPT
 session_id: native-login-shm-bind-relay-20260906
 session_role: implementer
@@ -8,11 +8,11 @@ project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: native_login_transport_repair
-phase: contract_red
+phase: implementation_validation
 branch: fix/OTC-20260906-native-login-shm-bind-relay
 base_branch: main
 created: 2026-09-06T21:35:00+02:00
-updated_at: 2026-09-06T21:35:00+02:00
+updated_at: 2026-09-06T21:59:00+02:00
 base_main: aedd3a9dac833523b5e69fd5037ce591c33bfd25
 execution_mode: chatgpt
 execution_class: repository_only
@@ -63,7 +63,7 @@ No replacement, vault decrypt, credential send or native auth attempt occurred. 
 
 ## Root cause
 
-The merged relay used a pathname AF_UNIX socket under the Kasm container `/dev/shm`, while the sidecar only joined the target IPC namespace. Linux IPC namespaces do not share filesystem pathname visibility; `/dev/shm` pathname visibility follows mount namespace topology. Therefore the sidecar had no proven path to the relay socket even though `--ipc container:<target>` was present.
+The merged relay used a pathname AF_UNIX socket under the Kasm container `/dev/shm`, while the sidecar only joined the target IPC namespace. Linux IPC namespaces do not share filesystem pathname visibility; pathname socket visibility follows mount namespace/filesystem topology. Therefore the sidecar had no proven path to the relay socket even though `--ipc container:<target>` was present.
 
 ## Repair design
 
@@ -74,8 +74,28 @@ Keep the existing one-shot `SCM_RIGHTS` relay and `--network none`, but expose o
 3. add a read-only `--mount type=bind,src=<target-shm>,dst=/relay-shm,readonly` to the ephemeral sidecar before the immutable image;
 4. keep the relay server path inside Kasm as `/dev/shm/<task-run-name>`;
 5. map only the sidecar client path to `/relay-shm/<same-name>`;
-6. preserve `SCM_RIGHTS`, sealed memfd validation, `--network none`, cap-drop, one-shot cleanup and exact-current peer checks;
-7. Docker `--mount` missing-source behavior remains fail-closed; no host plaintext or credential path is copied into Kasm.
+6. remove the irrelevant `--ipc` join while preserving target PID sharing needed by the bounded sidecar topology;
+7. preserve `SCM_RIGHTS`, sealed memfd validation, `--network none`, cap-drop, one-shot cleanup and exact-current peer checks;
+8. Docker `--mount` missing-source behavior remains fail-closed; no host plaintext or credential path is copied into Kasm.
+
+## TDD / validation evidence
+
+RED exact head `a36ec81036cfe7e46946d93c074950814d3f6a30`:
+- workflow run `34056155579`, job `101548318256`;
+- 7 focused contract tests ran with 8 expected failures against merged `main`;
+- missing proof included `/relay-shm`, `ResolvConfPath`, `target_shm_source`, read-only `dst=/relay-shm`, and `_sidecar_relay_socket`;
+- the old worker still contained `--ipc` and the sidecar still rooted relay paths at `/dev/shm`;
+- PR-head self-hosted jobs were skipped;
+- runtime governance run `34056155584` passed, proving the child task itself remained repository-only.
+
+Implementation exact head `4b87540747548ca03cc3ee7bc04a09216a6f39dd`:
+- the worker binds target shm from exact inspected target identity and maps only the relay basename into sidecar `/relay-shm`;
+- sidecar relay root is `/relay-shm` while the Kasm relay server remains `/dev/shm`;
+- `--ipc` was removed; `--network none`, sealed memfd and `SCM_RIGHTS` remain unchanged;
+- focused physical-executor contract run `34056496456`, job `101549252363` is GREEN, with all PR-head self-hosted jobs skipped;
+- runtime governance run `34056496423` is GREEN;
+- native auth bridge run `34056496443` is GREEN;
+- general CI `34056496591` reached only the informational static-analysis tail at this checkpoint; a new exact-head CI generation follows this task checkpoint update.
 
 ## Acceptance
 
@@ -89,4 +109,4 @@ Keep the existing one-shot `SCM_RIGHTS` relay and `--network none`, but expose o
 
 ## Next action
 
-Add RED contract assertions for target Docker shm bind derivation and sidecar relay-path mapping, then obtain hosted RED before implementation.
+Obtain exact-head hosted GREEN on this checkpointed head, perform final diff/review-thread readback, merge PR #966, then return to the parent trusted-main PRECHECK and one-shot physical executor.

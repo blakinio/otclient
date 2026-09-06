@@ -164,6 +164,34 @@ class PhysicalExecutorContractTests(unittest.TestCase):
         ):
             self.assertNotIn(forbidden, text)
 
+    def test_relay_failure_observability_is_allowlisted_and_sidecar_first(self) -> None:
+        sidecar = SIDECAR.read_text(encoding="utf-8")
+        worker = WORKER.read_text(encoding="utf-8")
+        for needle in (
+            "SAFE_ERROR_CODES",
+            "_safe_error_code",
+            "relay_transport_failed",
+            "machine_local_vault_decrypt_failed",
+            '"error": _safe_error_code(exc)',
+        ):
+            with self.subTest(sidecar=needle):
+                self.assertIn(needle, sidecar)
+        self.assertNotIn('"error": str(exc)', sidecar)
+        for needle in (
+            "_classify_sidecar_probe_failure",
+            "target_shm_bind_source_unavailable",
+            "sidecar_probe_client_",
+            "sidecar_probe_process_failed",
+            "bind source path does not exist",
+        ):
+            with self.subTest(worker=needle):
+                self.assertIn(needle, worker)
+        probe_start = worker.index("def sidecar_probe(")
+        probe_end = worker.index("\ndef precheck(", probe_start)
+        probe = worker[probe_start:probe_end]
+        self.assertLess(probe.index("completed.returncode != 0"), probe.index("_finish_relay(relay"))
+        self.assertNotIn("completed.stderr", probe)
+
     def test_container_client_receives_relay_fd_and_forwards_only_sealed_memfd(self) -> None:
         text = CONTAINER_CLIENT.read_text(encoding="utf-8")
         required = (

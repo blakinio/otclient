@@ -1,0 +1,94 @@
+name: OTC 956 one-shot be4f48 source patcher
+
+on:
+  push:
+    branches:
+      - feat/OTC-20260905-control-center-native-login-start
+    paths:
+      - .github/workflows/otc-956-be4f48-source-patcher.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          ref: feat/OTC-20260905-control-center-native-login-start
+          fetch-depth: 0
+      - name: Apply exact bounded replacements
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              p = Path(path)
+              text = p.read_text(encoding='utf-8')
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{path}: expected old fragment exactly once, got {count}')
+              p.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          auth = 'tools/tibia_runtime_bridge/experimental_auth.cpp'
+          replace_once(auth, 'constexpr std::uint64_t kClientSize = 51965216;', 'constexpr std::uint64_t kClientSize = 52105824;')
+          replace_once(auth, 'constexpr char kClientSha256[] = "e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe";', 'constexpr char kClientSha256[] = "552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1";')
+          replace_once(auth, 'constexpr std::uintptr_t kGameClientVptrOffset = 0x3076908;', 'constexpr std::uintptr_t kGameClientVptrOffset = 0x30acd08;')
+          replace_once(auth, 'constexpr std::uintptr_t kColdAuthTargetOffset = 0xd06850;', 'constexpr std::uintptr_t kColdAuthTargetOffset = 0xd18d70;')
+          replace_once(
+              auth,
+              '''constexpr std::array<unsigned char, 32> kColdAuthFence = {
+    0x48, 0x8b, 0x51, 0x10, 0x48, 0x8b, 0x71, 0x08,
+    0x48, 0x83, 0xc4, 0x48, 0x5b, 0x5d, 0xe9, 0x2d,
+    0x38, 0x9e, 0xff, 0x0f, 0x1f, 0x44, 0x00, 0x00,
+    0x48, 0x8b, 0xbf, 0xa0, 0x09, 0x00, 0x00, 0x48,
+};''',
+              '''constexpr std::array<unsigned char, 32> kColdAuthFence = {
+    0x48, 0x8b, 0x51, 0x10, 0x48, 0x8b, 0x71, 0x08,
+    0x48, 0x83, 0xc4, 0x48, 0x5b, 0x5d, 0xe9, 0x4d,
+    0x67, 0x9c, 0xff, 0x0f, 0x1f, 0x44, 0x00, 0x00,
+    0x48, 0x8b, 0xbf, 0xa0, 0x09, 0x00, 0x00, 0x48,
+};''',
+          )
+
+          char = 'tools/tibia_runtime_bridge/experimental_character_control_current.cpp'
+          replace_once(char, 'constexpr std::uint64_t kClientSize = 52109920;', 'constexpr std::uint64_t kClientSize = 52105824;')
+          replace_once(char, 'constexpr char kClientSha256[] = "ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8";', 'constexpr char kClientSha256[] = "552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1";')
+          replace_once(char, 'constexpr std::uintptr_t kCharacterControllerVptrOffset = 0x30c3988;', 'constexpr std::uintptr_t kCharacterControllerVptrOffset = 0x30c29a8;')
+
+          replace_once(
+              'tools/tibia_re_control_center/control_domain.py',
+              'from .scenario import ACTION_KINDS, ValidatedScenario, validate_scenario\n\n\n_NATIVE_LOGIN_CLAIM_META_KEY',
+              'from .scenario import ACTION_KINDS, ValidatedScenario, validate_scenario\n\n_NATIVE_LOGIN_CLAIM_META_KEY',
+          )
+
+          task = 'docs/agents/tasks/active/OTC-20260905-control-center-native-login-start.md'
+          replace_once(
+              task,
+              '  - tests/tools/tibia_re_control_center/test_package_b.py\n',
+              '  - tests/tools/tibia_re_control_center/test_package_b.py\n  - tests/tools/tibia_runtime_bridge/test_native_login_be4f48_bindings.py\n',
+          )
+          PY
+          python3 -m py_compile tools/tibia_runtime_bridge/current_sha_native_login_gate.py tests/tools/tibia_runtime_bridge/test_native_login_be4f48_bindings.py
+          PYTHONPATH=. python3 tests/tools/tibia_runtime_bridge/test_native_login_be4f48_bindings.py
+          git diff --check
+          rm .github/workflows/otc-956-be4f48-source-patcher.yml
+          git diff --check
+      - name: Commit bounded source rebind
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git config user.name 'otclient automation'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add tools/tibia_runtime_bridge/experimental_auth.cpp \
+                  tools/tibia_runtime_bridge/experimental_character_control_current.cpp \
+                  tools/tibia_re_control_center/control_domain.py \
+                  docs/agents/tasks/active/OTC-20260905-control-center-native-login-start.md \
+                  .github/workflows/otc-956-be4f48-source-patcher.yml
+          git commit -m 'fix(track-a): bind native login helpers to be4f48'
+          git push origin HEAD:feat/OTC-20260905-control-center-native-login-start

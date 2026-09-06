@@ -8,11 +8,11 @@ project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: physical_native_login_execution
-phase: validation
+phase: merge_candidate_validation
 branch: runtime/OTC-20260906-native-login-physical-executor
 base_branch: main
 created: 2026-09-06T17:35:00+02:00
-updated_at: 2026-09-06T18:10:00+02:00
+updated_at: 2026-09-06T18:36:00+02:00
 base_main: f3b93c85dec6e8c290eaa12266ca97bbce8514a4
 policy_version: 2
 prompting_standard_version: 2.1
@@ -89,6 +89,8 @@ The task record deliberately remains fail-closed before physical execution: auth
 
 Credential plaintext is forbidden from GitHub Secrets, workflow env, argv, stdin, task/evidence text and logs. The executor may consume only the existing machine-local encrypted vault. The vault remains host-only: it is decrypted once on the trusted runner into a fully sealed anonymous memfd, and only that inherited descriptor crosses into the Kasm namespaces through `nsenter`; the namespace-side process drops to the numeric `kasm-user` UID/GID before handing the descriptor to the exact auth helper through SCM_RIGHTS. No private key, CMS vault, or plaintext credential is copied into Kasm. No second credential attempt is permitted.
 
+A `PASS_WITH_PROCESS_HANDOFF` result is fail-closed: the namespace client must explicitly return sanitized `fd_sent=true` after `sendmsg(SCM_RIGHTS)` before a fresh exact PID/start handoff can qualify. An outer `nsenter`/transport timeout or otherwise ambiguous transport failure cannot be upgraded to success and never causes an automatic second secret attempt.
+
 ## Physical success
 
 Success requires all of:
@@ -108,11 +110,19 @@ RED head `3cde9a55ead37a8035ef808b2de94d7711b6f040`:
 - 5 focused tests ran with exactly 2 errors because the worker and container-side FD client did not yet exist;
 - the Synology physical job was skipped.
 
-Implementation checkpoint `dc16166c2d591256ebbc9141293e0153eaa34eae`:
+Intermediate implementation checkpoint `dc16166c2d591256ebbc9141293e0153eaa34eae`:
 - focused physical-executor contract: 5/5 PASS;
 - Python compilation reached successfully;
 - workflow run `34044317122`, job `101516525874` then failed only in Track A runtime governance because the task frontmatter used non-schema `canonical_registration: REQUIRED_CURRENT`;
 - self-hosted PR boundary run `34044317179` was SUCCESS;
 - no physical job or secret access ran from PR head.
 
-The current checkpoint corrects only that admission metadata mismatch: `canonical_registration: PRESENT`, canonical namespace `canonical-live-runtime`, unknown transient generations, pending gates, unknown uniqueness and `mutation_authorized: false` until trusted-main physical execution proves the live values.
+Fully green pre-final-safety head `412d3afa2a800b363c8da05b9f4ea2688c6f5147`:
+- physical executor contract run `34044763032`: SUCCESS;
+- self-hosted PR boundary run `34044763027`: SUCCESS;
+- Track A runtime governance run `34044763028`: SUCCESS;
+- native auth bridge validation run `34044763025`: SUCCESS;
+- repository CI run `34044763160`: SUCCESS;
+- physical PRECHECK/EXECUTE jobs remained skipped on PR head as required.
+
+Final self-review then found and fixed one causal fail-closed issue: an ambiguous outer `nsenter` transport failure could previously be combined with a later PID handoff. Commit `f3ef92ad492b50b3074e3e394a4baac5102fc366` removed that path; commit `1e8b4eda1088b1ea56ebff47ae3deb64250d0bc0` added a regression contract requiring explicit `fd_sent` proof and forbidding `auth_transport_unknown`. This checkpoint is awaiting exact-head CI before Ready/merge.

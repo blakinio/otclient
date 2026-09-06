@@ -93,11 +93,13 @@ jobs:
           cmake --build "$build" --parallel 2
           cp "$build/otclient-tibia-runtime-bridge.so" "$bundle/"
           cp "$build/otclient-tibia-native-auth-experimental.so" "$bundle/"
+          read -r -a qt_cflags <<< "$(pkg-config --cflags Qt6Core)"
+          read -r -a qt_libs <<< "$(pkg-config --libs Qt6Core)"
           c++ -std=c++20 -fPIC -shared -Wall -Wextra -Wpedantic -Werror \
-            $(pkg-config --cflags Qt6Core) \
+            "${qt_cflags[@]}" \
             tools/tibia_runtime_bridge/experimental_character_control_current.cpp \
             -o "$bundle/otclient-tibia-character-control-current.so" \
-            $(pkg-config --libs Qt6Core) -ldl -pthread
+            "${qt_libs[@]}" -ldl -pthread
           cp tools/tibia_runtime_bridge/container_native_login_client.py "$bundle/"
           cp tools/tibia_runtime_bridge/profiles/tibia-15.32.be4f48.json "$bundle/"
           strings "$bundle/otclient-tibia-native-auth-experimental.so" | grep -F 'AUTH_WITH_CREDENTIALS' >/dev/null
@@ -257,8 +259,7 @@ jobs:
           }
           probe_changed() {
             local out="$RUNNER_TEMP/current-probe.json"
-            local i
-            for i in $(seq 1 30); do
+            for ((i=0; i<30; i++)); do
               if python3 "$probe" probe "$out" >/dev/null 2>&1; then
                 python3 - "$registration" "$out" <<'PY'
           import json,sys

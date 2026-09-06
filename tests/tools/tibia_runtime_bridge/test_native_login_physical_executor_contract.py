@@ -126,7 +126,11 @@ class PhysicalExecutorContractTests(unittest.TestCase):
         required = (
             "runtime_access: canonical_reuse_or_mutation",
             "runtime_owner_task: OTC-20260906-native-login-physical-executor",
-            "runtime_namespace: synology:otclient-track-a-kasmvnc:display-1",
+            "runtime_namespace: canonical-live-runtime",
+            "physical_runtime_locator: synology:otclient-track-a-kasmvnc:display-1",
+            "canonical_registration: PRESENT",
+            "canonical_lease_generation: UNKNOWN",
+            "registration_lease_generation: UNKNOWN",
             "gate_a: REQUIRED_NOT_PROVEN",
             "generation_rebind: REQUIRED_NOT_PROVEN",
             "gate_b: REQUIRED_NOT_PROVEN",

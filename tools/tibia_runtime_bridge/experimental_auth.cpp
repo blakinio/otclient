@@ -39,18 +39,18 @@
 
 namespace {
 
-constexpr std::uint64_t kClientSize = 51965216;
-constexpr char kClientSha256[] = "e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe";
-constexpr std::uintptr_t kGameClientVptrOffset = 0x3076908;
+constexpr std::uint64_t kClientSize = 52105824;
+constexpr char kClientSha256[] = "552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1";
+constexpr std::uintptr_t kGameClientVptrOffset = 0x30acd08;
 constexpr char kGameClientClass[] = "tibia::client::TGameClient";
 constexpr int kGameClientLocalMethodCount = 44;
 constexpr int kColdAuthMethodId = 17;
 constexpr char kColdAuthSignature[] = "onRequestLoginWithCredentials(QString,QString)";
-constexpr std::uintptr_t kColdAuthTargetOffset = 0xd06850;
+constexpr std::uintptr_t kColdAuthTargetOffset = 0xd18d70;
 constexpr std::array<unsigned char, 32> kColdAuthFence = {
     0x48, 0x8b, 0x51, 0x10, 0x48, 0x8b, 0x71, 0x08,
-    0x48, 0x83, 0xc4, 0x48, 0x5b, 0x5d, 0xe9, 0x2d,
-    0x38, 0x9e, 0xff, 0x0f, 0x1f, 0x44, 0x00, 0x00,
+    0x48, 0x83, 0xc4, 0x48, 0x5b, 0x5d, 0xe9, 0x4d,
+    0x67, 0x9c, 0xff, 0x0f, 0x1f, 0x44, 0x00, 0x00,
     0x48, 0x8b, 0xbf, 0xa0, 0x09, 0x00, 0x00, 0x48,
 };
 constexpr std::size_t kMaxCredentialBytes = 1024;

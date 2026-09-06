@@ -36,6 +36,7 @@ from .model import (
     ValidationError,
     validate_opaque_id,
 )
+from .native_login_lifecycle import NativeLoginLifecycle, NativeLoginLifecycleError
 from .persistent_store import (
     RequestLedgerRecord,
     SQLitePersistentStore,
@@ -43,6 +44,8 @@ from .persistent_store import (
 )
 from .recorder import Recorder, ensure_no_secret_material
 from .scenario import ACTION_KINDS, ValidatedScenario, validate_scenario
+
+_NATIVE_LOGIN_CLAIM_META_KEY = "native_login_active_resource"
 
 
 @dataclass(frozen=True)
@@ -119,7 +122,14 @@ def _error_body(code: str, message: str, request_id: str | None, resource_id: st
 class ControlDomainService:
     """Single Package B semantic path. The only mutating adapter admitted here is FakeAdapter."""
 
-    def __init__(self, data_root: str, *, backend_epoch: str | None = None, event_retention: int = 4096) -> None:
+    def __init__(
+        self,
+        data_root: str,
+        *,
+        backend_epoch: str | None = None,
+        event_retention: int = 4096,
+        native_login_lifecycle: NativeLoginLifecycle | None = None,
+    ) -> None:
         self.clock = RuntimeMonotonicClock()
         self.adapter = FakeAdapter(self.clock, allow_mutation=True)
         for capability in ACTION_KINDS:
@@ -129,6 +139,7 @@ class ControlDomainService:
         self.store = SQLitePersistentStore(data_root, event_retention=event_retention)
         self.coordinator = MutationCoordinator(self.adapter, self.store, self.clock, backend_epoch=backend_epoch)
         self.agent = AgentSessionCoordinator(self.store, self.coordinator)
+        self.native_login_lifecycle = native_login_lifecycle or NativeLoginLifecycle()
         self._request_stripes = tuple(threading.RLock() for _ in range(64))
         self._test_faults: dict[str, int] = {}
 
@@ -229,6 +240,7 @@ class ControlDomainService:
             "AGENT_TASK": "agent-task",
             "AGENT_CHAT": "agent-chat",
             "AGENT_CONTROL": "agent-control",
+            "NATIVE_LOGIN_START": "native-login",
         }[operation]
 
     def _new_resource_id(self, operation: str) -> str:
@@ -458,9 +470,13 @@ class ControlDomainService:
         if resource.get("result") is None:
             return None
         result = copy.deepcopy(resource["result"])
-        code = 201 if resource.get("operation") in {
-            "CREATE_RUN", "ONE_STEP_EXPERIMENT", "AGENT_TASK",
-        } else 200
+        operation = resource.get("operation")
+        if operation in {"CREATE_RUN", "ONE_STEP_EXPERIMENT", "AGENT_TASK"}:
+            code = 201
+        elif operation == "NATIVE_LOGIN_START":
+            code = 202
+        else:
+            code = 200
         return DomainReply(code, result, "COMPLETED", str(result.get("status", "UNKNOWN")), resource["resource_id"])
 
     def _recover_incomplete_run(self, resource_id: str, request_id: str, operation: str, normalized: dict[str, Any]) -> DomainReply | None:
@@ -546,6 +562,73 @@ class ControlDomainService:
     def one_step(self, resource_id: str, request_id: str, normalized: dict[str, Any]) -> DomainReply:
         return self._execute_scenario(resource_id, request_id, normalized, "ONE_STEP_EXPERIMENT")
 
+    def _claim_native_login(self, resource_id: str) -> bool:
+        with self.store._transaction("native_login_claim"):
+            row = self.store._db.execute(
+                "SELECT value FROM meta WHERE key=?",
+                (_NATIVE_LOGIN_CLAIM_META_KEY,),
+            ).fetchone()
+            if row is not None:
+                return False
+            self.store._db.execute(
+                "INSERT INTO meta(key,value) VALUES(?,?)",
+                (_NATIVE_LOGIN_CLAIM_META_KEY, resource_id),
+            )
+        return True
+
+    def _release_native_login_claim(self) -> None:
+        with self.store._transaction("native_login_claim_release"):
+            self.store._db.execute(
+                "DELETE FROM meta WHERE key=?",
+                (_NATIVE_LOGIN_CLAIM_META_KEY,),
+            )
+
+    def native_login_start(self, resource_id: str, request_id: str, normalized: dict[str, Any]) -> DomainReply:
+        resource = self.store.ensure_resource(resource_id, request_id, "NATIVE_LOGIN_START", normalized)
+        prior = self._resource_reply(resource)
+        if prior is not None:
+            return prior
+        with self.coordinator.stop_operation_lock:
+            if self.coordinator.control_state.stop_latched:
+                raise ControlDomainError(
+                    "NATIVE_LOGIN_STOP_LATCHED",
+                    "native login is blocked while global STOP is latched",
+                    http_status=409,
+                )
+            if not self._claim_native_login(resource_id):
+                raise ControlDomainError(
+                    "NATIVE_LOGIN_ALREADY_ACTIVE",
+                    "native login lifecycle already has an active operation",
+                    http_status=409,
+                )
+            if self.coordinator.control_state.stop_latched:
+                self._release_native_login_claim()
+                raise ControlDomainError(
+                    "NATIVE_LOGIN_STOP_LATCHED",
+                    "native login is blocked while global STOP is latched",
+                    http_status=409,
+                )
+            try:
+                payload = dict(self.native_login_lifecycle.start(resource_id))
+            except NativeLoginLifecycleError as exc:
+                if not exc.physical_effect:
+                    self._release_native_login_claim()
+                raise ControlDomainError(
+                    exc.code,
+                    exc.safe_message,
+                    http_status=409,
+                ) from exc
+            if payload.get("operation_id") != resource_id:
+                raise ControlDomainError(
+                    "NATIVE_LOGIN_OPERATION_ID_MISMATCH",
+                    "native login runtime returned a mismatched operation identity",
+                    http_status=500,
+                )
+            ensure_no_secret_material(payload, key_path="native_login_start_result")
+            _ensure_persistable(payload, key_path="native_login_start_result")
+            self.store.finish_resource(resource_id, "COMPLETED", payload)
+            return DomainReply(202, payload, "COMPLETED", str(payload.get("state", "UNKNOWN")), resource_id)
+
     def _transition_payload(self, state: ControlState, resource_id: str) -> dict[str, Any]:
         return {
             "resource_id": resource_id,
@@ -562,16 +645,38 @@ class ControlDomainService:
         prior = self._resource_reply(resource)
         if prior is not None:
             return prior
-        historical = self.store.load_control_transition(resource_id)
-        if historical is None:
-            if not self.coordinator.stop_all(transition_id=resource_id, reason_code="CONTROL_API_STOP_ALL"):
-                raise ControlDomainError("CONTROL_STOP_DURABILITY_FAILED", "STOP could not be durably committed", http_status=503)
+        with self.coordinator.stop_operation_lock:
             historical = self.store.load_control_transition(resource_id)
-        if historical is None:
-            raise ControlDomainError("CONTROL_STATE_CONTRADICTION", "STOP transition history is missing", http_status=500)
-        payload = self._transition_payload(historical, resource_id)
-        self.store.finish_resource(resource_id, "COMPLETED", payload)
-        return DomainReply(200, payload, "COMPLETED", "STOPPED", resource_id)
+            if historical is None:
+                if not self.coordinator.stop_all(transition_id=resource_id, reason_code="CONTROL_API_STOP_ALL"):
+                    raise ControlDomainError("CONTROL_STOP_DURABILITY_FAILED", "STOP could not be durably committed", http_status=503)
+                historical = self.store.load_control_transition(resource_id)
+            if historical is None or not historical.stop_latched:
+                raise ControlDomainError("CONTROL_STATE_CONTRADICTION", "STOP transition history is missing", http_status=500)
+            try:
+                native_stop = dict(self.native_login_lifecycle.stop(resource_id))
+            except NativeLoginLifecycleError as exc:
+                raise ControlDomainError(
+                    exc.code,
+                    exc.safe_message,
+                    http_status=503,
+                ) from exc
+            if native_stop.get("operation_id") != resource_id:
+                raise ControlDomainError(
+                    "NATIVE_LOGIN_OPERATION_ID_MISMATCH",
+                    "native login runtime returned a mismatched operation identity",
+                    http_status=500,
+                )
+            ensure_no_secret_material(native_stop, key_path="native_login_stop_result")
+            _ensure_persistable(native_stop, key_path="native_login_stop_result")
+            payload = self._transition_payload(historical, resource_id)
+            with self.store._transaction("native_login_stop_finish"):
+                self.store._db.execute(
+                    "DELETE FROM meta WHERE key=?",
+                    (_NATIVE_LOGIN_CLAIM_META_KEY,),
+                )
+                self.store.finish_resource(resource_id, "COMPLETED", payload)
+            return DomainReply(200, payload, "COMPLETED", "STOPPED", resource_id)
 
     def reset_stop(self, resource_id: str, request_id: str, normalized: dict[str, Any]) -> DomainReply:
         resource = self.store.ensure_resource(resource_id, request_id, "RESET_STOP", normalized)

@@ -6,33 +6,33 @@ import shlex
 import struct
 import sys
 
-EXPECTED_SIZE = 52_109_920
-EXPECTED_SHA256 = "ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8"
+EXPECTED_SIZE = 52_105_824
+EXPECTED_SHA256 = "552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1"
 
 RTTI = {
     "game_client": (
         "N5tibia6client11TGameClientE",
-        0x30ADCE8,
+        0x30ACD08,
         "tibia::client::TGameClient",
     ),
     "character_controller": (
         "N5tibia10gamewindow29TCharacterSelectionControllerE",
-        0x30C3988,
+        0x30C29A8,
         "tibia::gamewindow::TCharacterSelectionController",
     ),
     "player_protocol_handler": (
         "N5tibia4game29TPlayerProtocolMessageHandlerE",
-        0x30BF620,
+        0x30BE640,
         "tibia::game::TPlayerProtocolMessageHandler",
     ),
     "gameserver_game_session": (
         "N5tibia4game22TGameserverGameSessionE",
-        0x30AFF80,
+        0x30AEFA0,
         "tibia::game::TGameserverGameSession",
     ),
     "worldmap_handler": (
         "N5tibia8worldmap31TWorldmapProtocolMessageHandlerE",
-        0x30C01D0,
+        0x30BF1F0,
         "tibia::worldmap::TWorldmapProtocolMessageHandler",
     ),
 }
@@ -181,8 +181,8 @@ def main(argv: list[str]) -> int:
         print(f"CURRENT_RTTI_{name.upper()}_VPTR=0x{actual:x}")
 
     # TGameClient: method 17 = onRequestLoginWithCredentials(QString,QString)
-    game_base = 0x1CB4CF4
-    game_data = 0x1CB4740
+    game_base = 0x1CB3CF4
+    game_data = 0x1CB3740
     game_row = tuple(u32(game_data + 4 * (14 + 6 * 17 + j)) for j in range(6))
     if qstring(game_base, 31) != "onRequestLoginWithCredentials" or game_row != (31, 2, 311, 2, 8, 26):
         raise RuntimeError("CURRENT_AUTH_QMETA_ROW_MISMATCH")
@@ -190,17 +190,17 @@ def main(argv: list[str]) -> int:
         raw,
         i32,
         bytes_at,
-        0x1D903C4,
+        0x1D8F2C4,
         17,
-        0xD196F0,
-        "488b5110488b71084883c4485b5de93d609cff0f1f440000488bbfa009000048",
+        0xD18D70,
+        "488b5110488b71084883c4485b5de94d679cff0f1f440000488bbfa009000048",
     )
     print("CURRENT_AUTH_CONTRACT=PASS")
 
     # TCharacterSelectionController: requestCharacterLogin(TCharacterLoginData)
     # and onCharacterSelectionConfirmed(QList<int> SelectedCharacters).
-    char_base = 0x1CC4C14
-    char_data = 0x1CC47C0
+    char_base = 0x1CC3C14
+    char_data = 0x1CC37C0
     request_row = tuple(u32(char_data + 4 * (74 + j)) for j in range(6))
     confirm_row = tuple(u32(char_data + 4 * (74 + 6 * 11 + j)) for j in range(6))
     if qstring(char_base, 1) != "requestCharacterLogin" or qstring(char_base, 3) != "tibia::authentication::TCharacterLoginData":
@@ -217,25 +217,25 @@ def main(argv: list[str]) -> int:
         raw,
         i32,
         bytes_at,
-        0x1D98FE4,
+        0x1D97EE4,
         0,
-        0xD52050,
+        0xD516C0,
         "498b442408f30f6f08488b100f298c2480000000488b481048898c2490000000",
     )
     _check_target(
         raw,
         i32,
         bytes_at,
-        0x1D98FE4,
+        0x1D97EE4,
         11,
-        0xD52020,
-        "498b7424084881c4f80000005b5d415c415d415e415fe985b2afff0f1f440000",
+        0xD51690,
+        "498b7424084881c4f80000005b5d415c415d415e415fe995b9afff0f1f440000",
     )
     print("CURRENT_CHARACTER_CONTRACT=PASS")
 
     # TAuthenticationProcessController: selected-character progression surface.
-    auth_base = 0x1CAC760
-    auth_data = 0x1CAC140
+    auth_base = 0x1CAB760
+    auth_data = 0x1CAB140
     request_gs_row = tuple(u32(auth_data + 4 * (14 + 6 * 5 + j)) for j in range(6))
     start_gs_row = tuple(u32(auth_data + 4 * (14 + 6 * 27 + j)) for j in range(6))
     if qstring(auth_base, 7) != "requestCharacterGameserverLogin" or qstring(auth_base, 34) != "onStartGameServerLoginStateEntered":
@@ -246,19 +246,19 @@ def main(argv: list[str]) -> int:
         raw,
         i32,
         bytes_at,
-        0x1D8FF20,
+        0x1D8EE20,
         5,
-        0xD0FD27,
+        0xD0F3A7,
         "31c9ba05000000e981faffff31c9ba04000000e975faffff4883c4305b5d415c",
     )
     _check_target(
         raw,
         i32,
         bytes_at,
-        0x1D8FF20,
+        0x1D8EE20,
         27,
-        0xD0FB62,
-        "4883c4305b5d415ce991e2a4ff488b4108ba08000000488d4c2410488d357cb1",
+        0xD0F1E2,
+        "4883c4305b5d415ce9b1e9a4ff488b4108ba08000000488d4c2410488d351cab",
     )
     print("CURRENT_GAMESERVER_ROUTE_CONTRACT=PASS")
 

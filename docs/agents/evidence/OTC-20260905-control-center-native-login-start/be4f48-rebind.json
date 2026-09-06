@@ -1,0 +1,150 @@
+{
+  "exact_client": {
+    "sha256": "552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1",
+    "size": 52105824,
+    "version": "15.32.be4f48"
+  },
+  "qmeta": {
+    "authentication_process_controller": {
+      "class_name": "tibia::authentication::TAuthenticationProcessController",
+      "class_name_index": 0,
+      "dispatch": {
+        "lea": 13692031,
+        "table": 30993952,
+        "target": 13693863,
+        "target_fence": "31c9ba05000000e981faffff31c9ba04000000e975faffff4883c4305b5d415c"
+      },
+      "metadata": 30060864,
+      "metaobject": {
+        "metacall_slot": 51027256,
+        "metadata_slot": 51027248,
+        "static_metacall": 13692016,
+        "static_metaobject": 51027232,
+        "stringdata_slot": 51027240
+      },
+      "method_count": 51,
+      "method_data": 14,
+      "revision": 13,
+      "signal_count": 11,
+      "start": {
+        "dispatch": {
+          "lea": 13692031,
+          "table": 30993952,
+          "target": 13693410,
+          "target_fence": "4883c4305b5d415ce9b1e9a4ff488b4108ba08000000488d4c2410488d351cab"
+        },
+        "index": 27,
+        "params": [43],
+        "row": [34, 0, 355, 2, 8, 32]
+      },
+      "stringdata": 30062432,
+      "target_index": 5,
+      "target_name_index": 7,
+      "target_params": [43],
+      "target_row": [7, 0, 325, 2, 262, 6]
+    },
+    "character_controller": {
+      "class_name": "tibia::gamewindow::TCharacterSelectionController",
+      "class_name_index": 0,
+      "confirm": {
+        "dispatch": {
+          "lea": 13964032,
+          "table": 31031012,
+          "target": 13964944,
+          "target_fence": "498b7424084881c4f80000005b5d415c415d415e415fe995b9afff0f1f440000"
+        },
+        "index": 11,
+        "params": [43, 2147483665],
+        "row": [16, 1, 245, 2, 10, 26]
+      },
+      "dispatch": {
+        "lea": 13964032,
+        "table": 31031012,
+        "target": 13964992,
+        "target_fence": "498b442408f30f6f08488b100f298c2480000000488b481048898c2490000000"
+      },
+      "metadata": 30160832,
+      "metaobject": {
+        "metacall_slot": 49831320,
+        "metadata_slot": 49831312,
+        "static_metacall": 13964000,
+        "static_metaobject": 49831296,
+        "stringdata_slot": 49831304
+      },
+      "method_count": 26,
+      "method_data": 74,
+      "revision": 13,
+      "signal_count": 10,
+      "stringdata": 30161940,
+      "target_index": 0,
+      "target_name_index": 1,
+      "target_params": [43, 2147483651],
+      "target_row": [1, 1, 230, 2, 6, 13]
+    },
+    "game_client": {
+      "class_name": "tibia::client::TGameClient",
+      "class_name_index": 0,
+      "dispatch": {
+        "lea": 13731722,
+        "table": 30995140,
+        "target": 13733232,
+        "target_fence": "488b5110488b71084883c4485b5de94d679cff0f1f440000488bbfa009000048"
+      },
+      "metadata": 30095168,
+      "metaobject": {
+        "metacall_slot": 49814552,
+        "metadata_slot": 49814544,
+        "static_metacall": 13731712,
+        "static_metaobject": 49814528,
+        "stringdata_slot": 49814536
+      },
+      "method_count": 44,
+      "method_data": 14,
+      "revision": 13,
+      "signal_count": 6,
+      "stringdata": 30096628,
+      "target_index": 17,
+      "target_name_index": 31,
+      "target_params": [43, 10, 10],
+      "target_row": [31, 2, 311, 2, 8, 26]
+    }
+  },
+  "rtti": {
+    "character_controller": {
+      "class_name": "tibia::gamewindow::TCharacterSelectionController",
+      "mangled": "N5tibia10gamewindow29TCharacterSelectionControllerE",
+      "vptr": 51128744
+    },
+    "game_client": {
+      "class_name": "tibia::client::TGameClient",
+      "mangled": "N5tibia6client11TGameClientE",
+      "vptr": 51039496
+    },
+    "gameserver_game_session": {
+      "class_name": "tibia::game::TGameserverGameSession",
+      "mangled": "N5tibia4game22TGameserverGameSessionE",
+      "vptr": 51048352
+    },
+    "player_protocol_handler": {
+      "class_name": "tibia::game::TPlayerProtocolMessageHandler",
+      "mangled": "N5tibia4game29TPlayerProtocolMessageHandlerE",
+      "vptr": 51111488
+    },
+    "worldmap_handler": {
+      "class_name": "tibia::worldmap::TWorldmapProtocolMessageHandler",
+      "mangled": "N5tibia8worldmap31TWorldmapProtocolMessageHandlerE",
+      "vptr": 51114480
+    }
+  },
+  "safety": {
+    "credentials_used": false,
+    "official_client_executed": false,
+    "packet_capture": false,
+    "process_memory_access": false,
+    "raw_client_retained": false,
+    "runtime_access": "none",
+    "track_b_pr_284_modified": false
+  },
+  "schema": "otclient.track-a.native-login-current-rebind.v1",
+  "terminal_result": "BE4F48_NATIVE_LOGIN_STATIC_REBIND_PROVEN"
+}

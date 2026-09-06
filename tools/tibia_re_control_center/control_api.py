@@ -17,6 +17,7 @@ from .canonical import jcs_dumps
 from .control_domain import ControlDomainError, ControlDomainService, DomainReply
 from .control_ui import render_control_ui
 from .model import SimulatedCrash, ValidationError
+from .native_login_socket import lifecycle_from_environment
 
 MAX_BODY_BYTES = 262_144
 MAX_HEADER_BYTES = 32_768
@@ -46,6 +47,7 @@ def _allowed_methods(path: str) -> frozenset[str]:
         "/v1/agent/session",
         "/v1/agent/events",
         "/v1/agent/result",
+        "/v1/native-login/status",
     } or _RUN_ARTIFACT_RE.fullmatch(path) or _RUN_RE.fullmatch(path) or _ACTION_RE.fullmatch(path):
         methods.add("GET")
     if path in {
@@ -56,6 +58,7 @@ def _allowed_methods(path: str) -> frozenset[str]:
         "/v1/agent/tasks",
         "/v1/agent/chat",
         "/v1/agent/control",
+        "/v1/native-login/start",
     } or _RUN_CONTROL_RE.fullmatch(path):
         methods.add("POST")
     return frozenset(methods)
@@ -336,6 +339,10 @@ class ControlRequestHandler(BaseHTTPRequestHandler):
                 if query:
                     raise ControlDomainError("CONTROL_QUERY_INVALID", "status does not accept query parameters")
                 payload = self.control.domain.status()
+            elif path == "/v1/native-login/status":
+                if query:
+                    raise ControlDomainError("CONTROL_QUERY_INVALID", "native login status does not accept query parameters")
+                payload = self.control.domain.native_login_lifecycle.status()
             elif path == "/v1/capabilities":
                 if query:
                     raise ControlDomainError("CONTROL_QUERY_INVALID", "capabilities does not accept query parameters")
@@ -413,6 +420,8 @@ class ControlRequestHandler(BaseHTTPRequestHandler):
                 operation, handler = "STOP_ALL", self.control.domain.stop_all
             elif path == "/v1/reset-stop":
                 operation, handler = "RESET_STOP", self.control.domain.reset_stop
+            elif path == "/v1/native-login/start":
+                operation, handler = "NATIVE_LOGIN_START", self.control.domain.native_login_start
             elif path == "/v1/agent/tasks":
                 operation, handler = "AGENT_TASK", self.control.domain.agent_submit_task
             elif path == "/v1/agent/chat":
@@ -468,7 +477,10 @@ class ControlApiServer:
         if isinstance(port, bool) or not isinstance(port, int) or port < 0 or port > 65535:
             raise ValueError("port must be in 0..65535")
         self.data_root = Path(data_root).expanduser().resolve()
-        self.domain = domain or ControlDomainService(str(self.data_root))
+        self.domain = domain or ControlDomainService(
+            str(self.data_root),
+            native_login_lifecycle=lifecycle_from_environment(),
+        )
         self.nonce = secrets.token_bytes(32).hex()
         self._httpd = _ControlHttpServer((host, port), ControlRequestHandler)
         self._httpd.control = self  # type: ignore[attr-defined]

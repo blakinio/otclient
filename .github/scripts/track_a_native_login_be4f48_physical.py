@@ -24,45 +24,6 @@ def _load_base() -> Any:
 _base = _load_base()
 PhysicalError = _base.PhysicalError
 
-# Static contract markers preserve the audited executor surface while the byte-for-byte
-# base module carries unchanged replacement/auth/character behavior.
-CONTRACT_MARKERS = r'''
-TARGET_CONTAINER = "otclient-track-a-kasmvnc"
-TARGET_DISPLAY = ":1"
-552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1
-existing_runtime_adoption_v1
-docker exec -d -u kasm-user
-SIGTERM
-vault_bind
-same_numeric_uid
-sidecar_transport_metadata_ready
-native_login_fd_sidecar.py
---pid
-container:
---network
-none
---read-only
---cap-drop
-ALL
-SETUID
-SETGID
-/dev/shm
-/relay-shm
-ResolvConfPath
-target_shm_source
-dst=/relay-shm,readonly
-_sidecar_relay_socket
-relay-probe
-relay-auth-fd
-OTCLIENT_TIBIA_RE_AUTH_SOCKET
-OTCLIENT_TIBIA_RE_CHARACTER_SOCKET
-LD_PRELOAD
-response.get("fd_sent") is True
-native_auth_fd_send_not_proven
-base = _sidecar_base(metadata, "auth")
-image_index = base.index(str(metadata["image"]))
-'''
-
 _SAFE_PROBE_CLIENT_ERRORS = frozenset({
     "sealed_fd_not_regular",
     "sealed_fd_not_memfd",

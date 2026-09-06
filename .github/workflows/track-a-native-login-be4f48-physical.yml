@@ -1,0 +1,416 @@
+name: Track A be4f48 physical native login
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+    paths:
+      - .github/workflows/track-a-native-login-be4f48-physical.yml
+      - .github/scripts/track_a_native_login_be4f48_physical.py
+      - tools/tibia_runtime_bridge/container_native_login_client.py
+      - tests/tools/tibia_runtime_bridge/test_native_login_physical_executor_contract.py
+      - docs/agents/tasks/active/OTC-20260906-native-login-physical-executor.md
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+
+env:
+  TASK_ID: OTC-20260906-native-login-physical-executor
+  EXPECTED_VERSION: 15.32.be4f48
+  EXPECTED_SIZE: '52105824'
+  EXPECTED_SHA: 552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1
+  VAULT_DIR: /work/_otclient_tibia_re_state/secret-vault
+  CONTAINER: otclient-track-a-kasmvnc
+
+jobs:
+  contract:
+    if: github.event_name == 'pull_request'
+    name: Physical native-login executor contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Run exact-head executor contract
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          PYTHONPATH=. python3 tests/tools/tibia_runtime_bridge/test_native_login_physical_executor_contract.py
+          python3 -m py_compile \
+            .github/scripts/track_a_native_login_be4f48_physical.py \
+            tools/tibia_runtime_bridge/container_native_login_client.py
+          python3 .github/scripts/test_track_a_agent_runtime_governance.py \
+            --changed-from "${{ github.event.pull_request.base.sha }}" \
+            --expected-branch "$GITHUB_HEAD_REF"
+          git diff --check "${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}"
+
+  prepare:
+    if: >-
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request &&
+      github.event.comment.user.login == github.repository_owner &&
+      (github.event.comment.body == '/track-a-native-login-be4f48 PRECHECK' ||
+       github.event.comment.body == '/track-a-native-login-be4f48 EXECUTE')
+    name: Build exact trusted-main helper bundle
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact trusted main
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          ref: main
+          fetch-depth: 2
+      - name: Prove trusted main and exact current fence
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$(git rev-parse HEAD)" = "$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          PYTHONPATH=. python3 - <<'PY'
+          from tools.tibia_re_control_center.current_client_fence import current_client_fence
+          fence=current_client_fence()
+          assert fence.version=='15.32.be4f48'
+          assert fence.size==52105824
+          assert fence.sha256=='552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1'
+          print('BE4F48_TRUSTED_MAIN_FENCE=PASS')
+          PY
+      - name: Build exact-current bridge auth and character helpers
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends cmake ninja-build qt6-base-dev pkg-config
+          build="$RUNNER_TEMP/native-login-helper-build"
+          bundle="$RUNNER_TEMP/native-login-helper-bundle"
+          mkdir -p "$bundle"
+          cmake -S tools/tibia_runtime_bridge -B "$build" -G Ninja \
+            -DOTCLIENT_TIBIA_RE_BUILD_EXPERIMENTAL_AUTH=ON
+          cmake --build "$build" --parallel 2
+          cp "$build/otclient-tibia-runtime-bridge.so" "$bundle/"
+          cp "$build/otclient-tibia-native-auth-experimental.so" "$bundle/"
+          read -r -a qt_cflags <<< "$(pkg-config --cflags Qt6Core)"
+          read -r -a qt_libs <<< "$(pkg-config --libs Qt6Core)"
+          c++ -std=c++20 -fPIC -shared -Wall -Wextra -Wpedantic -Werror \
+            "${qt_cflags[@]}" \
+            tools/tibia_runtime_bridge/experimental_character_control_current.cpp \
+            -o "$bundle/otclient-tibia-character-control-current.so" \
+            "${qt_libs[@]}" -ldl -pthread
+          cp tools/tibia_runtime_bridge/container_native_login_client.py "$bundle/"
+          cp tools/tibia_runtime_bridge/profiles/tibia-15.32.be4f48.json "$bundle/"
+          strings "$bundle/otclient-tibia-native-auth-experimental.so" | grep -F 'AUTH_WITH_CREDENTIALS' >/dev/null
+          strings "$bundle/otclient-tibia-native-auth-experimental.so" | grep -F 'onRequestLoginWithCredentials' >/dev/null
+          strings "$bundle/otclient-tibia-character-control-current.so" | grep -F 'CONFIRM_UNIQUE' >/dev/null
+          python3 - "$bundle" <<'PY'
+          import hashlib,json,pathlib,sys
+          root=pathlib.Path(sys.argv[1])
+          names=(
+              'otclient-tibia-runtime-bridge.so',
+              'otclient-tibia-native-auth-experimental.so',
+              'otclient-tibia-character-control-current.so',
+              'container_native_login_client.py',
+              'tibia-15.32.be4f48.json',
+          )
+          files={}
+          for name in names:
+              p=root/name
+              h=hashlib.sha256()
+              with p.open('rb') as f:
+                  for block in iter(lambda:f.read(1<<20),b''): h.update(block)
+              files[name]=h.hexdigest()
+          (root/'bundle-manifest.json').write_text(
+              json.dumps({'schema':'otclient.track-a.native-login-helper-bundle.v1','files':files},sort_keys=True,separators=(',',':'))+'\n',
+              encoding='utf-8',
+          )
+          print('BE4F48_HELPER_BUNDLE=PASS')
+          PY
+      - name: Upload exact trusted-main helper bundle
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: be4f48-native-login-helper-bundle-${{ github.run_id }}
+          path: ${{ runner.temp }}/native-login-helper-bundle
+          if-no-files-found: error
+          retention-days: 1
+
+  physical:
+    if: >-
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request &&
+      github.event.comment.user.login == github.repository_owner &&
+      (github.event.comment.body == '/track-a-native-login-be4f48 PRECHECK' ||
+       github.event.comment.body == '/track-a-native-login-be4f48 EXECUTE')
+    needs: prepare
+    name: Trusted-main be4f48 physical native login
+    runs-on: [otclient, synology]
+    timeout-minutes: 45
+    concurrency:
+      group: track-a-be4f48-native-login-physical
+      cancel-in-progress: false
+    steps:
+      - name: Checkout exact trusted main
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          ref: main
+          fetch-depth: 2
+      - name: Download exact trusted-main helper bundle
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: be4f48-native-login-helper-bundle-${{ github.run_id }}
+          path: ${{ runner.temp }}/native-login-helper-bundle
+      - name: Prove trusted-main physical admission preconditions
+        id: precheck
+        shell: bash
+        env:
+          BUNDLE: ${{ runner.temp }}/native-login-helper-bundle
+        run: |
+          set +x
+          set -Eeuo pipefail
+          test "$RUNNER_NAME" = "synology-otclient-01"
+          test "$(git rev-parse HEAD)" = "$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          command -v docker >/dev/null
+          command -v nsenter >/dev/null
+          out="$RUNNER_TEMP/native-login-precheck.json"
+          PYTHONPATH=. python3 .github/scripts/track_a_native_login_be4f48_physical.py precheck \
+            --vault-dir "$VAULT_DIR" --bundle "$BUNDLE" --result "$out"
+          python3 - "$out" <<'PY'
+          import json,sys
+          d=json.load(open(sys.argv[1],encoding='utf-8'))
+          assert d['schema']=='otclient.track-a.native-login-physical-precheck.v1'
+          for key in ('exact_current','target_unique','registration_current','nsenter_fd_bridge_ready','same_numeric_uid','container_init_pid_visible'):
+              assert d[key] is True
+          assert d['vault_bind']=='HOST_ONLY_PRESENT_PRIVATE'
+          assert d['credential_plaintext_accessed'] is False
+          print('TRACK_A_NATIVE_LOGIN_PRECHECK=PASS')
+          print('CREDENTIAL_PLAINTEXT_ACCESSED=false')
+          PY
+      - name: Stop after read-only PRECHECK
+        if: github.event.comment.body == '/track-a-native-login-be4f48 PRECHECK'
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          echo NATIVE_LOGIN_PHYSICAL_MUTATION=false
+          echo NATIVE_LOGIN_SECRET_ACCESS=false
+          echo NATIVE_LOGIN_PRECHECK_TERMINAL=READY_FOR_EXECUTE
+      - name: Execute one-shot canonical native login
+        if: github.event.comment.body == '/track-a-native-login-be4f48 EXECUTE'
+        shell: bash
+        env:
+          BUNDLE: ${{ runner.temp }}/native-login-helper-bundle
+        run: |
+          set +x
+          set -Eeuo pipefail
+          lease=.github/scripts/tibia-official-client-re-canonical-live-lease
+          transition=.github/scripts/tibia-official-client-re-canonical-live-transition.py
+          probe=.github/scripts/tibia-official-client-re-kasm-existing-runtime-probe.py
+          worker=.github/scripts/track_a_native_login_be4f48_physical.py
+          state=/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime
+          task_state=/home/runner/_work/_otclient_tibia_re_state/tasks/$TASK_ID
+          registration=$state/runtime-registration.json
+          mkdir -p "$task_state"
+          chmod 700 "$task_state"
+          token="$task_state/native-login-${GITHUB_RUN_ID}.token"
+          session="native-login-${GITHUB_RUN_ID}"
+          active=false
+
+          release_if_active() {
+            if [[ "$active" == true && -f "$token" ]]; then
+              "$lease" release --task-id "$TASK_ID" --session-id "$session" --token-file "$token" >/dev/null || true
+              active=false
+            fi
+          }
+          trap release_if_active EXIT
+
+          acquire() {
+            "$lease" acquire --task-id "$TASK_ID" --session-id "$session" --token-file "$token" --ttl-seconds 2700
+            active=true
+          }
+          generation() {
+            "$lease" status --json | python3 -c 'import json,sys; print(json.load(sys.stdin)["generation"])'
+          }
+          reg_generation() {
+            python3 - "$registration" <<'PY'
+          import json,sys
+          print(json.load(open(sys.argv[1],encoding='utf-8'))['lease_generation'])
+          PY
+          }
+          align_and_gate() {
+            local g r
+            g="$(generation)"; r="$(reg_generation)"
+            if (( r < g )); then
+              python3 "$transition" rebind --task-id "$TASK_ID" --session-id "$session" --token-file "$token" --probe "$probe"
+            elif (( r > g )); then
+              echo CANONICAL_REGISTRATION_GENERATION_AHEAD >&2
+              return 2
+            fi
+            python3 "$transition" gate-b --task-id "$TASK_ID" --session-id "$session" --token-file "$token" --probe "$probe"
+            echo TRACK_A_GATE_B=PASS
+          }
+          recover_and_gate() {
+            python3 "$transition" stale-registration-recovery \
+              --task-id "$TASK_ID" --session-id "$session" --token-file "$token" --probe "$probe"
+            python3 "$transition" gate-b --task-id "$TASK_ID" --session-id "$session" --token-file "$token" --probe "$probe"
+            echo TRACK_A_STALE_REGISTRATION_RECOVERY=PASS
+            echo TRACK_A_GATE_B=PASS
+          }
+          probe_changed() {
+            local out="$RUNNER_TEMP/current-probe.json"
+            for ((i=0; i<30; i++)); do
+              if python3 "$probe" probe "$out" >/dev/null 2>&1; then
+                python3 - "$registration" "$out" <<'PY'
+          import json,sys
+          reg=json.load(open(sys.argv[1],encoding='utf-8'))
+          cur=json.load(open(sys.argv[2],encoding='utf-8'))
+          raise SystemExit(0 if (cur['pid']!=reg['pid'] and cur['process_start_ticks']!=reg['process_start_ticks']) else 1)
+          PY
+                return $?
+              fi
+              sleep 1
+            done
+            echo CURRENT_EXACT_TARGET_PROBE_TIMEOUT >&2
+            return 2
+          }
+          recover_if_changed() {
+            set +e
+            probe_changed
+            local changed_rc=$?
+            set -e
+            if [[ $changed_rc -eq 0 ]]; then
+              release_if_active
+              acquire
+              recover_and_gate
+            elif [[ $changed_rc -eq 1 ]]; then
+              python3 "$transition" gate-b --task-id "$TASK_ID" --session-id "$session" --token-file "$token" --probe "$probe"
+            else
+              return "$changed_rc"
+            fi
+          }
+
+          echo ONE_SHOT_NATIVE_LOGIN=AUTHORIZED_BY_OWNER_COMMENT
+          acquire
+          align_and_gate
+
+          "$lease" guard-run --task-id "$TASK_ID" --session-id "$session" --token-file "$token" -- \
+            python3 "$worker" replace --vault-dir "$VAULT_DIR" --bundle "$BUNDLE" --result "$RUNNER_TEMP/replacement.json"
+          release_if_active
+
+          acquire
+          recover_and_gate
+
+          "$lease" guard-run --task-id "$TASK_ID" --session-id "$session" --token-file "$token" -- \
+            python3 "$worker" auth-one-shot --vault-dir "$VAULT_DIR" --result "$RUNNER_TEMP/auth.json"
+          recover_if_changed
+
+          "$lease" guard-run --task-id "$TASK_ID" --session-id "$session" --token-file "$token" -- \
+            python3 "$worker" confirm-unique --result "$RUNNER_TEMP/character-confirm.json"
+          echo CONFIRM_UNIQUE=PASS
+          recover_if_changed
+
+          # Build the already-reviewed exact-current gameWindowState reader in memory.
+          gws_bundle="$RUNNER_TEMP/game-window-state-causal-bundle.py"
+          python3 - "$gws_bundle" <<'PY'
+          from pathlib import Path
+          import json,sys
+          out=Path(sys.argv[1])
+          manifest_path=Path('docs/agents/contracts/TRACK_A_CURRENT_CLIENT_FENCE_V1.json')
+          manifest_source=manifest_path.read_text(encoding='utf-8')
+          manifest=json.loads(manifest_source)
+          provenance_path=Path(manifest['current_provenance'])
+          provenance_source=provenance_path.read_text(encoding='utf-8')
+          module_sources=(
+              ('track_a_current_world_entered_anchor','.github/scripts/track_a_current_world_entered_anchor.py'),
+              ('track_a_current_world_entered_durable_state','.github/scripts/track_a_current_world_entered_durable_state.py'),
+              ('tools.tibia_re_control_center.current_client_fence','tools/tibia_re_control_center/current_client_fence.py'),
+              ('tools.tibia_runtime_bridge.game_window_state_rebind','tools/tibia_runtime_bridge/game_window_state_rebind.py'),
+          )
+          sources=[(name,path_s,Path(path_s).read_text(encoding='utf-8')) for name,path_s in module_sources]
+          qpath=Path('.github/scripts/track_a_game_window_state_qualification.py')
+          qsource=qpath.read_text(encoding='utf-8')
+          lines=[
+              'import atexit,shutil,sys,tempfile,types\n',
+              'from pathlib import Path\n',
+              "_root=Path(tempfile.mkdtemp(prefix='track-a-gws-'))\n",
+              'atexit.register(shutil.rmtree,_root,ignore_errors=True)\n',
+              f"_static={{'docs/agents/contracts/TRACK_A_CURRENT_CLIENT_FENCE_V1.json':{manifest_source!r},{str(provenance_path)!r}:{provenance_source!r}}}\n",
+              "for _rel,_data in _static.items():\n _p=_root/_rel;_p.parent.mkdir(parents=True,exist_ok=True);_p.write_text(_data,encoding='utf-8')\n",
+              "for _pkg in ('tools','tools.tibia_re_control_center','tools.tibia_runtime_bridge'):\n _m=types.ModuleType(_pkg);_m.__path__=[];sys.modules[_pkg]=_m\n",
+          ]
+          for name,path_s,source in sources:
+              runtime_path=f"_root/{path_s!r}"
+              if name.startswith('tools.'):
+                  lines.append(f"m=types.ModuleType({name!r});m.__file__=str({runtime_path});sys.modules[{name!r}]=m\n")
+              else:
+                  lines.append(f"m=types.ModuleType({name!r});m.__file__={path_s!r};sys.modules[{name!r}]=m\n")
+              lines.append(f"exec(compile({source!r},m.__file__,'exec'),m.__dict__)\n")
+          lines.append(f"globals()['__file__']=str(_root/{str(qpath)!r})\n")
+          lines.append(f"exec(compile({qsource!r},globals()['__file__'],'exec'),globals())\n")
+          out.write_text(''.join(lines),encoding='utf-8')
+          PY
+
+          read -r target_pid target_start < <(python3 - "$registration" <<'PY'
+          import json,sys
+          d=json.load(open(sys.argv[1],encoding='utf-8'))
+          print(d['pid'],d['process_start_ticks'])
+          PY
+          )
+          causal="$RUNNER_TEMP/game-window-state-causal.jsonl"
+          docker exec -i "$CONTAINER" python3 - \
+            --pid "$target_pid" --start-ticks "$target_start" \
+            --expected-size "$EXPECTED_SIZE" --expected-sha256 "$EXPECTED_SHA" \
+            --output /dev/stdout --duration-seconds 45 --poll-seconds 0.25 --heartbeat-seconds 5 \
+            < "$gws_bundle" > "$causal"
+          python3 - "$causal" <<'PY'
+          import json,sys
+          rows=[json.loads(line) for line in open(sys.argv[1],encoding='utf-8') if line.strip()]
+          if not rows:
+              raise SystemExit('CAUSAL_GAME_WINDOW_STATE_EMPTY')
+          for row in rows:
+              if row.get('schema')!='otclient.track-a.game-window-state-qualification.v1':
+                  raise SystemExit('CAUSAL_GAME_WINDOW_STATE_SCHEMA_INVALID')
+              if row.get('process_memory_access')!='read_only':
+                  raise SystemExit('CAUSAL_GAME_WINDOW_STATE_ACCESS_INVALID')
+              if row.get('credentials_retained') is not False or row.get('session_secrets_retained') is not False:
+                  raise SystemExit('CAUSAL_GAME_WINDOW_STATE_SECRET_RETENTION_INVALID')
+          if not any(row.get('semantic_state')=='INGAME' and row.get('known_text')=='INGAME' for row in rows):
+              raise SystemExit('CAUSAL_GAME_WINDOW_STATE_INGAME_NOT_OBSERVED')
+          print('gameWindowState=INGAME')
+          print('STRUCTURAL_IN_GAME=PASS')
+          print('CAUSAL_PROOF=COMPLETE')
+          PY
+
+          python3 "$transition" gate-b --task-id "$TASK_ID" --session-id "$session" --token-file "$token" --probe "$probe"
+          python3 "$probe" probe "$RUNNER_TEMP/final-runtime.json"
+          python3 - "$RUNNER_TEMP/auth.json" "$RUNNER_TEMP/character-confirm.json" <<'PY'
+          import json,sys
+          auth=json.load(open(sys.argv[1],encoding='utf-8'))
+          char=json.load(open(sys.argv[2],encoding='utf-8'))
+          assert auth['secret_attempt_count']==1
+          assert auth['NO_SECOND_SECRET_ATTEMPT'] is True
+          assert auth['sealed_memfd'] is True and auth['scm_rights'] is True
+          assert char['character_count']==1 and char['CONFIRM_UNIQUE'] is True
+          print('NO_SECOND_SECRET_ATTEMPT=true')
+          print('NATIVE_CHARACTER_COUNT=1')
+          print('CHARACTER_ACTUALLY_LOGGED_INTO_GAME=YES')
+          PY
+          release_if_active
+          trap - EXIT
+          echo CLIENT_TERMINATED_BY_WORKFLOW=false
+          echo TRACK_A_NATIVE_LOGIN_PHYSICAL_TERMINAL=IN_GAME
+      - name: Upload sanitized physical evidence
+        if: ${{ always() && github.event.comment.body == '/track-a-native-login-be4f48 EXECUTE' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: be4f48-native-login-physical-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/native-login-precheck.json
+            ${{ runner.temp }}/replacement.json
+            ${{ runner.temp }}/auth.json
+            ${{ runner.temp }}/character-confirm.json
+            ${{ runner.temp }}/game-window-state-causal.jsonl
+            ${{ runner.temp }}/final-runtime.json
+          if-no-files-found: warn
+          retention-days: 3

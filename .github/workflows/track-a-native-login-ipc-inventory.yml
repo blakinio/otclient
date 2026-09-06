@@ -1,0 +1,146 @@
+name: Track A native-login IPC inventory
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/track-a-native-login-ipc-inventory.yml
+      - docs/agents/tasks/active/OTC-20260906-native-login-ipc-inventory.md
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Validate read-only diagnostic contract
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 .github/scripts/test_track_a_agent_runtime_governance.py \
+            --changed-from "${{ github.event.pull_request.base.sha }}" \
+            --expected-branch "$GITHUB_HEAD_REF"
+          grep -F "github.event.comment.user.login == github.repository_owner" .github/workflows/track-a-native-login-ipc-inventory.yml >/dev/null
+          grep -F "docker inspect" .github/workflows/track-a-native-login-ipc-inventory.yml >/dev/null
+          if grep -E 'docker (exec|run|create|start|stop|restart|kill|cp)' .github/workflows/track-a-native-login-ipc-inventory.yml >/dev/null; then
+            echo MUTATING_DOCKER_COMMAND_FORBIDDEN >&2
+            exit 1
+          fi
+          git diff --check "${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}"
+
+  inventory:
+    if: >-
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request &&
+      github.event.comment.user.login == github.repository_owner &&
+      github.event.comment.body == '/track-a-native-login-ipc-inventory'
+    runs-on: [otclient, synology]
+    timeout-minutes: 8
+    steps:
+      - name: Checkout exact trusted main
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          ref: main
+          fetch-depth: 2
+
+      - name: Inspect runner and Kasm transport metadata read-only
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$RUNNER_NAME" = "synology-otclient-01"
+          test "$(git rev-parse HEAD)" = "$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          command -v docker >/dev/null
+          python3 - <<'PY'
+          import hashlib,json,socket,subprocess
+
+          TARGET='otclient-track-a-kasmvnc'
+          def run(args):
+              p=subprocess.run(args,text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,check=False,timeout=15)
+              if p.returncode:
+                  raise SystemExit('IPC_INVENTORY_DOCKER_READ_FAILED')
+              return p.stdout
+
+          rows=[]
+          for line in run(['docker','ps','--no-trunc','--format','{{.ID}}\t{{.Names}}']).splitlines():
+              parts=line.split('\t',1)
+              if len(parts)==2: rows.append(tuple(parts))
+          targets=[row for row in rows if row[1]==TARGET]
+          if len(targets)!=1: raise SystemExit('IPC_INVENTORY_TARGET_CONTAINER_NOT_UNIQUE')
+          target_id,target_name=targets[0]
+          host_token=socket.gethostname().lower()
+          runners=[row for row in rows if row[0].lower().startswith(host_token) or host_token.startswith(row[0].lower()[:12])]
+          if len(runners)!=1: raise SystemExit('IPC_INVENTORY_RUNNER_CONTAINER_NOT_UNIQUE')
+          runner_id,runner_name=runners[0]
+          docs=json.loads(run(['docker','inspect',runner_id,target_id]))
+          if not isinstance(docs,list) or len(docs)!=2: raise SystemExit('IPC_INVENTORY_INSPECT_SHAPE_INVALID')
+          by_name={d.get('Name','').lstrip('/'):d for d in docs}
+          if runner_name not in by_name or target_name not in by_name: raise SystemExit('IPC_INVENTORY_NAME_MISMATCH')
+
+          def mount_rows(doc):
+              out=[]
+              for m in doc.get('Mounts') or []:
+                  src=str(m.get('Source') or '')
+                  if not src: continue
+                  out.append({
+                      'source_sha256':hashlib.sha256(src.encode()).hexdigest(),
+                      'type':str(m.get('Type') or ''),
+                      'destination':str(m.get('Destination') or ''),
+                      'rw':bool(m.get('RW')),
+                  })
+              return out
+          runner=by_name[runner_name]; target=by_name[target_name]
+          rm=mount_rows(runner); tm=mount_rows(target)
+          shared=[]
+          for a in rm:
+              for b in tm:
+                  if a['source_sha256']==b['source_sha256']:
+                      shared.append({
+                          'source_sha256':a['source_sha256'],
+                          'runner_destination':a['destination'],
+                          'target_destination':b['destination'],
+                          'runner_rw':a['rw'],
+                          'target_rw':b['rw'],
+                          'runner_type':a['type'],
+                          'target_type':b['type'],
+                      })
+          def modes(doc):
+              h=doc.get('HostConfig') or {}
+              return {
+                  'pid_mode':str(h.get('PidMode') or ''),
+                  'ipc_mode':str(h.get('IpcMode') or ''),
+                  'network_mode':str(h.get('NetworkMode') or ''),
+                  'privileged':bool(h.get('Privileged')),
+                  'cap_add':sorted(str(x) for x in (h.get('CapAdd') or [])),
+              }
+          result={
+              'schema':'otclient.track-a.native-login-ipc-inventory.v1',
+              'trusted_main_sha':run(['git','rev-parse','HEAD']).strip(),
+              'runner_name':runner_name,
+              'target_name':target_name,
+              'runner_mounts':rm,
+              'target_mounts':tm,
+              'shared_mounts':shared,
+              'shared_mount_count':len(shared),
+              'runner_modes':modes(runner),
+              'target_modes':modes(target),
+              'docker_socket_destination_present':any(x['destination']=='/var/run/docker.sock' for x in rm),
+              'runtime_mutation':False,
+              'credential_access':False,
+              'process_memory_access':False,
+              'raw_mount_sources_retained':False,
+          }
+          print('TRACK_A_NATIVE_LOGIN_IPC_INVENTORY='+json.dumps(result,sort_keys=True,separators=(',',':')))
+          print('RUNTIME_MUTATION=false')
+          print('CREDENTIAL_ACCESS=false')
+          PY

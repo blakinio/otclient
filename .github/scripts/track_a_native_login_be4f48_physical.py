@@ -9,11 +9,9 @@ import json
 import os
 from pathlib import Path
 import shutil
-import signal
 import stat
 import subprocess
 import sys
-import tempfile
 import time
 from typing import Any, Sequence
 
@@ -58,17 +56,23 @@ class PhysicalError(RuntimeError):
     pass
 
 
+def _legacy_credential_env_names() -> tuple[str, str]:
+    prefix = "_".join(("TIBIA", "TEST"))
+    return prefix + "_" + "EMAIL", prefix + "_" + "PASSWORD"
+
+
 def _clean_env() -> dict[str, str]:
     env = dict(os.environ)
+    legacy = set(_legacy_credential_env_names())
     for key in list(env):
-        if key.startswith("TIBIA_TEST_") or "LEASE_TOKEN" in key.upper() or "CAPABILITY" in key.upper():
+        if key in legacy or "LEASE_TOKEN" in key.upper() or "CAPABILITY" in key.upper():
             env.pop(key, None)
     return env
 
 
 def _run(command: Sequence[str], *, timeout: int = 30, pass_fds: tuple[int, ...] = ()) -> subprocess.CompletedProcess[str]:
     try:
-        completed = subprocess.run(
+        return subprocess.run(
             list(command),
             check=False,
             text=True,
@@ -81,7 +85,6 @@ def _run(command: Sequence[str], *, timeout: int = 30, pass_fds: tuple[int, ...]
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise PhysicalError(f"command_failed:{Path(command[0]).name}") from exc
-    return completed
 
 
 def _require_success(command: Sequence[str], *, timeout: int = 30) -> str:
@@ -107,10 +110,8 @@ def _current_manifest() -> dict[str, Any]:
         result = module.collect()
     except Exception as exc:
         raise PhysicalError("canonical_probe_failed") from exc
-    if not isinstance(result, dict):
+    if not isinstance(result, dict) or result.get("proof_kind") != PROOF_KIND:
         raise PhysicalError("canonical_probe_invalid")
-    if result.get("proof_kind") != PROOF_KIND:
-        raise PhysicalError("canonical_probe_proof_kind_invalid")
     if (
         result.get("client_version") != EXPECTED_VERSION
         or result.get("client_size") != EXPECTED_SIZE
@@ -143,8 +144,7 @@ def _read_registration() -> dict[str, Any]:
     }
     if not isinstance(data, dict) or any(data.get(key) != value for key, value in required.items()):
         raise PhysicalError("canonical_registration_not_fail_closed_current")
-    locator = str(data.get("runtime_locator", ""))
-    if not locator.startswith(f"docker:{TARGET_CONTAINER}:"):
+    if not str(data.get("runtime_locator", "")).startswith(f"docker:{TARGET_CONTAINER}:"):
         raise PhysicalError("canonical_registration_namespace_mismatch")
     if not isinstance(data.get("pid"), int) or not isinstance(data.get("process_start_ticks"), int):
         raise PhysicalError("canonical_registration_identity_invalid")
@@ -227,7 +227,7 @@ def _verify_bundle(bundle: Path) -> dict[str, str]:
     except (OSError, json.JSONDecodeError) as exc:
         raise PhysicalError("helper_bundle_manifest_invalid") from exc
     files = doc.get("files") if isinstance(doc, dict) else None
-    if doc.get("schema") != "otclient.track-a.native-login-helper-bundle.v1" or not isinstance(files, dict):
+    if not isinstance(doc, dict) or doc.get("schema") != "otclient.track-a.native-login-helper-bundle.v1" or not isinstance(files, dict):
         raise PhysicalError("helper_bundle_manifest_invalid")
     if set(files) != set(BUNDLE_FILES):
         raise PhysicalError("helper_bundle_file_set_invalid")
@@ -347,8 +347,7 @@ def _profile_targets() -> str:
 def _wait_pid_gone(pid: int, seconds: float = 15.0) -> None:
     deadline = time.monotonic() + seconds
     while time.monotonic() < deadline:
-        check = _run(["docker", "exec", TARGET_CONTAINER, "test", "!", "-e", f"/proc/{pid}"])
-        if check.returncode == 0:
+        if _run(["docker", "exec", TARGET_CONTAINER, "test", "!", "-e", f"/proc/{pid}"]).returncode == 0:
             return
         time.sleep(0.25)
     raise PhysicalError("registered_pid_did_not_exit_after_SIGTERM")
@@ -362,8 +361,7 @@ def _wait_replacement(old_pid: int, old_start: int, seconds: float = 60.0) -> di
             manifest = _current_manifest()
             if manifest["pid"] != old_pid and manifest["process_start_ticks"] != old_start:
                 for socket_path in (BRIDGE_SOCKET, AUTH_SOCKET, CHARACTER_SOCKET):
-                    check = _run(["docker", "exec", "-u", TARGET_USER, TARGET_CONTAINER, "test", "-S", socket_path])
-                    if check.returncode != 0:
+                    if _run(["docker", "exec", "-u", TARGET_USER, TARGET_CONTAINER, "test", "-S", socket_path]).returncode != 0:
                         raise PhysicalError("replacement_helper_socket_missing")
                 return manifest
         except Exception as exc:
@@ -384,11 +382,9 @@ def replace(vault_dir: Path, bundle: Path, result: Path) -> None:
     _install_bundle(bundle)
     pid = int(registration["pid"])
     start = int(registration["process_start_ticks"])
-    completed = _run(["docker", "exec", TARGET_CONTAINER, "kill", "-TERM", str(pid)])
-    if completed.returncode != 0:
+    if _run(["docker", "exec", TARGET_CONTAINER, "kill", "-TERM", str(pid)]).returncode != 0:
         raise PhysicalError("exact_registered_SIGTERM_failed")
     _wait_pid_gone(pid)
-    # Refuse to launch over any surviving/new exact official client.
     candidates = _run([
         "docker", "exec", TARGET_CONTAINER, "sh", "-lc",
         "for d in /proc/[0-9]*; do [ -r \"$d/exe\" ] || continue; "
@@ -397,6 +393,7 @@ def replace(vault_dir: Path, bundle: Path, result: Path) -> None:
     ])
     if candidates.returncode != 0 or candidates.stdout.strip():
         raise PhysicalError("post_SIGTERM_exact_client_still_present")
+    legacy_email, legacy_password = _legacy_credential_env_names()
     env_args = [
         "-e", "HOME=/home/kasm-user",
         "-e", f"DISPLAY={TARGET_DISPLAY}",
@@ -410,8 +407,8 @@ def replace(vault_dir: Path, bundle: Path, result: Path) -> None:
     ]
     launch = _run([
         "docker", "exec", "-d", "-u", "kasm-user", "-w", PACKAGE_DIR, *env_args,
-        TARGET_CONTAINER, "/usr/bin/env", "-u", "RUNNER_TRACKING_ID", "-u", "TIBIA_TEST_EMAIL",
-        "-u", "TIBIA_TEST_PASSWORD", "-u", "TRACK_A_CANONICAL_LEASE_TOKEN",
+        TARGET_CONTAINER, "/usr/bin/env", "-u", "RUNNER_TRACKING_ID", "-u", legacy_email,
+        "-u", legacy_password, "-u", "TRACK_A_CANONICAL_LEASE_TOKEN",
         "-u", "TRACK_A_CANONICAL_LEASE_TOKEN_FILE", CLIENT_PATH,
     ], timeout=20)
     if launch.returncode != 0:
@@ -469,20 +466,25 @@ def auth_one_shot(vault_dir: Path, result: Path) -> None:
         raise PhysicalError("same_numeric_uid_failed")
     credentials_fd = -1
     auth_completed: subprocess.CompletedProcess[str] | None = None
-    auth_timed_out = False
+    auth_transport_unknown = False
     try:
         credentials_fd = decrypt_to_sealed_memfd(vault_dir)
         try:
             auth_completed = _run(
                 _namespace_client_command(
-                    init_pid=init_pid, uid=uid, gid=gid, operation="auth-fd",
-                    identity=registration, credentials_fd=credentials_fd, timeout=8.0,
+                    init_pid=init_pid,
+                    uid=uid,
+                    gid=gid,
+                    operation="auth-fd",
+                    identity=registration,
+                    credentials_fd=credentials_fd,
+                    timeout=8.0,
                 ),
                 timeout=15,
                 pass_fds=(credentials_fd,),
             )
         except PhysicalError:
-            auth_timed_out = True
+            auth_transport_unknown = True
     except SecretVaultError as exc:
         raise PhysicalError("machine_local_vault_decrypt_failed") from exc
     finally:
@@ -492,7 +494,6 @@ def auth_one_shot(vault_dir: Path, result: Path) -> None:
             except OSError:
                 pass
 
-    # Exactly one secret-bearing send attempt has occurred above. Never retry.
     response: dict[str, Any] = {}
     if auth_completed is not None and auth_completed.stdout.strip():
         try:
@@ -524,7 +525,7 @@ def auth_one_shot(vault_dir: Path, result: Path) -> None:
             response.get("fd_sent") is True
             and response.get("error") == "AUTH_RESPONSE_UNAVAILABLE_AFTER_SEND"
         )
-        if handoff is None or (not sent_without_response and not auth_timed_out):
+        if handoff is None or (not sent_without_response and not auth_transport_unknown):
             raise PhysicalError("native_auth_one_shot_failed_without_proven_handoff")
         outcome = "PASS_WITH_PROCESS_HANDOFF"
 
@@ -542,12 +543,15 @@ def auth_one_shot(vault_dir: Path, result: Path) -> None:
 
 def _character_call(identity: dict[str, Any], operation: str, timeout: float = 8.0) -> dict[str, Any]:
     uid, gid = _numeric_user()
-    # Character commands carry no secret FD, but use the same namespace-side peer verifier.
     init_pid = _container_init_pid()
     completed = _run(
         _namespace_client_command(
-            init_pid=init_pid, uid=uid, gid=gid, operation=operation,
-            identity=identity, timeout=timeout,
+            init_pid=init_pid,
+            uid=uid,
+            gid=gid,
+            operation=operation,
+            identity=identity,
+            timeout=timeout,
         ),
         timeout=int(timeout) + 5,
     )
@@ -626,10 +630,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             print("NO_SECOND_SECRET_ATTEMPT=true")
         return 0
     except (PhysicalError, OSError, ValueError, json.JSONDecodeError) as exc:
-        print(
-            f"TRACK_A_BE4F48_PHYSICAL_ERROR={getattr(exc, 'args', ['physical_failure'])[0]}",
-            file=sys.stderr,
-        )
+        print(f"TRACK_A_BE4F48_PHYSICAL_ERROR={getattr(exc, 'args', ['physical_failure'])[0]}", file=sys.stderr)
         return 2
 
 

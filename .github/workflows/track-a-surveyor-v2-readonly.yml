@@ -11,6 +11,8 @@ on:
         description: Existing/current Track A runtime task whose owned runtime may be observed
         required: true
         type: string
+  issue_comment:
+    types: [created]
 
 permissions:
   contents: read
@@ -27,19 +29,52 @@ env:
 
 jobs:
   snapshot:
-    if: github.actor == 'blakinio' && inputs.authorization == 'ONE_SHOT_SURVEYOR_READ_ONLY'
+    if: >-
+      (github.event_name == 'workflow_dispatch' &&
+       github.actor == github.repository_owner &&
+       inputs.authorization == 'ONE_SHOT_SURVEYOR_READ_ONLY') ||
+      (github.event_name == 'issue_comment' &&
+       github.event.issue.pull_request &&
+       github.event.comment.user.login == github.repository_owner &&
+       startsWith(github.event.comment.body, '/track-a-surveyor-v2-readonly ONE_SHOT_SURVEYOR_READ_ONLY '))
     runs-on: [otclient, synology]
     timeout-minutes: 8
     steps:
       - name: Validate bounded authorization and task identity
+        id: request
         shell: bash
         env:
-          RUNTIME_TASK_ID: ${{ inputs.runtime_task_id }}
+          EVENT_NAME: ${{ github.event_name }}
+          DISPATCH_AUTHORIZATION: ${{ inputs.authorization || '' }}
+          DISPATCH_RUNTIME_TASK_ID: ${{ inputs.runtime_task_id || '' }}
+          COMMENT_BODY: ${{ github.event.comment.body || '' }}
         run: |
           set -Eeuo pipefail
-          [[ "$RUNTIME_TASK_ID" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$ ]]
-          echo AUTHORIZATION_GATE=PASS
-          echo RUNTIME_TASK_ID="$RUNTIME_TASK_ID"
+          python3 - "$GITHUB_OUTPUT" <<'PY'
+          import os
+          import re
+          import sys
+
+          event = os.environ["EVENT_NAME"]
+          prefix = "/track-a-surveyor-v2-readonly ONE_SHOT_SURVEYOR_READ_ONLY "
+          if event == "workflow_dispatch":
+              if os.environ["DISPATCH_AUTHORIZATION"] != "ONE_SHOT_SURVEYOR_READ_ONLY":
+                  raise SystemExit("AUTHORIZATION_INVALID")
+              runtime_task_id = os.environ["DISPATCH_RUNTIME_TASK_ID"]
+          elif event == "issue_comment":
+              body = os.environ["COMMENT_BODY"]
+              if not body.startswith(prefix):
+                  raise SystemExit("COMMENT_COMMAND_INVALID")
+              runtime_task_id = body[len(prefix):]
+          else:
+              raise SystemExit("EVENT_INVALID")
+          if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,199}", runtime_task_id) is None:
+              raise SystemExit("RUNTIME_TASK_ID_INVALID")
+          with open(sys.argv[1], "a", encoding="utf-8") as handle:
+              handle.write(f"runtime_task_id={runtime_task_id}\n")
+          print("AUTHORIZATION_GATE=PASS")
+          print("RUNTIME_TASK_ID=" + runtime_task_id)
+          PY
           echo CREDENTIAL_ACCESS=false
           echo RUNTIME_MUTATION=false
 
@@ -59,7 +94,7 @@ jobs:
       - name: Read safe canonical control-plane metadata
         shell: bash
         env:
-          RUNTIME_TASK_ID: ${{ inputs.runtime_task_id }}
+          RUNTIME_TASK_ID: ${{ steps.request.outputs.runtime_task_id }}
         run: |
           set -Eeuo pipefail
           python3 - "$CANONICAL_STATE" "$RUNTIME_TASK_ID" "$RUNNER_TEMP/control.json" <<'PY'
@@ -175,7 +210,7 @@ jobs:
         env:
           TARGET_PID: ${{ steps.target.outputs.pid }}
           TARGET_START: ${{ steps.target.outputs.start_ticks }}
-          RUNTIME_TASK_ID: ${{ inputs.runtime_task_id }}
+          RUNTIME_TASK_ID: ${{ steps.request.outputs.runtime_task_id }}
         run: |
           set -Eeuo pipefail
           python3 - "$RUNNER_TEMP/control.json" "$TARGET_PID" "$TARGET_START" "$EXPECTED_VERSION" "$EXPECTED_SIZE" "$EXPECTED_SHA" "$DISPLAY_NAME" <<'PY'

@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260906-native-login-vault-auth
-status: implementing
+status: validating
 agent: ChatGPT
 session_id: native-login-vault-auth-20260906
 session_role: implementer
@@ -8,11 +8,11 @@ project_lane: otclient
 lane: RUNTIME-P1-BRIDGE
 track_id: official-client-re
 task_kind: implementation
-phase: implementation
+phase: validation
 branch: feat/OTC-20260906-native-login-vault-auth
 base_branch: main
 created: 2026-09-06T14:12:00Z
-updated_at: 2026-09-06T14:12:00Z
+updated_at: 2026-09-06T14:34:00Z
 base_main: 874b95d6e90da693868af9ec504654b8635ea462
 policy_version: 2
 prompting_standard_version: 2.1
@@ -53,7 +53,7 @@ depends_on:
 blocks:
   - OTC-20260905-control-center-native-login-start
 cross_repository_task_ids: []
-next_action: prove a focused RED contract for current-fence vault-to-auth FD handoff before adding the producer
+next_action: verify final checkpoint exact-head gates and review hygiene, then protected squash merge before physical executor work
 ---
 
 # OTC-20260906 — native login vault auth
@@ -64,7 +64,7 @@ Add the smallest secret-free command surface that consumes the already-proven ma
 
 ## Required behavior
 
-- actual login consumption must reject `TIBIA_TEST_EMAIL` and `TIBIA_TEST_PASSWORD` in the environment;
+- actual login consumption rejects `TIBIA_TEST_EMAIL` and `TIBIA_TEST_PASSWORD` in the environment;
 - no credential value or credential file path is accepted through argv, stdin, browser/API, task text or logs;
 - decrypt only through `secret_vault.decrypt_to_sealed_memfd()`;
 - pass only the sealed descriptor through `experimental_auth_client.auth_with_credentials_fd()`;
@@ -73,10 +73,21 @@ Add the smallest secret-free command surface that consumes the already-proven ma
 - output only a small allowlisted sanitized result;
 - no official client execution or physical runtime access occurs from this PR branch.
 
-## Validation plan
+## TDD evidence
 
-1. focused test RED because the producer does not exist;
-2. minimal producer implementation;
-3. focused synthetic GREEN tests;
-4. native-auth bridge validation + Track A governance + self-hosted PR boundary + general CI;
-5. full diff/review hygiene; Ready and protected squash merge.
+RED head `f5919a2855a11afabeaf43220220bc9742229c26`:
+- Track A native auth bridge validation run `34039375896`, job `101503226706`;
+- existing 25 bridge tests PASS;
+- all 4 new tests ERROR only because `tools.tibia_runtime_bridge.secret_vault_auth` did not exist.
+
+GREEN implementation head `4bffab7a3c5d1b8f4a216389b5a99daf951fd248`:
+- Track A native auth bridge validation run `34039455877`, job `101503441660` SUCCESS;
+- focused no-secret tests SUCCESS;
+- stable read-only bridge invariants SUCCESS;
+- explicit experimental auth helper build SUCCESS.
+
+## Safety result
+
+The producer takes only absolute vault/socket/identity paths, requires a private mode-0600 exact-current identity file, rejects legacy credential environment names, decrypts only to a sealed anonymous memfd, passes only its FD to the existing peer-verified SCM_RIGHTS transport, closes the FD in `finally`, and returns only allowlisted non-secret response fields.
+
+Physical runtime and real credential access remain NOT EXECUTED in this PR.

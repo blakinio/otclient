@@ -8,11 +8,11 @@ project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: native_login_transport_repair
-phase: implementation_validation
+phase: final_validation
 branch: fix/OTC-20260906-native-login-relay-observability
 base_branch: main
 created: 2026-09-06T22:08:00+02:00
-updated_at: 2026-09-06T22:32:00+02:00
+updated_at: 2026-09-06T22:39:00+02:00
 base_main: c72fea67b5659075819ea4aaec68b89360a8e7c6
 execution_mode: chatgpt
 execution_class: repository_only
@@ -63,7 +63,7 @@ Trusted-main run `34056826283 / 101550234967` on `c72fea67b5659075819ea4aaec68b8
 
 ## Root cause boundary
 
-The worker currently waits for the relay process and parses relay stdout before surfacing a nonzero sidecar process result. When the sidecar fails before connecting, the relay times out with empty stdout and `_finish_relay()` raises `relay_response_missing`, masking the original sidecar/Docker failure.
+The worker waited for the relay process and parsed relay stdout before surfacing a nonzero sidecar process result. When the sidecar failed before connecting, the relay timed out with empty stdout and `_finish_relay()` raised `relay_response_missing`, masking the original sidecar/Docker failure.
 
 ## Repair design
 
@@ -83,15 +83,24 @@ RED head `b953736ff3dad624e9efa0ce0265d46492b995de`:
 - 8 focused tests ran and the new observability contract produced 9 expected failures;
 - PR-head trusted-main physical jobs were skipped.
 
-Implementation head before this checkpoint: `ca0e5fece51ad543a916c4fceb4651187a83ff5c`.
-- original merged physical worker blob `666beeb601d93257585a5dd302afd255a57a0103` is preserved as `.github/scripts/track_a_native_login_be4f48_physical_base.py`;
+Implementation:
+- original merged physical worker blob `666beeb601d93257585a5dd302afd255a57a0103` is preserved as `.github/scripts/track_a_native_login_be4f48_physical_base.py` and its Git blob identity is asserted by the focused test;
 - public worker changes only secret-free probe failure ordering/classification;
 - sidecar emits only allowlisted static failure codes;
+- no test-only contract marker shim remains;
 - no credentials, runtime mutation authority or auth retry behavior was added.
+
+Validated implementation head `6c33f4b04c582be6387ecebb701c7f01dee2de14`:
+- focused physical executor workflow `34058535817` is GREEN; job `101554774360` is GREEN;
+- its trusted-main helper-build and physical self-hosted PR jobs are SKIPPED;
+- runtime governance `34058535778` is GREEN;
+- native-auth bridge validation `34058535834` is GREEN;
+- general CI `34058535955` is GREEN;
+- review submissions and inline review threads are both empty at final audit.
 
 ## Acceptance
 
-- focused tests first fail because current main lacks safe sidecar error-code emission and sidecar-first probe classification;
+- focused tests first failed because current main lacked safe sidecar error-code emission and sidecar-first probe classification;
 - implementation cannot serialize arbitrary exception messages;
 - known Docker bind failure is classified without logging raw daemon stderr or host paths;
 - secret-free sidecar failures are surfaced before relay timeout masking;
@@ -100,4 +109,4 @@ Implementation head before this checkpoint: `ca0e5fece51ad543a916c4fceb4651187a8
 
 ## Next action
 
-Obtain exact-head hosted GREEN on the checkpointed implementation, audit the final diff/review surface, merge #967, then return immediately to the parent trusted-main PRECHECK and one bounded EXECUTE.
+Obtain final exact-head GREEN after this evidence-only checkpoint, merge PR #967 with expected-head guard, then return immediately to the parent trusted-main PRECHECK and one bounded EXECUTE.

@@ -465,26 +465,21 @@ def auth_one_shot(vault_dir: Path, result: Path) -> None:
     if not same_numeric_uid(int(registration["pid"]), uid):
         raise PhysicalError("same_numeric_uid_failed")
     credentials_fd = -1
-    auth_completed: subprocess.CompletedProcess[str] | None = None
-    auth_transport_unknown = False
     try:
         credentials_fd = decrypt_to_sealed_memfd(vault_dir)
-        try:
-            auth_completed = _run(
-                _namespace_client_command(
-                    init_pid=init_pid,
-                    uid=uid,
-                    gid=gid,
-                    operation="auth-fd",
-                    identity=registration,
-                    credentials_fd=credentials_fd,
-                    timeout=8.0,
-                ),
-                timeout=15,
-                pass_fds=(credentials_fd,),
-            )
-        except PhysicalError:
-            auth_transport_unknown = True
+        auth_completed = _run(
+            _namespace_client_command(
+                init_pid=init_pid,
+                uid=uid,
+                gid=gid,
+                operation="auth-fd",
+                identity=registration,
+                credentials_fd=credentials_fd,
+                timeout=8.0,
+            ),
+            timeout=15,
+            pass_fds=(credentials_fd,),
+        )
     except SecretVaultError as exc:
         raise PhysicalError("machine_local_vault_decrypt_failed") from exc
     finally:
@@ -495,18 +490,24 @@ def auth_one_shot(vault_dir: Path, result: Path) -> None:
                 pass
 
     response: dict[str, Any] = {}
-    if auth_completed is not None and auth_completed.stdout.strip():
+    if auth_completed.stdout.strip():
         try:
             candidate = json.loads(auth_completed.stdout.strip().splitlines()[-1])
             if isinstance(candidate, dict):
                 response = candidate
         except json.JSONDecodeError:
             response = {}
-    if auth_completed is not None and auth_completed.returncode == 0:
+    if auth_completed.returncode == 0:
         if response.get("ok") is not True or response.get("invocation_dispatched") is not True:
             raise PhysicalError("native_auth_response_not_dispatch_proof")
         outcome = "PASS_RESPONSE"
     else:
+        sent_without_response = bool(
+            response.get("fd_sent") is True
+            and response.get("error") == "AUTH_RESPONSE_UNAVAILABLE_AFTER_SEND"
+        )
+        if not sent_without_response:
+            raise PhysicalError("native_auth_fd_send_not_proven")
         deadline = time.monotonic() + 15.0
         handoff: dict[str, Any] | None = None
         while time.monotonic() < deadline:
@@ -521,11 +522,7 @@ def auth_one_shot(vault_dir: Path, result: Path) -> None:
             except PhysicalError:
                 pass
             time.sleep(0.5)
-        sent_without_response = bool(
-            response.get("fd_sent") is True
-            and response.get("error") == "AUTH_RESPONSE_UNAVAILABLE_AFTER_SEND"
-        )
-        if handoff is None or (not sent_without_response and not auth_transport_unknown):
+        if handoff is None:
             raise PhysicalError("native_auth_one_shot_failed_without_proven_handoff")
         outcome = "PASS_WITH_PROCESS_HANDOFF"
 

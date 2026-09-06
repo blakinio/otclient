@@ -12,7 +12,7 @@ phase: implementation
 branch: feat/OTC-20260905-control-center-native-login-start
 base_branch: main
 created: 2026-09-05T17:54:29Z
-updated_at: 2026-09-06T06:15:00Z
+updated_at: 2026-09-06T06:59:00Z
 base_main: b6cf7402b4dbde59b2086f0982c7dcc711c3b5fc
 policy_version: 2
 prompting_standard_version: 2.1
@@ -49,6 +49,7 @@ owned_paths:
   - .github/workflows/track-a-native-login-be4f48-rebind.yml
   - tools/tibia_re_control_center/native_login_lifecycle.py
   - tools/tibia_re_control_center/native_login_socket.py
+  - tools/tibia_re_control_center/native_login_runtime_supervisor.py
   - tools/tibia_re_control_center/control_domain.py
   - tools/tibia_re_control_center/control_api.py
   - tools/tibia_re_control_center/control_ui.py
@@ -63,6 +64,7 @@ owned_paths:
   - tests/tools/tibia_re_control_center/test_native_login_api.py
   - tests/tools/tibia_re_control_center/test_native_login_socket.py
   - tests/tools/tibia_re_control_center/test_native_login_composition.py
+  - tests/tools/tibia_re_control_center/test_native_login_runtime_supervisor.py
   - tests/tools/tibia_re_control_center/test_package_b.py
   - tests/tools/tibia_runtime_bridge/test_native_login_be4f48_bindings.py
   - docs/agents/evidence/OTC-20260905-control-center-native-login-start/**
@@ -80,7 +82,7 @@ reuses:
 depends_on: []
 blocks: []
 cross_repository_task_ids: []
-next_action: bind the secret-free local AF_UNIX executor, then exact-head qualification and Synology deployment
+next_action: exact-head static qualification, then fresh physical admission and Synology deployment
 ---
 
 # OTC-20260905 — Control Center native login START
@@ -156,12 +158,15 @@ portal_api: GREEN
 portal_ui: GREEN
 stop_dominance: GREEN
 durable_single_session: GREEN
-package_b_regression: prior_602_GREEN_plus_native_socket_RED_running
-package_b_mandatory: prior_39_of_39_GREEN
-browser_cli_e2e: prior_GREEN
-falsification: prior_GREEN
-ruff_import_order: corrected_on_branch_pending_exact_head
+package_a_functional: 609_GREEN_on_pre_supervisor_head
+package_b_regression: 609_GREEN_on_pre_supervisor_head
+package_b_mandatory: 39_of_39_GREEN
+browser_cli_e2e: GREEN
+falsification: GREEN_on_pre_supervisor_head
+ruff_import_order: GREEN
 be4f48_rebind: STATIC_PROVEN_HELPERS_REBOUND
-native_login_socket: TDD_RED
-next_action: implement secret-free local AF_UNIX executor and production composition
+native_login_socket: GREEN
+native_login_runtime_supervisor: IMPLEMENTED_PENDING_EXACT_HEAD
+native_login_permit: ONE_SHOT_EXACT_CURRENT_FAIL_CLOSED
+next_action: exact-head static qualification, then fresh physical admission and Synology deployment
 ```

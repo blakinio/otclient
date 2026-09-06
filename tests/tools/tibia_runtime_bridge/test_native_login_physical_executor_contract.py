@@ -73,7 +73,7 @@ class PhysicalExecutorContractTests(unittest.TestCase):
         ):
             self.assertNotIn(forbidden.lower(), text.lower())
 
-    def test_worker_uses_exact_pid_vault_and_bounded_shared_ipc_fd_bridge(self) -> None:
+    def test_worker_uses_exact_pid_vault_and_target_shm_bound_fd_bridge(self) -> None:
         text = WORKER.read_text(encoding="utf-8")
         required = (
             "TARGET_CONTAINER = \"otclient-track-a-kasmvnc\"",
@@ -88,7 +88,6 @@ class PhysicalExecutorContractTests(unittest.TestCase):
             "native_login_fd_sidecar.py",
             "--pid",
             "container:",
-            "--ipc",
             "--network",
             "none",
             "--read-only",
@@ -97,6 +96,11 @@ class PhysicalExecutorContractTests(unittest.TestCase):
             "SETUID",
             "SETGID",
             "/dev/shm",
+            "/relay-shm",
+            "ResolvConfPath",
+            "target_shm_source",
+            "dst=/relay-shm,readonly",
+            "_sidecar_relay_socket",
             "relay-probe",
             "relay-auth-fd",
             "OTCLIENT_TIBIA_RE_AUTH_SOCKET",
@@ -118,6 +122,7 @@ class PhysicalExecutorContractTests(unittest.TestCase):
             "target_host_pid_namespace_not_visible",
             "SYS_ADMIN",
             "nsenter",
+            '"--ipc"',
         ):
             self.assertNotIn(forbidden, text)
 
@@ -127,7 +132,7 @@ class PhysicalExecutorContractTests(unittest.TestCase):
         self.assertIn('image_index = base.index(str(metadata["image"]))', text)
         self.assertNotIn('[*_sidecar_base(metadata, "auth"),\n        "--mount"', text)
 
-    def test_sidecar_decrypts_once_then_relays_sealed_fd_over_shared_ipc(self) -> None:
+    def test_sidecar_decrypts_once_then_relays_sealed_fd_over_bound_target_shm(self) -> None:
         text = SIDECAR.read_text(encoding="utf-8")
         required = (
             "decrypt_to_sealed_memfd",
@@ -135,7 +140,7 @@ class PhysicalExecutorContractTests(unittest.TestCase):
             "F_SEAL_SEAL",
             "SCM_RIGHTS",
             "sendmsg",
-            "/dev/shm",
+            "/relay-shm",
             "relay-probe",
             "relay-auth-fd",
             "AUTH_RESPONSE_UNAVAILABLE_AFTER_SEND",
@@ -155,6 +160,7 @@ class PhysicalExecutorContractTests(unittest.TestCase):
             "docker.sock",
             "nsenter",
             "SYS_ADMIN",
+            'RELAY_ROOT = Path("/dev/shm")',
         ):
             self.assertNotIn(forbidden, text)
 

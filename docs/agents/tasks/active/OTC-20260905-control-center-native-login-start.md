@@ -8,11 +8,11 @@ project_lane: otclient
 lane: RUNTIME-P1-BRIDGE
 track_id: official-client-re
 task_kind: implementation
-phase: implementation
+phase: validation
 branch: feat/OTC-20260905-control-center-native-login-start
 base_branch: main
 created: 2026-09-05T17:54:29Z
-updated_at: 2026-09-06T09:19:00Z
+updated_at: 2026-09-06T09:28:39Z
 base_main: b6cf7402b4dbde59b2086f0982c7dcc711c3b5fc
 policy_version: 2
 prompting_standard_version: 2.1
@@ -83,7 +83,7 @@ reuses:
 depends_on: []
 blocks: []
 cross_repository_task_ids: []
-next_action: exact-head static qualification, then fresh physical admission and Synology deployment
+next_action: verify final checkpoint exact-head CI, then final review/Ready/merge before fresh physical admission
 ---
 
 # OTC-20260905 — Control Center native login START
@@ -151,25 +151,37 @@ portal START
 ## Current checkpoint
 
 ```yaml
-status: IMPLEMENTING_STATIC
+status: STATIC_QUALIFIED_PENDING_FINAL_CHECKPOINT_HEAD
 runtime_access: none
 physical_runtime_touched: false
 track_b_touched: false
+qualified_head: 72193b0b5c56222bf9f2c387a2be6a09f702a59d
+all_static_workflows: 7_of_7_GREEN_on_72193b0b5c56222bf9f2c387a2be6a09f702a59d
+ci_run: 34024561440_GREEN
+track_a_governance_run: 34024561306_GREEN
+self_hosted_pr_boundary_run: 34024561212_GREEN
+native_auth_bridge_run: 34024561191_GREEN
+package_b_run: 34024561245_GREEN
+package_a_run: 34024561314_GREEN
+package_a_functional: GREEN_job_101463113844
+package_a_fresh_audit: GREEN_job_101463113958
+package_a_boundary: GREEN_on_72193b0b5c56222bf9f2c387a2be6a09f702a59d
+falsification: GREEN_on_72193b0b5c56222bf9f2c387a2be6a09f702a59d
+be4f48_rebind_run: 34024561387_GREEN
+be4f48_rebind: STATIC_PROVEN_LIVE_CAUSAL_REQUIRED
+full_diff_review: PASS_on_72193b0b5c56222bf9f2c387a2be6a09f702a59d
+review_submissions: 0
+unresolved_review_threads: 0
+pr_comments: 0
 portal_api: GREEN
 portal_ui: GREEN
 stop_dominance: GREEN
 durable_single_session: GREEN
-package_a_functional: 609_GREEN_on_pre_supervisor_head
-package_b_regression: 609_GREEN_on_pre_supervisor_head
 package_b_mandatory: 39_of_39_GREEN
 browser_cli_e2e: GREEN
-falsification: GREEN_on_pre_supervisor_head
-package_a_fresh_audit: FAIL_PATH_OWNERSHIP_on_198a68278888a970c94a52f2eff26a2346f33d23
-package_a_fresh_audit_failure: tools/tibia_runtime_bridge/game_window_state_rebind.py_missing_from_declared_boundary
 ruff_import_order: GREEN
-be4f48_rebind: STATIC_PROVEN_HELPERS_REBOUND
 native_login_socket: GREEN
-native_login_runtime_supervisor: IMPLEMENTED_PENDING_EXACT_HEAD
+native_login_runtime_supervisor: GREEN_on_72193b0b5c56222bf9f2c387a2be6a09f702a59d
 native_login_permit: ONE_SHOT_EXACT_CURRENT_FAIL_CLOSED
-next_action: exact-head static qualification, then fresh physical admission and Synology deployment
+next_action: verify exact-head CI for this checkpoint-only commit, then final review/Ready/merge
 ```

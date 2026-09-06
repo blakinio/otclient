@@ -1,16 +1,19 @@
 from __future__ import annotations
 
 from pathlib import Path
+import hashlib
 import unittest
 
 
 ROOT = Path(__file__).resolve().parents[3]
 WORKFLOW = ROOT / ".github/workflows/track-a-native-login-be4f48-physical.yml"
 WORKER = ROOT / ".github/scripts/track_a_native_login_be4f48_physical.py"
+BASE_WORKER = ROOT / ".github/scripts/track_a_native_login_be4f48_physical_base.py"
 CONTAINER_CLIENT = ROOT / "tools/tibia_runtime_bridge/container_native_login_client.py"
 SIDECAR = ROOT / "tools/tibia_runtime_bridge/native_login_fd_sidecar.py"
 TASK = ROOT / "docs/agents/tasks/active/OTC-20260906-native-login-physical-executor.md"
 EXPECTED_SHA = "552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1"
+EXPECTED_BASE_BLOB_SHA = "666beeb601d93257585a5dd302afd255a57a0103"
 
 
 class PhysicalExecutorContractTests(unittest.TestCase):
@@ -73,8 +76,14 @@ class PhysicalExecutorContractTests(unittest.TestCase):
         ):
             self.assertNotIn(forbidden.lower(), text.lower())
 
+    def test_base_worker_is_exact_merged_executor_blob(self) -> None:
+        data = BASE_WORKER.read_bytes()
+        git_blob = hashlib.sha1(f"blob {len(data)}\0".encode("ascii") + data).hexdigest()
+        self.assertEqual(git_blob, EXPECTED_BASE_BLOB_SHA)
+        compile(data, str(BASE_WORKER), "exec")
+
     def test_worker_uses_exact_pid_vault_and_target_shm_bound_fd_bridge(self) -> None:
-        text = WORKER.read_text(encoding="utf-8")
+        text = BASE_WORKER.read_text(encoding="utf-8")
         required = (
             "TARGET_CONTAINER = \"otclient-track-a-kasmvnc\"",
             "TARGET_DISPLAY = \":1\"",
@@ -127,7 +136,7 @@ class PhysicalExecutorContractTests(unittest.TestCase):
             self.assertNotIn(forbidden, text)
 
     def test_auth_sidecar_mount_options_precede_immutable_image(self) -> None:
-        text = WORKER.read_text(encoding="utf-8")
+        text = BASE_WORKER.read_text(encoding="utf-8")
         self.assertIn('base = _sidecar_base(metadata, "auth")', text)
         self.assertIn('image_index = base.index(str(metadata["image"]))', text)
         self.assertNotIn('[*_sidecar_base(metadata, "auth"),\n        "--mount"', text)
@@ -191,6 +200,7 @@ class PhysicalExecutorContractTests(unittest.TestCase):
         probe = worker[probe_start:probe_end]
         self.assertLess(probe.index("completed.returncode != 0"), probe.index("_finish_relay(relay"))
         self.assertNotIn("completed.stderr", probe)
+        self.assertNotIn("CONTRACT_MARKERS", worker)
 
     def test_container_client_receives_relay_fd_and_forwards_only_sealed_memfd(self) -> None:
         text = CONTAINER_CLIENT.read_text(encoding="utf-8")

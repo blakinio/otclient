@@ -39,6 +39,7 @@ CHARACTER_SO = TASK_ROOT + "/otclient-tibia-character-control-current.so"
 CONTAINER_CLIENT = TASK_ROOT + "/container_native_login_client.py"
 PROFILE = TASK_ROOT + "/tibia-15.32.be4f48.json"
 RELAY_ROOT = "/dev/shm"
+SIDECAR_RELAY_ROOT = "/relay-shm"
 RELAY_PREFIX = "otclient-native-login-relay-"
 REGISTRATION = Path("/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime/runtime-registration.json")
 PROBE_PATH = REPO_ROOT / ".github/scripts/tibia-official-client-re-kasm-existing-runtime-probe.py"
@@ -275,9 +276,19 @@ def _runner_sidecar_metadata(vault_dir: Path) -> dict[str, Any]:
     if runner_name not in by_name or TARGET_CONTAINER not in by_name:
         raise PhysicalError("sidecar_inspect_identity_mismatch")
     runner = by_name[runner_name]
+    target = by_name[TARGET_CONTAINER]
     image = str(runner.get("Image", ""))
     if not image.startswith("sha256:") or len(image) != 71 or any(ch not in "0123456789abcdef" for ch in image[7:]):
         raise PhysicalError("sidecar_runner_image_invalid")
+    resolv_conf_path = str(target.get("ResolvConfPath", ""))
+    if not resolv_conf_path.startswith("/") or "," in resolv_conf_path:
+        raise PhysicalError("target_resolv_conf_path_invalid")
+    container_dir = Path(resolv_conf_path).parent
+    if container_dir.name.lower() != target_id:
+        raise PhysicalError("target_docker_container_dir_identity_mismatch")
+    target_shm_source = str(container_dir / "mounts" / "shm")
+    if not target_shm_source.startswith("/") or "," in target_shm_source:
+        raise PhysicalError("target_shm_source_invalid")
     work_mounts = [
         mount for mount in (runner.get("Mounts") or [])
         if isinstance(mount, dict) and mount.get("Destination") == "/work" and mount.get("RW") is True
@@ -307,7 +318,13 @@ def _runner_sidecar_metadata(vault_dir: Path) -> dict[str, Any]:
     ]).strip()
     if residue:
         raise PhysicalError("sidecar_residue_present")
-    return {"image": image, "work_source": work_source, "target_id": target_id, "vault_root": vault_root}
+    return {
+        "image": image,
+        "work_source": work_source,
+        "target_id": target_id,
+        "target_shm_source": target_shm_source,
+        "vault_root": vault_root,
+    }
 
 
 def _host_source(path: Path, metadata: dict[str, Any]) -> str:
@@ -336,8 +353,21 @@ def _relay_socket(operation: str) -> str:
     return f"{RELAY_ROOT}/{RELAY_PREFIX}{run_id}-{operation}"
 
 
+def _sidecar_relay_socket(relay_socket: str) -> str:
+    target = Path(relay_socket)
+    if target.parent != Path(RELAY_ROOT) or not target.name.startswith(RELAY_PREFIX):
+        raise PhysicalError("relay_socket_mapping_invalid")
+    suffix = target.name[len(RELAY_PREFIX):]
+    if not suffix or any(ch not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_" for ch in suffix):
+        raise PhysicalError("relay_socket_mapping_invalid")
+    return str(Path(SIDECAR_RELAY_ROOT) / target.name)
+
+
 def _sidecar_base(metadata: dict[str, Any], operation: str) -> list[str]:
     sidecar_host = _host_source(SIDECAR_SOURCE, metadata)
+    target_shm_source = str(metadata["target_shm_source"])
+    if not target_shm_source.startswith("/") or "," in target_shm_source:
+        raise PhysicalError("target_shm_source_invalid")
     return [
         "docker", "run", "--rm",
         "--name", _sidecar_name(operation),
@@ -346,13 +376,13 @@ def _sidecar_base(metadata: dict[str, Any], operation: str) -> list[str]:
         "--read-only",
         "--user", "0:0",
         "--pid", f"container:{TARGET_CONTAINER}",
-        "--ipc", f"container:{TARGET_CONTAINER}",
         "--cap-drop", "ALL",
         "--cap-add", "SETUID",
         "--cap-add", "SETGID",
         "--security-opt", "no-new-privileges",
         "--env", "PYTHONDONTWRITEBYTECODE=1",
         "--mount", f"type=bind,src={sidecar_host},dst=/tmp/native_login_fd_sidecar.py,readonly",
+        "--mount", f"type=bind,src={target_shm_source},dst=/relay-shm,readonly",
         "--entrypoint", "python3",
         str(metadata["image"]),
         "/tmp/native_login_fd_sidecar.py",
@@ -362,6 +392,7 @@ def _sidecar_base(metadata: dict[str, Any], operation: str) -> list[str]:
 def _sidecar_auth_command(metadata: dict[str, Any], relay_socket: str) -> list[str]:
     secret_vault_host = _host_source(SECRET_VAULT_SOURCE, metadata)
     vault_host = _host_source(Path(metadata["vault_root"]), metadata)
+    sidecar_relay_socket = _sidecar_relay_socket(relay_socket)
     base = _sidecar_base(metadata, "auth")
     image_index = base.index(str(metadata["image"]))
     return [
@@ -369,7 +400,7 @@ def _sidecar_auth_command(metadata: dict[str, Any], relay_socket: str) -> list[s
         "--mount", f"type=bind,src={secret_vault_host},dst=/tmp/secret_vault.py,readonly",
         "--mount", f"type=bind,src={vault_host},dst=/vault,readonly",
         *base[image_index:],
-        "auth", "--relay-socket", relay_socket, "--timeout", "15.0",
+        "auth", "--relay-socket", sidecar_relay_socket, "--timeout", "15.0",
     ]
 
 
@@ -504,7 +535,8 @@ def sidecar_probe(vault_dir: Path, result: Path) -> None:
     sidecar_error: PhysicalError | None = None
     try:
         completed = _run([
-            *_sidecar_base(metadata, "probe"), "probe", "--relay-socket", relay_socket, "--timeout", "10.0",
+            *_sidecar_base(metadata, "probe"),
+            "probe", "--relay-socket", _sidecar_relay_socket(relay_socket), "--timeout", "10.0",
         ], timeout=16)
     except PhysicalError as exc:
         sidecar_error = exc
@@ -538,9 +570,12 @@ def precheck(vault_dir: Path, bundle: Path, result: Path) -> None:
     uid, gid = _numeric_user()
     if not same_numeric_uid(int(manifest["pid"]), uid):
         raise PhysicalError("same_numeric_uid_failed")
-    _runner_sidecar_metadata(vault_dir)
+    metadata = _runner_sidecar_metadata(vault_dir)
+    if not str(metadata.get("target_shm_source", "")).startswith("/"):
+        raise PhysicalError("target_shm_source_invalid")
     for operation in ("probe", "auth"):
         relay_socket = _relay_socket(operation)
+        _sidecar_relay_socket(relay_socket)
         if _run(["docker", "exec", TARGET_CONTAINER, "test", "!", "-e", relay_socket]).returncode != 0:
             raise PhysicalError("relay_socket_residue_present")
     _write_json(result, {

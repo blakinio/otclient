@@ -8,12 +8,12 @@ project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: physical_native_login_execution
-phase: sidecar_fd_transport_repair
-branch: fix/OTC-20260906-native-login-sidecar-fd-transport
+phase: canonical_lease_executable_repair
+branch: fix/OTC-20260906-native-login-lease-invocation
 base_branch: main
 created: 2026-09-06T17:35:00+02:00
-updated_at: 2026-09-06T19:31:00+02:00
-base_main: 76f14ecc781f2b6dee17a27e692f9cfe1b6a574d
+updated_at: 2026-09-06T20:12:00+02:00
+base_main: 330ef9d9bb11ddff5428d2a93123f194fa7f67d1
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: chatgpt
@@ -48,6 +48,7 @@ parent_task: OTC-20260905-control-center-native-login-start
 owned_paths:
   - .github/workflows/track-a-native-login-be4f48-physical.yml
   - .github/scripts/track_a_native_login_be4f48_physical.py
+  - .github/scripts/tibia-official-client-re-canonical-live-lease
   - tools/tibia_runtime_bridge/container_native_login_client.py
   - tools/tibia_runtime_bridge/native_login_fd_sidecar.py
   - tests/tools/tibia_runtime_bridge/test_native_login_physical_executor_contract.py
@@ -124,15 +125,12 @@ Second merged PRECHECK `34046945750 / 101523685277` reached `synology-otclient-0
 
 Merged read-only IPC inventory PR #962 (`76f14ecc781f2b6dee17a27e692f9cfe1b6a574d`) was executed as run `34048659727`, job `101528184803`: `shared_mount_count=0`; runner and Kasm both use private PID/IPC modes; Kasm has no mounts; the runner has `/work`, `/runner` and `/var/run/docker.sock`; `credential_access=false`, `runtime_mutation=false`, `process_memory_access=false`. A fresh Remote Desktop Commander check also found the Synology host device offline, so direct host `nsenter` is not currently available.
 
+Sidecar transport PR #963 merged as protected `main` `330ef9d9bb11ddff5428d2a93123f194fa7f67d1`. Trusted-main PRECHECK `34050218008 / 101532472331` passed exact current, target uniqueness, registration-current and sidecar metadata checks and terminated with `NATIVE_LOGIN_PHYSICAL_MUTATION=false` and `NATIVE_LOGIN_SECRET_ACCESS=false`.
+
+The subsequent trusted-main EXECUTE `34050377214 / 101532897575` failed on the first canonical lease `acquire` with `Permission denied` when invoking `.github/scripts/tibia-official-client-re-canonical-live-lease`. This occurred before lease acquisition, Gate B, sidecar probe, client replacement, vault decrypt or credential send. Therefore runtime mutation remained false and the credential-bearing attempt count remains zero.
+
 ## Current repair
 
-Implement a bounded Docker-host sidecar transport rather than weakening the credential boundary:
+The canonical lease wrapper content is unchanged and its dedicated deterministic lease suite passes. Git tree inspection proved the wrapper blob was stored without an executable bit; replacing only its tree mode with `100755` produces a distinct tree while preserving the exact blob SHA. PR #964 is therefore a bounded executable-mode repair, not a lease semantics change.
 
-- PR-head remains repository-only and cannot run the sidecar;
-- PRECHECK remains read-only and only proves sidecar metadata prerequisites;
-- EXECUTE performs a secret-free sidecar FD-preservation/mount-namespace probe under current Gate A/Gate B before replacing the client;
-- character state and confirmation use ordinary exact-target `docker exec` inside Kasm and no longer depend on host PID namespace visibility;
-- auth uses one synchronous, task-labelled sidecar with only `SYS_ADMIN`, `SETUID` and `SETGID` added, `network=none`, read-only root, exact read-only bind mounts and no Docker socket;
-- no second secret attempt is permitted.
-
-Next action: define the sidecar transport contract RED, implement it, obtain exact-head GREEN, merge, rerun trusted-main PRECHECK, then run owner-authorized EXECUTE only if PRECHECK remains clean.
+This branch remains repository-only. After exact-head governance/lease/CI gates pass, merge the mode repair, rerun trusted-main PRECHECK, and only after PRECHECK PASS rerun owner-authorized EXECUTE. Because the prior EXECUTE stopped before vault access, that future run remains the first credential-bearing attempt.

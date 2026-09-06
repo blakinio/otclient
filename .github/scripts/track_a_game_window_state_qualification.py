@@ -320,16 +320,12 @@ def _write_event(handle, event: dict[str, object]) -> None:
 
 def _binding_values(binding: dict[str, object]) -> tuple[int, int]:
     try:
-        rtti = binding["rtti"]
-        read_property = binding["read_property"]
-        if not isinstance(rtti, dict) or not isinstance(read_property, dict):
-            raise TypeError
-        backing = read_property["backing_member"]
+        backing = binding["read_property"]["backing_member"]
         if not isinstance(backing, dict):
             raise TypeError
         if int(backing.get("byte_width", 0)) != GAME_WINDOW_STATE_MEMBER_WIDTH:
             raise QualificationError("GAME_WINDOW_STATE_MEMBER_WIDTH_CHANGED")
-        vptr_offset = int(rtti["vptr_offset"])
+        vptr_offset = int(binding["rtti"]["vptr_offset"])
         member_offset = int(backing["member_offset"])
     except (KeyError, TypeError, ValueError) as exc:
         raise QualificationError("GAME_WINDOW_STATE_BINDING_INVALID") from exc

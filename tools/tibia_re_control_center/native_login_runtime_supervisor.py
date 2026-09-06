@@ -2,17 +2,18 @@ from __future__ import annotations
 
 """Fail-closed local supervisor for the Control Center native-login lifecycle."""
 
-from dataclasses import dataclass
 import json
 import os
-from pathlib import Path
 import re
 import secrets
 import socket
 import stat
 import threading
 import time
-from typing import Any, Callable
+from collections.abc import Callable
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
 
 from .current_client_fence import current_client_fence
 
@@ -95,7 +96,7 @@ class NativeLoginPermitStore:
 
         expires_at = payload["expires_at_epoch"]
         if isinstance(expires_at, bool) or not isinstance(expires_at, int):
-            raise RuntimeError("AUTHORIZATION_INVALID")
+            raise TypeError("authorization expiry must be an integer")
         now = int(self._now())
         if expires_at <= now:
             raise RuntimeError("AUTHORIZATION_EXPIRED")
@@ -291,7 +292,7 @@ class NativeLoginRuntimeSupervisor:
                     return
                 self._effect_observed = True
             outcome = self._login_runner(operation_id, permit, cancelled)
-        except Exception:
+        except (OSError, RuntimeError, TypeError, ValueError):
             outcome = "FAILED"
 
         mapping = {

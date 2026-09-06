@@ -45,6 +45,11 @@ jobs:
               'self.assertIn("kGameClientVptrOffset = 0x3076908", source)',
               'self.assertIn("kGameClientVptrOffset = 0x30acd08", source)',
           )
+          replace_once(
+              'tests/tools/tibia_runtime_bridge/test_bridge.py',
+              'self.assertIn("kColdAuthTargetOffset = 0xd06850", source)',
+              'self.assertIn("kColdAuthTargetOffset = 0xd18d70", source)',
+          )
 
           replace_once(
               'tools/tibia_re_control_center/control_api.py',

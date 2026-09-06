@@ -354,6 +354,25 @@ def _sidecar_base(metadata: dict[str, Any], operation: str) -> list[str]:
     ]
 
 
+def _sidecar_auth_command(metadata: dict[str, Any], registration: dict[str, Any], uid: int, gid: int) -> list[str]:
+    secret_vault_host = _host_source(SECRET_VAULT_SOURCE, metadata)
+    vault_host = _host_source(Path(metadata["vault_root"]), metadata)
+    base = _sidecar_base(metadata, "auth")
+    image_index = base.index(str(metadata["image"]))
+    return [
+        *base[:image_index],
+        "--mount", f"type=bind,src={secret_vault_host},dst=/tmp/secret_vault.py,readonly",
+        "--mount", f"type=bind,src={vault_host},dst=/vault,readonly",
+        *base[image_index:],
+        "auth",
+        "--boot-id-sha256", str(registration["boot_id_sha256"]),
+        "--pid", str(registration["pid"]),
+        "--start-ticks", str(registration["process_start_ticks"]),
+        "--drop-uid", str(uid),
+        "--drop-gid", str(gid),
+    ]
+
+
 def _parse_sidecar_response(completed: subprocess.CompletedProcess[str]) -> dict[str, Any]:
     if not completed.stdout.strip():
         raise PhysicalError("sidecar_response_missing")
@@ -364,6 +383,24 @@ def _parse_sidecar_response(completed: subprocess.CompletedProcess[str]) -> dict
     if not isinstance(response, dict):
         raise PhysicalError("sidecar_response_invalid")
     return response
+
+
+def _write_json(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_CLOEXEC, 0o600)
+    try:
+        os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
+            json.dump(payload, handle, sort_keys=True, separators=(",", ":"))
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+    except BaseException:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+        raise
 
 
 def sidecar_probe(vault_dir: Path, result: Path) -> None:
@@ -386,24 +423,6 @@ def sidecar_probe(vault_dir: Path, result: Path) -> None:
         "credential_plaintext_accessed": False,
         "secret_attempt_count": 0,
     })
-
-
-def _write_json(path: Path, payload: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_CLOEXEC, 0o600)
-    try:
-        os.fchmod(fd, 0o600)
-        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
-            json.dump(payload, handle, sort_keys=True, separators=(",", ":"))
-            handle.write("\n")
-            handle.flush()
-            os.fsync(handle.fileno())
-    except BaseException:
-        try:
-            os.close(fd)
-        except OSError:
-            pass
-        raise
 
 
 def precheck(vault_dir: Path, bundle: Path, result: Path) -> None:
@@ -559,29 +578,7 @@ def auth_one_shot(vault_dir: Path, result: Path) -> None:
     if not same_numeric_uid(int(registration["pid"]), uid):
         raise PhysicalError("same_numeric_uid_failed")
     metadata = _runner_sidecar_metadata(vault_dir)
-    vault_host = _host_source(Path(metadata["vault_root"]), metadata)
-    secret_vault_host = _host_source(SECRET_VAULT_SOURCE, metadata)
-    command = [
-        *_sidecar_base(metadata, "auth"),
-        "--mount", f"type=bind,src={secret_vault_host},dst=/tmp/secret_vault.py,readonly",
-        "--mount", f"type=bind,src={vault_host},dst=/vault,readonly",
-    ]
-    # Docker options must precede the immutable image/entrypoint arguments.
-    image_index = command.index(str(metadata["image"]))
-    image_tail = command[image_index:]
-    command = [
-        *command[:image_index],
-        "--mount", f"type=bind,src={secret_vault_host},dst=/tmp/secret_vault.py,readonly",
-        "--mount", f"type=bind,src={vault_host},dst=/vault,readonly",
-        *image_tail,
-        "auth",
-        "--boot-id-sha256", str(registration["boot_id_sha256"]),
-        "--pid", str(registration["pid"]),
-        "--start-ticks", str(registration["process_start_ticks"]),
-        "--drop-uid", str(uid),
-        "--drop-gid", str(gid),
-    ]
-    completed = _run(command, timeout=50)
+    completed = _run(_sidecar_auth_command(metadata, registration, uid, gid), timeout=50)
     response = _parse_sidecar_response(completed)
     if completed.returncode == 0:
         if response.get("ok") is not True or response.get("invocation_dispatched") is not True:

@@ -61,6 +61,7 @@ owned_paths:
   - tests/tools/tibia_re_control_center/test_native_login_control.py
   - tests/tools/tibia_re_control_center/test_native_login_api.py
   - tests/tools/tibia_re_control_center/test_package_b.py
+  - tests/tools/tibia_runtime_bridge/test_native_login_be4f48_bindings.py
   - docs/agents/evidence/OTC-20260905-control-center-native-login-start/**
   - docs/agents/tasks/active/OTC-20260905-control-center-native-login-start.md
 modules_touched:

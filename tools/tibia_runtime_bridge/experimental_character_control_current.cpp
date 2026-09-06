@@ -40,9 +40,9 @@
 
 namespace {
 
-constexpr std::uint64_t kClientSize = 52109920;
-constexpr char kClientSha256[] = "ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8";
-constexpr std::uintptr_t kCharacterControllerVptrOffset = 0x30c3988;
+constexpr std::uint64_t kClientSize = 52105824;
+constexpr char kClientSha256[] = "552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1";
+constexpr std::uintptr_t kCharacterControllerVptrOffset = 0x30c29a8;
 constexpr char kCharacterControllerClass[] = "tibia::gamewindow::TCharacterSelectionController";
 constexpr char kConfirmSignature[] = "onCharacterSelectionConfirmed(QList<int>)";
 

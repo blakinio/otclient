@@ -45,7 +45,6 @@ from .persistent_store import (
 from .recorder import Recorder, ensure_no_secret_material
 from .scenario import ACTION_KINDS, ValidatedScenario, validate_scenario
 
-
 _NATIVE_LOGIN_CLAIM_META_KEY = "native_login_active_resource"
 
 

@@ -16,7 +16,7 @@ from typing import Any, Sequence
 
 SECRET_VAULT_MODULE = Path("/tmp/secret_vault.py")
 VAULT_DIR = Path("/vault")
-RELAY_ROOT = Path("/dev/shm")
+RELAY_ROOT = Path("/relay-shm")
 RELAY_PREFIX = "otclient-native-login-relay-"
 RELAY_PROBE_COMMAND = b"relay-probe\n"
 RELAY_AUTH_COMMAND = b"relay-auth-fd\n"
@@ -59,7 +59,7 @@ def _validate_sealed_fd(fd: int) -> None:
 
 def _relay_path(path: Path) -> Path:
     if not path.is_absolute() or path.parent != RELAY_ROOT:
-        raise SidecarError("relay_socket_outside_shared_ipc")
+        raise SidecarError("relay_socket_outside_shared_mount")
     if not path.name.startswith(RELAY_PREFIX):
         raise SidecarError("relay_socket_namespace_invalid")
     return path

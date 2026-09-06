@@ -12,7 +12,7 @@ phase: implementation
 branch: feat/OTC-20260905-control-center-native-login-start
 base_branch: main
 created: 2026-09-05T17:54:29Z
-updated_at: 2026-09-06T06:59:00Z
+updated_at: 2026-09-06T09:19:00Z
 base_main: b6cf7402b4dbde59b2086f0982c7dcc711c3b5fc
 policy_version: 2
 prompting_standard_version: 2.1
@@ -55,6 +55,7 @@ owned_paths:
   - tools/tibia_re_control_center/control_ui.py
   - tools/tibia_re_control_center/persistent_store.py
   - tools/tibia_runtime_bridge/current_sha_native_login_gate.py
+  - tools/tibia_runtime_bridge/game_window_state_rebind.py
   - tools/tibia_runtime_bridge/native_login_rebind_core.py
   - tools/tibia_runtime_bridge/rebind_native_login_current.py
   - tools/tibia_runtime_bridge/experimental_auth.cpp
@@ -163,6 +164,8 @@ package_b_regression: 609_GREEN_on_pre_supervisor_head
 package_b_mandatory: 39_of_39_GREEN
 browser_cli_e2e: GREEN
 falsification: GREEN_on_pre_supervisor_head
+package_a_fresh_audit: FAIL_PATH_OWNERSHIP_on_198a68278888a970c94a52f2eff26a2346f33d23
+package_a_fresh_audit_failure: tools/tibia_runtime_bridge/game_window_state_rebind.py_missing_from_declared_boundary
 ruff_import_order: GREEN
 be4f48_rebind: STATIC_PROVEN_HELPERS_REBOUND
 native_login_socket: GREEN

@@ -27,6 +27,7 @@ class PhysicalExecutorContractTests(unittest.TestCase):
             "ref: main",
             "git ls-remote origin refs/heads/main",
             "persist-credentials: false",
+            "needs: prepare",
         )
         for needle in required:
             with self.subTest(needle=needle):
@@ -68,7 +69,7 @@ class PhysicalExecutorContractTests(unittest.TestCase):
         ):
             self.assertNotIn(forbidden.lower(), text.lower())
 
-    def test_worker_has_exact_pid_replacement_and_fail_closed_vault_precheck(self) -> None:
+    def test_worker_uses_exact_pid_host_vault_and_namespace_fd_bridge(self) -> None:
         text = WORKER.read_text(encoding="utf-8")
         required = (
             "TARGET_CONTAINER = \"otclient-track-a-kasmvnc\"",
@@ -79,6 +80,9 @@ class PhysicalExecutorContractTests(unittest.TestCase):
             "SIGTERM",
             "vault_bind",
             "same_numeric_uid",
+            "decrypt_to_sealed_memfd",
+            "nsenter",
+            "pass_fds",
             "OTCLIENT_TIBIA_RE_AUTH_SOCKET",
             "OTCLIENT_TIBIA_RE_CHARACTER_SOCKET",
             "LD_PRELOAD",
@@ -89,11 +93,14 @@ class PhysicalExecutorContractTests(unittest.TestCase):
         for forbidden in ("pkill", "killall", "SIGKILL", "TIBIA_TEST_EMAIL", "TIBIA_TEST_PASSWORD"):
             self.assertNotIn(forbidden, text)
 
-    def test_container_client_keeps_credentials_fd_only(self) -> None:
+    def test_container_client_receives_only_inherited_sealed_fd(self) -> None:
         text = CONTAINER_CLIENT.read_text(encoding="utf-8")
         required = (
-            "decrypt_to_sealed_memfd",
-            "auth_with_credentials_fd",
+            "auth-fd",
+            "_validate_credentials_memfd",
+            "F_GET_SEALS",
+            "SCM_RIGHTS",
+            "sendmsg",
             "PeerIdentityExpectation",
             "os.setgid",
             "os.setuid",
@@ -103,7 +110,15 @@ class PhysicalExecutorContractTests(unittest.TestCase):
         for needle in required:
             with self.subTest(needle=needle):
                 self.assertIn(needle, text)
-        for forbidden in ("TIBIA_TEST_EMAIL", "TIBIA_TEST_PASSWORD", "password=", "email="):
+        for forbidden in (
+            "decrypt_to_sealed_memfd",
+            "secret_vault",
+            "--vault-dir",
+            "TIBIA_TEST_EMAIL",
+            "TIBIA_TEST_PASSWORD",
+            "password=",
+            "email=",
+        ):
             self.assertNotIn(forbidden, text)
 
     def test_runtime_task_is_pregate_fail_closed(self) -> None:

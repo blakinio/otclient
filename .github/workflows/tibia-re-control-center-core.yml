@@ -169,6 +169,27 @@ jobs:
               'docs/agents/reports/OTC-20260901-vision-p2-',
               'docs/agents/evidence/OTC-20260823-tibia-re-control-center-package-b/',
           )
+          native_login_task = 'docs/agents/tasks/active/OTC-20260905-control-center-native-login-start.md'
+          native_login_branch = 'feat/OTC-20260905-control-center-native-login-start'
+          native_login_base = 'b6cf7402b4dbde59b2086f0982c7dcc711c3b5fc'
+          native_login_repo = 'blakinio/otclient'
+          if (
+              native_login_task in changed
+              and base == native_login_base
+              and os.environ.get('HEAD_REF') == native_login_branch
+              and os.environ.get('HEAD_REPO') == native_login_repo
+          ):
+              allowed_exact |= {
+                  '.github/workflows/track-a-native-login-be4f48-rebind.yml',
+                  'docs/agents/evidence/OTC-20260905-control-center-native-login-start/be4f48-rebind.json',
+                  'tests/tools/tibia_runtime_bridge/test_bridge.py',
+                  'tests/tools/tibia_runtime_bridge/test_native_login_be4f48_bindings.py',
+                  'tools/tibia_runtime_bridge/current_sha_native_login_gate.py',
+                  'tools/tibia_runtime_bridge/experimental_auth.cpp',
+                  'tools/tibia_runtime_bridge/experimental_character_control_current.cpp',
+                  'tools/tibia_runtime_bridge/native_login_rebind_core.py',
+                  'tools/tibia_runtime_bridge/rebind_native_login_current.py',
+              }
           fence_task = 'docs/agents/tasks/active/OTC-20260902-canonical-current-client-fence-be4f48.md'
           fence_branch = 'fix/OTC-20260902-canonical-current-client-fence-be4f48'
           fence_base = '8441fc1cce1600033b505d68ebc5c0141b337394'

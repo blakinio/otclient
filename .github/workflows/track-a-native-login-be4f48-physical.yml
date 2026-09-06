@@ -1,0 +1,81 @@
+name: Track A be4f48 physical native login
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+    paths:
+      - .github/workflows/track-a-native-login-be4f48-physical.yml
+      - .github/scripts/track_a_native_login_be4f48_physical.py
+      - tools/tibia_runtime_bridge/container_native_login_client.py
+      - tests/tools/tibia_runtime_bridge/test_native_login_physical_executor_contract.py
+      - docs/agents/tasks/active/OTC-20260906-native-login-physical-executor.md
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+
+env:
+  TASK_ID: OTC-20260906-native-login-physical-executor
+  EXPECTED_VERSION: 15.32.be4f48
+  EXPECTED_SIZE: '52105824'
+  EXPECTED_SHA: 552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1
+  VAULT_DIR: /work/_otclient_tibia_re_state/secret-vault
+
+jobs:
+  contract:
+    if: github.event_name == 'pull_request'
+    name: Physical native-login executor contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+      - name: Run test-first executor contract
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          PYTHONPATH=. python3 tests/tools/tibia_runtime_bridge/test_native_login_physical_executor_contract.py
+          python3 .github/scripts/test_track_a_agent_runtime_governance.py \
+            --changed-from "${{ github.event.pull_request.base.sha }}" \
+            --expected-branch "$GITHUB_HEAD_REF"
+          git diff --check "${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}"
+
+  physical:
+    if: >-
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request &&
+      github.event.comment.user.login == github.repository_owner &&
+      (github.event.comment.body == '/track-a-native-login-be4f48 PRECHECK' ||
+       github.event.comment.body == '/track-a-native-login-be4f48 EXECUTE')
+    name: Trusted-main be4f48 physical native login
+    runs-on: [otclient, synology]
+    timeout-minutes: 45
+    concurrency:
+      group: track-a-be4f48-native-login-physical
+      cancel-in-progress: false
+    steps:
+      - name: Checkout exact trusted main
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          ref: main
+          fetch-depth: 2
+      - name: Fail closed until executor implementation is merged
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$(git rev-parse HEAD)" = "$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          # Final implementation must use canonical-live-lease acquire under ONE_SHOT_NATIVE_LOGIN,
+          # transition rebind and gate-b, guard-run for every mutation, and a newer-generation
+          # stale-registration-recovery after replacement or auth process handoff.
+          # It must prove gameWindowState causally after CONFIRM_UNIQUE and emit
+          # NO_SECOND_SECRET_ATTEMPT=true. The reviewed probe is:
+          # tibia-official-client-re-kasm-existing-runtime-probe.py
+          # canonical-live-lease acquire ; transition rebind ; transition gate-b ; guard-run ; stale-registration-recovery
+          echo PHYSICAL_EXECUTOR_IMPLEMENTATION_NOT_MERGED >&2
+          exit 2

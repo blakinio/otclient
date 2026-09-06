@@ -16,7 +16,7 @@ from typing import Any, Sequence
 
 SECRET_VAULT_MODULE = Path("/tmp/secret_vault.py")
 VAULT_DIR = Path("/vault")
-RELAY_ROOT = Path("/relay-shm")
+RELAY_ROOT = Path("/proc/1/root/dev/shm")
 RELAY_PREFIX = "otclient-native-login-relay-"
 RELAY_PROBE_COMMAND = b"relay-probe\n"
 RELAY_AUTH_COMMAND = b"relay-auth-fd\n"
@@ -26,7 +26,7 @@ SAFE_ERROR_CODES = frozenset({
     "sealed_fd_not_regular",
     "sealed_fd_not_memfd",
     "sealed_fd_incomplete",
-    "relay_socket_outside_shared_mount",
+    "relay_socket_outside_target_proc_root",
     "relay_socket_namespace_invalid",
     "relay_response_too_large",
     "relay_response_missing",
@@ -85,8 +85,11 @@ def _validate_sealed_fd(fd: int) -> None:
 
 def _relay_path(path: Path) -> Path:
     if not path.is_absolute() or path.parent != RELAY_ROOT:
-        raise SidecarError("relay_socket_outside_shared_mount")
+        raise SidecarError("relay_socket_outside_target_proc_root")
     if not path.name.startswith(RELAY_PREFIX):
+        raise SidecarError("relay_socket_namespace_invalid")
+    suffix = path.name[len(RELAY_PREFIX):]
+    if not suffix or any(ch not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_" for ch in suffix):
         raise SidecarError("relay_socket_namespace_invalid")
     return path
 

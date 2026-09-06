@@ -1,0 +1,37 @@
+{
+  "schema": "otclient.tibia-runtime-bridge.profile.v1",
+  "client_version": "15.32.be4f48",
+  "binary_sha256": "552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1",
+  "targets": {
+    "game_client": {
+      "resolver": "primary_vptr",
+      "vptr_offset": "0x30acd08",
+      "expected_qt_class": "tibia::client::TGameClient",
+      "evidence": "exact-current native-login be4f48 static rebind run 34024784802"
+    },
+    "character_controller": {
+      "resolver": "primary_vptr",
+      "vptr_offset": "0x30c29a8",
+      "expected_qt_class": "tibia::gamewindow::TCharacterSelectionController",
+      "evidence": "exact-current native-login be4f48 static rebind run 34024784802"
+    },
+    "player_protocol_handler": {
+      "resolver": "primary_vptr",
+      "vptr_offset": "0x30be640",
+      "expected_qt_class": "tibia::game::TPlayerProtocolMessageHandler",
+      "evidence": "exact-current native-login be4f48 static rebind run 34024784802"
+    },
+    "gameserver_game_session": {
+      "resolver": "primary_vptr",
+      "vptr_offset": "0x30aefa0",
+      "expected_qt_class": "tibia::game::TGameserverGameSession",
+      "evidence": "exact-current native-login be4f48 static rebind run 34024784802"
+    },
+    "worldmap_handler": {
+      "resolver": "primary_vptr",
+      "vptr_offset": "0x30bf1f0",
+      "expected_qt_class": "tibia::worldmap::TWorldmapProtocolMessageHandler",
+      "evidence": "exact-current native-login be4f48 static rebind run 34024784802"
+    }
+  }
+}

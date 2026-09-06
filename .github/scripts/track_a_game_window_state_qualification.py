@@ -13,16 +13,17 @@ import sys
 import time
 from typing import Callable, NoReturn, Sequence
 
-import track_a_current_world_entered_anchor as anchor
-import track_a_current_world_entered_durable_state as durable
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
-GAME_WINDOW_CLASS = "tibia::gamewindow::TGameWindowController"
-GAME_WINDOW_STATE_MEMBER_OFFSET = 0x60
+from tools.tibia_re_control_center.current_client_fence import current_client_fence
+from tools.tibia_runtime_bridge.game_window_state_rebind import analyze_game_window_state
+
 GAME_WINDOW_STATE_MEMBER_WIDTH = 24
 MAX_QSTRING_CHARS = 32
 HEAP_SCAN_LIMIT = 768 * 1024 * 1024
 SCAN_CHUNK = 8 * 1024 * 1024
-CURRENT_VERSION = "15.32.75d4a0"
 INGAME_TEXT = "INGAME"
 DISALLOWED_SPECIAL_MAPPINGS = {"[vvar]", "[vdso]", "[vsyscall]"}
 
@@ -208,18 +209,19 @@ def _digest_bytes(raw: bytes) -> str:
 
 
 def _load_exact_executable(pid: int, expected_size: int, expected_sha256: str) -> tuple[Path, bytes, os.stat_result]:
-    if expected_size != int(anchor.EXPECTED_SIZE) or expected_sha256 != str(anchor.EXPECTED_SHA256):
+    fence = current_client_fence()
+    if expected_size != fence.size or expected_sha256 != fence.sha256:
         raise QualificationError("CALLER_EXACT_CLIENT_FENCE_NOT_CANONICAL")
     proc_exe = Path(f"/proc/{pid}/exe")
     try:
-        stat = proc_exe.stat()
+        stat_result = proc_exe.stat()
         exe = Path(os.path.realpath(proc_exe))
         raw = exe.read_bytes()
     except OSError as exc:
         raise QualificationError("EXACT_CLIENT_EXECUTABLE_UNAVAILABLE") from exc
     if len(raw) != expected_size or _digest_bytes(raw) != expected_sha256:
         raise QualificationError("EXACT_CLIENT_FENCE_MISMATCH")
-    return exe, raw, stat
+    return exe, raw, stat_result
 
 
 def _mapping_base(regions: Sequence[Mapping], exe: Path) -> int:
@@ -289,6 +291,8 @@ def _observe_state(
     object_address: int,
     runtime_vptr: int,
     regions: Sequence[Mapping],
+    *,
+    member_offset: int,
 ) -> dict[str, object]:
     _verify_process_identity(pid, start_ticks, initial_stat)
     vptr = struct.unpack("<Q", _read_exact(fd, object_address, 8, "OBJECT_VPTR_READ_FAILED"))[0]
@@ -296,7 +300,7 @@ def _observe_state(
         raise QualificationError("GAME_WINDOW_CONTROLLER_VPTR_CHANGED")
     member = _read_exact(
         fd,
-        object_address + GAME_WINDOW_STATE_MEMBER_OFFSET,
+        object_address + member_offset,
         GAME_WINDOW_STATE_MEMBER_WIDTH,
         "QSTRING_MEMBER_READ_FAILED",
     )
@@ -314,6 +318,24 @@ def _write_event(handle, event: dict[str, object]) -> None:
     handle.flush()
 
 
+def _binding_values(binding: dict[str, object]) -> tuple[int, int]:
+    try:
+        backing = binding["read_property"]["backing_member"]
+        if not isinstance(backing, dict):
+            raise TypeError
+        if int(backing.get("byte_width", 0)) != GAME_WINDOW_STATE_MEMBER_WIDTH:
+            raise QualificationError("GAME_WINDOW_STATE_MEMBER_WIDTH_CHANGED")
+        vptr_offset = int(binding["rtti"]["vptr_offset"])
+        member_offset = int(backing["member_offset"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise QualificationError("GAME_WINDOW_STATE_BINDING_INVALID") from exc
+    if vptr_offset <= 0:
+        raise QualificationError("GAME_WINDOW_CONTROLLER_VPTR_OFFSET_INVALID")
+    if member_offset <= 0 or member_offset > 0x10000:
+        raise QualificationError("GAME_WINDOW_STATE_MEMBER_OFFSET_INVALID")
+    return vptr_offset, member_offset
+
+
 def run(args: argparse.Namespace) -> int:
     if args.pid <= 0 or args.start_ticks <= 0:
         raise QualificationError("PID_IDENTITY_INVALID")
@@ -326,12 +348,12 @@ def run(args: argparse.Namespace) -> int:
     if _start_ticks(args.pid) != args.start_ticks:
         raise QualificationError("START_TICKS_MISMATCH")
 
-    exe, raw, initial_stat = _load_exact_executable(args.pid, args.expected_size, args.expected_sha256)
-    sections, relocs = anchor.parse_elf_layout(raw)
-    resolved = durable.resolve_primary_vptr_from_rtti(raw, sections, relocs, GAME_WINDOW_CLASS)
+    exe, _raw, initial_stat = _load_exact_executable(args.pid, args.expected_size, args.expected_sha256)
+    binding = analyze_game_window_state(exe)
+    vptr_offset, member_offset = _binding_values(binding)
     regions = parse_maps(Path(f"/proc/{args.pid}/maps").read_text(encoding="utf-8"))
     base = _mapping_base(regions, exe)
-    runtime_vptr = base + int(resolved["vptr_offset"])
+    runtime_vptr = base + vptr_offset
     heap_begin, heap_end = _heap_bounds(regions)
 
     output = Path(args.output)
@@ -347,7 +369,14 @@ def run(args: argparse.Namespace) -> int:
             while time.monotonic() < deadline:
                 try:
                     semantic = _observe_state(
-                        fd, args.pid, args.start_ticks, initial_stat, object_address, runtime_vptr, regions
+                        fd,
+                        args.pid,
+                        args.start_ticks,
+                        initial_stat,
+                        object_address,
+                        runtime_vptr,
+                        regions,
+                        member_offset=member_offset,
                     )
                 except QualificationError as exc:
                     unknown = _unknown(str(exc))
@@ -407,7 +436,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
         return run(args)
-    except (QualificationError, durable.DurableStateError, anchor.AnchorError, OSError, ValueError, struct.error) as exc:
+    except (QualificationError, RuntimeError, OSError, ValueError, struct.error) as exc:
         print(f"GAME_WINDOW_STATE_QUALIFICATION_FAIL_CLOSED={type(exc).__name__}:{exc}", file=sys.stderr)
         return 2
 

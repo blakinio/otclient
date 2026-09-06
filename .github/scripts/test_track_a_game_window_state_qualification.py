@@ -141,12 +141,19 @@ class EventSanitizationTests(unittest.TestCase):
 
 
 class StaticAuthorityGuardTests(unittest.TestCase):
-    def test_reader_contains_no_historical_absolute_rtti_or_vptr_authority(self):
+    def test_reader_derives_current_binding_and_contains_no_historical_authority(self):
         text = SCRIPT.read_text(encoding='utf-8')
-        for forbidden in ('0x30c2250', '0x30c3488', '0x30b6ba0', '0xd28890', '0x4d7dc0'):
-            self.assertNotIn(forbidden, text.lower())
-        self.assertIn('resolve_primary_vptr_from_rtti', text)
-        self.assertIn('GAME_WINDOW_STATE_MEMBER_OFFSET = 0x60', text)
+        for forbidden in (
+            '0x30c2250', '0x30c3488', '0x30b6ba0', '0xd28890', '0x4d7dc0',
+            'CURRENT_VERSION = "15.32.75d4a0"', 'GAME_WINDOW_STATE_MEMBER_OFFSET = 0x60',
+            'anchor.EXPECTED_SHA256', 'anchor.EXPECTED_SIZE',
+        ):
+            self.assertNotIn(forbidden.lower(), text.lower())
+        self.assertIn('current_client_fence', text)
+        self.assertIn('analyze_game_window_state', text)
+        self.assertIn('binding = analyze_game_window_state(exe)', text)
+        self.assertIn('binding["read_property"]["backing_member"]', text)
+        self.assertIn('binding["rtti"]["vptr_offset"]', text)
 
     def test_proc_mem_is_read_only_and_forbidden_surfaces_are_absent(self):
         text = SCRIPT.read_text(encoding='utf-8')

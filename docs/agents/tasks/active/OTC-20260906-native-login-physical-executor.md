@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260906-native-login-physical-executor
-status: validating
+status: implementing
 agent: ChatGPT
 session_id: native-login-physical-executor-20260906
 session_role: implementer
@@ -8,12 +8,12 @@ project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: physical_native_login_execution
-phase: merge_candidate_validation
-branch: runtime/OTC-20260906-native-login-physical-executor
+phase: sidecar_fd_transport_repair
+branch: fix/OTC-20260906-native-login-sidecar-fd-transport
 base_branch: main
 created: 2026-09-06T17:35:00+02:00
-updated_at: 2026-09-06T18:36:00+02:00
-base_main: f3b93c85dec6e8c290eaa12266ca97bbce8514a4
+updated_at: 2026-09-06T19:31:00+02:00
+base_main: 76f14ecc781f2b6dee17a27e692f9cfe1b6a574d
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: chatgpt
@@ -49,6 +49,7 @@ owned_paths:
   - .github/workflows/track-a-native-login-be4f48-physical.yml
   - .github/scripts/track_a_native_login_be4f48_physical.py
   - tools/tibia_runtime_bridge/container_native_login_client.py
+  - tools/tibia_runtime_bridge/native_login_fd_sidecar.py
   - tests/tools/tibia_runtime_bridge/test_native_login_physical_executor_contract.py
   - docs/agents/tasks/active/OTC-20260906-native-login-physical-executor.md
 modules_touched:
@@ -87,42 +88,51 @@ The task record deliberately remains fail-closed before physical execution: auth
 
 ## Secret boundary
 
-Credential plaintext is forbidden from GitHub Secrets, workflow env, argv, stdin, task/evidence text and logs. The executor may consume only the existing machine-local encrypted vault. The vault remains host-only: it is decrypted once on the trusted runner into a fully sealed anonymous memfd, and only that inherited descriptor crosses into the Kasm namespaces through `nsenter`; the namespace-side process drops to the numeric `kasm-user` UID/GID before handing the descriptor to the exact auth helper through SCM_RIGHTS. No private key, CMS vault, or plaintext credential is copied into Kasm. No second credential attempt is permitted.
+Credential plaintext is forbidden from GitHub Secrets, workflow env, argv, stdin, task/evidence text and logs. The executor may consume only the existing machine-local encrypted vault and may perform at most one credential-bearing auth attempt.
 
-A `PASS_WITH_PROCESS_HANDOFF` result is fail-closed: the namespace client must explicitly return sanitized `fd_sent=true` after `sendmsg(SCM_RIGHTS)` before a fresh exact PID/start handoff can qualify. An outer `nsenter`/transport timeout or otherwise ambiguous transport failure cannot be upgraded to success and never causes an automatic second secret attempt.
+Fresh runtime inventory proved that the GitHub runner itself is containerized, has no shared mount with Kasm and cannot see the host PID namespace. Therefore the former direct runner `memfd -> nsenter` path is not executable on the current topology.
+
+The repair keeps the encrypted vault on Synology machine-local storage and never copies the vault key, certificate, CMS payload or credential plaintext into the Kasm filesystem. During owner-authorized EXECUTE only, after current Gate A/Gate B and a secret-free transport probe, one short-lived task-labelled transport sidecar may receive read-only bind mounts of the exact vault directory plus the exact trusted-main sidecar/vault helper files. That sidecar decrypts the vault once into a fully sealed anonymous memfd, enters only the Kasm mount namespace while already sharing its PID namespace, drops to the numeric `kasm-user` UID/GID in the existing namespace client, and hands only the sealed descriptor to the exact auth helper through `SCM_RIGHTS`. The sidecar is synchronous, non-persistent and does not launch a second official client.
+
+A `PASS_WITH_PROCESS_HANDOFF` result remains fail-closed: the namespace client must explicitly return sanitized `fd_sent=true` after `sendmsg(SCM_RIGHTS)` before a fresh exact PID/start handoff can qualify. Ambiguous transport failure cannot be upgraded to success and never causes an automatic second secret attempt.
 
 ## Physical success
 
 Success requires all of:
 
 1. trusted-main current fence and unique canonical target;
-2. exact-PID controlled replacement with be4f48 bridge/auth/character helpers;
-3. canonical recovery and Gate B for the replacement PID;
-4. one successful native auth ingress with no retry;
-5. native character state proves exactly one character and `CONFIRM_UNIQUE` dispatch succeeds;
-6. exact-current read-only causal state observation after confirmation proves `gameWindowState == "INGAME"` on the admitted exact process;
-7. authenticated canonical client remains running and no broad process cleanup is performed.
+2. a secret-free sidecar transport probe under current canonical authority before client replacement;
+3. exact-PID controlled replacement with be4f48 bridge/auth/character helpers;
+4. canonical recovery and Gate B for the replacement PID;
+5. one successful native auth ingress with no retry;
+6. native character state proves exactly one character and `CONFIRM_UNIQUE` dispatch succeeds;
+7. exact-current read-only causal state observation after confirmation proves `gameWindowState == "INGAME"` on the admitted exact process;
+8. authenticated canonical client remains running and no broad process cleanup is performed.
 
 ## TDD and validation evidence
 
-RED head `3cde9a55ead37a8035ef808b2de94d7711b6f040`:
+Initial RED head `3cde9a55ead37a8035ef808b2de94d7711b6f040`:
 - workflow run `34043036312`, job `101513088002`;
-- 5 focused tests ran with exactly 2 errors because the worker and container-side FD client did not yet exist;
+- 5 focused tests ran with exactly 2 errors because the worker and namespace FD client did not yet exist;
 - the Synology physical job was skipped.
 
-Intermediate implementation checkpoint `dc16166c2d591256ebbc9141293e0153eaa34eae`:
-- focused physical-executor contract: 5/5 PASS;
-- Python compilation reached successfully;
-- workflow run `34044317122`, job `101516525874` then failed only in Track A runtime governance because the task frontmatter used non-schema `canonical_registration: REQUIRED_CURRENT`;
-- self-hosted PR boundary run `34044317179` was SUCCESS;
-- no physical job or secret access ran from PR head.
+Fully green original executor head `1423b65ae97c783de84e7ba97591a1a9638616f0` was merged through PR #960 as protected `main` commit `65f6a96e099f77ce93ac5023456cf4a65c84b463`.
 
-Fully green pre-final-safety head `412d3afa2a800b363c8da05b9f4ea2688c6f5147`:
-- physical executor contract run `34044763032`: SUCCESS;
-- self-hosted PR boundary run `34044763027`: SUCCESS;
-- Track A runtime governance run `34044763028`: SUCCESS;
-- native auth bridge validation run `34044763025`: SUCCESS;
-- repository CI run `34044763160`: SUCCESS;
-- physical PRECHECK/EXECUTE jobs remained skipped on PR head as required.
+First merged PRECHECK `34046535436 / 101522467183` stopped before Synology because the standalone character helper had one `-Werror=unused-function`; PR #961 removed that dead helper and added an exact standalone compile gate, then merged as `09fe1e2ddd334b2e97d5e60f15ec5de4e9024ae7`.
 
-Final self-review then found and fixed one causal fail-closed issue: an ambiguous outer `nsenter` transport failure could previously be combined with a later PID handoff. Commit `f3ef92ad492b50b3074e3e394a4baac5102fc366` removed that path; commit `1e8b4eda1088b1ea56ebff47ae3deb64250d0bc0` added a regression contract requiring explicit `fd_sent` proof and forbidding `auth_transport_unknown`. This checkpoint is awaiting exact-head CI before Ready/merge.
+Second merged PRECHECK `34046945750 / 101523685277` reached `synology-otclient-01`, exact trusted main and the helper bundle, then failed at `target_host_pid_namespace_not_visible`. The EXECUTE step was skipped; no vault decrypt, credential access, login or client mutation occurred.
+
+Merged read-only IPC inventory PR #962 (`76f14ecc781f2b6dee17a27e692f9cfe1b6a574d`) was executed as run `34048659727`, job `101528184803`: `shared_mount_count=0`; runner and Kasm both use private PID/IPC modes; Kasm has no mounts; the runner has `/work`, `/runner` and `/var/run/docker.sock`; `credential_access=false`, `runtime_mutation=false`, `process_memory_access=false`. A fresh Remote Desktop Commander check also found the Synology host device offline, so direct host `nsenter` is not currently available.
+
+## Current repair
+
+Implement a bounded Docker-host sidecar transport rather than weakening the credential boundary:
+
+- PR-head remains repository-only and cannot run the sidecar;
+- PRECHECK remains read-only and only proves sidecar metadata prerequisites;
+- EXECUTE performs a secret-free sidecar FD-preservation/mount-namespace probe under current Gate A/Gate B before replacing the client;
+- character state and confirmation use ordinary exact-target `docker exec` inside Kasm and no longer depend on host PID namespace visibility;
+- auth uses one synchronous, task-labelled sidecar with only `SYS_ADMIN`, `SETUID` and `SETGID` added, `network=none`, read-only root, exact read-only bind mounts and no Docker socket;
+- no second secret attempt is permitted.
+
+Next action: define the sidecar transport contract RED, implement it, obtain exact-head GREEN, merge, rerun trusted-main PRECHECK, then run owner-authorized EXECUTE only if PRECHECK remains clean.

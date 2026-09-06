@@ -15,9 +15,15 @@ class SurveyorOwnerCommentTriggerContractTests(unittest.TestCase):
             "startsWith(github.event.comment.body, '/track-a-surveyor-v2-readonly ONE_SHOT_SURVEYOR_READ_ONLY ')",
             source,
         )
+        self.assertIn("id: request", source)
         self.assertIn("EVENT_NAME: ${{ github.event_name }}", source)
+        self.assertIn("DISPATCH_AUTHORIZATION: ${{ inputs.authorization || '' }}", source)
+        self.assertIn("DISPATCH_RUNTIME_TASK_ID: ${{ inputs.runtime_task_id || '' }}", source)
         self.assertIn("COMMENT_BODY: ${{ github.event.comment.body || '' }}", source)
-        self.assertIn("runtime_task_id", source)
+        self.assertEqual(
+            source.count("RUNTIME_TASK_ID: ${{ steps.request.outputs.runtime_task_id }}"),
+            2,
+        )
         self.assertNotIn("actions: write", source)
         self.assertNotIn("/dispatches", source)
         self.assertNotIn("GH_TOKEN", source)

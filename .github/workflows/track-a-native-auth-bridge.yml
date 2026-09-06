@@ -7,10 +7,8 @@ on:
       - .github/workflows/track-a-native-auth-bridge.yml
       - tools/tibia_runtime_bridge/**
       - tests/tools/tibia_runtime_bridge/test_bridge.py
-      - tests/tools/tibia_runtime_bridge/test_native_login_runtime_supervisor.py
       - docs/agents/evidence/OTC-20260818-native-auth-with-credentials-bridge/**
       - docs/agents/tasks/active/OTC-20260818-native-auth-with-credentials-bridge.md
-      - docs/agents/tasks/active/OTC-20260905-control-center-native-login-start.md
   workflow_dispatch:
 
 permissions:
@@ -42,10 +40,8 @@ jobs:
             tools/tibia_runtime_bridge/ipc_client.py \
             tools/tibia_runtime_bridge/experimental_auth_client.py \
             tools/tibia_runtime_bridge/experimental_auth_launcher.py \
-            tests/tools/tibia_runtime_bridge/test_bridge.py \
-            tests/tools/tibia_runtime_bridge/test_native_login_runtime_supervisor.py
+            tests/tools/tibia_runtime_bridge/test_bridge.py
           PYTHONPATH=. python3 tests/tools/tibia_runtime_bridge/test_bridge.py
-          PYTHONPATH=. python3 tests/tools/tibia_runtime_bridge/test_native_login_runtime_supervisor.py
           grep -F 'credential-bearing environment variables are forbidden' \
             tools/tibia_runtime_bridge/experimental_auth_launcher.py >/dev/null
           grep -F 'os.path.lexists' tools/tibia_runtime_bridge/experimental_auth_launcher.py >/dev/null

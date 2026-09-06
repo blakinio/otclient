@@ -11,6 +11,7 @@ on:
       - tools/tibia_runtime_bridge/current_sha_native_login_gate.py
       - tools/tibia_runtime_bridge/experimental_auth.cpp
       - tools/tibia_runtime_bridge/experimental_character_control_current.cpp
+      - tests/tools/tibia_runtime_bridge/test_native_login_be4f48_bindings.py
       - docs/agents/tasks/active/OTC-20260905-control-center-native-login-start.md
       - docs/agents/evidence/OTC-20260905-control-center-native-login-start/**
 
@@ -35,7 +36,9 @@ jobs:
           set -Eeuo pipefail
           python3 -m py_compile \
             tools/tibia_runtime_bridge/native_login_rebind_core.py \
-            tools/tibia_runtime_bridge/rebind_native_login_current.py
+            tools/tibia_runtime_bridge/rebind_native_login_current.py \
+            tests/tools/tibia_runtime_bridge/test_native_login_be4f48_bindings.py
+          PYTHONPATH=. python3 tests/tools/tibia_runtime_bridge/test_native_login_be4f48_bindings.py
           python3 .github/scripts/test_track_a_agent_runtime_governance.py \
             --changed-from "${{ github.event.pull_request.base.sha }}" \
             --expected-branch "$GITHUB_HEAD_REF"

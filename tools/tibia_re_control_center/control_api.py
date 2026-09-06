@@ -17,6 +17,7 @@ from .canonical import jcs_dumps
 from .control_domain import ControlDomainError, ControlDomainService, DomainReply
 from .control_ui import render_control_ui
 from .model import SimulatedCrash, ValidationError
+from .native_login_socket import lifecycle_from_environment
 
 MAX_BODY_BYTES = 262_144
 MAX_HEADER_BYTES = 32_768
@@ -476,7 +477,10 @@ class ControlApiServer:
         if isinstance(port, bool) or not isinstance(port, int) or port < 0 or port > 65535:
             raise ValueError("port must be in 0..65535")
         self.data_root = Path(data_root).expanduser().resolve()
-        self.domain = domain or ControlDomainService(str(self.data_root))
+        self.domain = domain or ControlDomainService(
+            str(self.data_root),
+            native_login_lifecycle=lifecycle_from_environment(),
+        )
         self.nonce = secrets.token_bytes(32).hex()
         self._httpd = _ControlHttpServer((host, port), ControlRequestHandler)
         self._httpd.control = self  # type: ignore[attr-defined]

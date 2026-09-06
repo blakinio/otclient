@@ -19,8 +19,6 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from tools.tibia_runtime_bridge.secret_vault import SecretVaultError, decrypt_to_sealed_memfd
-
 TARGET_CONTAINER = "otclient-track-a-kasmvnc"
 TARGET_DISPLAY = ":1"
 TARGET_USER = "kasm-user"
@@ -30,6 +28,7 @@ EXPECTED_VERSION = "15.32.be4f48"
 EXPECTED_SIZE = 52105824
 EXPECTED_SHA = "552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1"
 PROOF_KIND = "existing_runtime_adoption_v1"
+TASK_ID = "OTC-20260906-native-login-physical-executor"
 TASK_ROOT = "/tmp/otclient-native-login-current-sha"
 BRIDGE_SOCKET = TASK_ROOT + "/bridge.sock"
 AUTH_SOCKET = TASK_ROOT + "/auth.sock"
@@ -42,6 +41,10 @@ PROFILE = TASK_ROOT + "/tibia-15.32.be4f48.json"
 REGISTRATION = Path("/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime/runtime-registration.json")
 PROBE_PATH = REPO_ROOT / ".github/scripts/tibia-official-client-re-kasm-existing-runtime-probe.py"
 PROFILE_PATH = REPO_ROOT / "tools/tibia_runtime_bridge/profiles/tibia-15.32.be4f48.json"
+SIDECAR_SOURCE = REPO_ROOT / "tools/tibia_runtime_bridge/native_login_fd_sidecar.py"
+SECRET_VAULT_SOURCE = REPO_ROOT / "tools/tibia_runtime_bridge/secret_vault.py"
+SIDECAR_LABEL = "otclient.track-a.task"
+SIDECAR_NAME_PREFIX = "otclient-native-login-fd-"
 BUNDLE_MANIFEST = "bundle-manifest.json"
 BUNDLE_FILES = {
     "otclient-tibia-runtime-bridge.so": BRIDGE_SO,
@@ -70,18 +73,18 @@ def _clean_env() -> dict[str, str]:
     return env
 
 
-def _run(command: Sequence[str], *, timeout: int = 30, pass_fds: tuple[int, ...] = ()) -> subprocess.CompletedProcess[str]:
+def _run(command: Sequence[str], *, timeout: int = 30) -> subprocess.CompletedProcess[str]:
     try:
         return subprocess.run(
             list(command),
             check=False,
             text=True,
+            stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             timeout=timeout,
             env=_clean_env(),
             close_fds=True,
-            pass_fds=pass_fds,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise PhysicalError(f"command_failed:{Path(command[0]).name}") from exc
@@ -160,23 +163,26 @@ def _require_manifest_matches_registration(manifest: dict[str, Any], registratio
             raise PhysicalError(f"canonical_identity_mismatch:{key}")
 
 
-def _container_id() -> str:
-    output = _require_success(["docker", "ps", "--no-trunc", "--format", "{{.ID}}\t{{.Names}}"])
-    rows = []
+def _docker_rows(*, include_stopped: bool = False) -> list[tuple[str, str]]:
+    command = ["docker", "ps"]
+    if include_stopped:
+        command.append("-a")
+    command.extend(["--no-trunc", "--format", "{{.ID}}\t{{.Names}}"])
+    output = _require_success(command)
+    rows: list[tuple[str, str]] = []
     for line in output.splitlines():
         parts = line.split("\t", 1)
-        if len(parts) == 2 and parts[1] == TARGET_CONTAINER:
-            rows.append(parts[0].lower())
+        if len(parts) != 2:
+            raise PhysicalError("docker_inventory_malformed")
+        rows.append((parts[0].strip().lower(), parts[1].strip()))
+    return rows
+
+
+def _container_id() -> str:
+    rows = [cid for cid, name in _docker_rows() if name == TARGET_CONTAINER]
     if len(rows) != 1 or len(rows[0]) != 64 or any(ch not in "0123456789abcdef" for ch in rows[0]):
         raise PhysicalError("target_container_identity_invalid")
     return rows[0]
-
-
-def _container_init_pid() -> int:
-    output = _require_success(["docker", "inspect", "-f", "{{.State.Pid}}", TARGET_CONTAINER]).strip()
-    if not output.isdigit() or int(output) < 2:
-        raise PhysicalError("target_container_init_pid_invalid")
-    return int(output)
 
 
 def _numeric_user() -> tuple[int, int]:
@@ -195,7 +201,7 @@ def same_numeric_uid(pid: int, expected_uid: int) -> bool:
     return output.isdigit() and int(output) == expected_uid
 
 
-def _vault_precheck(vault_dir: Path) -> None:
+def _vault_precheck(vault_dir: Path) -> Path:
     try:
         root = vault_dir.resolve(strict=True)
         st = root.lstat()
@@ -211,6 +217,7 @@ def _vault_precheck(vault_dir: Path) -> None:
             raise PhysicalError("vault_bind_component_missing") from exc
         if not stat.S_ISREG(item.st_mode) or path.is_symlink() or stat.S_IMODE(item.st_mode) != 0o600:
             raise PhysicalError("vault_bind_component_unsafe")
+    return root
 
 
 def _sha(path: Path) -> str:
@@ -246,23 +253,139 @@ def _verify_bundle(bundle: Path) -> dict[str, str]:
     return verified
 
 
-def _nsenter_precheck() -> tuple[int, int, int]:
-    if os.geteuid() != 0:
-        raise PhysicalError("nsenter_requires_root_runner")
-    nsenter = shutil.which("nsenter")
-    if not nsenter:
-        raise PhysicalError("nsenter_unavailable")
-    init_pid = _container_init_pid()
-    if not Path(f"/proc/{init_pid}/ns/mnt").exists() or not Path(f"/proc/{init_pid}/root").exists():
-        raise PhysicalError("target_host_pid_namespace_not_visible")
-    uid, gid = _numeric_user()
-    completed = _run([
-        nsenter, "--target", str(init_pid), "--mount", "--pid", "--root", "--wd=/", "--",
-        "python3", "-c", "import os; assert os.geteuid()==0",
-    ], timeout=10)
-    if completed.returncode != 0:
-        raise PhysicalError("nsenter_target_namespace_unavailable")
-    return init_pid, uid, gid
+def _runner_sidecar_metadata(vault_dir: Path) -> dict[str, Any]:
+    if not shutil.which("docker") or not shutil.which("nsenter") or not shutil.which("openssl"):
+        raise PhysicalError("sidecar_tooling_unavailable")
+    target_id = _container_id()
+    host_token = os.uname().nodename.lower()
+    runners = [row for row in _docker_rows() if row[0].startswith(host_token) or host_token.startswith(row[0][:12])]
+    if len(runners) != 1:
+        raise PhysicalError("runner_container_identity_invalid")
+    runner_id, runner_name = runners[0]
+    try:
+        docs = json.loads(_require_success(["docker", "inspect", runner_id, target_id]))
+    except json.JSONDecodeError as exc:
+        raise PhysicalError("sidecar_inspect_invalid") from exc
+    if not isinstance(docs, list) or len(docs) != 2:
+        raise PhysicalError("sidecar_inspect_invalid")
+    by_name = {str(doc.get("Name", "")).lstrip("/"): doc for doc in docs if isinstance(doc, dict)}
+    if runner_name not in by_name or TARGET_CONTAINER not in by_name:
+        raise PhysicalError("sidecar_inspect_identity_mismatch")
+    runner = by_name[runner_name]
+    image = str(runner.get("Image", ""))
+    if not image.startswith("sha256:") or len(image) != 71 or any(ch not in "0123456789abcdef" for ch in image[7:]):
+        raise PhysicalError("sidecar_runner_image_invalid")
+    work_mounts = [
+        mount for mount in (runner.get("Mounts") or [])
+        if isinstance(mount, dict) and mount.get("Destination") == "/work" and mount.get("RW") is True
+    ]
+    if len(work_mounts) != 1:
+        raise PhysicalError("sidecar_work_mount_invalid")
+    work_source = str(work_mounts[0].get("Source", ""))
+    if not work_source.startswith("/") or "," in work_source:
+        raise PhysicalError("sidecar_work_source_invalid")
+    socket_mounts = [
+        mount for mount in (runner.get("Mounts") or [])
+        if isinstance(mount, dict) and mount.get("Destination") == "/var/run/docker.sock"
+    ]
+    if len(socket_mounts) != 1:
+        raise PhysicalError("sidecar_docker_socket_mount_missing")
+    for source in (SIDECAR_SOURCE, SECRET_VAULT_SOURCE):
+        if not source.is_file() or source.is_symlink():
+            raise PhysicalError("sidecar_source_invalid")
+    vault_root = _vault_precheck(vault_dir)
+    for path in (SIDECAR_SOURCE.resolve(), SECRET_VAULT_SOURCE.resolve(), vault_root):
+        try:
+            path.relative_to(Path("/work"))
+        except ValueError as exc:
+            raise PhysicalError("sidecar_source_outside_work_mount") from exc
+    residue = _require_success([
+        "docker", "ps", "-a", "--filter", f"label={SIDECAR_LABEL}={TASK_ID}", "--format", "{{.ID}}",
+    ]).strip()
+    if residue:
+        raise PhysicalError("sidecar_residue_present")
+    return {
+        "image": image,
+        "work_source": work_source,
+        "target_id": target_id,
+        "vault_root": vault_root,
+    }
+
+
+def _host_source(path: Path, metadata: dict[str, Any]) -> str:
+    resolved = path.resolve(strict=True)
+    try:
+        relative = resolved.relative_to(Path("/work"))
+    except ValueError as exc:
+        raise PhysicalError("sidecar_bind_outside_work_mount") from exc
+    source = str(Path(str(metadata["work_source"])) / relative)
+    if not source.startswith("/") or "," in source:
+        raise PhysicalError("sidecar_bind_source_invalid")
+    return source
+
+
+def _sidecar_name(operation: str) -> str:
+    run_id = os.environ.get("GITHUB_RUN_ID", "")
+    if not run_id.isdigit():
+        raise PhysicalError("sidecar_run_identity_invalid")
+    return f"{SIDECAR_NAME_PREFIX}{run_id}-{operation}"
+
+
+def _sidecar_base(metadata: dict[str, Any], operation: str) -> list[str]:
+    sidecar_host = _host_source(SIDECAR_SOURCE, metadata)
+    return [
+        "docker", "run", "--rm",
+        "--name", _sidecar_name(operation),
+        "--label", f"{SIDECAR_LABEL}={TASK_ID}",
+        "--network", "none",
+        "--read-only",
+        "--user", "0:0",
+        "--pid", f"container:{TARGET_CONTAINER}",
+        "--cap-drop", "ALL",
+        "--cap-add", "SYS_ADMIN",
+        "--cap-add", "SETUID",
+        "--cap-add", "SETGID",
+        "--security-opt", "no-new-privileges",
+        "--env", "PYTHONDONTWRITEBYTECODE=1",
+        "--mount", f"type=bind,src={sidecar_host},dst=/tmp/native_login_fd_sidecar.py,readonly",
+        "--entrypoint", "python3",
+        str(metadata["image"]),
+        "/tmp/native_login_fd_sidecar.py",
+    ]
+
+
+def _parse_sidecar_response(completed: subprocess.CompletedProcess[str]) -> dict[str, Any]:
+    if not completed.stdout.strip():
+        raise PhysicalError("sidecar_response_missing")
+    try:
+        response = json.loads(completed.stdout.strip().splitlines()[-1])
+    except json.JSONDecodeError as exc:
+        raise PhysicalError("sidecar_response_invalid") from exc
+    if not isinstance(response, dict):
+        raise PhysicalError("sidecar_response_invalid")
+    return response
+
+
+def sidecar_probe(vault_dir: Path, result: Path) -> None:
+    registration = _read_registration()
+    manifest = _current_manifest()
+    _require_manifest_matches_registration(manifest, registration)
+    uid, _gid = _numeric_user()
+    if not same_numeric_uid(int(registration["pid"]), uid):
+        raise PhysicalError("same_numeric_uid_failed")
+    metadata = _runner_sidecar_metadata(vault_dir)
+    completed = _run([*_sidecar_base(metadata, "probe"), "probe"], timeout=50)
+    response = _parse_sidecar_response(completed)
+    if completed.returncode != 0 or response != {"ok": True, "sealed_fd_preserved": True, "target_mount_visible": True}:
+        raise PhysicalError("sidecar_probe_failed")
+    _write_json(result, {
+        "schema": "otclient.track-a.native-login-sidecar-probe.v1",
+        "sidecar_probe": True,
+        "sealed_fd_preserved": True,
+        "target_mount_visible": True,
+        "credential_plaintext_accessed": False,
+        "secret_attempt_count": 0,
+    })
 
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
@@ -289,19 +412,20 @@ def precheck(vault_dir: Path, bundle: Path, result: Path) -> None:
     registration = _read_registration()
     manifest = _current_manifest()
     _require_manifest_matches_registration(manifest, registration)
-    init_pid, uid, gid = _nsenter_precheck()
+    uid, gid = _numeric_user()
     if not same_numeric_uid(int(manifest["pid"]), uid):
         raise PhysicalError("same_numeric_uid_failed")
+    _runner_sidecar_metadata(vault_dir)
     _write_json(result, {
         "schema": "otclient.track-a.native-login-physical-precheck.v1",
         "exact_current": True,
         "target_unique": True,
         "registration_current": True,
-        "nsenter_fd_bridge_ready": True,
+        "sidecar_transport_metadata_ready": True,
         "same_numeric_uid": True,
         "vault_bind": "HOST_ONLY_PRESENT_PRIVATE",
         "credential_plaintext_accessed": False,
-        "container_init_pid_visible": init_pid >= 2,
+        "sidecar_created": False,
         "target_uid": uid,
         "target_gid": gid,
     })
@@ -427,77 +551,39 @@ def replace(vault_dir: Path, bundle: Path, result: Path) -> None:
     })
 
 
-def _namespace_client_command(
-    *,
-    init_pid: int,
-    uid: int,
-    gid: int,
-    operation: str,
-    identity: dict[str, Any],
-    credentials_fd: int | None = None,
-    timeout: float = 8.0,
-) -> list[str]:
-    command = [
-        shutil.which("nsenter") or "nsenter", "--target", str(init_pid), "--mount", "--pid", "--root", "--wd=/", "--",
-        "python3", CONTAINER_CLIENT, operation,
-        "--socket", AUTH_SOCKET if operation == "auth-fd" else CHARACTER_SOCKET,
-        "--boot-id-sha256", str(identity["boot_id_sha256"]),
-        "--pid", str(identity["pid"]),
-        "--start-ticks", str(identity["process_start_ticks"]),
-        "--client-version", EXPECTED_VERSION,
-        "--client-size", str(EXPECTED_SIZE),
-        "--client-sha256", EXPECTED_SHA,
-        "--timeout", str(timeout),
-    ]
-    if operation == "auth-fd":
-        if credentials_fd is None:
-            raise PhysicalError("credentials_fd_missing")
-        command.extend(["--credentials-fd", str(credentials_fd), "--drop-uid", str(uid), "--drop-gid", str(gid)])
-    return command
-
-
 def auth_one_shot(vault_dir: Path, result: Path) -> None:
-    _vault_precheck(vault_dir)
     registration = _read_registration()
     manifest = _current_manifest()
     _require_manifest_matches_registration(manifest, registration)
-    init_pid, uid, gid = _nsenter_precheck()
+    uid, gid = _numeric_user()
     if not same_numeric_uid(int(registration["pid"]), uid):
         raise PhysicalError("same_numeric_uid_failed")
-    credentials_fd = -1
-    try:
-        credentials_fd = decrypt_to_sealed_memfd(vault_dir)
-        auth_completed = _run(
-            _namespace_client_command(
-                init_pid=init_pid,
-                uid=uid,
-                gid=gid,
-                operation="auth-fd",
-                identity=registration,
-                credentials_fd=credentials_fd,
-                timeout=8.0,
-            ),
-            timeout=15,
-            pass_fds=(credentials_fd,),
-        )
-    except SecretVaultError as exc:
-        raise PhysicalError("machine_local_vault_decrypt_failed") from exc
-    finally:
-        if credentials_fd >= 0:
-            try:
-                os.close(credentials_fd)
-            except OSError:
-                pass
-
-    response: dict[str, Any] = {}
-    if auth_completed.stdout.strip():
-        try:
-            candidate = json.loads(auth_completed.stdout.strip().splitlines()[-1])
-            if isinstance(candidate, dict):
-                response = candidate
-        except json.JSONDecodeError:
-            response = {}
-    if auth_completed.returncode == 0:
+    metadata = _runner_sidecar_metadata(vault_dir)
+    vault_host = _host_source(Path(metadata["vault_root"]), metadata)
+    secret_vault_host = _host_source(SECRET_VAULT_SOURCE, metadata)
+    command = [
+        *_sidecar_base(metadata, "auth"),
+        "--mount", f"type=bind,src={secret_vault_host},dst=/tmp/secret_vault.py,readonly",
+        "--mount", f"type=bind,src={vault_host},dst=/vault,readonly",
+    ]
+    # Docker options must precede the immutable image/entrypoint arguments.
+    image_index = command.index(str(metadata["image"]))
+    image_tail = command[image_index:]
+    command = [
+        *command[:image_index],
+        "--mount", f"type=bind,src={secret_vault_host},dst=/tmp/secret_vault.py,readonly",
+        "--mount", f"type=bind,src={vault_host},dst=/vault,readonly",
+        *image_tail,
+        "auth",
+        "--boot-id-sha256", str(registration["boot_id_sha256"]),
+        "--pid", str(registration["pid"]),
+        "--start-ticks", str(registration["process_start_ticks"]),
+        "--drop-uid", str(uid),
+        "--drop-gid", str(gid),
+    ]
+    completed = _run(command, timeout=50)
+    response = _parse_sidecar_response(completed)
+    if completed.returncode == 0:
         if response.get("ok") is not True or response.get("invocation_dispatched") is not True:
             raise PhysicalError("native_auth_response_not_dispatch_proof")
         outcome = "PASS_RESPONSE"
@@ -525,13 +611,13 @@ def auth_one_shot(vault_dir: Path, result: Path) -> None:
         if handoff is None:
             raise PhysicalError("native_auth_one_shot_failed_without_proven_handoff")
         outcome = "PASS_WITH_PROCESS_HANDOFF"
-
     _write_json(result, {
         "schema": "otclient.track-a.native-login-auth.v1",
         "native_auth_ingress": outcome,
         "secret_source": "machine_local_encrypted_vault",
         "sealed_memfd": True,
         "scm_rights": True,
+        "sidecar_transport": True,
         "secret_attempt_count": 1,
         "NO_SECOND_SECRET_ATTEMPT": True,
         "credential_values_logged": False,
@@ -539,19 +625,21 @@ def auth_one_shot(vault_dir: Path, result: Path) -> None:
 
 
 def _character_call(identity: dict[str, Any], operation: str, timeout: float = 8.0) -> dict[str, Any]:
-    uid, gid = _numeric_user()
-    init_pid = _container_init_pid()
-    completed = _run(
-        _namespace_client_command(
-            init_pid=init_pid,
-            uid=uid,
-            gid=gid,
-            operation=operation,
-            identity=identity,
-            timeout=timeout,
-        ),
-        timeout=int(timeout) + 5,
-    )
+    command = [
+        "docker", "exec", "-u", TARGET_USER,
+        "-e", "PYTHONDONTWRITEBYTECODE=1",
+        TARGET_CONTAINER,
+        "python3", CONTAINER_CLIENT, operation,
+        "--socket", CHARACTER_SOCKET,
+        "--boot-id-sha256", str(identity["boot_id_sha256"]),
+        "--pid", str(identity["pid"]),
+        "--start-ticks", str(identity["process_start_ticks"]),
+        "--client-version", EXPECTED_VERSION,
+        "--client-size", str(EXPECTED_SIZE),
+        "--client-sha256", EXPECTED_SHA,
+        "--timeout", str(timeout),
+    ]
+    completed = _run(command, timeout=int(timeout) + 5)
     if completed.returncode != 0 or not completed.stdout.strip():
         raise PhysicalError(f"character_{operation}_failed")
     try:
@@ -599,6 +687,9 @@ def _parser() -> argparse.ArgumentParser:
     pre.add_argument("--vault-dir", required=True, type=Path)
     pre.add_argument("--bundle", required=True, type=Path)
     pre.add_argument("--result", required=True, type=Path)
+    transport = sub.add_parser("sidecar-probe")
+    transport.add_argument("--vault-dir", required=True, type=Path)
+    transport.add_argument("--result", required=True, type=Path)
     replacement = sub.add_parser("replace")
     replacement.add_argument("--vault-dir", required=True, type=Path)
     replacement.add_argument("--bundle", required=True, type=Path)
@@ -616,6 +707,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         if args.operation == "precheck":
             precheck(args.vault_dir, args.bundle, args.result)
+        elif args.operation == "sidecar-probe":
+            sidecar_probe(args.vault_dir, args.result)
         elif args.operation == "replace":
             replace(args.vault_dir, args.bundle, args.result)
         elif args.operation == "auth-one-shot":

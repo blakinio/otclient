@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import json
 import os
-from pathlib import Path
 import re
 import socket
 import stat
+from pathlib import Path
 from typing import Any
 
 from .native_login_lifecycle import NativeLoginLifecycle, NativeLoginLifecycleError

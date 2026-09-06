@@ -98,6 +98,40 @@ def _classify_sidecar_probe_failure(completed: subprocess.CompletedProcess[str])
     return "sidecar_probe_process_failed"
 
 
+def _partial_stdout_text(value: str | bytes | None) -> str:
+    if isinstance(value, str):
+        return value
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return ""
+
+
+def _run_probe_sidecar(command: Sequence[str], *, timeout: int) -> subprocess.CompletedProcess[str]:
+    """Run only the secret-free probe sidecar while preserving bounded timeout evidence."""
+    try:
+        return subprocess.run(
+            list(command),
+            check=False,
+            text=True,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=timeout,
+            env=_base._clean_env(),
+            close_fds=True,
+        )
+    except subprocess.TimeoutExpired as exc:
+        partial_stdout = _partial_stdout_text(exc.stdout)
+        if partial_stdout:
+            synthetic = subprocess.CompletedProcess(list(command), 124, partial_stdout, "")
+            failure = _classify_sidecar_probe_failure(synthetic)
+            if failure.startswith("sidecar_probe_client_"):
+                raise PhysicalError(failure) from exc
+        raise PhysicalError("sidecar_probe_process_timeout") from exc
+    except OSError as exc:
+        raise PhysicalError("sidecar_probe_process_failed") from exc
+
+
 def _stop_failed_probe_relay(relay: subprocess.Popen[str], relay_socket: str) -> None:
     if relay.poll() is None:
         relay.terminate()
@@ -120,13 +154,13 @@ def sidecar_probe(vault_dir: Path, result: Path) -> None:
     relay_socket = _base._relay_socket("probe")
     relay = _base._start_relay("relay-probe", relay_socket)
     try:
-        completed = _base._run([
+        completed = _run_probe_sidecar([
             *_base._sidecar_base(metadata, "probe"),
             "probe", "--relay-socket", _base._sidecar_relay_socket(relay_socket), "--timeout", "10.0",
         ], timeout=16)
-    except PhysicalError as exc:
+    except PhysicalError:
         _stop_failed_probe_relay(relay, relay_socket)
-        raise PhysicalError("sidecar_probe_process_failed") from exc
+        raise
     if completed.returncode != 0:
         failure = _classify_sidecar_probe_failure(completed)
         _stop_failed_probe_relay(relay, relay_socket)

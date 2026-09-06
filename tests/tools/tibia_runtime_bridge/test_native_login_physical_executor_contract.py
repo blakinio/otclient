@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parents[3]
 WORKFLOW = ROOT / ".github/workflows/track-a-native-login-be4f48-physical.yml"
 WORKER = ROOT / ".github/scripts/track_a_native_login_be4f48_physical.py"
 CONTAINER_CLIENT = ROOT / "tools/tibia_runtime_bridge/container_native_login_client.py"
+SIDECAR = ROOT / "tools/tibia_runtime_bridge/native_login_fd_sidecar.py"
 TASK = ROOT / "docs/agents/tasks/active/OTC-20260906-native-login-physical-executor.md"
 EXPECTED_SHA = "552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1"
 
@@ -28,6 +29,7 @@ class PhysicalExecutorContractTests(unittest.TestCase):
             "git ls-remote origin refs/heads/main",
             "persist-credentials: false",
             "needs: prepare",
+            "tools/tibia_runtime_bridge/native_login_fd_sidecar.py",
         )
         for needle in required:
             with self.subTest(needle=needle):
@@ -51,6 +53,8 @@ class PhysicalExecutorContractTests(unittest.TestCase):
             "VAULT_DIR: /work/_otclient_tibia_re_state/secret-vault",
             "gameWindowState",
             "CONFIRM_UNIQUE",
+            "sidecar-probe",
+            "NO_SECRET_ACCESS_BEFORE_SIDECAR_PROBE=true",
         )
         for needle in required:
             with self.subTest(needle=needle):
@@ -69,7 +73,7 @@ class PhysicalExecutorContractTests(unittest.TestCase):
         ):
             self.assertNotIn(forbidden.lower(), text.lower())
 
-    def test_worker_uses_exact_pid_host_vault_and_namespace_fd_bridge(self) -> None:
+    def test_worker_uses_exact_pid_vault_and_bounded_sidecar_fd_bridge(self) -> None:
         text = WORKER.read_text(encoding="utf-8")
         required = (
             "TARGET_CONTAINER = \"otclient-track-a-kasmvnc\"",
@@ -80,9 +84,19 @@ class PhysicalExecutorContractTests(unittest.TestCase):
             "SIGTERM",
             "vault_bind",
             "same_numeric_uid",
-            "decrypt_to_sealed_memfd",
-            "nsenter",
-            "pass_fds",
+            "sidecar_transport_metadata_ready",
+            "native_login_fd_sidecar.py",
+            "--pid",
+            "container:",
+            "--network",
+            "none",
+            "--read-only",
+            "--cap-drop",
+            "ALL",
+            "--cap-add",
+            "SYS_ADMIN",
+            "SETUID",
+            "SETGID",
             "OTCLIENT_TIBIA_RE_AUTH_SOCKET",
             "OTCLIENT_TIBIA_RE_CHARACTER_SOCKET",
             "LD_PRELOAD",
@@ -99,6 +113,41 @@ class PhysicalExecutorContractTests(unittest.TestCase):
             "TIBIA_TEST_EMAIL",
             "TIBIA_TEST_PASSWORD",
             "auth_transport_unknown",
+            "target_host_pid_namespace_not_visible",
+        ):
+            self.assertNotIn(forbidden, text)
+
+    def test_auth_sidecar_mount_options_precede_immutable_image(self) -> None:
+        text = WORKER.read_text(encoding="utf-8")
+        self.assertIn('base = _sidecar_base(metadata, "auth")', text)
+        self.assertIn('image_index = base.index(str(metadata["image"]))', text)
+        self.assertNotIn('[*_sidecar_base(metadata, "auth"),\n        "--mount"', text)
+
+    def test_sidecar_decrypts_once_then_preserves_sealed_fd_across_nsenter(self) -> None:
+        text = SIDECAR.read_text(encoding="utf-8")
+        required = (
+            "decrypt_to_sealed_memfd",
+            "F_GET_SEALS",
+            "F_SEAL_SEAL",
+            "nsenter",
+            "pass_fds",
+            "auth-fd",
+            "--credentials-fd",
+            "AUTH_RESPONSE_UNAVAILABLE_AFTER_SEND",
+            "fd_sent",
+            "probe",
+            "sealed_fd_preserved",
+            "target_mount_visible",
+        )
+        for needle in required:
+            with self.subTest(needle=needle):
+                self.assertIn(needle, text)
+        for forbidden in (
+            "TIBIA_TEST_EMAIL",
+            "TIBIA_TEST_PASSWORD",
+            "password=",
+            "email=",
+            "docker.sock",
         ):
             self.assertNotIn(forbidden, text)
 
@@ -146,6 +195,8 @@ class PhysicalExecutorContractTests(unittest.TestCase):
             "target_uniqueness: UNKNOWN",
             "mutation_authorized: false",
             "physical_e2e_required: true",
+            "shared_mount_count=0",
+            "target_host_pid_namespace_not_visible",
         )
         for needle in required:
             with self.subTest(needle=needle):

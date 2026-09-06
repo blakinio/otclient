@@ -8,6 +8,7 @@ on:
       - .github/workflows/track-a-native-login-be4f48-physical.yml
       - .github/scripts/track_a_native_login_be4f48_physical.py
       - tools/tibia_runtime_bridge/container_native_login_client.py
+      - tools/tibia_runtime_bridge/native_login_fd_sidecar.py
       - tests/tools/tibia_runtime_bridge/test_native_login_physical_executor_contract.py
       - docs/agents/tasks/active/OTC-20260906-native-login-physical-executor.md
   issue_comment:
@@ -43,7 +44,8 @@ jobs:
           PYTHONPATH=. python3 tests/tools/tibia_runtime_bridge/test_native_login_physical_executor_contract.py
           python3 -m py_compile \
             .github/scripts/track_a_native_login_be4f48_physical.py \
-            tools/tibia_runtime_bridge/container_native_login_client.py
+            tools/tibia_runtime_bridge/container_native_login_client.py \
+            tools/tibia_runtime_bridge/native_login_fd_sidecar.py
           python3 .github/scripts/test_track_a_agent_runtime_governance.py \
             --changed-from "${{ github.event.pull_request.base.sha }}" \
             --expected-branch "$GITHUB_HEAD_REF"
@@ -174,6 +176,7 @@ jobs:
           test "$(git rev-parse HEAD)" = "$(git ls-remote origin refs/heads/main | awk '{print $1}')"
           command -v docker >/dev/null
           command -v nsenter >/dev/null
+          command -v openssl >/dev/null
           out="$RUNNER_TEMP/native-login-precheck.json"
           PYTHONPATH=. python3 .github/scripts/track_a_native_login_be4f48_physical.py precheck \
             --vault-dir "$VAULT_DIR" --bundle "$BUNDLE" --result "$out"
@@ -181,11 +184,13 @@ jobs:
           import json,sys
           d=json.load(open(sys.argv[1],encoding='utf-8'))
           assert d['schema']=='otclient.track-a.native-login-physical-precheck.v1'
-          for key in ('exact_current','target_unique','registration_current','nsenter_fd_bridge_ready','same_numeric_uid','container_init_pid_visible'):
+          for key in ('exact_current','target_unique','registration_current','sidecar_transport_metadata_ready','same_numeric_uid'):
               assert d[key] is True
+          assert d['sidecar_created'] is False
           assert d['vault_bind']=='HOST_ONLY_PRESENT_PRIVATE'
           assert d['credential_plaintext_accessed'] is False
           print('TRACK_A_NATIVE_LOGIN_PRECHECK=PASS')
+          print('SIDECAR_TRANSPORT_METADATA_READY=true')
           print('CREDENTIAL_PLAINTEXT_ACCESSED=false')
           PY
       - name: Stop after read-only PRECHECK
@@ -294,6 +299,21 @@ jobs:
           acquire
           align_and_gate
 
+          echo NO_SECRET_ACCESS_BEFORE_SIDECAR_PROBE=true
+          "$lease" guard-run --task-id "$TASK_ID" --session-id "$session" --token-file "$token" -- \
+            python3 "$worker" sidecar-probe --vault-dir "$VAULT_DIR" --result "$RUNNER_TEMP/sidecar-probe.json"
+          python3 - "$RUNNER_TEMP/sidecar-probe.json" <<'PY'
+          import json,sys
+          d=json.load(open(sys.argv[1],encoding='utf-8'))
+          assert d['schema']=='otclient.track-a.native-login-sidecar-probe.v1'
+          assert d['sidecar_probe'] is True
+          assert d['sealed_fd_preserved'] is True
+          assert d['target_mount_visible'] is True
+          assert d['credential_plaintext_accessed'] is False
+          assert d['secret_attempt_count']==0
+          print('SIDECAR_FD_TRANSPORT_PROBE=PASS')
+          PY
+
           "$lease" guard-run --task-id "$TASK_ID" --session-id "$session" --token-file "$token" -- \
             python3 "$worker" replace --vault-dir "$VAULT_DIR" --bundle "$BUNDLE" --result "$RUNNER_TEMP/replacement.json"
           release_if_active
@@ -391,6 +411,7 @@ jobs:
           assert auth['secret_attempt_count']==1
           assert auth['NO_SECOND_SECRET_ATTEMPT'] is True
           assert auth['sealed_memfd'] is True and auth['scm_rights'] is True
+          assert auth['sidecar_transport'] is True
           assert char['character_count']==1 and char['CONFIRM_UNIQUE'] is True
           print('NO_SECOND_SECRET_ATTEMPT=true')
           print('NATIVE_CHARACTER_COUNT=1')
@@ -407,6 +428,7 @@ jobs:
           name: be4f48-native-login-physical-${{ github.run_id }}
           path: |
             ${{ runner.temp }}/native-login-precheck.json
+            ${{ runner.temp }}/sidecar-probe.json
             ${{ runner.temp }}/replacement.json
             ${{ runner.temp }}/auth.json
             ${{ runner.temp }}/character-confirm.json

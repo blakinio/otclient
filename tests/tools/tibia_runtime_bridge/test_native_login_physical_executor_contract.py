@@ -73,7 +73,7 @@ class PhysicalExecutorContractTests(unittest.TestCase):
         ):
             self.assertNotIn(forbidden.lower(), text.lower())
 
-    def test_worker_uses_exact_pid_vault_and_bounded_sidecar_fd_bridge(self) -> None:
+    def test_worker_uses_exact_pid_vault_and_bounded_shared_ipc_fd_bridge(self) -> None:
         text = WORKER.read_text(encoding="utf-8")
         required = (
             "TARGET_CONTAINER = \"otclient-track-a-kasmvnc\"",
@@ -88,15 +88,17 @@ class PhysicalExecutorContractTests(unittest.TestCase):
             "native_login_fd_sidecar.py",
             "--pid",
             "container:",
+            "--ipc",
             "--network",
             "none",
             "--read-only",
             "--cap-drop",
             "ALL",
-            "--cap-add",
-            "SYS_ADMIN",
             "SETUID",
             "SETGID",
+            "/dev/shm",
+            "relay-probe",
+            "relay-auth-fd",
             "OTCLIENT_TIBIA_RE_AUTH_SOCKET",
             "OTCLIENT_TIBIA_RE_CHARACTER_SOCKET",
             "LD_PRELOAD",
@@ -114,6 +116,8 @@ class PhysicalExecutorContractTests(unittest.TestCase):
             "TIBIA_TEST_PASSWORD",
             "auth_transport_unknown",
             "target_host_pid_namespace_not_visible",
+            "SYS_ADMIN",
+            "nsenter",
         ):
             self.assertNotIn(forbidden, text)
 
@@ -123,16 +127,17 @@ class PhysicalExecutorContractTests(unittest.TestCase):
         self.assertIn('image_index = base.index(str(metadata["image"]))', text)
         self.assertNotIn('[*_sidecar_base(metadata, "auth"),\n        "--mount"', text)
 
-    def test_sidecar_decrypts_once_then_preserves_sealed_fd_across_nsenter(self) -> None:
+    def test_sidecar_decrypts_once_then_relays_sealed_fd_over_shared_ipc(self) -> None:
         text = SIDECAR.read_text(encoding="utf-8")
         required = (
             "decrypt_to_sealed_memfd",
             "F_GET_SEALS",
             "F_SEAL_SEAL",
-            "nsenter",
-            "pass_fds",
-            "auth-fd",
-            "--credentials-fd",
+            "SCM_RIGHTS",
+            "sendmsg",
+            "/dev/shm",
+            "relay-probe",
+            "relay-auth-fd",
             "AUTH_RESPONSE_UNAVAILABLE_AFTER_SEND",
             "fd_sent",
             "probe",
@@ -148,17 +153,23 @@ class PhysicalExecutorContractTests(unittest.TestCase):
             "password=",
             "email=",
             "docker.sock",
+            "nsenter",
+            "SYS_ADMIN",
         ):
             self.assertNotIn(forbidden, text)
 
-    def test_container_client_receives_only_inherited_sealed_fd(self) -> None:
+    def test_container_client_receives_relay_fd_and_forwards_only_sealed_memfd(self) -> None:
         text = CONTAINER_CLIENT.read_text(encoding="utf-8")
         required = (
             "auth-fd",
+            "relay-probe",
+            "relay-auth-fd",
             "_validate_credentials_memfd",
             "F_GET_SEALS",
             "SCM_RIGHTS",
+            "recvmsg",
             "sendmsg",
+            "listen",
             "PeerIdentityExpectation",
             "os.setgid",
             "os.setuid",

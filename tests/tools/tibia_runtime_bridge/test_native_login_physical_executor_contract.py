@@ -86,11 +86,20 @@ class PhysicalExecutorContractTests(unittest.TestCase):
             "OTCLIENT_TIBIA_RE_AUTH_SOCKET",
             "OTCLIENT_TIBIA_RE_CHARACTER_SOCKET",
             "LD_PRELOAD",
+            'response.get("fd_sent") is True',
+            "native_auth_fd_send_not_proven",
         )
         for needle in required:
             with self.subTest(needle=needle):
                 self.assertIn(needle, text)
-        for forbidden in ("pkill", "killall", "SIGKILL", "TIBIA_TEST_EMAIL", "TIBIA_TEST_PASSWORD"):
+        for forbidden in (
+            "pkill",
+            "killall",
+            "SIGKILL",
+            "TIBIA_TEST_EMAIL",
+            "TIBIA_TEST_PASSWORD",
+            "auth_transport_unknown",
+        ):
             self.assertNotIn(forbidden, text)
 
     def test_container_client_receives_only_inherited_sealed_fd(self) -> None:

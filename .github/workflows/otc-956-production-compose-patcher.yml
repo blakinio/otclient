@@ -1,0 +1,110 @@
+name: OTC 956 production compose patcher
+
+on:
+  push:
+    branches:
+      - feat/OTC-20260905-control-center-native-login-start
+    paths:
+      - .github/workflows/otc-956-production-compose-patcher.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          ref: feat/OTC-20260905-control-center-native-login-start
+          fetch-depth: 0
+      - name: Apply bounded production composition repairs
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              p = Path(path)
+              text = p.read_text(encoding='utf-8')
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{path}: expected old fragment exactly once, got {count}')
+              p.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          replace_once(
+              'tests/tools/tibia_runtime_bridge/test_bridge.py',
+              'self.assertIn("kGameClientVptrOffset = 0x3076908", source)',
+              'self.assertIn("kGameClientVptrOffset = 0x30acd08", source)',
+          )
+
+          replace_once(
+              'tools/tibia_re_control_center/control_api.py',
+              'from .model import SimulatedCrash, ValidationError\n',
+              'from .model import SimulatedCrash, ValidationError\nfrom .native_login_socket import lifecycle_from_environment\n',
+          )
+          replace_once(
+              'tools/tibia_re_control_center/control_api.py',
+              '        self.domain = domain or ControlDomainService(str(self.data_root))',
+              '        self.domain = domain or ControlDomainService(\n            str(self.data_root),\n            native_login_lifecycle=lifecycle_from_environment(),\n        )',
+          )
+
+          workflow = '.github/workflows/tibia-re-control-center-core.yml'
+          anchor = "          fence_task = 'docs/agents/tasks/active/OTC-20260902-canonical-current-client-fence-be4f48.md'"
+          block = "\n".join([
+              "          native_login_task = 'docs/agents/tasks/active/OTC-20260905-control-center-native-login-start.md'",
+              "          native_login_branch = 'feat/OTC-20260905-control-center-native-login-start'",
+              "          native_login_base = 'b6cf7402b4dbde59b2086f0982c7dcc711c3b5fc'",
+              "          native_login_repo = 'blakinio/otclient'",
+              "          if (",
+              "              native_login_task in changed",
+              "              and base == native_login_base",
+              "              and os.environ.get('HEAD_REF') == native_login_branch",
+              "              and os.environ.get('HEAD_REPO') == native_login_repo",
+              "          ):",
+              "              allowed_exact |= {",
+              "                  '.github/workflows/track-a-native-login-be4f48-rebind.yml',",
+              "                  'docs/agents/evidence/OTC-20260905-control-center-native-login-start/be4f48-rebind.json',",
+              "                  'tests/tools/tibia_runtime_bridge/test_bridge.py',",
+              "                  'tests/tools/tibia_runtime_bridge/test_native_login_be4f48_bindings.py',",
+              "                  'tools/tibia_runtime_bridge/current_sha_native_login_gate.py',",
+              "                  'tools/tibia_runtime_bridge/experimental_auth.cpp',",
+              "                  'tools/tibia_runtime_bridge/experimental_character_control_current.cpp',",
+              "                  'tools/tibia_runtime_bridge/native_login_rebind_core.py',",
+              "                  'tools/tibia_runtime_bridge/rebind_native_login_current.py',",
+              "              }",
+              anchor,
+          ])
+          replace_once(workflow, anchor, block)
+
+          task = 'docs/agents/tasks/active/OTC-20260905-control-center-native-login-start.md'
+          replace_once(
+              task,
+              '  - tests/tools/tibia_re_control_center/test_native_login_socket.py\n',
+              '  - tests/tools/tibia_re_control_center/test_native_login_socket.py\n  - tests/tools/tibia_re_control_center/test_native_login_composition.py\n',
+          )
+          PY
+          PYTHONPATH=. python3 tests/tools/tibia_re_control_center/test_native_login_socket.py
+          PYTHONPATH=. python3 tests/tools/tibia_re_control_center/test_native_login_composition.py
+          PYTHONPATH=. python3 tests/tools/tibia_runtime_bridge/test_bridge.py
+          python3 -m py_compile tools/tibia_re_control_center/native_login_socket.py tools/tibia_re_control_center/control_api.py
+          python3 .github/scripts/test_track_a_agent_runtime_governance.py --changed-from b6cf7402b4dbde59b2086f0982c7dcc711c3b5fc --expected-branch feat/OTC-20260905-control-center-native-login-start
+          git diff --check
+          rm .github/workflows/otc-956-production-compose-patcher.yml
+          git diff --check
+      - name: Commit bounded repairs
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git config user.name 'otclient automation'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .github/workflows/tibia-re-control-center-core.yml \
+                  .github/workflows/otc-956-production-compose-patcher.yml \
+                  docs/agents/tasks/active/OTC-20260905-control-center-native-login-start.md \
+                  tests/tools/tibia_runtime_bridge/test_bridge.py \
+                  tests/tools/tibia_re_control_center/test_native_login_composition.py \
+                  tools/tibia_re_control_center/control_api.py
+          git commit -m 'fix(control-center): bind native login production composition'
+          git push origin HEAD:feat/OTC-20260905-control-center-native-login-start

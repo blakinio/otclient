@@ -7,6 +7,7 @@ on:
     paths:
       - .github/workflows/track-a-native-login-be4f48-rebind.yml
       - tools/tibia_runtime_bridge/native_login_rebind_core.py
+      - tools/tibia_runtime_bridge/game_window_state_rebind.py
       - tools/tibia_runtime_bridge/rebind_native_login_current.py
       - tools/tibia_runtime_bridge/current_sha_native_login_gate.py
       - tools/tibia_runtime_bridge/experimental_auth.cpp
@@ -36,6 +37,7 @@ jobs:
           set -Eeuo pipefail
           python3 -m py_compile \
             tools/tibia_runtime_bridge/native_login_rebind_core.py \
+            tools/tibia_runtime_bridge/game_window_state_rebind.py \
             tools/tibia_runtime_bridge/rebind_native_login_current.py \
             tests/tools/tibia_runtime_bridge/test_native_login_be4f48_bindings.py
           PYTHONPATH=. python3 tests/tools/tibia_runtime_bridge/test_native_login_be4f48_bindings.py
@@ -138,7 +140,7 @@ jobs:
           p='artifacts/native-login-be4f48-rebind/result.json'
           d=json.load(open(p,encoding='utf-8'))
           assert d['schema']=='otclient.track-a.native-login-current-rebind.v1'
-          assert d['terminal_result']=='BE4F48_NATIVE_LOGIN_STATIC_REBIND_PROVEN'
+          assert d['terminal_result']=='BE4F48_NATIVE_LOGIN_AND_INGAME_STATIC_REBIND_PROVEN'
           assert d['exact_client']=={
               'version':'15.32.be4f48',
               'size':52105824,
@@ -155,7 +157,35 @@ jobs:
           assert d['qmeta']['game_client']['target_index']==17
           assert d['qmeta']['character_controller']['confirm']['index']==11
           assert d['qmeta']['authentication_process_controller']['start']['index']==27
+          window=d['qmeta']['game_window_controller']
+          assert window['class_name']=='tibia::gamewindow::TGameWindowController'
+          prop=window['property']
+          assert prop['name']=='gameWindowState'
+          assert prop['type_name']=='QString'
+          backing=window['read_property']['backing_member']
+          assert backing['state']=='PROVEN_STATIC_QMETA_BACKING_MEMBER'
+          assert backing['byte_width']==24
+          candidate=window['semantic_candidate']
+          assert candidate['expression']=='gameWindowState == "INGAME"'
+          assert candidate['positive_value']=='INGAME'
+          assert candidate['negative_value']==''
+          assert candidate['classification']=='PROVEN_STATIC_SEMANTIC_CANDIDATE_NOT_RUNTIME_PROMOTED'
+          disc=d['in_game_discriminator']
+          assert disc['static_rebind']=='PROVEN'
+          assert disc['live_causal_validation']=='REQUIRED'
+          assert window['safety']['runtime_access']=='none'
+          assert window['safety']['official_client_executed'] is False
+          assert window['safety']['process_memory_access'] is False
+          assert window['safety']['credentials_used'] is False
+          assert window['safety']['in_game_claimed'] is False
+          assert window['safety']['semantic_promotion_performed'] is False
+          values={item['value'] for item in window['literal_values']}
+          assert values=={'INGAME',''}
           print('BE4F48_NATIVE_LOGIN_REBIND_SANITIZED_RESULT=PASS')
+          print(f"BE4F48_GAME_WINDOW_VPTR={window['rtti']['vptr_offset']:#x}")
+          print(f"BE4F48_GAME_WINDOW_MEMBER_OFFSET={backing['member_offset']:#x}")
+          print(f"BE4F48_GAME_WINDOW_PROPERTY_INDEX={prop['index']}")
+          print(f"BE4F48_GAME_WINDOW_NOTIFY_INDEX={window['notify_signal']['index']}")
           PY
 
       - name: Upload sanitized bounded result only

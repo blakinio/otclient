@@ -1,29 +1,27 @@
 #!/usr/bin/env python3
-"""Ephemeral sealed-FD transport used by the trusted-main native-login executor."""
+"""Ephemeral sealed-FD sidecar for the trusted-main native-login IPC relay."""
 from __future__ import annotations
 
 import argparse
+import array
 import fcntl
 import importlib.util
 import json
 import os
 from pathlib import Path
-import shutil
 import signal
+import socket
 import stat
-import subprocess
-import sys
 from typing import Any, Sequence
 
-CLIENT_PATH = "/home/kasm-user/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
-CONTAINER_CLIENT = "/tmp/otclient-native-login-current-sha/container_native_login_client.py"
-AUTH_SOCKET = "/tmp/otclient-native-login-current-sha/auth.sock"
-EXPECTED_VERSION = "15.32.be4f48"
-EXPECTED_SIZE = 52105824
-EXPECTED_SHA = "552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1"
 SECRET_VAULT_MODULE = Path("/tmp/secret_vault.py")
 VAULT_DIR = Path("/vault")
+RELAY_ROOT = Path("/dev/shm")
+RELAY_PREFIX = "otclient-native-login-relay-"
+RELAY_PROBE_COMMAND = b"relay-probe\n"
+RELAY_AUTH_COMMAND = b"relay-auth-fd\n"
 REQUIRED_SEALS = fcntl.F_SEAL_WRITE | fcntl.F_SEAL_GROW | fcntl.F_SEAL_SHRINK | fcntl.F_SEAL_SEAL
+_MAX_RESPONSE_BYTES = 1024 * 1024
 
 
 class SidecarError(RuntimeError):
@@ -51,78 +49,75 @@ def _validate_sealed_fd(fd: int) -> None:
     st = os.fstat(fd)
     if not stat.S_ISREG(st.st_mode):
         raise SidecarError("sealed_fd_not_regular")
+    target = os.readlink(f"/proc/self/fd/{fd}")
+    if not (target.startswith("/memfd:") or target.startswith("memfd:")):
+        raise SidecarError("sealed_fd_not_memfd")
     seals = fcntl.fcntl(fd, fcntl.F_GET_SEALS)
     if seals & REQUIRED_SEALS != REQUIRED_SEALS:
         raise SidecarError("sealed_fd_incomplete")
 
 
-def _nsenter_prefix() -> list[str]:
-    nsenter = shutil.which("nsenter")
-    if not nsenter:
-        raise SidecarError("nsenter_unavailable")
-    if not Path("/proc/1/ns/mnt").exists() or not Path("/proc/1/root").exists():
-        raise SidecarError("target_namespace_unavailable")
-    return [
-        nsenter,
-        "--target", "1",
-        "--mount",
-        "--root=/proc/1/root",
-        "--wd=/",
-        "--",
-    ]
+def _relay_path(path: Path) -> Path:
+    if not path.is_absolute() or path.parent != RELAY_ROOT:
+        raise SidecarError("relay_socket_outside_shared_ipc")
+    if not path.name.startswith(RELAY_PREFIX):
+        raise SidecarError("relay_socket_namespace_invalid")
+    return path
 
 
-def _run_target(command: Sequence[str], *, fd: int, timeout: int) -> subprocess.CompletedProcess[str]:
+def _receive_json(sock: socket.socket) -> dict[str, Any]:
+    chunks: list[bytes] = []
+    total = 0
+    while True:
+        chunk = sock.recv(4096)
+        if not chunk:
+            break
+        chunks.append(chunk)
+        total += len(chunk)
+        if total > _MAX_RESPONSE_BYTES:
+            raise SidecarError("relay_response_too_large")
+        if b"\n" in chunk:
+            break
+    if not chunks:
+        raise SidecarError("relay_response_missing")
+    line = b"".join(chunks).split(b"\n", 1)[0]
     try:
-        return subprocess.run(
-            [*_nsenter_prefix(), *command],
-            check=False,
-            text=True,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            timeout=timeout,
-            close_fds=True,
-            pass_fds=(fd,),
-            env={"PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", "PYTHONDONTWRITEBYTECODE": "1"},
+        response = json.loads(line.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise SidecarError("relay_response_invalid") from exc
+    if not isinstance(response, dict) or not isinstance(response.get("ok"), bool):
+        raise SidecarError("relay_response_invalid")
+    return response
+
+
+def _relay_fd(relay_socket: Path, command: bytes, fd: int, timeout: float) -> dict[str, Any]:
+    path = _relay_path(relay_socket)
+    if b"\n" not in command or command.count(b"\n") != 1 or not command.endswith(b"\n"):
+        raise SidecarError("relay_command_invalid")
+    descriptors = array.array("i", [fd])
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    sock.settimeout(timeout)
+    try:
+        sock.connect(str(path))
+        sent = sock.sendmsg(
+            [command],
+            [(socket.SOL_SOCKET, socket.SCM_RIGHTS, descriptors.tobytes())],
         )
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        raise SidecarError("target_namespace_command_failed") from exc
+        if sent != len(command):
+            raise SidecarError("relay_descriptor_send_partial")
+        return _receive_json(sock)
+    except (OSError, ConnectionError, socket.timeout) as exc:
+        raise SidecarError("relay_transport_failed") from exc
+    finally:
+        sock.close()
 
 
-def _probe() -> int:
+def _probe(args: argparse.Namespace) -> int:
     fd = -1
     try:
         fd = _sealed_probe_fd()
         _validate_sealed_fd(fd)
-        inner = r'''
-import fcntl,hashlib,json,os,stat,sys
-fd=int(sys.argv[1]); path=sys.argv[2]; size=int(sys.argv[3]); digest=sys.argv[4]
-required=fcntl.F_SEAL_WRITE|fcntl.F_SEAL_GROW|fcntl.F_SEAL_SHRINK|fcntl.F_SEAL_SEAL
-st=os.fstat(fd)
-if not stat.S_ISREG(st.st_mode) or fcntl.fcntl(fd,fcntl.F_GET_SEALS)&required!=required:
-    raise SystemExit(2)
-pst=os.stat(path)
-if not stat.S_ISREG(pst.st_mode) or pst.st_size!=size:
-    raise SystemExit(3)
-h=hashlib.sha256()
-with open(path,'rb',buffering=0) as f:
-    for block in iter(lambda:f.read(1<<20),b''): h.update(block)
-if h.hexdigest()!=digest:
-    raise SystemExit(4)
-print(json.dumps({'ok':True,'sealed_fd_preserved':True,'target_mount_visible':True},sort_keys=True,separators=(',',':')))
-'''
-        completed = _run_target(
-            ["python3", "-c", inner, str(fd), CLIENT_PATH, str(EXPECTED_SIZE), EXPECTED_SHA],
-            fd=fd,
-            timeout=15,
-        )
-        if completed.returncode != 0 or not completed.stdout.strip():
-            raise SidecarError("probe_target_validation_failed")
-        try:
-            response = json.loads(completed.stdout.strip().splitlines()[-1])
-        except json.JSONDecodeError as exc:
-            raise SidecarError("probe_response_invalid") from exc
+        response = _relay_fd(args.relay_socket, RELAY_PROBE_COMMAND, fd, args.timeout)
         if response != {"ok": True, "sealed_fd_preserved": True, "target_mount_visible": True}:
             raise SidecarError("probe_response_invalid")
         _emit(response)
@@ -152,35 +147,14 @@ def _auth(args: argparse.Namespace) -> int:
         except Exception as exc:
             raise SidecarError("machine_local_vault_decrypt_failed") from exc
         _validate_sealed_fd(fd)
-        command = [
-            "python3", CONTAINER_CLIENT, "auth-fd",
-            "--socket", AUTH_SOCKET,
-            "--boot-id-sha256", args.boot_id_sha256,
-            "--pid", str(args.pid),
-            "--start-ticks", str(args.start_ticks),
-            "--client-version", EXPECTED_VERSION,
-            "--client-size", str(EXPECTED_SIZE),
-            "--client-sha256", EXPECTED_SHA,
-            "--credentials-fd", str(fd),
-            "--drop-uid", str(args.drop_uid),
-            "--drop-gid", str(args.drop_gid),
-            "--timeout", "8.0",
-        ]
-        completed = _run_target(command, fd=fd, timeout=15)
-        if not completed.stdout.strip():
-            raise SidecarError("auth_response_missing")
-        try:
-            response = json.loads(completed.stdout.strip().splitlines()[-1])
-        except json.JSONDecodeError as exc:
-            raise SidecarError("auth_response_invalid") from exc
-        if completed.returncode == 0:
-            if response.get("ok") is not True or response.get("invocation_dispatched") is not True:
+        response = _relay_fd(args.relay_socket, RELAY_AUTH_COMMAND, fd, args.timeout)
+        if response.get("ok") is True:
+            if response.get("invocation_dispatched") is not True:
                 raise SidecarError("auth_dispatch_not_proven")
             _emit(response)
             return 0
         if not (
-            completed.returncode == 79
-            and response.get("fd_sent") is True
+            response.get("fd_sent") is True
             and response.get("error") == "AUTH_RESPONSE_UNAVAILABLE_AFTER_SEND"
         ):
             raise SidecarError("auth_fd_send_not_proven")
@@ -194,13 +168,12 @@ def _auth(args: argparse.Namespace) -> int:
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="operation", required=True)
-    sub.add_parser("probe")
+    probe = sub.add_parser("probe")
+    probe.add_argument("--relay-socket", required=True, type=Path)
+    probe.add_argument("--timeout", type=float, default=12.0)
     auth = sub.add_parser("auth")
-    auth.add_argument("--boot-id-sha256", required=True)
-    auth.add_argument("--pid", required=True, type=int)
-    auth.add_argument("--start-ticks", required=True, type=int)
-    auth.add_argument("--drop-uid", required=True, type=int)
-    auth.add_argument("--drop-gid", required=True, type=int)
+    auth.add_argument("--relay-socket", required=True, type=Path)
+    auth.add_argument("--timeout", type=float, default=15.0)
     return parser
 
 
@@ -208,7 +181,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     signal.alarm(40)
     args = _parser().parse_args(argv)
     try:
-        return _probe() if args.operation == "probe" else _auth(args)
+        return _probe(args) if args.operation == "probe" else _auth(args)
     except (SidecarError, OSError, ValueError):
         _emit({"ok": False, "error": "SIDECAR_FAIL_CLOSED"})
         return 2

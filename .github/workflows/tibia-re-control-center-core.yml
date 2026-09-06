@@ -187,6 +187,7 @@ jobs:
                   'tools/tibia_runtime_bridge/current_sha_native_login_gate.py',
                   'tools/tibia_runtime_bridge/experimental_auth.cpp',
                   'tools/tibia_runtime_bridge/experimental_character_control_current.cpp',
+                  'tools/tibia_runtime_bridge/game_window_state_rebind.py',
                   'tools/tibia_runtime_bridge/native_login_rebind_core.py',
                   'tools/tibia_runtime_bridge/rebind_native_login_current.py',
               }

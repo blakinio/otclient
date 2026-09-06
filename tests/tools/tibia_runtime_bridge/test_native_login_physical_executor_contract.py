@@ -117,6 +117,12 @@ class PhysicalExecutorContractTests(unittest.TestCase):
         ):
             self.assertNotIn(forbidden, text)
 
+    def test_auth_sidecar_mount_options_precede_immutable_image(self) -> None:
+        text = WORKER.read_text(encoding="utf-8")
+        self.assertIn('base = _sidecar_base(metadata, "auth")', text)
+        self.assertIn('image_index = base.index(str(metadata["image"]))', text)
+        self.assertNotIn('[*_sidecar_base(metadata, "auth"),\n        "--mount"', text)
+
     def test_sidecar_decrypts_once_then_preserves_sealed_fd_across_nsenter(self) -> None:
         text = SIDECAR.read_text(encoding="utf-8")
         required = (

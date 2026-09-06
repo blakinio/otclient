@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260906-native-login-relay-observability
-status: implementing
+status: validating
 agent: ChatGPT
 session_id: native-login-relay-observability-20260906
 session_role: implementer
@@ -8,11 +8,11 @@ project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: native_login_transport_repair
-phase: contract_red
+phase: implementation_validation
 branch: fix/OTC-20260906-native-login-relay-observability
 base_branch: main
 created: 2026-09-06T22:08:00+02:00
-updated_at: 2026-09-06T22:08:00+02:00
+updated_at: 2026-09-06T22:32:00+02:00
 base_main: c72fea67b5659075819ea4aaec68b89360a8e7c6
 execution_mode: chatgpt
 execution_class: repository_only
@@ -38,6 +38,7 @@ task_completion_policy: merge_then_parent_physical_qualification
 parent_task: OTC-20260906-native-login-physical-executor
 owned_paths:
   - .github/scripts/track_a_native_login_be4f48_physical.py
+  - .github/scripts/track_a_native_login_be4f48_physical_base.py
   - tools/tibia_runtime_bridge/native_login_fd_sidecar.py
   - tests/tools/tibia_runtime_bridge/test_native_login_physical_executor_contract.py
   - docs/agents/tasks/active/OTC-20260906-native-login-relay-observability.md
@@ -66,23 +67,37 @@ The worker currently waits for the relay process and parses relay stdout before 
 
 ## Repair design
 
-1. Keep all existing runtime/secret behavior unchanged.
-2. Sidecar emits only a strict allowlist of static, secret-free error codes; arbitrary exception text is never serialized.
-3. Secret-free probe inspects a nonzero sidecar result before letting relay timeout become the primary error.
-4. Docker mount-source failures map to `target_shm_bind_source_unavailable` without echoing host paths.
-5. Sidecar fail-closed responses map to a bounded `sidecar_probe_<safe-code>` error.
-6. Relay is still allowed to reach its bounded timeout/cleanup so the exact task socket is not orphaned; any relay cleanup error is secondary to the already-proven sidecar failure.
-7. No PR-head self-hosted execution is permitted.
+1. Keep replacement/auth/character runtime behavior byte-for-byte unchanged in a private base worker copied by Git blob identity from merged main.
+2. Keep the public worker as a thin overlay that replaces only the secret-free `sidecar_probe` path.
+3. Sidecar emits only a strict allowlist of static, secret-free error codes; arbitrary exception text is never serialized.
+4. Secret-free probe inspects a nonzero sidecar result before relay timeout can become the primary error.
+5. Docker mount-source failures map to `target_shm_bind_source_unavailable` without retaining host paths.
+6. Sidecar failures map only to bounded `sidecar_probe_client_<allowlisted-code>` or `sidecar_probe_process_failed` states.
+7. Exact per-run relay cleanup remains bounded to the task socket; no broad process or filesystem cleanup is introduced.
+8. No PR-head self-hosted execution is permitted.
+
+## TDD / implementation evidence
+
+RED head `b953736ff3dad624e9efa0ce0265d46492b995de`:
+- workflow run `34057131215`, job `101550965483`;
+- 8 focused tests ran and the new observability contract produced 9 expected failures;
+- PR-head trusted-main physical jobs were skipped.
+
+Implementation head before this checkpoint: `ca0e5fece51ad543a916c4fceb4651187a83ff5c`.
+- original merged physical worker blob `666beeb601d93257585a5dd302afd255a57a0103` is preserved as `.github/scripts/track_a_native_login_be4f48_physical_base.py`;
+- public worker changes only secret-free probe failure ordering/classification;
+- sidecar emits only allowlisted static failure codes;
+- no credentials, runtime mutation authority or auth retry behavior was added.
 
 ## Acceptance
 
 - focused tests first fail because current main lacks safe sidecar error-code emission and sidecar-first probe classification;
 - implementation cannot serialize arbitrary exception messages;
-- known Docker bind failure is classified without raw daemon stderr or host paths;
+- known Docker bind failure is classified without logging raw daemon stderr or host paths;
 - secret-free sidecar failures are surfaced before relay timeout masking;
 - exact-head hosted CI passes and PR-head self-hosted jobs remain skipped;
 - after merge, parent may perform one fresh trusted-main PRECHECK and one EXECUTE because all prior EXECUTEs stopped before credential access.
 
 ## Next action
 
-Add RED contract assertions for allowlisted sidecar errors and sidecar-first probe classification, then obtain hosted RED before implementation.
+Obtain exact-head hosted GREEN on the checkpointed implementation, audit the final diff/review surface, merge #967, then return immediately to the parent trusted-main PRECHECK and one bounded EXECUTE.

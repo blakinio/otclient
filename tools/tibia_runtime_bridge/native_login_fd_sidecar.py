@@ -22,6 +22,24 @@ RELAY_PROBE_COMMAND = b"relay-probe\n"
 RELAY_AUTH_COMMAND = b"relay-auth-fd\n"
 REQUIRED_SEALS = fcntl.F_SEAL_WRITE | fcntl.F_SEAL_GROW | fcntl.F_SEAL_SHRINK | fcntl.F_SEAL_SEAL
 _MAX_RESPONSE_BYTES = 1024 * 1024
+SAFE_ERROR_CODES = frozenset({
+    "sealed_fd_not_regular",
+    "sealed_fd_not_memfd",
+    "sealed_fd_incomplete",
+    "relay_socket_outside_shared_mount",
+    "relay_socket_namespace_invalid",
+    "relay_response_too_large",
+    "relay_response_missing",
+    "relay_response_invalid",
+    "relay_command_invalid",
+    "relay_descriptor_send_partial",
+    "relay_transport_failed",
+    "probe_response_invalid",
+    "secret_vault_module_unavailable",
+    "machine_local_vault_decrypt_failed",
+    "auth_dispatch_not_proven",
+    "auth_fd_send_not_proven",
+})
 
 
 class SidecarError(RuntimeError):
@@ -30,6 +48,14 @@ class SidecarError(RuntimeError):
 
 def _emit(payload: dict[str, Any]) -> None:
     print(json.dumps(payload, sort_keys=True, separators=(",", ":")), flush=True)
+
+
+def _safe_error_code(exc: BaseException) -> str:
+    if isinstance(exc, SidecarError) and exc.args:
+        code = exc.args[0]
+        if isinstance(code, str) and code in SAFE_ERROR_CODES:
+            return code
+    return "SIDECAR_FAIL_CLOSED"
 
 
 def _sealed_probe_fd() -> int:
@@ -99,10 +125,7 @@ def _relay_fd(relay_socket: Path, command: bytes, fd: int, timeout: float) -> di
     sock.settimeout(timeout)
     try:
         sock.connect(str(path))
-        sent = sock.sendmsg(
-            [command],
-            [(socket.SOL_SOCKET, socket.SCM_RIGHTS, descriptors.tobytes())],
-        )
+        sent = sock.sendmsg([command], [(socket.SOL_SOCKET, socket.SCM_RIGHTS, descriptors.tobytes())])
         if sent != len(command):
             raise SidecarError("relay_descriptor_send_partial")
         return _receive_json(sock)
@@ -153,10 +176,7 @@ def _auth(args: argparse.Namespace) -> int:
                 raise SidecarError("auth_dispatch_not_proven")
             _emit(response)
             return 0
-        if not (
-            response.get("fd_sent") is True
-            and response.get("error") == "AUTH_RESPONSE_UNAVAILABLE_AFTER_SEND"
-        ):
+        if not (response.get("fd_sent") is True and response.get("error") == "AUTH_RESPONSE_UNAVAILABLE_AFTER_SEND"):
             raise SidecarError("auth_fd_send_not_proven")
         _emit({"ok": False, "fd_sent": True, "error": "AUTH_RESPONSE_UNAVAILABLE_AFTER_SEND"})
         return 79
@@ -182,8 +202,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
         return _probe(args) if args.operation == "probe" else _auth(args)
-    except (SidecarError, OSError, ValueError):
-        _emit({"ok": False, "error": "SIDECAR_FAIL_CLOSED"})
+    except (SidecarError, OSError, ValueError) as exc:
+        _emit({"ok": False, "error": _safe_error_code(exc)})
         return 2
     finally:
         signal.alarm(0)

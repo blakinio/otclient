@@ -1,0 +1,880 @@
+#!/usr/bin/env python3
+"""Bounded physical worker for exact-current be4f48 native login on canonical KasmVNC."""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import importlib.util
+import json
+import os
+from pathlib import Path
+import shutil
+import stat
+import subprocess
+import sys
+import time
+from typing import Any, Sequence
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+TARGET_CONTAINER = "otclient-track-a-kasmvnc"
+TARGET_DISPLAY = ":1"
+TARGET_USER = "kasm-user"
+PACKAGE_DIR = "/home/kasm-user/.local/share/CipSoft GmbH/Tibia/packages/Tibia"
+CLIENT_PATH = PACKAGE_DIR + "/bin/client"
+EXPECTED_VERSION = "15.32.be4f48"
+EXPECTED_SIZE = 52105824
+EXPECTED_SHA = "552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1"
+PROOF_KIND = "existing_runtime_adoption_v1"
+TASK_ID = "OTC-20260906-native-login-physical-executor"
+TASK_ROOT = "/tmp/otclient-native-login-current-sha"
+BRIDGE_SOCKET = TASK_ROOT + "/bridge.sock"
+AUTH_SOCKET = TASK_ROOT + "/auth.sock"
+CHARACTER_SOCKET = TASK_ROOT + "/character.sock"
+BRIDGE_SO = TASK_ROOT + "/otclient-tibia-runtime-bridge.so"
+AUTH_SO = TASK_ROOT + "/otclient-tibia-native-auth-experimental.so"
+CHARACTER_SO = TASK_ROOT + "/otclient-tibia-character-control-current.so"
+CONTAINER_CLIENT = TASK_ROOT + "/container_native_login_client.py"
+PROFILE = TASK_ROOT + "/tibia-15.32.be4f48.json"
+RELAY_ROOT = "/dev/shm"
+SIDECAR_RELAY_ROOT = "/relay-shm"
+RELAY_PREFIX = "otclient-native-login-relay-"
+REGISTRATION = Path("/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime/runtime-registration.json")
+PROBE_PATH = REPO_ROOT / ".github/scripts/tibia-official-client-re-kasm-existing-runtime-probe.py"
+PROFILE_PATH = REPO_ROOT / "tools/tibia_runtime_bridge/profiles/tibia-15.32.be4f48.json"
+SIDECAR_SOURCE = REPO_ROOT / "tools/tibia_runtime_bridge/native_login_fd_sidecar.py"
+SECRET_VAULT_SOURCE = REPO_ROOT / "tools/tibia_runtime_bridge/secret_vault.py"
+CONTAINER_CLIENT_SOURCE = REPO_ROOT / "tools/tibia_runtime_bridge/container_native_login_client.py"
+SIDECAR_LABEL = "otclient.track-a.task"
+SIDECAR_NAME_PREFIX = "otclient-native-login-fd-"
+BUNDLE_MANIFEST = "bundle-manifest.json"
+BUNDLE_FILES = {
+    "otclient-tibia-runtime-bridge.so": BRIDGE_SO,
+    "otclient-tibia-native-auth-experimental.so": AUTH_SO,
+    "otclient-tibia-character-control-current.so": CHARACTER_SO,
+    "container_native_login_client.py": CONTAINER_CLIENT,
+    "tibia-15.32.be4f48.json": PROFILE,
+}
+
+
+class PhysicalError(RuntimeError):
+    pass
+
+
+def _legacy_credential_env_names() -> tuple[str, str]:
+    prefix = "_".join(("TIBIA", "TEST"))
+    return prefix + "_" + "EMAIL", prefix + "_" + "PASSWORD"
+
+
+def _clean_env() -> dict[str, str]:
+    env = dict(os.environ)
+    legacy = set(_legacy_credential_env_names())
+    for key in list(env):
+        if key in legacy or "LEASE_TOKEN" in key.upper() or "CAPABILITY" in key.upper():
+            env.pop(key, None)
+    return env
+
+
+def _run(command: Sequence[str], *, timeout: int = 30) -> subprocess.CompletedProcess[str]:
+    try:
+        return subprocess.run(
+            list(command),
+            check=False,
+            text=True,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=timeout,
+            env=_clean_env(),
+            close_fds=True,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise PhysicalError(f"command_failed:{Path(command[0]).name}") from exc
+
+
+def _require_success(command: Sequence[str], *, timeout: int = 30) -> str:
+    completed = _run(command, timeout=timeout)
+    if completed.returncode != 0:
+        raise PhysicalError(f"command_failed:{Path(command[0]).name}:{completed.returncode}")
+    return completed.stdout
+
+
+def _load_probe_module() -> Any:
+    spec = importlib.util.spec_from_file_location("track_a_kasm_existing_runtime_probe", PROBE_PATH)
+    if spec is None or spec.loader is None:
+        raise PhysicalError("canonical_probe_unavailable")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _current_manifest() -> dict[str, Any]:
+    module = _load_probe_module()
+    try:
+        result = module.collect()
+    except Exception as exc:
+        raise PhysicalError("canonical_probe_failed") from exc
+    if not isinstance(result, dict) or result.get("proof_kind") != PROOF_KIND:
+        raise PhysicalError("canonical_probe_invalid")
+    if (
+        result.get("client_version") != EXPECTED_VERSION
+        or result.get("client_size") != EXPECTED_SIZE
+        or result.get("client_sha256") != EXPECTED_SHA
+        or result.get("candidate_count") != 1
+        or result.get("inventory_complete") is not True
+        or result.get("display") != TARGET_DISPLAY
+    ):
+        raise PhysicalError("canonical_probe_exact_current_failed")
+    return result
+
+
+def _read_registration() -> dict[str, Any]:
+    try:
+        st = REGISTRATION.lstat()
+        if not stat.S_ISREG(st.st_mode) or REGISTRATION.is_symlink() or stat.S_IMODE(st.st_mode) != 0o600:
+            raise PhysicalError("canonical_registration_unsafe")
+        data = json.loads(REGISTRATION.read_text(encoding="utf-8"))
+    except PhysicalError:
+        raise
+    except (OSError, json.JSONDecodeError) as exc:
+        raise PhysicalError("canonical_registration_unavailable") from exc
+    required = {
+        "proof_kind": PROOF_KIND,
+        "client_version": EXPECTED_VERSION,
+        "client_size": EXPECTED_SIZE,
+        "client_sha256": EXPECTED_SHA,
+        "display": TARGET_DISPLAY,
+        "state": "UNKNOWN",
+    }
+    if not isinstance(data, dict) or any(data.get(key) != value for key, value in required.items()):
+        raise PhysicalError("canonical_registration_not_fail_closed_current")
+    if not str(data.get("runtime_locator", "")).startswith(f"docker:{TARGET_CONTAINER}:"):
+        raise PhysicalError("canonical_registration_namespace_mismatch")
+    if not isinstance(data.get("pid"), int) or not isinstance(data.get("process_start_ticks"), int):
+        raise PhysicalError("canonical_registration_identity_invalid")
+    return data
+
+
+def _require_manifest_matches_registration(manifest: dict[str, Any], registration: dict[str, Any]) -> None:
+    for key in (
+        "boot_id_sha256", "pid", "process_start_ticks", "client_version", "client_size",
+        "client_sha256", "display", "runtime_locator", "candidate_fingerprint",
+    ):
+        if manifest.get(key) != registration.get(key):
+            raise PhysicalError(f"canonical_identity_mismatch:{key}")
+
+
+def _docker_rows(*, include_stopped: bool = False) -> list[tuple[str, str]]:
+    command = ["docker", "ps"]
+    if include_stopped:
+        command.append("-a")
+    command.extend(["--no-trunc", "--format", "{{.ID}}\t{{.Names}}"])
+    output = _require_success(command)
+    rows: list[tuple[str, str]] = []
+    for line in output.splitlines():
+        parts = line.split("\t", 1)
+        if len(parts) != 2:
+            raise PhysicalError("docker_inventory_malformed")
+        rows.append((parts[0].strip().lower(), parts[1].strip()))
+    return rows
+
+
+def _container_id() -> str:
+    rows = [cid for cid, name in _docker_rows() if name == TARGET_CONTAINER]
+    if len(rows) != 1 or len(rows[0]) != 64 or any(ch not in "0123456789abcdef" for ch in rows[0]):
+        raise PhysicalError("target_container_identity_invalid")
+    return rows[0]
+
+
+def _numeric_user() -> tuple[int, int]:
+    uid = _require_success(["docker", "exec", TARGET_CONTAINER, "id", "-u", TARGET_USER]).strip()
+    gid = _require_success(["docker", "exec", TARGET_CONTAINER, "id", "-g", TARGET_USER]).strip()
+    if not uid.isdigit() or not gid.isdigit() or int(uid) < 1 or int(gid) < 1:
+        raise PhysicalError("target_numeric_user_invalid")
+    return int(uid), int(gid)
+
+
+def same_numeric_uid(pid: int, expected_uid: int) -> bool:
+    output = _require_success([
+        "docker", "exec", TARGET_CONTAINER, "sh", "-lc",
+        f"awk '/^Uid:/' /proc/{pid}/status | awk '{{print $2}}'",
+    ]).strip()
+    return output.isdigit() and int(output) == expected_uid
+
+
+def _vault_precheck(vault_dir: Path) -> Path:
+    try:
+        root = vault_dir.resolve(strict=True)
+        st = root.lstat()
+    except OSError as exc:
+        raise PhysicalError("vault_bind_missing") from exc
+    if not stat.S_ISDIR(st.st_mode) or stat.S_IMODE(st.st_mode) != 0o700:
+        raise PhysicalError("vault_bind_unsafe")
+    for name in ("tibia-test-credentials.key", "tibia-test-credentials.crt", "tibia-test-credentials.cms"):
+        path = root / name
+        try:
+            item = path.lstat()
+        except OSError as exc:
+            raise PhysicalError("vault_bind_component_missing") from exc
+        if not stat.S_ISREG(item.st_mode) or path.is_symlink() or stat.S_IMODE(item.st_mode) != 0o600:
+            raise PhysicalError("vault_bind_component_unsafe")
+    return root
+
+
+def _sha(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb", buffering=0) as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def _verify_bundle(bundle: Path) -> dict[str, str]:
+    try:
+        doc = json.loads((bundle / BUNDLE_MANIFEST).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise PhysicalError("helper_bundle_manifest_invalid") from exc
+    files = doc.get("files") if isinstance(doc, dict) else None
+    if not isinstance(doc, dict) or doc.get("schema") != "otclient.track-a.native-login-helper-bundle.v1" or not isinstance(files, dict):
+        raise PhysicalError("helper_bundle_manifest_invalid")
+    if set(files) != set(BUNDLE_FILES):
+        raise PhysicalError("helper_bundle_file_set_invalid")
+    verified: dict[str, str] = {}
+    for name, expected in files.items():
+        path = bundle / name
+        if not path.is_file() or path.is_symlink():
+            raise PhysicalError("helper_bundle_file_invalid")
+        actual = _sha(path)
+        if actual != expected:
+            raise PhysicalError("helper_bundle_digest_mismatch")
+        verified[name] = actual
+    profile = json.loads((bundle / "tibia-15.32.be4f48.json").read_text(encoding="utf-8"))
+    if profile.get("binary_sha256") != EXPECTED_SHA or profile.get("client_version") != EXPECTED_VERSION:
+        raise PhysicalError("helper_bundle_profile_fence_invalid")
+    return verified
+
+
+def _runner_sidecar_metadata(vault_dir: Path) -> dict[str, Any]:
+    if not shutil.which("docker") or not shutil.which("openssl"):
+        raise PhysicalError("sidecar_tooling_unavailable")
+    target_id = _container_id()
+    host_token = os.uname().nodename.lower()
+    runners = [row for row in _docker_rows() if row[0].startswith(host_token) or host_token.startswith(row[0][:12])]
+    if len(runners) != 1:
+        raise PhysicalError("runner_container_identity_invalid")
+    runner_id, runner_name = runners[0]
+    try:
+        docs = json.loads(_require_success(["docker", "inspect", runner_id, target_id]))
+    except json.JSONDecodeError as exc:
+        raise PhysicalError("sidecar_inspect_invalid") from exc
+    if not isinstance(docs, list) or len(docs) != 2:
+        raise PhysicalError("sidecar_inspect_invalid")
+    by_name = {str(doc.get("Name", "")).lstrip("/"): doc for doc in docs if isinstance(doc, dict)}
+    if runner_name not in by_name or TARGET_CONTAINER not in by_name:
+        raise PhysicalError("sidecar_inspect_identity_mismatch")
+    runner = by_name[runner_name]
+    target = by_name[TARGET_CONTAINER]
+    image = str(runner.get("Image", ""))
+    if not image.startswith("sha256:") or len(image) != 71 or any(ch not in "0123456789abcdef" for ch in image[7:]):
+        raise PhysicalError("sidecar_runner_image_invalid")
+    resolv_conf_path = str(target.get("ResolvConfPath", ""))
+    if not resolv_conf_path.startswith("/") or "," in resolv_conf_path:
+        raise PhysicalError("target_resolv_conf_path_invalid")
+    container_dir = Path(resolv_conf_path).parent
+    if container_dir.name.lower() != target_id:
+        raise PhysicalError("target_docker_container_dir_identity_mismatch")
+    target_shm_source = str(container_dir / "mounts" / "shm")
+    if not target_shm_source.startswith("/") or "," in target_shm_source:
+        raise PhysicalError("target_shm_source_invalid")
+    work_mounts = [
+        mount for mount in (runner.get("Mounts") or [])
+        if isinstance(mount, dict) and mount.get("Destination") == "/work" and mount.get("RW") is True
+    ]
+    if len(work_mounts) != 1:
+        raise PhysicalError("sidecar_work_mount_invalid")
+    work_source = str(work_mounts[0].get("Source", ""))
+    if not work_source.startswith("/") or "," in work_source:
+        raise PhysicalError("sidecar_work_source_invalid")
+    socket_mounts = [
+        mount for mount in (runner.get("Mounts") or [])
+        if isinstance(mount, dict) and mount.get("Destination") == "/var/run/docker.sock"
+    ]
+    if len(socket_mounts) != 1:
+        raise PhysicalError("sidecar_docker_socket_mount_missing")
+    for source in (SIDECAR_SOURCE, SECRET_VAULT_SOURCE, CONTAINER_CLIENT_SOURCE):
+        if not source.is_file() or source.is_symlink():
+            raise PhysicalError("sidecar_source_invalid")
+    vault_root = _vault_precheck(vault_dir)
+    for path in (SIDECAR_SOURCE.resolve(), SECRET_VAULT_SOURCE.resolve(), CONTAINER_CLIENT_SOURCE.resolve(), vault_root):
+        try:
+            path.relative_to(Path("/work"))
+        except ValueError as exc:
+            raise PhysicalError("sidecar_source_outside_work_mount") from exc
+    residue = _require_success([
+        "docker", "ps", "-a", "--filter", f"label={SIDECAR_LABEL}={TASK_ID}", "--format", "{{.ID}}",
+    ]).strip()
+    if residue:
+        raise PhysicalError("sidecar_residue_present")
+    return {
+        "image": image,
+        "work_source": work_source,
+        "target_id": target_id,
+        "target_shm_source": target_shm_source,
+        "vault_root": vault_root,
+    }
+
+
+def _host_source(path: Path, metadata: dict[str, Any]) -> str:
+    resolved = path.resolve(strict=True)
+    try:
+        relative = resolved.relative_to(Path("/work"))
+    except ValueError as exc:
+        raise PhysicalError("sidecar_bind_outside_work_mount") from exc
+    source = str(Path(str(metadata["work_source"])) / relative)
+    if not source.startswith("/") or "," in source:
+        raise PhysicalError("sidecar_bind_source_invalid")
+    return source
+
+
+def _sidecar_name(operation: str) -> str:
+    run_id = os.environ.get("GITHUB_RUN_ID", "")
+    if not run_id.isdigit():
+        raise PhysicalError("sidecar_run_identity_invalid")
+    return f"{SIDECAR_NAME_PREFIX}{run_id}-{operation}"
+
+
+def _relay_socket(operation: str) -> str:
+    run_id = os.environ.get("GITHUB_RUN_ID", "")
+    if not run_id.isdigit() or operation not in {"probe", "auth"}:
+        raise PhysicalError("relay_run_identity_invalid")
+    return f"{RELAY_ROOT}/{RELAY_PREFIX}{run_id}-{operation}"
+
+
+def _sidecar_relay_socket(relay_socket: str) -> str:
+    target = Path(relay_socket)
+    if target.parent != Path(RELAY_ROOT) or not target.name.startswith(RELAY_PREFIX):
+        raise PhysicalError("relay_socket_mapping_invalid")
+    suffix = target.name[len(RELAY_PREFIX):]
+    if not suffix or any(ch not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_" for ch in suffix):
+        raise PhysicalError("relay_socket_mapping_invalid")
+    return str(Path(SIDECAR_RELAY_ROOT) / target.name)
+
+
+def _sidecar_base(metadata: dict[str, Any], operation: str) -> list[str]:
+    sidecar_host = _host_source(SIDECAR_SOURCE, metadata)
+    target_shm_source = str(metadata["target_shm_source"])
+    if not target_shm_source.startswith("/") or "," in target_shm_source:
+        raise PhysicalError("target_shm_source_invalid")
+    return [
+        "docker", "run", "--rm",
+        "--name", _sidecar_name(operation),
+        "--label", f"{SIDECAR_LABEL}={TASK_ID}",
+        "--network", "none",
+        "--read-only",
+        "--user", "0:0",
+        "--pid", f"container:{TARGET_CONTAINER}",
+        "--cap-drop", "ALL",
+        "--cap-add", "SETUID",
+        "--cap-add", "SETGID",
+        "--security-opt", "no-new-privileges",
+        "--env", "PYTHONDONTWRITEBYTECODE=1",
+        "--mount", f"type=bind,src={sidecar_host},dst=/tmp/native_login_fd_sidecar.py,readonly",
+        "--mount", f"type=bind,src={target_shm_source},dst=/relay-shm,readonly",
+        "--entrypoint", "python3",
+        str(metadata["image"]),
+        "/tmp/native_login_fd_sidecar.py",
+    ]
+
+
+def _sidecar_auth_command(metadata: dict[str, Any], relay_socket: str) -> list[str]:
+    secret_vault_host = _host_source(SECRET_VAULT_SOURCE, metadata)
+    vault_host = _host_source(Path(metadata["vault_root"]), metadata)
+    sidecar_relay_socket = _sidecar_relay_socket(relay_socket)
+    base = _sidecar_base(metadata, "auth")
+    image_index = base.index(str(metadata["image"]))
+    return [
+        *base[:image_index],
+        "--mount", f"type=bind,src={secret_vault_host},dst=/tmp/secret_vault.py,readonly",
+        "--mount", f"type=bind,src={vault_host},dst=/vault,readonly",
+        *base[image_index:],
+        "auth", "--relay-socket", sidecar_relay_socket, "--timeout", "15.0",
+    ]
+
+
+def _parse_response_text(text: str, label: str) -> dict[str, Any]:
+    if not text.strip():
+        raise PhysicalError(f"{label}_response_missing")
+    try:
+        response = json.loads(text.strip().splitlines()[-1])
+    except json.JSONDecodeError as exc:
+        raise PhysicalError(f"{label}_response_invalid") from exc
+    if not isinstance(response, dict):
+        raise PhysicalError(f"{label}_response_invalid")
+    return response
+
+
+def _parse_sidecar_response(completed: subprocess.CompletedProcess[str]) -> dict[str, Any]:
+    return _parse_response_text(completed.stdout, "sidecar")
+
+
+def _relay_command(operation: str, relay_socket: str, registration: dict[str, Any] | None, uid: int | None, gid: int | None) -> list[str]:
+    command = ["docker", "exec", "-i", TARGET_CONTAINER, "python3", "-", operation, "--relay-socket", relay_socket]
+    if operation == "relay-probe":
+        command.extend(["--timeout", "10.0"])
+        return command
+    if operation != "relay-auth-fd" or registration is None or uid is None or gid is None:
+        raise PhysicalError("relay_auth_identity_missing")
+    command.extend([
+        "--socket", AUTH_SOCKET,
+        "--boot-id-sha256", str(registration["boot_id_sha256"]),
+        "--pid", str(registration["pid"]),
+        "--start-ticks", str(registration["process_start_ticks"]),
+        "--client-version", EXPECTED_VERSION,
+        "--client-size", str(EXPECTED_SIZE),
+        "--client-sha256", EXPECTED_SHA,
+        "--timeout", "15.0",
+        "--drop-uid", str(uid),
+        "--drop-gid", str(gid),
+    ])
+    return command
+
+
+def _start_relay(operation: str, relay_socket: str, *, registration: dict[str, Any] | None = None, uid: int | None = None, gid: int | None = None) -> subprocess.Popen[str]:
+    if _run(["docker", "exec", TARGET_CONTAINER, "test", "!", "-e", relay_socket]).returncode != 0:
+        raise PhysicalError("relay_socket_residue_present")
+    try:
+        source = CONTAINER_CLIENT_SOURCE.read_text(encoding="utf-8")
+        process = subprocess.Popen(
+            _relay_command(operation, relay_socket, registration, uid, gid),
+            text=True,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env=_clean_env(),
+            close_fds=True,
+        )
+    except OSError as exc:
+        raise PhysicalError("relay_start_failed") from exc
+    if process.stdin is None:
+        process.terminate()
+        raise PhysicalError("relay_stdin_unavailable")
+    try:
+        process.stdin.write(source)
+        process.stdin.close()
+        process.stdin = None
+    except BaseException:
+        process.terminate()
+        raise
+    deadline = time.monotonic() + 6.0
+    while time.monotonic() < deadline:
+        if process.poll() is not None:
+            try:
+                process.communicate(timeout=1)
+            except subprocess.TimeoutExpired:
+                pass
+            raise PhysicalError("relay_exited_before_ready")
+        if _run(["docker", "exec", TARGET_CONTAINER, "test", "-S", relay_socket], timeout=5).returncode == 0:
+            return process
+        time.sleep(0.1)
+    process.terminate()
+    try:
+        process.wait(timeout=2)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=2)
+    raise PhysicalError("relay_socket_not_ready")
+
+
+def _finish_relay(process: subprocess.Popen[str], *, timeout: int = 20) -> tuple[int, dict[str, Any]]:
+    try:
+        stdout, _stderr = process.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired as exc:
+        process.terminate()
+        try:
+            process.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait(timeout=2)
+        raise PhysicalError("relay_process_timeout") from exc
+    response = _parse_response_text(stdout, "relay")
+    return int(process.returncode or 0), response
+
+
+def _write_json(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_CLOEXEC, 0o600)
+    try:
+        os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
+            json.dump(payload, handle, sort_keys=True, separators=(",", ":"))
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+    except BaseException:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+        raise
+
+
+def sidecar_probe(vault_dir: Path, result: Path) -> None:
+    registration = _read_registration()
+    manifest = _current_manifest()
+    _require_manifest_matches_registration(manifest, registration)
+    uid, _gid = _numeric_user()
+    if not same_numeric_uid(int(registration["pid"]), uid):
+        raise PhysicalError("same_numeric_uid_failed")
+    metadata = _runner_sidecar_metadata(vault_dir)
+    relay_socket = _relay_socket("probe")
+    relay = _start_relay("relay-probe", relay_socket)
+    completed: subprocess.CompletedProcess[str] | None = None
+    sidecar_error: PhysicalError | None = None
+    try:
+        completed = _run([
+            *_sidecar_base(metadata, "probe"),
+            "probe", "--relay-socket", _sidecar_relay_socket(relay_socket), "--timeout", "10.0",
+        ], timeout=16)
+    except PhysicalError as exc:
+        sidecar_error = exc
+    relay_rc, relay_response = _finish_relay(relay, timeout=14)
+    if sidecar_error is not None:
+        raise sidecar_error
+    if completed is None:
+        raise PhysicalError("sidecar_probe_missing")
+    response = _parse_sidecar_response(completed)
+    expected = {"ok": True, "sealed_fd_preserved": True, "target_mount_visible": True}
+    if completed.returncode != 0 or relay_rc != 0 or response != expected or relay_response != expected:
+        raise PhysicalError("sidecar_probe_failed")
+    if _run(["docker", "exec", TARGET_CONTAINER, "test", "!", "-e", relay_socket]).returncode != 0:
+        raise PhysicalError("relay_socket_cleanup_failed")
+    _write_json(result, {
+        "schema": "otclient.track-a.native-login-sidecar-probe.v1",
+        "sidecar_probe": True,
+        "sealed_fd_preserved": True,
+        "target_mount_visible": True,
+        "credential_plaintext_accessed": False,
+        "secret_attempt_count": 0,
+    })
+
+
+def precheck(vault_dir: Path, bundle: Path, result: Path) -> None:
+    _vault_precheck(vault_dir)
+    _verify_bundle(bundle)
+    registration = _read_registration()
+    manifest = _current_manifest()
+    _require_manifest_matches_registration(manifest, registration)
+    uid, gid = _numeric_user()
+    if not same_numeric_uid(int(manifest["pid"]), uid):
+        raise PhysicalError("same_numeric_uid_failed")
+    metadata = _runner_sidecar_metadata(vault_dir)
+    if not str(metadata.get("target_shm_source", "")).startswith("/"):
+        raise PhysicalError("target_shm_source_invalid")
+    for operation in ("probe", "auth"):
+        relay_socket = _relay_socket(operation)
+        _sidecar_relay_socket(relay_socket)
+        if _run(["docker", "exec", TARGET_CONTAINER, "test", "!", "-e", relay_socket]).returncode != 0:
+            raise PhysicalError("relay_socket_residue_present")
+    _write_json(result, {
+        "schema": "otclient.track-a.native-login-physical-precheck.v1",
+        "exact_current": True,
+        "target_unique": True,
+        "registration_current": True,
+        "sidecar_transport_metadata_ready": True,
+        "same_numeric_uid": True,
+        "vault_bind": "HOST_ONLY_PRESENT_PRIVATE",
+        "credential_plaintext_accessed": False,
+        "sidecar_created": False,
+        "target_uid": uid,
+        "target_gid": gid,
+    })
+
+
+def _install_bundle(bundle: Path) -> None:
+    _verify_bundle(bundle)
+    _require_success([
+        "docker", "exec", TARGET_CONTAINER, "sh", "-lc",
+        f"umask 077; install -d -m 700 {TASK_ROOT}; rm -f {BRIDGE_SOCKET} {AUTH_SOCKET} {CHARACTER_SOCKET} {BRIDGE_SO} {AUTH_SO} {CHARACTER_SO} {CONTAINER_CLIENT} {PROFILE}",
+    ])
+    for name in BUNDLE_FILES:
+        completed = _run(["docker", "cp", str(bundle / name), f"{TARGET_CONTAINER}:{TASK_ROOT}/{name}"], timeout=30)
+        if completed.returncode != 0:
+            raise PhysicalError("helper_bundle_copy_failed")
+    _require_success([
+        "docker", "exec", TARGET_CONTAINER, "sh", "-lc",
+        f"chown {TARGET_USER}:{TARGET_USER} {TASK_ROOT}/*; chmod 600 {TASK_ROOT}/*",
+    ])
+    manifest = json.loads((bundle / BUNDLE_MANIFEST).read_text(encoding="utf-8"))["files"]
+    for name, expected in manifest.items():
+        actual = _require_success(["docker", "exec", TARGET_CONTAINER, "sha256sum", f"{TASK_ROOT}/{name}"]).split()[0]
+        if actual != expected:
+            raise PhysicalError("installed_helper_digest_mismatch")
+
+
+def _profile_targets() -> str:
+    profile = json.loads(PROFILE_PATH.read_text(encoding="utf-8"))
+    if profile.get("binary_sha256") != EXPECTED_SHA:
+        raise PhysicalError("local_profile_fence_invalid")
+    targets = profile.get("targets")
+    if not isinstance(targets, dict):
+        raise PhysicalError("local_profile_targets_invalid")
+    values: list[str] = []
+    for name in sorted(targets):
+        target = targets[name]
+        values.append(f"{name},{int(target['vptr_offset'], 16):x},{target['expected_qt_class']}")
+    return ";".join(values)
+
+
+def _wait_pid_gone(pid: int, seconds: float = 15.0) -> None:
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        if _run(["docker", "exec", TARGET_CONTAINER, "test", "!", "-e", f"/proc/{pid}"]).returncode == 0:
+            return
+        time.sleep(0.25)
+    raise PhysicalError("registered_pid_did_not_exit_after_SIGTERM")
+
+
+def _wait_replacement(old_pid: int, old_start: int, seconds: float = 60.0) -> dict[str, Any]:
+    deadline = time.monotonic() + seconds
+    last_error: Exception | None = None
+    while time.monotonic() < deadline:
+        try:
+            manifest = _current_manifest()
+            if manifest["pid"] != old_pid and manifest["process_start_ticks"] != old_start:
+                for socket_path in (BRIDGE_SOCKET, AUTH_SOCKET, CHARACTER_SOCKET):
+                    if _run(["docker", "exec", "-u", TARGET_USER, TARGET_CONTAINER, "test", "-S", socket_path]).returncode != 0:
+                        raise PhysicalError("replacement_helper_socket_missing")
+                return manifest
+        except Exception as exc:
+            last_error = exc
+        time.sleep(0.5)
+    raise PhysicalError("replacement_exact_current_runtime_not_ready") from last_error
+
+
+def replace(vault_dir: Path, bundle: Path, result: Path) -> None:
+    _vault_precheck(vault_dir)
+    _verify_bundle(bundle)
+    registration = _read_registration()
+    manifest = _current_manifest()
+    _require_manifest_matches_registration(manifest, registration)
+    uid, _gid = _numeric_user()
+    if not same_numeric_uid(int(registration["pid"]), uid):
+        raise PhysicalError("same_numeric_uid_failed")
+    _install_bundle(bundle)
+    pid = int(registration["pid"])
+    start = int(registration["process_start_ticks"])
+    if _run(["docker", "exec", TARGET_CONTAINER, "kill", "-TERM", str(pid)]).returncode != 0:
+        raise PhysicalError("exact_registered_SIGTERM_failed")
+    _wait_pid_gone(pid)
+    candidates = _run([
+        "docker", "exec", TARGET_CONTAINER, "sh", "-lc",
+        "for d in /proc/[0-9]*; do [ -r \"$d/exe\" ] || continue; "
+        f"[ \"$(stat -Lc %s \"$d/exe\" 2>/dev/null || echo x)\" = \"{EXPECTED_SIZE}\" ] || continue; "
+        f"[ \"$(sha256sum \"$d/exe\" 2>/dev/null | awk '{{print $1}}')\" = \"{EXPECTED_SHA}\" ] && echo ${{d#/proc/}}; done",
+    ])
+    if candidates.returncode != 0 or candidates.stdout.strip():
+        raise PhysicalError("post_SIGTERM_exact_client_still_present")
+    legacy_email, legacy_password = _legacy_credential_env_names()
+    env_args = [
+        "-e", "HOME=/home/kasm-user",
+        "-e", f"DISPLAY={TARGET_DISPLAY}",
+        "-e", f"LD_PRELOAD={BRIDGE_SO}:{AUTH_SO}:{CHARACTER_SO}",
+        "-e", f"OTCLIENT_TIBIA_RE_SOCKET={BRIDGE_SOCKET}",
+        "-e", f"OTCLIENT_TIBIA_RE_AUTH_SOCKET={AUTH_SOCKET}",
+        "-e", f"OTCLIENT_TIBIA_RE_CHARACTER_SOCKET={CHARACTER_SOCKET}",
+        "-e", f"OTCLIENT_TIBIA_RE_BINARY_SHA256={EXPECTED_SHA}",
+        "-e", f"OTCLIENT_TIBIA_RE_CLIENT_VERSION={EXPECTED_VERSION}",
+        "-e", f"OTCLIENT_TIBIA_RE_TARGETS={_profile_targets()}",
+    ]
+    launch = _run([
+        "docker", "exec", "-d", "-u", "kasm-user", "-w", PACKAGE_DIR, *env_args,
+        TARGET_CONTAINER, "/usr/bin/env", "-u", "RUNNER_TRACKING_ID", "-u", legacy_email,
+        "-u", legacy_password, "-u", "TRACK_A_CANONICAL_LEASE_TOKEN",
+        "-u", "TRACK_A_CANONICAL_LEASE_TOKEN_FILE", CLIENT_PATH,
+    ], timeout=20)
+    if launch.returncode != 0:
+        raise PhysicalError("replacement_launch_failed")
+    replacement = _wait_replacement(pid, start)
+    _write_json(result, {
+        "schema": "otclient.track-a.native-login-replacement.v1",
+        "exact_current": True,
+        "old_pid_replaced": True,
+        "pid": replacement["pid"],
+        "process_start_ticks": replacement["process_start_ticks"],
+        "boot_id_sha256": replacement["boot_id_sha256"],
+        "candidate_fingerprint": replacement["candidate_fingerprint"],
+        "helpers_ready": True,
+        "credential_plaintext_accessed": False,
+    })
+
+
+def auth_one_shot(vault_dir: Path, result: Path) -> None:
+    registration = _read_registration()
+    manifest = _current_manifest()
+    _require_manifest_matches_registration(manifest, registration)
+    uid, gid = _numeric_user()
+    if not same_numeric_uid(int(registration["pid"]), uid):
+        raise PhysicalError("same_numeric_uid_failed")
+    metadata = _runner_sidecar_metadata(vault_dir)
+    relay_socket = _relay_socket("auth")
+    relay = _start_relay("relay-auth-fd", relay_socket, registration=registration, uid=uid, gid=gid)
+    completed: subprocess.CompletedProcess[str] | None = None
+    sidecar_error: PhysicalError | None = None
+    try:
+        completed = _run(_sidecar_auth_command(metadata, relay_socket), timeout=24)
+    except PhysicalError as exc:
+        sidecar_error = exc
+    relay_rc, relay_response = _finish_relay(relay, timeout=20)
+    if sidecar_error is not None:
+        raise sidecar_error
+    if completed is None:
+        raise PhysicalError("native_auth_sidecar_missing")
+    response = _parse_sidecar_response(completed)
+    if completed.returncode == 0:
+        if relay_rc != 0 or response != relay_response:
+            raise PhysicalError("native_auth_relay_response_mismatch")
+        if response.get("ok") is not True or response.get("invocation_dispatched") is not True:
+            raise PhysicalError("native_auth_response_not_dispatch_proof")
+        outcome = "PASS_RESPONSE"
+    else:
+        sent_without_response = bool(
+            completed.returncode == 79
+            and relay_rc == 79
+            and response == relay_response
+            and response.get("fd_sent") is True
+            and response.get("error") == "AUTH_RESPONSE_UNAVAILABLE_AFTER_SEND"
+        )
+        if not sent_without_response:
+            raise PhysicalError("native_auth_fd_send_not_proven")
+        deadline = time.monotonic() + 15.0
+        handoff: dict[str, Any] | None = None
+        while time.monotonic() < deadline:
+            try:
+                candidate = _current_manifest()
+                if candidate.get("pid") != registration.get("pid") and candidate.get("process_start_ticks") != registration.get("process_start_ticks"):
+                    handoff = candidate
+                    break
+            except PhysicalError:
+                pass
+            time.sleep(0.5)
+        if handoff is None:
+            raise PhysicalError("native_auth_one_shot_failed_without_proven_handoff")
+        outcome = "PASS_WITH_PROCESS_HANDOFF"
+    if _run(["docker", "exec", TARGET_CONTAINER, "test", "!", "-e", relay_socket]).returncode != 0:
+        raise PhysicalError("relay_socket_cleanup_failed")
+    _write_json(result, {
+        "schema": "otclient.track-a.native-login-auth.v1",
+        "native_auth_ingress": outcome,
+        "secret_source": "machine_local_encrypted_vault",
+        "sealed_memfd": True,
+        "scm_rights": True,
+        "sidecar_transport": True,
+        "secret_attempt_count": 1,
+        "NO_SECOND_SECRET_ATTEMPT": True,
+        "credential_values_logged": False,
+    })
+
+
+def _character_call(identity: dict[str, Any], operation: str, timeout: float = 8.0) -> dict[str, Any]:
+    command = [
+        "docker", "exec", "-u", TARGET_USER, "-e", "PYTHONDONTWRITEBYTECODE=1", TARGET_CONTAINER,
+        "python3", CONTAINER_CLIENT, operation,
+        "--socket", CHARACTER_SOCKET,
+        "--boot-id-sha256", str(identity["boot_id_sha256"]),
+        "--pid", str(identity["pid"]),
+        "--start-ticks", str(identity["process_start_ticks"]),
+        "--client-version", EXPECTED_VERSION,
+        "--client-size", str(EXPECTED_SIZE),
+        "--client-sha256", EXPECTED_SHA,
+        "--timeout", str(timeout),
+    ]
+    completed = _run(command, timeout=int(timeout) + 5)
+    if completed.returncode != 0 or not completed.stdout.strip():
+        raise PhysicalError(f"character_{operation}_failed")
+    try:
+        result = json.loads(completed.stdout.strip().splitlines()[-1])
+    except json.JSONDecodeError as exc:
+        raise PhysicalError("character_response_invalid") from exc
+    if not isinstance(result, dict) or result.get("ok") is not True:
+        raise PhysicalError("character_response_not_ok")
+    return result
+
+
+def confirm_unique(result: Path) -> None:
+    registration = _read_registration()
+    manifest = _current_manifest()
+    _require_manifest_matches_registration(manifest, registration)
+    deadline = time.monotonic() + 90.0
+    state: dict[str, Any] | None = None
+    while time.monotonic() < deadline:
+        try:
+            state = _character_call(registration, "character-state", timeout=5.0)
+        except PhysicalError:
+            state = None
+        if state is not None and state.get("character_count") == 1 and state.get("confirm_method_present") is True:
+            break
+        time.sleep(0.5)
+    if state is None or state.get("character_count") != 1 or state.get("confirm_method_present") is not True:
+        raise PhysicalError("native_character_count_not_exactly_one")
+    confirmed = _character_call(registration, "confirm-unique", timeout=8.0)
+    if confirmed.get("confirmation_dispatched") is not True or confirmed.get("character_index") != 0:
+        raise PhysicalError("native_character_confirmation_not_proven")
+    _write_json(result, {
+        "schema": "otclient.track-a.native-login-character-confirm.v1",
+        "character_count": 1,
+        "confirm_method_present": True,
+        "CONFIRM_UNIQUE": True,
+        "confirmation_dispatched": True,
+        "character_index": 0,
+    })
+
+
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description=__doc__)
+    sub = parser.add_subparsers(dest="operation", required=True)
+    pre = sub.add_parser("precheck")
+    pre.add_argument("--vault-dir", required=True, type=Path)
+    pre.add_argument("--bundle", required=True, type=Path)
+    pre.add_argument("--result", required=True, type=Path)
+    transport = sub.add_parser("sidecar-probe")
+    transport.add_argument("--vault-dir", required=True, type=Path)
+    transport.add_argument("--result", required=True, type=Path)
+    replacement = sub.add_parser("replace")
+    replacement.add_argument("--vault-dir", required=True, type=Path)
+    replacement.add_argument("--bundle", required=True, type=Path)
+    replacement.add_argument("--result", required=True, type=Path)
+    auth = sub.add_parser("auth-one-shot")
+    auth.add_argument("--vault-dir", required=True, type=Path)
+    auth.add_argument("--result", required=True, type=Path)
+    confirm = sub.add_parser("confirm-unique")
+    confirm.add_argument("--result", required=True, type=Path)
+    return parser
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    args = _parser().parse_args(argv)
+    try:
+        if args.operation == "precheck":
+            precheck(args.vault_dir, args.bundle, args.result)
+        elif args.operation == "sidecar-probe":
+            sidecar_probe(args.vault_dir, args.result)
+        elif args.operation == "replace":
+            replace(args.vault_dir, args.bundle, args.result)
+        elif args.operation == "auth-one-shot":
+            auth_one_shot(args.vault_dir, args.result)
+        else:
+            confirm_unique(args.result)
+        print(f"TRACK_A_BE4F48_PHYSICAL_{args.operation.upper().replace('-', '_')}=PASS")
+        if args.operation == "auth-one-shot":
+            print("NO_SECOND_SECRET_ATTEMPT=true")
+        return 0
+    except (PhysicalError, OSError, ValueError, json.JSONDecodeError) as exc:
+        print(f"TRACK_A_BE4F48_PHYSICAL_ERROR={getattr(exc, 'args', ['physical_failure'])[0]}", file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

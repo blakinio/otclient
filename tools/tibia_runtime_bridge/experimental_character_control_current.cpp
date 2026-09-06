@@ -54,11 +54,6 @@ struct Region {
 std::atomic<std::uintptr_t> gMainBase{0};
 std::string gSocketPath;
 
-std::string errorJson(const char* code)
-{
-    return std::string{"{\"ok\":false,\"error\":\""} + code + "\"}";
-}
-
 int phdrCallback(dl_phdr_info* info, std::size_t, void*)
 {
     if (info != nullptr && (info->dlpi_name == nullptr || info->dlpi_name[0] == '\0')) {

@@ -55,6 +55,19 @@ class NativeLoginBe4f48BindingTests(unittest.TestCase):
         self.assertIn(f"constexpr std::uint64_t kClientSize = {EXPECTED_SIZE};", source)
         self.assertIn("constexpr std::uintptr_t kCharacterControllerVptrOffset = 0x30c29a8;", source)
 
+    def test_rebind_includes_exact_current_game_window_state_contract(self) -> None:
+        analyzer = ROOT / "tools/tibia_runtime_bridge/game_window_state_rebind.py"
+        self.assertTrue(analyzer.is_file(), "be4f48 game-window-state analyzer missing")
+        source = analyzer.read_text(encoding="utf-8")
+        self.assertIn(f'EXPECTED_SHA256 = "{EXPECTED_SHA}"', source)
+        self.assertIn("EXPECTED_SIZE = 52_105_824", source)
+        self.assertIn('GAME_WINDOW_CLASS = "tibia::gamewindow::TGameWindowController"', source)
+        self.assertIn('GAME_WINDOW_STATE_PROPERTY = "gameWindowState"', source)
+        self.assertIn('INGAME_TEXT = "INGAME"', source)
+        self.assertNotIn("d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a", source)
+        wrapper = (ROOT / "tools/tibia_runtime_bridge/rebind_native_login_current.py").read_text(encoding="utf-8")
+        self.assertIn("augment_rebind_output", wrapper)
+
 
 if __name__ == "__main__":
     unittest.main()

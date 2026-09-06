@@ -9,6 +9,9 @@ TASK = ROOT / 'docs/agents/tasks/active/OTC-20260828-game-window-state-qualifica
 text = WORKFLOW.read_text(encoding='utf-8')
 task_text = TASK.read_text(encoding='utf-8')
 
+CURRENT_SHA = '552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1'
+STALE_SHA = 'd1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a'
+
 required = (
     'issue_comment:',
     'PREFLIGHT_GAME_WINDOW_STATE_QUALIFICATION',
@@ -56,11 +59,15 @@ required = (
     'PROCESS_MEMORY_OBSERVATION_PERFORMED=false',
     "if: github.event.comment.body == 'START_GAME_WINDOW_STATE_QUALIFICATION'",
     'python3 .github/scripts/test_track_a_canonical_current_client_fence.py',
+    'EXPECTED_VERSION: 15.32.be4f48',
     'EXPECTED_SIZE: 52105824',
-    'EXPECTED_SHA: d1a16819cec7e40cfee39c099d4868d2eb2d7c1c942078eda105233b5688817a',
+    f'EXPECTED_SHA: {CURRENT_SHA}',
     'docker exec -i "$CONTAINER" python3 -',
     'track_a_current_world_entered_anchor.py',
     'track_a_current_world_entered_durable_state.py',
+    'tools/tibia_re_control_center/current_client_fence.py',
+    'tools/tibia_runtime_bridge/game_window_state_rebind.py',
+    'docs/agents/contracts/TRACK_A_CURRENT_CLIENT_FENCE_V1.json',
     'track_a_game_window_state_qualification.py',
     'duration-seconds 1800',
     'heartbeat-seconds 5',
@@ -96,6 +103,8 @@ for forbidden in (
     'START_GAME_WINDOW_STATE_QUALIFICATION container=',
     'PREFLIGHT_GAME_WINDOW_STATE_QUALIFICATION container=',
     'REGISTERED_TARGET_NOT_CURRENT_UNIQUE_CANDIDATE',
+    STALE_SHA,
+    'EXPECTED_VERSION: 15.32.75d4a0',
     'xdotool', 'xprop', 'xwininfo', 'wmctrl', 'screenshot',
     'TIBIA_TEST_EMAIL', 'TIBIA_TEST_PASSWORD', 'docker cp', '/proc/$pid/environ',
 ):

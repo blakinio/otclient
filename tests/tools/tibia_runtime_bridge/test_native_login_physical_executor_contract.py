@@ -82,7 +82,7 @@ class PhysicalExecutorContractTests(unittest.TestCase):
         self.assertEqual(git_blob, EXPECTED_BASE_BLOB_SHA)
         compile(data, str(BASE_WORKER), "exec")
 
-    def test_worker_uses_exact_pid_vault_and_target_shm_bound_fd_bridge(self) -> None:
+    def test_base_worker_preserves_exact_pid_vault_and_previous_runtime_logic(self) -> None:
         text = BASE_WORKER.read_text(encoding="utf-8")
         required = (
             "TARGET_CONTAINER = \"otclient-track-a-kasmvnc\"",
@@ -104,14 +104,6 @@ class PhysicalExecutorContractTests(unittest.TestCase):
             "ALL",
             "SETUID",
             "SETGID",
-            "/dev/shm",
-            "/relay-shm",
-            "ResolvConfPath",
-            "target_shm_source",
-            "dst=/relay-shm,readonly",
-            "_sidecar_relay_socket",
-            "relay-probe",
-            "relay-auth-fd",
             "OTCLIENT_TIBIA_RE_AUTH_SOCKET",
             "OTCLIENT_TIBIA_RE_CHARACTER_SOCKET",
             "LD_PRELOAD",
@@ -141,7 +133,7 @@ class PhysicalExecutorContractTests(unittest.TestCase):
         self.assertIn('image_index = base.index(str(metadata["image"]))', text)
         self.assertNotIn('[*_sidecar_base(metadata, "auth"),\n        "--mount"', text)
 
-    def test_sidecar_decrypts_once_then_relays_sealed_fd_over_bound_target_shm(self) -> None:
+    def test_sidecar_decrypts_once_then_relays_sealed_fd_over_target_proc_root(self) -> None:
         text = SIDECAR.read_text(encoding="utf-8")
         required = (
             "decrypt_to_sealed_memfd",
@@ -149,7 +141,7 @@ class PhysicalExecutorContractTests(unittest.TestCase):
             "F_SEAL_SEAL",
             "SCM_RIGHTS",
             "sendmsg",
-            "/relay-shm",
+            "/proc/1/root/dev/shm",
             "relay-probe",
             "relay-auth-fd",
             "AUTH_RESPONSE_UNAVAILABLE_AFTER_SEND",
@@ -169,6 +161,7 @@ class PhysicalExecutorContractTests(unittest.TestCase):
             "docker.sock",
             "nsenter",
             "SYS_ADMIN",
+            'RELAY_ROOT = Path("/relay-shm")',
             'RELAY_ROOT = Path("/dev/shm")',
         ):
             self.assertNotIn(forbidden, text)
@@ -188,10 +181,9 @@ class PhysicalExecutorContractTests(unittest.TestCase):
         self.assertNotIn('"error": str(exc)', sidecar)
         for needle in (
             "_classify_sidecar_probe_failure",
-            "target_shm_bind_source_unavailable",
             "sidecar_probe_client_",
             "sidecar_probe_process_failed",
-            "bind source path does not exist",
+            "relay_socket_outside_target_proc_root",
         ):
             with self.subTest(worker=needle):
                 self.assertIn(needle, worker)
@@ -199,7 +191,8 @@ class PhysicalExecutorContractTests(unittest.TestCase):
         probe_end = worker.index("\ndef precheck(", probe_start)
         probe = worker[probe_start:probe_end]
         self.assertLess(probe.index("completed.returncode != 0"), probe.index("_finish_relay(relay"))
-        self.assertNotIn("completed.stderr", probe)
+        self.assertNotIn("completed.stderr", worker)
+        self.assertNotIn("target_shm_bind_source_unavailable", worker)
         self.assertNotIn("CONTRACT_MARKERS", worker)
 
     def test_container_client_receives_relay_fd_and_forwards_only_sealed_memfd(self) -> None:

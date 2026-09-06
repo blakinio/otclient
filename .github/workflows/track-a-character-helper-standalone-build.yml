@@ -1,0 +1,59 @@
+name: Track A current character helper standalone build
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/track-a-character-helper-standalone-build.yml
+      - tools/tibia_runtime_bridge/experimental_character_control_current.cpp
+      - docs/agents/tasks/active/OTC-20260906-character-helper-standalone-build.md
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Exact-current character helper standalone build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Install deterministic build dependencies
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends qt6-base-dev pkg-config
+
+      - name: Build character helper with physical-preparer warnings
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          read -r -a qt_cflags <<< "$(pkg-config --cflags Qt6Core)"
+          read -r -a qt_libs <<< "$(pkg-config --libs Qt6Core)"
+          out="$RUNNER_TEMP/otclient-tibia-character-control-current.so"
+          c++ -std=c++20 -fPIC -shared -Wall -Wextra -Wpedantic -Werror \
+            "${qt_cflags[@]}" \
+            tools/tibia_runtime_bridge/experimental_character_control_current.cpp \
+            -o "$out" \
+            "${qt_libs[@]}" -ldl -pthread
+          test -s "$out"
+          strings "$out" | grep -F 'CONFIRM_UNIQUE' >/dev/null
+          strings "$out" | grep -F 'onCharacterSelectionConfirmed(QList<int>)' >/dev/null
+          echo CHARACTER_HELPER_STANDALONE_BUILD=PASS
+          echo OFFICIAL_CLIENT_EXECUTED=false
+          echo RUNTIME_ACCESS=none
+
+      - name: Validate repository-only repair
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 .github/scripts/test_track_a_agent_runtime_governance.py \
+            --changed-from "${{ github.event.pull_request.base.sha }}" \
+            --expected-branch "$GITHUB_HEAD_REF"
+          git diff --check "${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}"

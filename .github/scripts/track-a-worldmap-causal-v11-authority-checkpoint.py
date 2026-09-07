@@ -1,0 +1,72 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+p=Path(sys.argv[1])
+s=p.read_text(encoding='utf-8')
+replacements=(
+('session_id: chatgpt-worldmap-server-delivery-causal-20260817-v9','session_id: chatgpt-worldmap-server-delivery-causal-20260817-v11'),
+('phase: baseline_auth_submit_button_v9_world_entry_screenshot','phase: baseline_downstream_auth_state_v11_world_entry_screenshot'),
+('updated: 2026-08-17T21:49:00+02:00','updated: 2026-08-17T22:18:00+02:00'),
+('owner_authorization_text: "dokoncz zadanie i potwierdz wejscia do swiata gry na mape sascreenem"','owner_authorization_text: "dokoncz zadanie i potwierdz wejscia do swiata gry na mape sascreenem"; reaffirmed "wykonaj"'),
+('owner_authorization_scope: exactly one additional sequential real baseline login attempt to repair the proven v7 auth-submit discriminator, complete structural world entry, and persist one cropped map-only screenshot after structural IN_GAME; no parallel session and no screenshot before IN_GAME','owner_authorization_scope: one additional sequential real baseline login attempt for v11 after v10 consumed the third attempt; v11 uses the press-proven Login control, secret-safe field occupancy proof, downstream native auth-state acceptance, structural world entry, and one post-IN_GAME cropped map screenshot; no parallel session'),
+('baseline_ephemeral_client_launches_consumed: 16','baseline_ephemeral_client_launches_consumed: 19'),
+('baseline_ephemeral_login_max: 3','baseline_ephemeral_login_max: 4'),
+('baseline_ephemeral_login_consumed: 2','baseline_ephemeral_login_consumed: 3'),
+('last_progress_at: 2026-08-17T21:49:00+02:00','last_progress_at: 2026-08-17T22:18:00+02:00'),
+('ci_check_generation: v9_auth_submit_button_native_state_and_screenshot','ci_check_generation: v11_downstream_auth_state_and_screenshot'),
+('baseline_login_max: 3','baseline_login_max: 4'),
+('baseline_login_consumed: 2','baseline_login_consumed: 3'),
+)
+for old,new in replacements:
+    if old not in s:
+        raise SystemExit('WORLDMAP_V11_AUTHORITY_ERROR=anchor_missing:'+old)
+    s=s.replace(old,new,1)
+anchor='third_baseline_login_attempt_authorized: true\n'
+if anchor not in s:
+    raise SystemExit('WORLDMAP_V11_AUTHORITY_ERROR=third_authority_anchor_missing')
+s=s.replace(anchor,anchor+'fourth_baseline_login_attempt_authorized: true\n',1)
+append='''
+
+# V10 physical discriminator and V11 authority
+
+V10 run `32064354985`, physical rerun job `95493198150`, preserved the exact XID/VNC contract and passed all pre-secret gates. Press-cancel physically identified the Login control without activating it:
+
+```text
+WORLDMAP_V10_FIELD_DERIVED_TRANSLATION=400,215
+WORLDMAP_V10_PRESS_CANCEL=PASS
+WORLDMAP_V10_PRESS_BBOX=998,593,1084,613
+WORLDMAP_V10_LOGIN_BUTTON_TARGET=1030,603
+WORLDMAP_V10_PRESECRET_LOGIN_BUTTON=PROVEN_PRESS_CANCEL
+```
+
+The protected FIFO handoff then occurred and the third baseline login submission was emitted, consuming `3/3`. No explicit native uploader/login failure was observed; the generation stopped because v10 required one specific uploader-success event:
+
+```text
+WORLDMAP_BASELINE_LOGIN_SUBMISSION_METHOD=PRESS_CANCEL_PROVEN_BUTTON_CLICK
+WORLDMAP_BASELINE_LOGIN_SUBMITTED=true
+WORLDMAP_BASELINE_ERROR=native_account_login_uploader_success_not_observed
+WORLDMAP_BASELINE_ORIGINAL_SOURCE_REHASH=PASS
+WORLDMAP_BASELINE_CLEANUP=COMPLETE
+WORLDMAP_FINAL_NAMESPACE_PROCESS_COUNT=0
+```
+
+V11 is materially different: it clicks the center of the physically observed pressed-state bbox; proves both protected fields are visibly occupied using changed-pixel counts only; accepts the stronger downstream native `ShowCharacterSelection` state even when an intermediate uploader/LoginFinished breakpoint is not observed; and emits only safe event counters on failure.
+
+The owner's latest `wykonaj` authorizes exactly one additional sequential v11 baseline login:
+
+```yaml
+baseline_ephemeral_login_max: 4
+baseline_ephemeral_login_consumed: 3
+fourth_baseline_login_attempt_authorized: true
+```
+
+No parallel session is authorized. Screenshot authority remains map-only and strictly post-structural-IN_GAME.
+'''
+if '# V10 physical discriminator and V11 authority' in s:
+    raise SystemExit('WORLDMAP_V11_AUTHORITY_ERROR=checkpoint_already_present')
+s+=append
+p.write_text(s,encoding='utf-8')
+print('WORLDMAP_V11_TASK_AUTHORITY_EDIT=PASS')

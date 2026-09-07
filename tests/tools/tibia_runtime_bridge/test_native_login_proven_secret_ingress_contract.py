@@ -5,8 +5,8 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[3]
-WORKFLOW = ROOT / ".github/workflows/track-a-native-login-be4f48-physical.yml"
-WORKER = ROOT / ".github/scripts/track_a_native_login_be4f48_physical.py"
+WORKFLOW = ROOT / ".github/workflows/track-a-native-login-be4f48-proven.yml"
+WORKER = ROOT / ".github/scripts/track_a_native_login_be4f48_proven.py"
 INGRESS = ROOT / "tools/tibia_runtime_bridge/native_login_secret_ingress.py"
 
 EXPECTED_VERSION = "15.32.be4f48"
@@ -57,23 +57,39 @@ class ProvenSecretIngressContractTests(unittest.TestCase):
             "PASS_WITH_PROCESS_HANDOFF",
             "secret_attempt_count",
             "NO_SECOND_SECRET_ATTEMPT",
+            '"secret_ingress": "bounded_docker_exec"',
         ):
             with self.subTest(needle=needle):
                 self.assertIn(needle, text)
         self.assertNotIn("_runner_sidecar_metadata(vault_dir)", text)
         self.assertNotIn("_sidecar_auth_command", text)
+        self.assertNotIn("native_login_fd_sidecar.py", text)
 
-    def test_physical_workflow_removes_sidecar_probe_from_critical_path(self) -> None:
+    def test_corrected_physical_workflow_has_no_sidecar_critical_path(self) -> None:
         text = WORKFLOW.read_text(encoding="utf-8")
-        self.assertNotIn("sidecar-probe", text)
-        self.assertNotIn("SIDECAR_FD_TRANSPORT_PROBE", text)
-        self.assertNotIn("NO_SECRET_ACCESS_BEFORE_SIDECAR_PROBE", text)
-        self.assertNotIn("sidecar_transport_metadata_ready", text)
-        self.assertIn("native_login_secret_ingress.py", text)
-        self.assertIn("NO_SECRET_ACCESS_BEFORE_AUTH=true", text)
-        self.assertIn("auth-one-shot", text)
-        self.assertIn("CONFIRM_UNIQUE=PASS", text)
-        self.assertIn("STRUCTURAL_IN_GAME=PASS", text)
+        for forbidden in (
+            "sidecar-probe",
+            "SIDECAR_FD_TRANSPORT_PROBE",
+            "NO_SECRET_ACCESS_BEFORE_SIDECAR_PROBE",
+            "sidecar_transport_metadata_ready",
+            "native_login_fd_sidecar.py",
+            "nsenter",
+        ):
+            self.assertNotIn(forbidden, text)
+        for required in (
+            "/track-a-native-login-be4f48-proven PRECHECK",
+            "/track-a-native-login-be4f48-proven EXECUTE",
+            "native_login_secret_ingress.py",
+            "NO_SECRET_ACCESS_BEFORE_AUTH=true",
+            "auth-one-shot",
+            "CONFIRM_UNIQUE=PASS",
+            "STRUCTURAL_IN_GAME=PASS",
+            "runs-on: [otclient, synology]",
+            "github.event.comment.user.login == github.repository_owner",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, text)
+        self.assertNotIn("${{ secrets.", text)
 
 
 if __name__ == "__main__":

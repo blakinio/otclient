@@ -131,6 +131,44 @@ jobs:
           echo NO_CREDENTIAL_ACCESS=true
           echo RUNTIME_MUTATION=false
 
+      - name: Consume one-shot diagnostic authorization
+        shell: bash
+        env:
+          TRUSTED_MAIN: ${{ steps.trust.outputs.trusted_main }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          root='/home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260907-same-boot-zero-client-diagnostic-live/runtime'
+          mkdir -p "$root"
+          chmod 700 "$root"
+          marker="$root/zero-client-diagnostic-attempt-consumed.json"
+          python3 - "$marker" "$TRUSTED_MAIN" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" <<'PY'
+          import json
+          import os
+          import pathlib
+          import sys
+
+          path = pathlib.Path(sys.argv[1])
+          payload = {
+              'schema_version': 1,
+              'trusted_main': sys.argv[2],
+              'run_id': sys.argv[3],
+              'run_attempt': int(sys.argv[4]),
+          }
+          try:
+              fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+          except FileExistsError as exc:
+              raise SystemExit('DIAGNOSTIC_ATTEMPT_ALREADY_CONSUMED') from exc
+          with os.fdopen(fd, 'w', encoding='utf-8') as handle:
+              json.dump(payload, handle, sort_keys=True, separators=(',', ':'))
+              handle.write('\n')
+              handle.flush()
+              os.fsync(handle.fileno())
+          PY
+          echo DIAGNOSTIC_ONE_SHOT_AUTHORIZATION_CONSUMED=PASS
+          echo NO_CREDENTIAL_ACCESS=true
+          echo RUNTIME_MUTATION=false
+
       - name: Run one guarded read-only preflight diagnostic
         shell: bash
         env:

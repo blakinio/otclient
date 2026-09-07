@@ -43,6 +43,10 @@ def _hex64(value: Any) -> bool:
 def _read() -> dict[str, Any] | None:
     if not _base.REG.exists():
         return None
+    st = _base.REG.lstat()
+    owner = not hasattr(os, "getuid") or st.st_uid == os.getuid()
+    if not stat.S_ISREG(st.st_mode) or _base.REG.is_symlink() or (st.st_mode & 0o777) != 0o600 or not owner:
+        raise _base.E("registration_file_unsafe")
     try:
         data = json.loads(_base.REG.read_text())
     except (OSError, json.JSONDecodeError):
@@ -50,10 +54,6 @@ def _read() -> dict[str, Any] | None:
     if not isinstance(data, dict) or data.get("proof_kind") != _base.ADOPTION_PROOF_KIND:
         return _original_read()
 
-    st = _base.REG.lstat()
-    owner = not hasattr(os, "getuid") or st.st_uid == os.getuid()
-    if not stat.S_ISREG(st.st_mode) or _base.REG.is_symlink() or (st.st_mode & 0o777) != 0o600 or not owner:
-        raise _base.E("registration_file_unsafe")
     if not _base.FIELDS.issubset(data):
         raise _base.E("registration_schema_invalid")
     if data.get("schema_version") != 1 or data.get("runtime_id") != _base.RID:

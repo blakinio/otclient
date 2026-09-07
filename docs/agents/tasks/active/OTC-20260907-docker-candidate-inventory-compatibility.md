@@ -63,7 +63,7 @@ Trusted-main stage diagnostic `34110414865 / 101705085690` on `main@9736b38e9c8a
 
 It showed the canonical Kasm target itself was healthy and empty: `EXACT_CANDIDATE_COUNT=0` and `MAIN_WINDOW_COUNT=0`. Failures came only from attempting candidate inspection in unrelated Synology containers.
 
-The runtime scope was then explicitly corrected: official-client uniqueness for this Track A path is within the canonical Kasm container `otclient-track-a-kasmvnc`, not across every Docker container on the Synology host.
+The runtime scope was then explicitly corrected by the owner: official-client uniqueness for this Track A path is within the canonical Kasm container `otclient-track-a-kasmvnc`, not across every Docker container on the Synology host.
 
 ## Repair objective
 

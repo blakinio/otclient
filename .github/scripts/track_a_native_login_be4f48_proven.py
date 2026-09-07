@@ -172,47 +172,72 @@ def _docker_stage(command: Sequence[str], failure_code: str, *, timeout: int = 3
     return completed.stdout
 
 
-def _install_bundle_numeric(bundle: Path) -> None:
+def _write_bundle_file_as_target(source: Path, target: str) -> None:
+    command = [
+        "docker", "exec", "-i", "-u", _base.TARGET_USER,
+        _base.TARGET_CONTAINER,
+        "sh", "-c", 'umask 077; cat > "$1"', "sh", target,
+    ]
+    try:
+        with source.open("rb") as handle:
+            completed = subprocess.run(
+                command,
+                check=False,
+                stdin=handle,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=30,
+                env=_base._clean_env(),
+                close_fds=True,
+            )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise PhysicalError("helper_install_stream_failed") from exc
+    if completed.returncode != 0:
+        raise PhysicalError("helper_install_stream_failed")
+
+
+def _install_bundle_user_owned(bundle: Path) -> None:
     _base._verify_bundle(bundle)
     uid, gid = _base._numeric_user()
     if uid < 1 or gid < 1:
-        raise PhysicalError("helper_install_numeric_identity_invalid")
+        raise PhysicalError("helper_install_identity_invalid")
 
+    # TASK_ROOT is an exact task-owned /tmp path. Remove only that bounded root,
+    # then recreate it directly as the GUI user so no ownership repair is needed.
     _docker_stage(
-        ["docker", "exec", _base.TARGET_CONTAINER, "install", "-d", "-m", "700", _base.TASK_ROOT],
+        ["docker", "exec", _base.TARGET_CONTAINER, "rm", "-rf", _base.TASK_ROOT],
+        "helper_install_reset_failed",
+    )
+    _docker_stage(
+        [
+            "docker", "exec", "-u", _base.TARGET_USER, _base.TARGET_CONTAINER,
+            "install", "-d", "-m", "700", _base.TASK_ROOT,
+        ],
         "helper_install_prepare_failed",
     )
 
-    cleanup_paths = list(dict.fromkeys((
-        _base.BRIDGE_SOCKET,
-        _base.AUTH_SOCKET,
-        _base.CHARACTER_SOCKET,
-        *_base.BUNDLE_FILES.values(),
-    )))
-    for target in cleanup_paths:
-        _docker_stage(
-            ["docker", "exec", _base.TARGET_CONTAINER, "rm", "-f", target],
-            "helper_install_cleanup_failed",
-        )
+    root_identity = _docker_stage(
+        ["docker", "exec", _base.TARGET_CONTAINER, "stat", "-c", "%u:%g:%a", _base.TASK_ROOT],
+        "helper_install_identity_invalid",
+    ).strip()
+    if root_identity != f"{uid}:{gid}:700":
+        raise PhysicalError("helper_install_identity_invalid")
 
     for name, target in _base.BUNDLE_FILES.items():
-        completed = _base._run(
-            ["docker", "cp", str(bundle / name), f"{_base.TARGET_CONTAINER}:{target}"],
-            timeout=30,
-        )
-        if completed.returncode != 0:
-            raise PhysicalError("helper_bundle_copy_failed")
-
-    owner = f"{uid}:{gid}"
-    for target in _base.BUNDLE_FILES.values():
+        _write_bundle_file_as_target(bundle / name, target)
         _docker_stage(
-            ["docker", "exec", _base.TARGET_CONTAINER, "chown", owner, target],
-            "helper_install_permissions_failed",
+            [
+                "docker", "exec", "-u", _base.TARGET_USER, _base.TARGET_CONTAINER,
+                "chmod", "600", target,
+            ],
+            "helper_install_stream_failed",
         )
-        _docker_stage(
-            ["docker", "exec", _base.TARGET_CONTAINER, "chmod", "600", target],
-            "helper_install_permissions_failed",
-        )
+        file_identity = _docker_stage(
+            ["docker", "exec", _base.TARGET_CONTAINER, "stat", "-c", "%u:%g:%a", target],
+            "helper_install_identity_invalid",
+        ).strip()
+        if file_identity != f"{uid}:{gid}:600":
+            raise PhysicalError("helper_install_identity_invalid")
 
     try:
         manifest = json.loads((bundle / _base.BUNDLE_MANIFEST).read_text(encoding="utf-8"))["files"]
@@ -220,7 +245,10 @@ def _install_bundle_numeric(bundle: Path) -> None:
         raise PhysicalError("helper_bundle_manifest_invalid") from exc
     for name, expected in manifest.items():
         output = _docker_stage(
-            ["docker", "exec", _base.TARGET_CONTAINER, "sha256sum", _base.BUNDLE_FILES[name]],
+            [
+                "docker", "exec", "-u", _base.TARGET_USER, _base.TARGET_CONTAINER,
+                "sha256sum", _base.BUNDLE_FILES[name],
+            ],
             "helper_install_digest_read_failed",
         )
         parts = output.split()
@@ -288,7 +316,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     # Only corrected ingress/install seams are replaced. Base replace() and
     # confirm_unique() remain untouched, preserving the recursion regression fix.
     _base.precheck = precheck
-    _base._install_bundle = _install_bundle_numeric
+    _base._install_bundle = _install_bundle_user_owned
     _base.auth_one_shot = auth_one_shot
     return int(_base.main(argv))
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compatibility entrypoint for Kasm bootstrap with daemon-side candidate prefilter."""
+"""Kasm bootstrap entrypoint scoped to the canonical Track A container."""
 from __future__ import annotations
 
 import importlib.util
@@ -8,20 +8,11 @@ import sys
 from types import ModuleType
 from typing import Any, Callable, Sequence
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
-
-from tools.tibia_re_control_center.docker_official_candidate_prefilter import (  # noqa: E402
-    ProcessCensusError,
-    container_requires_deep_scan,
-)
-
 BASE_PATH = Path(__file__).with_name("tibia-official-client-re-kasm-bootstrap-worker.py")
 
 
 def _load_base() -> ModuleType:
-    spec = importlib.util.spec_from_file_location("track_a_kasm_bootstrap_worker_compat_base", BASE_PATH)
+    spec = importlib.util.spec_from_file_location("track_a_kasm_bootstrap_worker_scoped_base", BASE_PATH)
     if spec is None or spec.loader is None:
         raise RuntimeError("bootstrap_worker_unavailable")
     module = importlib.util.module_from_spec(spec)
@@ -34,25 +25,24 @@ _base = _load_base()
 _original_candidate_rows = _base.candidate_rows
 
 
-def candidate_rows(
-    container_id: str,
+def exact_candidates(
+    containers: list[tuple[str, str]],
     runner: Callable[[Sequence[str]], str] = _base.run,
 ) -> list[dict[str, Any]]:
-    try:
-        required = container_requires_deep_scan(container_id, runner)
-    except ProcessCensusError as exc:
-        raise _base.WorkerError(str(exc)) from exc
-    if not required:
-        return []
-    return _original_candidate_rows(container_id, runner)
+    """Deep-scan only the one canonical Kasm container.
+
+    Track A runtime uniqueness is intentionally scoped to
+    ``otclient-track-a-kasmvnc``. Other Synology containers are outside this
+    runtime namespace and are not queried or executed inside.
+    """
+    target = [(container_id, name) for container_id, name in containers if name == _base.TARGET_CONTAINER]
+    if len(target) != 1:
+        raise _base.WorkerError(f"target_container_count:{len(target)}")
+    return _original_candidate_rows(target[0][0], runner)
 
 
-# exact_candidates resolves candidate_rows from the base module globals at call
-# time, so one bounded substitution preserves every existing deep proof and all
-# launch/rollback behavior while changing only harmless-container discovery.
-_base.candidate_rows = candidate_rows
+_base.exact_candidates = exact_candidates
 
-# Export the contract consumed by the same-boot invalidator.
 WorkerError = _base.WorkerError
 VER = _base.VER
 SIZE = _base.SIZE

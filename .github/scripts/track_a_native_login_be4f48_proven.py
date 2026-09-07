@@ -202,12 +202,22 @@ def _install_bundle_user_owned(bundle: Path) -> None:
     if uid < 1 or gid < 1:
         raise PhysicalError("helper_install_identity_invalid")
 
-    # TASK_ROOT is an exact task-owned /tmp path. Remove only that bounded root,
-    # then recreate it directly as the GUI user so no ownership repair is needed.
+    # The reset must not inherit the container image's default USER. The stale
+    # task root may contain files created by prior Docker-side installs, so use
+    # explicit container root only for deleting this exact bounded task path.
+    root_uid = _docker_stage(
+        ["docker", "exec", "-u", "0", _base.TARGET_CONTAINER, "id", "-u"],
+        "helper_install_root_exec_unavailable",
+    ).strip()
+    if root_uid != "0":
+        raise PhysicalError("helper_install_root_exec_unavailable")
     _docker_stage(
-        ["docker", "exec", _base.TARGET_CONTAINER, "rm", "-rf", _base.TASK_ROOT],
+        ["docker", "exec", "-u", "0", _base.TARGET_CONTAINER, "rm", "-rf", _base.TASK_ROOT],
         "helper_install_reset_failed",
     )
+
+    # From this point forward the helper runtime is owned and populated only by
+    # the exact GUI user; no chown or docker cp ownership repair is permitted.
     _docker_stage(
         [
             "docker", "exec", "-u", _base.TARGET_USER, _base.TARGET_CONTAINER,
@@ -217,7 +227,10 @@ def _install_bundle_user_owned(bundle: Path) -> None:
     )
 
     root_identity = _docker_stage(
-        ["docker", "exec", _base.TARGET_CONTAINER, "stat", "-c", "%u:%g:%a", _base.TASK_ROOT],
+        [
+            "docker", "exec", "-u", _base.TARGET_USER, _base.TARGET_CONTAINER,
+            "stat", "-c", "%u:%g:%a", _base.TASK_ROOT,
+        ],
         "helper_install_identity_invalid",
     ).strip()
     if root_identity != f"{uid}:{gid}:700":
@@ -233,7 +246,10 @@ def _install_bundle_user_owned(bundle: Path) -> None:
             "helper_install_stream_failed",
         )
         file_identity = _docker_stage(
-            ["docker", "exec", _base.TARGET_CONTAINER, "stat", "-c", "%u:%g:%a", target],
+            [
+                "docker", "exec", "-u", _base.TARGET_USER, _base.TARGET_CONTAINER,
+                "stat", "-c", "%u:%g:%a", target,
+            ],
             "helper_install_identity_invalid",
         ).strip()
         if file_identity != f"{uid}:{gid}:600":

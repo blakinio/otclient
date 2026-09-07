@@ -53,7 +53,7 @@ canonical_scope_contract: TRACK_A_CANONICAL_KASM_RUNTIME_SCOPE_V1
 
 # Canonical Kasm bootstrap retry v2 — live admission
 
-The previous bootstrap retry consumed its one process-creation attempt and failed before registration. Immediate read-only Surveyor run `34122156989`, job `101742448722`, subsequently proved the authoritative registration is ABSENT and the canonical Kasm container contains zero `client` processes. This v2 task therefore authorizes one new create-new attempt only after the bin-root launcher correction is merged to trusted `main`.
+The previous bootstrap retry consumed its one process-creation attempt and failed before registration. Immediate read-only Surveyor run `34122156989`, job `101742448722`, subsequently proved the authoritative registration is ABSENT and the canonical Kasm container contains zero `client` processes. The exact sanitized census marker was `TARGET_NAMESPACE_CLIENTS=0`. This v2 task therefore authorizes one new create-new attempt only after the bin-root launcher correction is merged to trusted `main`.
 
 This task does **not** authorize another registration invalidation.
 

@@ -5,11 +5,20 @@ from __future__ import annotations
 import importlib.util
 import json
 from pathlib import Path
+import re
 import sys
+import time
 from types import ModuleType
 from typing import Any, Callable, Sequence
 
 BASE_PATH = Path(__file__).with_name("tibia-official-client-re-kasm-existing-runtime-probe.py")
+RETRYABLE_READINESS = {
+    "official_client_candidate_count:0",
+    "main_window_count:0",
+    "window_pid_missing",
+    "window_pid_mismatch",
+}
+SAFE_ERROR_RE = re.compile(r"^[A-Za-z0-9_:-]{1,120}$")
 
 
 def _load_base() -> ModuleType:
@@ -49,6 +58,31 @@ def collect(runner: Callable[[Sequence[str]], str] = _base.run) -> dict[str, Any
     return payload
 
 
+def _safe_error(exc: BaseException) -> str:
+    code = str(exc)
+    return code if SAFE_ERROR_RE.fullmatch(code) else type(exc).__name__
+
+
+def collect_when_ready(
+    runner: Callable[[Sequence[str]], str] = _base.run,
+    sleeper: Callable[[float], None] = time.sleep,
+    attempts: int = 48,
+) -> dict[str, Any]:
+    """Retry only transient process/window readiness states; fail hard errors immediately."""
+    last: _base.ProbeError | None = None
+    for index in range(max(1, attempts)):
+        try:
+            return collect(runner)
+        except _base.ProbeError as exc:
+            code = _safe_error(exc)
+            if code not in RETRYABLE_READINESS or index + 1 >= max(1, attempts):
+                raise
+            last = exc
+            sleeper(0.25)
+    assert last is not None
+    raise last
+
+
 ProbeError = _base.ProbeError
 VER = _base.VER
 SIZE = _base.SIZE
@@ -64,13 +98,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 2
     output = Path(argv[1])
     try:
-        payload = collect()
+        payload = collect_when_ready()
         output.write_text(json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n")
         output.chmod(0o600)
         print("TRACK_A_KASM_EXISTING_RUNTIME_PROBE=PASS")
         return 0
-    except (ProbeError, OSError) as exc:
-        print(f"TRACK_A_KASM_EXISTING_RUNTIME_PROBE_ERROR={type(exc).__name__}", file=sys.stderr)
+    except ProbeError as exc:
+        print(f"TRACK_A_KASM_EXISTING_RUNTIME_PROBE_ERROR={_safe_error(exc)}", file=sys.stderr)
+        return 2
+    except OSError:
+        print("TRACK_A_KASM_EXISTING_RUNTIME_PROBE_ERROR=OSError", file=sys.stderr)
         return 2
 
 

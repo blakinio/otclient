@@ -19,7 +19,7 @@ The transition may only make the authoritative registration absent. It MUST NOT 
 
 Execution is owner-triggered from exact trusted `main` on `synology-otclient-01`. The recovery task MUST declare `runtime_access: canonical_recovery`, `recovery_mode: same_boot_zero_client_invalidation_v1`, `credentials_allowed: false`, `login_allowed: false`, and `process_control_authorized: false`.
 
-Before the invalidator runs, the workflow MUST acquire and validate a **newer canonical lease generation** for the recovery task. The invalidator MUST execute inside canonical lease `guard-run`; the guard supervisor holds `canonical-live-runtime/coordination.lock` continuously while validating the lease and while the metadata transition executes. The invalidator MUST verify that the active public lease identity and generation still match the guarded task/session and that `registration.lease_generation < current_lease_generation`.
+Before the invalidator runs, the workflow MUST acquire and validate a **newer canonical lease generation** for the recovery task. The invalidator MUST execute inside canonical lease `guard-run`; the guard supervisor holds `canonical-live-runtime/coordination.lock` continuously while validating the lease and while the metadata transition executes. The invalidator MUST independently prove that this lock is already held externally by failing a non-blocking exclusive flock attempt, then verify that the active public lease identity and generation still match the guarded task/session and that `registration.lease_generation < current_lease_generation`.
 
 ## Fresh proof required under guard
 
@@ -37,13 +37,15 @@ The exact trusted-main Kasm bootstrap worker is reused as a read-only zero-clien
 - the registration has not changed since it was first read;
 - the active recovery lease has not changed.
 
-Any unreadable, ambiguous, mismatched, official-looking, reused-PID, lease-drift, registration-drift, container-drift, display-drift, window, candidate, or fence condition fails closed.
+The zero-client, dead-registered-process and lease proofs are repeated immediately before commit. After commit they are repeated again before recovery may report success. Any unreadable, ambiguous, mismatched, official-looking, reused-PID, lease-drift, registration-drift, container-drift, display-drift, window, candidate, or fence condition fails closed.
 
 ## Commit rule
 
-Only after all required proof passes may the transition atomically rename `runtime-registration.json` to a private task-evidence tombstone inside the canonical state directory and fsync the directory. The authoritative path must then be absent. The tombstone preserves the original registration plus invalidation provenance; it is evidence, not authority and MUST NOT be renamed back into place by an operator.
+Only after all required proof passes may the transition atomically rename `runtime-registration.json` to a private task-evidence tombstone inside the canonical state directory and fsync the directory. The authoritative path must then be absent. The tombstone preserves the original registration **byte-for-byte**; the separate sanitized invalidation result records the recovery mode, lease/registration generations, zero-client proof and tombstone digest. The tombstone is evidence, not authority and MUST NOT be renamed back into place by an operator.
 
 This is a reviewed transition, not a manual edit of registration state. No caller may synthesize or rewrite PID, start ticks, boot identity, lease generation, display, runtime locator, candidate fingerprint, or client fence to make the proof pass.
+
+If any post-commit proof fails, recovery remains fail-closed with the stale authoritative registration absent and the tombstone retained. The transition MUST NOT restore a registration that no longer describes a proven live process merely to roll back metadata state.
 
 ## Postcondition and next transition
 

@@ -13,6 +13,8 @@ The canonical Track A runtime namespace is the single Docker container named:
 
 Official-client process uniqueness, zero-client recovery and create-new bootstrap decisions are evaluated inside this canonical container. Other Docker containers on the Synology host are outside the Track A runtime namespace and MUST NOT be executed into, inspected for Tibia processes, or treated as competing canonical runtime candidates.
 
+For Kasm-backed canonical recovery/bootstrap/adoption, this scope statement supersedes earlier wording that described an all-running-Docker candidate inventory. That earlier wording was an accidental host-wide expansion of the runtime namespace, not the intended Track A isolation boundary.
+
 ## Required invariants
 
 A recovery/bootstrap/adoption decision MUST prove all of the following:

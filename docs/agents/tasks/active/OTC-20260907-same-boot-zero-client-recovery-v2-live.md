@@ -52,21 +52,31 @@ depends_on:
 
 # Same-boot zero-client recovery v2 — live admission
 
-This admission exists only because trusted-main stage diagnostic `34110414865 / 101705085690` proved that the first recovery attempt failed on unrelated-container userspace compatibility, not on canonical target state.
+The first recovery attempt exposed an accidental scope expansion: candidate uniqueness was being evaluated across unrelated Docker containers on the Synology host. The corrected Track A runtime boundary is the canonical Kasm container `otclient-track-a-kasmvnc` only.
 
-The registration remains the same same-boot exact-current record bound to lease generation `55`; the failed recovery and diagnostics never invalidated it and never created a client. The canonical Kasm target remains a zero-client state by the latest direct Surveyor/stage evidence.
+The registration remains the same same-boot exact-current record bound to lease generation `55`; prior failed recovery and diagnostics never invalidated it and never created a client. Latest direct evidence showed zero client and zero Tibia main windows in canonical Kasm.
 
 ## PRECHECK
 
-One owner-triggered PRECHECK may acquire a fresh canonical lease and run only the compatibility bootstrap worker's zero-client preflight under `guard-run`. It must cover all running Docker containers through daemon-side process census and may deep-inspect only official-looking candidates. It creates no client and does not change registration. Failure consumes only the v2 PRECHECK authorization and requires a new reviewed repair; it must not fall through into EXECUTE.
+One owner-triggered PRECHECK may acquire a fresh canonical lease and run only the scoped Kasm worker's zero-client preflight under `guard-run`.
+
+It must prove, inside `otclient-track-a-kasmvnc` only:
+
+- exactly one canonical Kasm container identity;
+- current package/display/boot identity;
+- zero official-client candidates;
+- zero Tibia main windows;
+- current boot/display consistency with the stale registration.
+
+Unrelated Synology containers are outside this runtime namespace and must not be executed into or inspected for Tibia candidates. PRECHECK creates no client and does not change registration.
 
 ## EXECUTE
 
 Only after a fresh PRECHECK PASS, one separately owner-triggered EXECUTE may:
 
 1. consume a separate v2 recovery authorization;
-2. acquire a newer canonical recovery lease and run the reviewed same-boot metadata invalidator using the compatibility worker;
-3. require same boot, zero exact/current candidates, zero main windows, dead registered PID/start identity and stable proofs before/after atomic registration invalidation;
+2. acquire a newer canonical recovery lease and run the reviewed same-boot metadata invalidator using the scoped Kasm worker;
+3. require same boot, zero canonical-container candidates, zero canonical Tibia windows, dead registered PID/start identity and stable proofs before/after atomic registration invalidation;
 4. release recovery authority with canonical registration absent;
 5. hand off only to `OTC-20260907-same-boot-zero-client-bootstrap-v2-live`.
 

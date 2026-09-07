@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260907-proven-login-replacement-recovery
-status: validating
+status: ready
 agent: ChatGPT
 session_id: proven-login-replacement-recovery-20260907
 session_role: implementer
@@ -8,7 +8,7 @@ project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: runtime_replacement_repair
-phase: deterministic_validation
+phase: merge_readiness
 branch: fix/OTC-20260907-proven-login-replacement-recovery
 base_branch: main
 base_main: c2e191de82b805eb1ec950e20d83b04edb358429
@@ -49,7 +49,7 @@ modules_touched:
   - Track A canonical runtime recovery
 repair_cycles_for_current_gate: 1
 identical_failure_retries: 0
-ci_checks_for_current_head: 0
+ci_checks_for_current_head: 2
 ci_check_generation: draft
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -71,7 +71,7 @@ A physically successful helper relaunch in historical trusted run `32233929770 /
 
 The corrected proven-login wrapper now owns the replacement seam instead of inheriting the incomplete base launch shape. It uses the physically proven Kasm environment and shell/working-directory launch form while preserving the existing exact-current fence, helper sockets, one-shot secret boundary and explicit credential-environment scrubbing.
 
-Replacement is now transactional before auth. If the instrumented process cannot become exact-current with all helpers ready, the worker performs only bounded exact-current cleanup, starts one plain credential-free exact-current client with helper variables explicitly unset, verifies its exact identity/UID and writes sanitized rollback evidence. The operation then still returns failure before `auth-one-shot`; a later canonical stale-registration recovery must reconcile the rollback PID before any login attempt.
+Replacement is transactional before auth. If the instrumented process cannot become exact-current with all helpers ready, the worker performs only bounded exact-current cleanup, starts one plain credential-free exact-current client with helper variables explicitly unset, verifies its exact identity/UID and writes sanitized rollback evidence. The operation then still returns failure before `auth-one-shot`; a later canonical stale-registration recovery must reconcile the rollback PID before any login attempt.
 
 For the already-created `registration=PRESENT / clients=0` state, this task adds `TRACK_A_SAME_BOOT_ZERO_CLIENT_INVALIDATION_V1`. The invalidator is metadata-only and requires a newer recovery lease plus external canonical `guard-run`. It independently proves the coordination flock is already held, exact-fences the approved Kasm bootstrap worker, repeatedly proves same boot + zero official-client candidates + zero Tibia windows + dead registered process + unchanged lease/registration, then atomically moves only the stale registration to a byte-identical private tombstone. It repeats zero-client and lease proof after commit and never restores stale metadata on post-commit uncertainty.
 
@@ -81,6 +81,26 @@ The future trusted-main live sequence is split into two durable admissions:
 2. `OTC-20260907-same-boot-zero-client-bootstrap-live` — exactly one existing reviewed `kasm-bootstrap` create-new action, stopping at plain exact-current `state: UNKNOWN` with no credentials/login/input.
 
 The owner-only comment command `/track-a-same-boot-zero-client-recovery EXECUTE` executes those two transitions from exact trusted `main`; PR-head remains repository-only.
+
+## Exact-head validation
+
+Final implementation head before this documentation checkpoint was `e8034a5ffc086793dd47f9de71eeff528e0b40bb`. Current protected `main` remained `c2e191de82b805eb1ec950e20d83b04edb358429`; the PR was mergeable and had exactly 11 intended changed paths, zero review submissions and zero review threads.
+
+All exact-head pull-request workflows on `e8034a5f...` completed successfully:
+
+- `34104669992` — Track A same-boot zero-client recovery: SUCCESS;
+- `34104669889` — Track A be4f48 proven native login: SUCCESS;
+- `34104669994` — Track A proven secret-ingress contract: SUCCESS;
+- `34104669925` — Track A agent runtime governance, including fresh admission behavior audit: SUCCESS;
+- `34104669937` — Track A canonical current-client fence: SUCCESS;
+- `34104670000` — Track A Kasm canonical bootstrap: SUCCESS;
+- `34104669876` — Track A canonical client-fence reconciliation: SUCCESS;
+- `34104669965` — Track A self-hosted PR boundary: SUCCESS;
+- `34104670147` — CI: SUCCESS.
+
+The first exact-head generation exposed two compatibility defects in the governance shim rather than recovery semantics: missing `task_matches_expected_branch` export and missing direct current-fence loader marker. Both were repaired without changing the base governance validator; the promoted base validator is retained byte-for-byte in `track_a_agent_runtime_governance_base.py`, and all non-new-mode validation still delegates to it. The second exact-head generation passed all checks above.
+
+Independent deterministic audit evidence is supplied by the separate fresh-admission audit, canonical current-fence validator, self-hosted PR boundary validator and the new same-boot recovery contract. Open material findings after repair: `0`.
 
 ## Acceptance
 
@@ -96,4 +116,4 @@ The owner-only comment command `/track-a-same-boot-zero-client-recovery EXECUTE`
 
 ## Next action
 
-Run the new exact-head hosted recovery contract and the existing required PR checks. Repair only evidence-backed failures; do not run Synology live recovery from PR-head.
+Promote PR #975 after this documentation-only checkpoint receives its exact-head required checks. After merge, execute exactly one trusted-main `/track-a-same-boot-zero-client-recovery EXECUTE`; only after that restores one plain exact-current canonical client run fresh proven-login PRECHECK and then the single authorized proven-login EXECUTE.

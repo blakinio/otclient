@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260905-fast-login-serializer
-status: ready
+status: implementing
 agent: Codex
 session_id: astra-fast-login-20260905
 session_role: researcher
@@ -8,14 +8,14 @@ project_lane: otclient
 lane: P2-NETWORK
 track_id: official-client-re
 task_kind: implementation
-phase: design
+phase: implement
 branch: ai/OTC-20260905-fast-login-serializer
 base_branch: main
 created: 2026-09-05T15:33:15Z
-updated_at: 2026-09-05T15:35:00Z
+updated_at: 2026-09-05T15:39:41Z
 invocation_started_at: 2026-09-05T15:20:00Z
-last_progress_at: 2026-09-05T15:33:15Z
-base_main: bca9df65c4cf42f02216402dc12ade84548c5858
+last_progress_at: 2026-09-05T15:39:41Z
+base_main: b6cf7402b4dbde59b2086f0982c7dcc711c3b5fc
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: codex
@@ -57,7 +57,7 @@ decomposition_reason: one type-owned serializer-to-buffer discriminator
 foreground_runtime_budget_minutes: 120
 foreground_budget_reason: bounded source qualification and independently reviewed promotion/archive
 max_new_static_source_tasks: 3
-static_source_tasks_used: 0
+static_source_tasks_used: 1
 static_source_budget_reason: explicit owner FAST TRACK invocation; registration is not a scientific source task
 ci_checks_for_current_head: 0
 ci_check_generation: registration
@@ -82,7 +82,7 @@ reuses:
 depends_on: []
 blocks: []
 cross_repository_task_ids: []
-next_action: independently validate and merge this docs-only registration, then create isolated source Draft with repository-only RED
+next_action: implement minimal GREEN after repository-only RED, then qualify exact current selected types
 ---
 
 # Exact-current login serializer plan
@@ -177,3 +177,7 @@ runtime_access=none; official_client_executed=false; login_performed=false;
 credentials_used=false; process_memory_access=false; packet_capture=false;
 ocr_vision_used=false; official_service_e2e_count=0.
 E2E=NOT_APPLICABLE for this static source; no login compatibility claimed.
+
+## Source entry checkpoint
+
+Registration954 merged b6cf7402b4dbde59b2086f0982c7dcc711c3b5fc after independent PASS and exact-head CI/governance. Source ordinal1/3. Repository-only RED observed seven assertion failures and one expected unimplemented-result error across eight tests. No client acquisition or runtime. Decoder outputs are lexical snapshots only; no CFG/ABI/dataflow result is automatically inferred. Exact semantic interpretation requires independent review of selected snapshots.

@@ -91,19 +91,22 @@ class ProvenSecretIngressContractTests(unittest.TestCase):
                 self.assertIn(required, text)
         self.assertNotIn("${{ secrets.", text)
 
-    def test_wrapper_installs_helpers_with_numeric_identity_and_static_stage_failures(self) -> None:
+    def test_wrapper_installs_helpers_as_target_user_without_chown_or_docker_cp(self) -> None:
         text = WORKER.read_text(encoding="utf-8")
         for required in (
-            "def _install_bundle_numeric(",
+            "def _install_bundle_user_owned(",
+            "def _write_bundle_file_as_target(",
             "_base._numeric_user()",
-            'f"{uid}:{gid}"',
+            '"-u", _base.TARGET_USER',
+            '"rm", "-rf", _base.TASK_ROOT',
+            '"install", "-d", "-m", "700", _base.TASK_ROOT',
+            "helper_install_reset_failed",
             "helper_install_prepare_failed",
-            "helper_install_cleanup_failed",
-            "helper_bundle_copy_failed",
-            "helper_install_permissions_failed",
+            "helper_install_stream_failed",
+            "helper_install_identity_invalid",
             "helper_install_digest_read_failed",
             "installed_helper_digest_mismatch",
-            "_base._install_bundle = _install_bundle_numeric",
+            "_base._install_bundle = _install_bundle_user_owned",
         ):
             with self.subTest(required=required):
                 self.assertIn(required, text)
@@ -112,7 +115,8 @@ class ProvenSecretIngressContractTests(unittest.TestCase):
             "def confirm_unique(",
             "_base.replace =",
             "_base.confirm_unique =",
-            "chown kasm-user:kasm-user",
+            '"docker", "cp"',
+            '"chown"',
             "TASK_ROOT}/*",
         ):
             self.assertNotIn(forbidden, text)

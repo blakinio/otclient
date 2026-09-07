@@ -82,7 +82,8 @@ def _validate_launcher_fields(data: dict[str, Any]) -> None:
 
 def _read_kasm_bootstrap_record(path: Path, expected_schema: str) -> dict[str, Any]:
     try:
-        data = json.loads(path.read_text())
+        with path.open("r", encoding="utf-8") as handle:
+            data = json.load(handle)
     except (OSError, json.JSONDecodeError) as exc:
         raise _base.E("kasm_bootstrap_record_invalid", str(exc)) from exc
     if not isinstance(data, dict) or data.get("schema") != expected_schema:

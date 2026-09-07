@@ -52,7 +52,7 @@ depends_on:
 
 # Same-boot zero-client recovery v2 — live admission
 
-The first recovery attempt exposed an accidental scope expansion: candidate uniqueness was being evaluated across unrelated Docker containers on the Synology host. The corrected Track A runtime boundary is the canonical Kasm container `otclient-track-a-kasmvnc` only.
+The first recovery attempt exposed an accidental scope expansion: candidate uniqueness was being evaluated across unrelated Docker containers on the Synology host. `TRACK_A_CANONICAL_KASM_RUNTIME_SCOPE_V1` corrects the boundary to the canonical Kasm container `otclient-track-a-kasmvnc` only.
 
 The registration remains the same same-boot exact-current record bound to lease generation `55`; prior failed recovery and diagnostics never invalidated it and never created a client. Latest direct evidence showed zero client and zero Tibia main windows in canonical Kasm.
 

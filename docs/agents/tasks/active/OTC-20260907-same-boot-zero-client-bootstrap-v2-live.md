@@ -52,9 +52,11 @@ depends_on:
 
 This task becomes executable only after the v2 same-boot invalidation has atomically removed the stale registration under its own current canonical lease.
 
-The task authorizes exactly one reviewed `kasm-bootstrap` create-new transition, using the compatibility bootstrap worker and compatibility existing-runtime probe. Both compatibility entrypoints retain the existing exact size/SHA/start, window, adoption-manifest and registration semantics; their only change is the daemon-side first-stage all-container process census before any in-container deep candidate proof.
+The task authorizes exactly one reviewed `kasm-bootstrap` create-new transition for the canonical container `otclient-track-a-kasmvnc`. Candidate uniqueness is scoped to that container only. Unrelated containers on the Synology host are outside Track A and are not inspected or executed into.
 
-The transition must freshly prove registration absence, one canonical Kasm container/display, exact current package identity, zero official-client candidates/windows and current canonical lease before launching anything. It may create one plain exact-current official Linux client and must stop at `existing_runtime_adoption_v1`, `candidate_count: 1`, `state: UNKNOWN`.
+The scoped worker/probe retain the existing exact size/SHA/start, window, package, boot and registration proofs inside canonical Kasm. The scoped transition records truthful provenance as `inventory_scope: canonical_kasm_container` while remaining backward-compatible with the existing stale registration.
+
+The transition must freshly prove registration absence, exactly one canonical Kasm container/display, exact current package identity, zero official-client candidates/windows inside that container and current canonical lease before launching anything. It may create one plain exact-current official Linux client and must stop at `existing_runtime_adoption_v1`, `candidate_count: 1`, `inventory_scope: canonical_kasm_container`, `state: UNKNOWN`.
 
 No credential source, native auth, login, character selection, GUI input, gameplay or helper preload is authorized. The process-creation budget is consumed even if later bootstrap/adoption registration proof fails.
 

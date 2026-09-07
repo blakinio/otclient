@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import fcntl
 import hashlib
 import importlib.util
 import json
@@ -17,11 +18,13 @@ from typing import Any, Sequence
 STATE_DIR = Path("/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime")
 REGISTRATION_NAME = "runtime-registration.json"
 LEASE_NAME = "lease.json"
+LOCK_NAME = "coordination.lock"
 GUARD_ENV = "TRACK_A_SAME_BOOT_INVALIDATION_GUARDED"
 RECOVERY_MODE = "same_boot_zero_client_invalidation_v1"
 EXPECTED_VERSION = "15.32.be4f48"
 EXPECTED_SIZE = 52105824
 EXPECTED_SHA = "552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1"
+APPROVED_WORKER = Path(__file__).with_name("tibia-official-client-re-kasm-bootstrap-worker.py")
 
 
 class InvalidationError(RuntimeError):
@@ -55,6 +58,11 @@ def _fsync_dir(path: Path) -> None:
 
 
 def _load_worker(path: Path) -> ModuleType:
+    try:
+        if path.resolve(strict=True) != APPROVED_WORKER.resolve(strict=True):
+            raise InvalidationError("worker_not_approved")
+    except OSError as exc:
+        raise InvalidationError("worker_unavailable") from exc
     spec = importlib.util.spec_from_file_location("track_a_same_boot_zero_client_worker", path)
     if spec is None or spec.loader is None:
         raise InvalidationError("worker_unavailable")
@@ -67,7 +75,35 @@ def _load_worker(path: Path) -> ModuleType:
     for name in ("collect_preflight", "process_identity"):
         if not callable(getattr(module, name, None)):
             raise InvalidationError("worker_contract_invalid")
+    if (
+        getattr(module, "VER", None),
+        getattr(module, "SIZE", None),
+        getattr(module, "SHA", None),
+    ) != (EXPECTED_VERSION, EXPECTED_SIZE, EXPECTED_SHA):
+        raise InvalidationError("worker_current_fence_mismatch")
     return module
+
+
+def _require_external_guard(state_dir: Path) -> None:
+    if os.environ.get(GUARD_ENV) != "1":
+        raise InvalidationError("canonical_guard_required")
+    lock_path = state_dir / LOCK_NAME
+    try:
+        fd = os.open(lock_path, os.O_RDONLY | getattr(os, "O_CLOEXEC", 0))
+    except OSError as exc:
+        raise InvalidationError("canonical_guard_required") from exc
+    acquired = False
+    try:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            acquired = True
+        except BlockingIOError:
+            return
+    finally:
+        if acquired:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+        os.close(fd)
+    raise InvalidationError("canonical_guard_required")
 
 
 def _validate_registration(registration: dict[str, Any]) -> None:
@@ -90,11 +126,16 @@ def _validate_registration(registration: dict[str, Any]) -> None:
         if not isinstance(registration.get(field), int) or int(registration[field]) < 1:
             raise InvalidationError(f"registration_{field}_invalid")
     boot = registration.get("boot_id_sha256")
-    if not isinstance(boot, str) or len(boot) != 64:
+    if not isinstance(boot, str) or len(boot) != 64 or any(ch not in "0123456789abcdef" for ch in boot.lower()):
         raise InvalidationError("registration_boot_invalid")
 
 
-def _validate_lease(lease: dict[str, Any], task_id: str, session_id: str, registration_generation: int) -> int:
+def _validate_lease(
+    lease: dict[str, Any],
+    task_id: str,
+    session_id: str,
+    registration_lease_generation: int,
+) -> int:
     if lease.get("schema_version") != 1 or lease.get("runtime_id") != "track-a-canonical-live":
         raise InvalidationError("lease_schema_invalid")
     if lease.get("status") != "active" or lease.get("controller_task") != task_id or lease.get("controller_session") != session_id:
@@ -105,7 +146,7 @@ def _validate_lease(lease: dict[str, Any], task_id: str, session_id: str, regist
         raise InvalidationError("lease_state_invalid")
     if expires_at <= int(time.time()):
         raise InvalidationError("lease_expired")
-    if registration_generation >= generation:
+    if registration_lease_generation >= generation:
         raise InvalidationError("registration_lease_not_stale")
     return generation
 
@@ -125,8 +166,35 @@ def _validate_preflight(preflight: dict[str, Any], registration: dict[str, Any])
     if preflight.get("boot_id_sha256") != registration.get("boot_id_sha256"):
         raise InvalidationError("registration_boot_not_current")
     container_id = preflight.get("container_id")
-    if not isinstance(container_id, str) or len(container_id) != 64:
+    if not isinstance(container_id, str) or len(container_id) != 64 or any(ch not in "0123456789abcdef" for ch in container_id.lower()):
         raise InvalidationError("preflight_container_invalid")
+
+
+def _collect_zero_client(worker: ModuleType, registration: dict[str, Any], *, code: str) -> dict[str, Any]:
+    try:
+        preflight = worker.collect_preflight()
+    except Exception as exc:
+        raise InvalidationError(code) from exc
+    if not isinstance(preflight, dict):
+        raise InvalidationError(f"{code}_invalid")
+    _validate_preflight(preflight, registration)
+    return preflight
+
+
+def _registered_identity_absent(
+    worker: ModuleType,
+    registration: dict[str, Any],
+    preflight: dict[str, Any],
+) -> dict[str, Any]:
+    try:
+        identity = worker.process_identity(str(preflight["container_id"]), int(registration["pid"]))
+    except Exception as exc:
+        raise InvalidationError("registered_process_identity_unverifiable") from exc
+    if not isinstance(identity, dict) or not isinstance(identity.get("present"), bool):
+        raise InvalidationError("registered_process_identity_unverifiable")
+    if identity["present"] is True:
+        raise InvalidationError("registered_process_still_present")
+    return identity
 
 
 def invalidate(
@@ -136,10 +204,8 @@ def invalidate(
     session_id: str,
     worker: ModuleType,
     run_id: str,
-    guarded: bool,
 ) -> dict[str, Any]:
-    if not guarded:
-        raise InvalidationError("canonical_guard_required")
+    _require_external_guard(state_dir)
     registration_path = state_dir / REGISTRATION_NAME
     lease_path = state_dir / LEASE_NAME
 
@@ -148,22 +214,8 @@ def invalidate(
     lease, lease_raw = _private_json(lease_path)
     generation = _validate_lease(lease, task_id, session_id, int(registration["lease_generation"]))
 
-    try:
-        preflight = worker.collect_preflight()
-    except Exception as exc:
-        raise InvalidationError("zero_client_preflight_failed") from exc
-    if not isinstance(preflight, dict):
-        raise InvalidationError("zero_client_preflight_invalid")
-    _validate_preflight(preflight, registration)
-
-    try:
-        registered_identity = worker.process_identity(str(preflight["container_id"]), int(registration["pid"]))
-    except Exception as exc:
-        raise InvalidationError("registered_process_identity_unverifiable") from exc
-    if not isinstance(registered_identity, dict) or not isinstance(registered_identity.get("present"), bool):
-        raise InvalidationError("registered_process_identity_unverifiable")
-    if registered_identity["present"] is True:
-        raise InvalidationError("registered_process_still_present")
+    preflight = _collect_zero_client(worker, registration, code="zero_client_preflight_failed")
+    registered_identity = _registered_identity_absent(worker, registration, preflight)
 
     # Repeat every mutable proof immediately before the atomic metadata commit.
     registration_again, registration_raw_again = _private_json(registration_path)
@@ -173,17 +225,11 @@ def invalidate(
     if lease_raw_again != lease_raw or lease_again != lease:
         raise InvalidationError("lease_drift")
     _validate_lease(lease_again, task_id, session_id, int(registration["lease_generation"]))
-    try:
-        preflight_again = worker.collect_preflight()
-    except Exception as exc:
-        raise InvalidationError("zero_client_precommit_preflight_failed") from exc
+    preflight_again = _collect_zero_client(worker, registration, code="zero_client_precommit_preflight_failed")
     if preflight_again != preflight:
         raise InvalidationError("zero_client_preflight_drift")
-    try:
-        registered_identity_again = worker.process_identity(str(preflight["container_id"]), int(registration["pid"]))
-    except Exception as exc:
-        raise InvalidationError("registered_process_identity_unverifiable") from exc
-    if registered_identity_again != registered_identity or registered_identity_again.get("present") is not False:
+    registered_identity_again = _registered_identity_absent(worker, registration, preflight_again)
+    if registered_identity_again != registered_identity:
         raise InvalidationError("registered_process_identity_drift")
 
     safe_run = "".join(ch for ch in run_id if ch.isalnum() or ch in "-_")[:80]
@@ -198,8 +244,22 @@ def invalidate(
     _fsync_dir(state_dir)
     if registration_path.exists():
         raise InvalidationError("registration_invalidation_commit_failed")
+    if tombstone.read_bytes() != registration_raw:
+        raise InvalidationError("invalidation_tombstone_mismatch")
 
-    payload = {
+    # Post-commit failure must stay fail-closed: never restore a stale registration.
+    postflight = _collect_zero_client(worker, registration, code="zero_client_postcommit_preflight_failed")
+    if postflight != preflight:
+        raise InvalidationError("zero_client_postcommit_preflight_drift")
+    post_identity = _registered_identity_absent(worker, registration, postflight)
+    if post_identity != registered_identity:
+        raise InvalidationError("registered_process_postcommit_identity_drift")
+    lease_after, lease_raw_after = _private_json(lease_path)
+    if lease_after != lease or lease_raw_after != lease_raw:
+        raise InvalidationError("lease_postcommit_drift")
+    _validate_lease(lease_after, task_id, session_id, int(registration["lease_generation"]))
+
+    return {
         "schema": "otclient.track-a.same-boot-zero-client-invalidation.v1",
         "recovery_mode": RECOVERY_MODE,
         "lease_generation": generation,
@@ -214,7 +274,6 @@ def invalidate(
         "client_process_mutation": False,
         "canonical_registration": "ABSENT",
     }
-    return payload
 
 
 def _write_result(path: Path, payload: dict[str, Any]) -> None:
@@ -242,7 +301,6 @@ def main(argv: Sequence[str] | None = None) -> int:
             session_id=args.session_id,
             worker=worker,
             run_id=os.environ.get("GITHUB_RUN_ID", "local"),
-            guarded=os.environ.get(GUARD_ENV) == "1",
         )
         _write_result(args.result, payload)
         print("TRACK_A_SAME_BOOT_ZERO_CLIENT_INVALIDATION=PASS")

@@ -165,10 +165,6 @@ def precheck(vault_dir: Path, bundle: Path, result: Path) -> None:
     })
 
 
-def replace(vault_dir: Path, bundle: Path, result: Path) -> None:
-    _base.replace(vault_dir, bundle, result)
-
-
 def auth_one_shot(vault_dir: Path, result: Path) -> None:
     registration = _base._read_registration()
     manifest = _base._current_manifest()
@@ -176,7 +172,10 @@ def auth_one_shot(vault_dir: Path, result: Path) -> None:
     uid, _gid = _base._numeric_user()
     if not _base.same_numeric_uid(int(registration["pid"]), uid):
         raise PhysicalError("same_numeric_uid_failed")
-    if _base._run(["docker", "exec", "-u", _base.TARGET_USER, _base.TARGET_CONTAINER, "test", "-S", _base.AUTH_SOCKET]).returncode != 0:
+    if _base._run([
+        "docker", "exec", "-u", _base.TARGET_USER, _base.TARGET_CONTAINER,
+        "test", "-S", _base.AUTH_SOCKET,
+    ]).returncode != 0:
         raise PhysicalError("native_auth_socket_missing")
 
     rc, response = _run_proven_secret_ingress(vault_dir, registration)
@@ -222,15 +221,11 @@ def auth_one_shot(vault_dir: Path, result: Path) -> None:
     })
 
 
-def confirm_unique(result: Path) -> None:
-    _base.confirm_unique(result)
-
-
 def main(argv: Sequence[str] | None = None) -> int:
+    # Only the corrected ingress-specific seams are replaced. The base worker's
+    # replace() and confirm_unique() stay untouched and therefore cannot recurse.
     _base.precheck = precheck
-    _base.replace = replace
     _base.auth_one_shot = auth_one_shot
-    _base.confirm_unique = confirm_unique
     return int(_base.main(argv))
 
 

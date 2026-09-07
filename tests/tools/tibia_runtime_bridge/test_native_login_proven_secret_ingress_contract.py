@@ -65,6 +65,15 @@ class ProvenSecretIngressContractTests(unittest.TestCase):
         self.assertNotIn("_sidecar_auth_command", text)
         self.assertNotIn("native_login_fd_sidecar.py", text)
 
+    def test_worker_does_not_recursively_override_base_replace_or_confirm(self) -> None:
+        text = WORKER.read_text(encoding="utf-8")
+        self.assertIn("_base.precheck = precheck", text)
+        self.assertIn("_base.auth_one_shot = auth_one_shot", text)
+        self.assertNotIn("_base.replace = replace", text)
+        self.assertNotIn("_base.confirm_unique = confirm_unique", text)
+        self.assertNotIn("def replace(vault_dir", text)
+        self.assertNotIn("def confirm_unique(result", text)
+
     def test_corrected_physical_workflow_has_no_sidecar_critical_path(self) -> None:
         text = WORKFLOW.read_text(encoding="utf-8")
         for forbidden in (

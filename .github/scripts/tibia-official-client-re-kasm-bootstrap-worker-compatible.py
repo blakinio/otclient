@@ -33,6 +33,14 @@ _original_collect_preflight = _base.collect_preflight
 _original_rollback_launch = _base.rollback_launch
 CLIENT_DIR = str(Path(_base.CLIENT_PATH).parent)
 _base.LAUNCH_METHOD = LAUNCH_METHOD
+_LAUNCHER_SKIP_NEEDLE = "    hint=("
+if _base.CANDIDATE_SCRIPT.count(_LAUNCHER_SKIP_NEEDLE) != 1:
+    raise RuntimeError("candidate_script_contract_mismatch")
+LAUNCHER_AWARE_CANDIDATE_SCRIPT = _base.CANDIDATE_SCRIPT.replace(
+    _LAUNCHER_SKIP_NEEDLE,
+    "    if exe==sys.argv[2]: continue\n    hint=(",
+    1,
+)
 
 LAUNCHER_DISCOVERY_SCRIPT = r'''
 import hashlib,json,os,pathlib,shlex,stat,sys
@@ -288,6 +296,54 @@ def launcher_process_rows(
     return data
 
 
+def _launcher_aware_candidate_rows(
+    container_id: str,
+    record: dict[str, Any],
+    runner: Callable[[Sequence[str]], str],
+) -> list[dict[str, Any]]:
+    launchers = launcher_process_rows(record, runner)
+    if len(launchers) > 1:
+        raise _base.WorkerError("launcher_process_not_unique")
+    data = _base._json(
+        runner([
+            "docker", "exec", container_id, "python3", "-c", LAUNCHER_AWARE_CANDIDATE_SCRIPT,
+            str(_base.SIZE), str(record["launcher_path"]),
+        ]),
+        "candidate_inventory_invalid",
+    )
+    if not isinstance(data, list):
+        raise _base.WorkerError("candidate_inventory_invalid")
+    rows: list[dict[str, Any]] = []
+    for raw in data:
+        if not isinstance(raw, dict) or not isinstance(raw.get("pid"), int) or raw["pid"] < 2:
+            raise _base.WorkerError("candidate_inventory_invalid")
+        row = dict(raw)
+        row["container_id"] = container_id
+        if row.get("readable") is not True:
+            if row.get("official_hint") is True:
+                raise _base.WorkerError("official_client_candidate_unverifiable")
+            continue
+        if not isinstance(row.get("size"), int) or not isinstance(row.get("sha256"), str) or not isinstance(row.get("start_ticks"), int):
+            raise _base.WorkerError("candidate_inventory_invalid")
+        exact = row["size"] == _base.SIZE and row["sha256"] == _base.SHA
+        if row.get("official_hint") is True and not exact:
+            raise _base.WorkerError("conflicting_official_client_candidate")
+        if exact:
+            rows.append(row)
+    return rows
+
+
+def _launcher_aware_exact_candidates(
+    containers: list[tuple[str, str]],
+    record: dict[str, Any],
+    runner: Callable[[Sequence[str]], str],
+) -> list[dict[str, Any]]:
+    target = [(container_id, name) for container_id, name in containers if name == CANONICAL_CONTAINER]
+    if len(target) != 1:
+        raise _base.WorkerError(f"target_container_count:{len(target)}")
+    return _launcher_aware_candidate_rows(target[0][0], record, runner)
+
+
 def _wait_launcher_exit(
     record: dict[str, Any],
     runner: Callable[[Sequence[str]], str],
@@ -327,7 +383,7 @@ def launch_from_preflight(
             current_target = _base._target(containers)
         except _base.WorkerError as exc:
             raise _base.WorkerError("postlaunch_target_not_unique") from exc
-        found = exact_candidates(containers, runner)
+        found = _launcher_aware_exact_candidates(containers, saved, runner)
         if len(found) > 1:
             raise _base.WorkerError("postlaunch_target_not_unique")
         if len(found) == 1:

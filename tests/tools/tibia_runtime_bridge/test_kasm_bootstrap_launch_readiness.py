@@ -21,25 +21,27 @@ def load(path: Path, name: str):
 
 
 class Tests(unittest.TestCase):
-    def test_plain_launch_matches_physically_proven_bin_environment(self) -> None:
+    def test_launch_uses_official_linux_entrypoint_directory(self) -> None:
         worker = load(WORKER, "kasm_launch_readiness_worker")
-        command = worker._launch_command("a" * 64)
+        launcher_dir = "/home/kasm-user/Tibia"
+        command = worker._launch_command("a" * 64, launcher_dir)
         flat = " ".join(command)
-        client_dir = "/home/kasm-user/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin"
-        self.assertEqual(client_dir, worker.CLIENT_DIR)
+        self.assertEqual(worker.LAUNCH_METHOD, "docker_exec_detached_official_linux_entrypoint")
         self.assertIn("HOME=/home/kasm-user", command)
         self.assertIn("DISPLAY=:1", command)
         self.assertIn("XAUTHORITY=/home/kasm-user/.Xauthority", command)
-        self.assertIn(f"LD_LIBRARY_PATH={client_dir}:{client_dir}/lib", command)
         self.assertIn("-w", command)
-        self.assertEqual(client_dir, command[command.index("-w") + 1])
+        self.assertEqual(launcher_dir, command[command.index("-w") + 1])
         self.assertIn("sh", command)
         self.assertIn("-lc", command)
-        self.assertIn(f"cd '{client_dir}' && exec ./client", flat)
+        self.assertIn(f"cd {launcher_dir} && exec ./Tibia", flat)
+        self.assertNotIn("exec ./client", flat)
         self.assertNotIn(
-            "LD_LIBRARY_PATH=/home/kasm-user/.local/share/CipSoft GmbH/Tibia/packages/Tibia:/home/kasm-user/.local/share/CipSoft GmbH/Tibia/packages/Tibia/lib",
+            "/home/kasm-user/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin:/home/kasm-user/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/lib",
             command,
         )
+        ld_index = command.index("LD_LIBRARY_PATH")
+        self.assertEqual("-u", command[ld_index - 1])
         for name in (
             "TIBIA_TEST_EMAIL", "TIBIA_TEST_PASSWORD", "TRACK_A_CANONICAL_LEASE_TOKEN",
             "TRACK_A_CANONICAL_LEASE_TOKEN_FILE", "LD_PRELOAD", "OTCLIENT_TIBIA_RE_SOCKET",
@@ -47,13 +49,11 @@ class Tests(unittest.TestCase):
         ):
             self.assertIn(name, command)
 
-    def test_launch_persists_identity_before_window_readiness_wait(self) -> None:
-        text = WORKER.read_text(encoding="utf-8")
-        write = text.index("_base.write_record(path, launch)")
-        window = text.index("windows = _base._window_count", write)
-        self.assertLess(write, window)
-        self.assertIn("postlaunch_window_not_ready", text)
-        self.assertIn("postlaunch_identity_drift", text)
+    def test_launcher_aware_candidate_scan_skips_only_prechecked_launcher_path(self) -> None:
+        worker = load(WORKER, "kasm_launcher_aware_candidate_worker")
+        self.assertIn("if exe==sys.argv[2]: continue", worker.LAUNCHER_AWARE_CANDIDATE_SCRIPT)
+        self.assertEqual(1, worker._base.CANDIDATE_SCRIPT.count("    hint=("))
+        self.assertNotIn("if exe==sys.argv[2]: continue", worker._base.CANDIDATE_SCRIPT)
 
     def _preflight_record(self, worker):
         payload = {
@@ -68,38 +68,126 @@ class Tests(unittest.TestCase):
             "boot_id_sha256": "b" * 64,
             "candidate_count": 0,
             "main_window_count": 0,
+            "launcher_path": "/home/kasm-user/Tibia/Tibia",
+            "launcher_dir": "/home/kasm-user/Tibia",
+            "launcher_size": 123456,
+            "launcher_sha256": "c" * 64,
+            "launcher_selection": "unique",
         }
         payload["preflight_fingerprint"] = worker._base._fingerprint(payload)
         return payload
 
-    def test_rollback_accepts_preidentity_early_exit_only_after_fresh_zero_state(self) -> None:
-        worker = load(WORKER, "kasm_launch_early_exit_rollback_worker")
+    def test_collect_preflight_binds_launcher_identity_into_fingerprint(self) -> None:
+        worker = load(WORKER, "kasm_launcher_preflight_worker")
+        base_payload = {
+            "schema": worker._base.PREFLIGHT_SCHEMA,
+            "container_name": worker._base.TARGET_CONTAINER,
+            "container_id": "a" * 64,
+            "display": worker._base.TARGET_DISPLAY,
+            "package_dir": worker._base.PACKAGE_DIR,
+            "client_path": worker._base.CLIENT_PATH,
+            "client_size": worker._base.SIZE,
+            "client_sha256": worker._base.SHA,
+            "boot_id_sha256": "b" * 64,
+            "candidate_count": 0,
+            "main_window_count": 0,
+        }
+        base_payload["preflight_fingerprint"] = worker._base._fingerprint(base_payload)
+        launcher = {
+            "launcher_path": "/home/kasm-user/Tibia/Tibia",
+            "launcher_dir": "/home/kasm-user/Tibia",
+            "launcher_size": 123456,
+            "launcher_sha256": "c" * 64,
+            "launcher_selection": "desktop",
+        }
+        original_collect = worker._original_collect_preflight
+        original_identity = worker.launcher_identity
+        worker._original_collect_preflight = lambda _runner: dict(base_payload)
+        worker.launcher_identity = lambda _container, _runner: dict(launcher)
+        try:
+            result = worker.collect_preflight(lambda _command: "")
+        finally:
+            worker._original_collect_preflight = original_collect
+            worker.launcher_identity = original_identity
+        self.assertEqual(launcher["launcher_path"], result["launcher_path"])
+        unsigned = dict(result)
+        fingerprint = unsigned.pop("preflight_fingerprint")
+        self.assertEqual(fingerprint, worker._base._fingerprint(unsigned))
+        self.assertNotEqual(fingerprint, base_payload["preflight_fingerprint"])
+
+    def test_launch_persists_identity_before_launcher_and_window_readiness_waits(self) -> None:
+        text = WORKER.read_text(encoding="utf-8")
+        write = text.index("_base.write_record(path, launch)")
+        launcher_wait = text.index("_wait_launcher_exit", write)
+        window = text.index("windows = _base._window_count", write)
+        self.assertLess(write, launcher_wait)
+        self.assertLess(launcher_wait, window)
+        self.assertIn("launcher_residue", text)
+        self.assertIn("postlaunch_window_not_ready", text)
+        self.assertIn("postlaunch_identity_drift", text)
+
+    def test_preidentity_rollback_cleans_launcher_then_late_client_then_reproves_zero_state(self) -> None:
+        worker = load(WORKER, "kasm_entrypoint_preidentity_rollback_worker")
         saved = self._preflight_record(worker)
-        original_collect = worker._base.collect_preflight
+        calls: list[str] = []
+        original_launcher_cleanup = worker._kill_launcher_residue
+        original_client_cleanup = worker._kill_late_exact_client
+        original_wait_clean = worker._wait_clean_preflight
         with tempfile.TemporaryDirectory() as tmp:
             record = Path(tmp) / "record.json"
             worker._base.write_record(record, saved)
-            worker._base.collect_preflight = lambda _runner: dict(saved)
+            worker._kill_launcher_residue = lambda *_args, **_kwargs: calls.append("launcher")
+            worker._kill_late_exact_client = lambda *_args, **_kwargs: calls.append("client")
+            worker._wait_clean_preflight = lambda fp, *_args, **_kwargs: calls.append(f"clean:{fp}")
             try:
                 worker.rollback_launch(record, runner=lambda _command: "", sleeper=lambda _seconds: None)
             finally:
-                worker._base.collect_preflight = original_collect
+                worker._kill_launcher_residue = original_launcher_cleanup
+                worker._kill_late_exact_client = original_client_cleanup
+                worker._wait_clean_preflight = original_wait_clean
+        self.assertEqual(["launcher", "client", f"clean:{saved['preflight_fingerprint']}"], calls)
 
-    def test_rollback_rejects_preidentity_early_exit_when_zero_state_drifted(self) -> None:
-        worker = load(WORKER, "kasm_launch_early_exit_drift_worker")
+    def test_launch_record_rollback_keeps_existing_exact_client_cleanup_and_adds_launcher_cleanup(self) -> None:
+        worker = load(WORKER, "kasm_entrypoint_launch_rollback_worker")
         saved = self._preflight_record(worker)
-        drifted = dict(saved)
-        drifted["main_window_count"] = 1
-        original_collect = worker._base.collect_preflight
+        launch = {
+            "schema": worker._base.LAUNCH_SCHEMA,
+            "preflight_fingerprint": saved["preflight_fingerprint"],
+            "container_name": worker._base.TARGET_CONTAINER,
+            "container_id": saved["container_id"],
+            "display": worker._base.TARGET_DISPLAY,
+            "package_dir": worker._base.PACKAGE_DIR,
+            "client_path": worker._base.CLIENT_PATH,
+            "client_size": worker._base.SIZE,
+            "client_sha256": worker._base.SHA,
+            "pid": 321,
+            "process_start_ticks": 654,
+            "launch_method": worker.LAUNCH_METHOD,
+            "bootstrap_helper_residue": False,
+            "client_dir": worker.CLIENT_DIR,
+            "launcher_path": saved["launcher_path"],
+            "launcher_dir": saved["launcher_dir"],
+            "launcher_size": saved["launcher_size"],
+            "launcher_sha256": saved["launcher_sha256"],
+            "launcher_selection": saved["launcher_selection"],
+        }
+        calls: list[str] = []
+        original_base_rollback = worker._original_rollback_launch
+        original_launcher_cleanup = worker._kill_launcher_residue
+        original_wait_clean = worker._wait_clean_preflight
         with tempfile.TemporaryDirectory() as tmp:
             record = Path(tmp) / "record.json"
-            worker._base.write_record(record, saved)
-            worker._base.collect_preflight = lambda _runner: dict(drifted)
+            worker._base.write_record(record, launch)
+            worker._original_rollback_launch = lambda *_args, **_kwargs: calls.append("client")
+            worker._kill_launcher_residue = lambda *_args, **_kwargs: calls.append("launcher")
+            worker._wait_clean_preflight = lambda fp, *_args, **_kwargs: calls.append(f"clean:{fp}")
             try:
-                with self.assertRaisesRegex(worker.WorkerError, "rollback_prelaunch_zero_state_unproven"):
-                    worker.rollback_launch(record, runner=lambda _command: "", sleeper=lambda _seconds: None)
+                worker.rollback_launch(record, runner=lambda _command: "", sleeper=lambda _seconds: None)
             finally:
-                worker._base.collect_preflight = original_collect
+                worker._original_rollback_launch = original_base_rollback
+                worker._kill_launcher_residue = original_launcher_cleanup
+                worker._wait_clean_preflight = original_wait_clean
+        self.assertEqual(["client", "launcher", f"clean:{saved['preflight_fingerprint']}"], calls)
 
     def test_probe_retries_only_bounded_readiness_errors(self) -> None:
         probe = load(PROBE, "kasm_launch_readiness_probe")

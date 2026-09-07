@@ -8,7 +8,7 @@ project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: runtime_helper_install_repair
-phase: regression_red
+phase: exact_head_ci
 branch: fix/OTC-20260907-proven-login-user-owned-install
 base_branch: main
 base_main: c88269135863f45444d71b98001a59547e19b83d
@@ -49,7 +49,9 @@ The previous installer created the exact task root as root with mode 0700 and th
 
 ## Repair
 
-Reset only the exact task-owned `/tmp/otclient-native-login-current-sha` path while under the canonical guarded mutation. Recreate it directly as `kasm-user` mode 0700, stream each trusted helper bundle file through `docker exec -i -u kasm-user` into its exact path, and verify digests as `kasm-user`. Do not use `docker cp`, chown, wildcard ownership, sidecars, nsenter, or any credential material. Keep base replacement, auth semantics, character confirmation and one-shot budget unchanged.
+Reset only the exact task-owned `/tmp/otclient-native-login-current-sha` path while under the canonical guarded mutation. Recreate it directly as `kasm-user` mode 0700, stream each trusted helper bundle file through `docker exec -i -u kasm-user` into its exact path, explicitly verify directory/file numeric owner + mode, and verify helper digests as `kasm-user`. Do not use `docker cp`, chown, wildcard ownership, sidecars, nsenter, or any credential material. Keep base replacement, auth semantics, character confirmation and one-shot budget unchanged.
+
+Implementation head before CI: `d0338c7e3d5da1165825966ba7448dde80ddb515`.
 
 ## Acceptance
 

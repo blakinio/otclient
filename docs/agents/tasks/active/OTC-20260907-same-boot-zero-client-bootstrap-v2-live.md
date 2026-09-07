@@ -52,7 +52,7 @@ depends_on:
 
 This task becomes executable only after the v2 same-boot invalidation has atomically removed the stale registration under its own current canonical lease.
 
-The task authorizes exactly one reviewed `kasm-bootstrap` create-new transition for the canonical container `otclient-track-a-kasmvnc`. Candidate uniqueness is scoped to that container only. Unrelated containers on the Synology host are outside Track A and are not inspected or executed into.
+The task authorizes exactly one reviewed `kasm-bootstrap` create-new transition for the canonical container `otclient-track-a-kasmvnc`, under `TRACK_A_CANONICAL_KASM_RUNTIME_SCOPE_V1`. Candidate uniqueness is scoped to that container only. Unrelated containers on the Synology host are outside Track A and are not inspected or executed into.
 
 The scoped worker/probe retain the existing exact size/SHA/start, window, package, boot and registration proofs inside canonical Kasm. The scoped transition records truthful provenance as `inventory_scope: canonical_kasm_container` while remaining backward-compatible with the existing stale registration.
 

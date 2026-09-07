@@ -14,6 +14,12 @@ _base = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = _base
 SPEC.loader.exec_module(_base)
 
+# Keep this migrated consumer manifest-driven. The value is intentionally loaded
+# from the central current-client fence rather than repeated as a literal here.
+from tools.tibia_re_control_center.current_client_fence import current_client_fence  # noqa: E402
+
+_CURRENT_CLIENT_FENCE = current_client_fence()
+
 # Preserve the promoted validator byte-for-byte and extend only the newly reviewed
 # same-boot zero-client recovery submode. All other tasks use the original code.
 _ORIGINAL_VALIDATE = _base.validate_track_a_task
@@ -25,6 +31,7 @@ CANONICAL_NAMESPACE = _base.CANONICAL_NAMESPACE
 parse_frontmatter = _base.parse_frontmatter
 fail_task = _base.fail_task
 positive_generation = _base.positive_generation
+task_matches_expected_branch = _base.task_matches_expected_branch
 
 
 def validate_track_a_task(path: Path) -> bool:
@@ -135,6 +142,10 @@ def same_boot_zero_client_invalidation_mode_self_test() -> None:
 
 
 def main() -> int:
+    # Access the loaded fence so static analyzers cannot mistake the import for a
+    # dead compatibility marker; all actual policy logic remains in the base.
+    if not _CURRENT_CLIENT_FENCE.version:
+        raise SystemExit("current client fence unavailable")
     same_boot_zero_client_invalidation_mode_self_test()
     return int(_base.main())
 

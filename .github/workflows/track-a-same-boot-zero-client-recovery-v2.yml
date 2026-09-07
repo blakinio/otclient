@@ -1,0 +1,362 @@
+name: Track A same-boot zero-client recovery v2
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+    paths:
+      - tools/tibia_re_control_center/docker_official_candidate_prefilter.py
+      - .github/scripts/tibia-official-client-re-kasm-bootstrap-worker-compatible.py
+      - .github/scripts/tibia-official-client-re-kasm-existing-runtime-probe-compatible.py
+      - .github/scripts/tibia-official-client-re-same-boot-zero-client-invalidate-compatible.py
+      - .github/workflows/track-a-same-boot-zero-client-recovery-v2.yml
+      - tests/tools/tibia_runtime_bridge/test_docker_candidate_inventory_compatibility.py
+      - tests/tools/tibia_runtime_bridge/test_same_boot_zero_client_recovery_v2_contract.py
+      - docs/agents/contracts/TRACK_A_DOCKER_OFFICIAL_CANDIDATE_CENSUS_V1.md
+      - docs/agents/tasks/active/OTC-20260907-docker-candidate-inventory-compatibility.md
+      - docs/agents/tasks/active/OTC-20260907-same-boot-zero-client-recovery-v2-live.md
+      - docs/agents/tasks/active/OTC-20260907-same-boot-zero-client-bootstrap-v2-live.md
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-same-boot-zero-client-recovery-v2-${{ github.event_name }}
+  cancel-in-progress: false
+
+env:
+  CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime
+  RECOVERY_TASK: OTC-20260907-same-boot-zero-client-recovery-v2-live
+  BOOTSTRAP_TASK: OTC-20260907-same-boot-zero-client-bootstrap-v2-live
+  EXPECTED_VERSION: 15.32.be4f48
+  EXPECTED_SIZE: '52105824'
+  EXPECTED_SHA: 552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1
+
+jobs:
+  contract:
+    if: github.event_name == 'pull_request'
+    name: Same-boot recovery v2 contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Run deterministic compatibility and recovery contracts
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -Eeuo pipefail
+          test "$(git rev-parse HEAD)" = "$HEAD_SHA"
+          python3 tests/tools/tibia_runtime_bridge/test_docker_candidate_inventory_compatibility.py
+          python3 tests/tools/tibia_runtime_bridge/test_same_boot_zero_client_recovery_v2_contract.py
+          python3 .github/scripts/test_tibia_official_client_re_kasm_bootstrap_worker.py -q
+          python3 .github/scripts/test_tibia_official_client_re_kasm_existing_runtime_probe.py
+          python3 .github/scripts/test_tibia_official_client_re_canonical_live_transition.py -q
+          python3 .github/scripts/test_track_a_agent_runtime_governance.py \
+            --changed-from "$BASE_SHA" --expected-branch "$HEAD_BRANCH"
+          python3 .github/scripts/audit_track_a_selfhosted_pr_boundary.py --base "$BASE_SHA"
+          python3 -m py_compile \
+            tools/tibia_re_control_center/docker_official_candidate_prefilter.py \
+            .github/scripts/tibia-official-client-re-kasm-bootstrap-worker-compatible.py \
+            .github/scripts/tibia-official-client-re-kasm-existing-runtime-probe-compatible.py \
+            .github/scripts/tibia-official-client-re-same-boot-zero-client-invalidate-compatible.py
+          ruby -e "require 'yaml'; YAML.load_file('.github/workflows/track-a-same-boot-zero-client-recovery-v2.yml'); puts 'YAML_PARSE=PASS'"
+          git diff --check "$BASE_SHA"...HEAD
+          echo TRACK_A_SAME_BOOT_ZERO_CLIENT_RECOVERY_V2_CONTRACT=PASS
+
+  live-precheck:
+    if: >-
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request &&
+      github.event.issue.number == 975 &&
+      github.event.comment.user.login == github.repository_owner &&
+      github.event.comment.body == '/track-a-same-boot-zero-client-recovery-v2 PRECHECK'
+    name: Trusted-main compatibility zero-client PRECHECK
+    runs-on: [otclient, synology]
+    timeout-minutes: 12
+    steps:
+      - name: Checkout exact trusted main
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          ref: main
+          fetch-depth: 2
+
+      - name: Prove trusted main and durable v2 recovery admission
+        id: trust
+        shell: bash
+        run: |
+          set +x
+          set -Eeuo pipefail
+          test "$RUNNER_NAME" = 'synology-otclient-01'
+          test "$GITHUB_RUN_ATTEMPT" = '1'
+          trusted_main="$(git rev-parse HEAD)"
+          live_main="$(git ls-remote origin refs/heads/main | awk 'NR==1 {print $1}')"
+          test "$trusted_main" = "$live_main"
+          python3 tests/tools/tibia_runtime_bridge/test_docker_candidate_inventory_compatibility.py
+          python3 tests/tools/tibia_runtime_bridge/test_same_boot_zero_client_recovery_v2_contract.py
+          python3 .github/scripts/test_track_a_agent_runtime_governance.py
+          python3 - <<'PY'
+          import importlib.util, pathlib, sys
+          root=pathlib.Path('.')
+          path=root/'.github/scripts/test_track_a_agent_runtime_governance.py'
+          spec=importlib.util.spec_from_file_location('recovery_v2_governance',path)
+          assert spec and spec.loader
+          gov=importlib.util.module_from_spec(spec); sys.modules[spec.name]=gov; spec.loader.exec_module(gov)
+          task=root/'docs/agents/tasks/active/OTC-20260907-same-boot-zero-client-recovery-v2-live.md'
+          assert gov.validate_track_a_task(task)
+          v=gov.parse_frontmatter(task)
+          expected={
+            'runtime_access':'canonical_recovery',
+            'runtime_owner_task':'OTC-20260907-same-boot-zero-client-recovery-v2-live',
+            'runtime_namespace':'canonical-live-runtime',
+            'canonical_registration':'PRESENT',
+            'registration_lease_generation':'55',
+            'gate_a':'REQUIRED_NOT_PROVEN',
+            'generation_rebind':'NOT_APPLICABLE',
+            'gate_b':'NOT_APPLICABLE',
+            'bootstrap':'NOT_APPLICABLE',
+            'mutation_authorized':'false',
+            'recovery_mode':'same_boot_zero_client_invalidation_v1',
+            'credentials_allowed':'false','login_allowed':'false',
+            'process_control_authorized':'false','physical_action_budget':'0',
+            'precheck_attempt_limit':'1','recovery_attempt_limit':'1',
+          }
+          for k,e in expected.items():
+            if v.get(k)!=e: raise SystemExit(f'RECOVERY_V2_ADMISSION_REFUSED:{k}={v.get(k)!r}')
+          source=v.get('live_runtime_authorization_source','').strip()
+          if not source or source.upper() in {'NONE','UNKNOWN','NOT_APPLICABLE'}:
+            raise SystemExit('RECOVERY_V2_ADMISSION_REFUSED:authorization_source')
+          print('TRACK_A_RECOVERY_V2_ADMISSION=PASS')
+          PY
+          echo "trusted_main=$trusted_main" >> "$GITHUB_OUTPUT"
+          echo NO_CREDENTIAL_ACCESS=true
+          echo RUNTIME_MUTATION=false
+
+      - name: Consume one-shot v2 PRECHECK authorization
+        shell: bash
+        env:
+          TRUSTED_MAIN: ${{ steps.trust.outputs.trusted_main }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          root="/home/runner/_work/_otclient_tibia_re_state/tasks/$RECOVERY_TASK/runtime"
+          mkdir -p "$root"; chmod 700 "$root"
+          marker="$root/recovery-v2-precheck-attempt-consumed.json"
+          python3 - "$marker" "$TRUSTED_MAIN" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" <<'PY'
+          import json,os,pathlib,sys
+          path=pathlib.Path(sys.argv[1]); payload={'schema_version':1,'trusted_main':sys.argv[2],'run_id':sys.argv[3],'run_attempt':int(sys.argv[4])}
+          try: fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
+          except FileExistsError as exc: raise SystemExit('RECOVERY_V2_PRECHECK_ALREADY_CONSUMED') from exc
+          with os.fdopen(fd,'w',encoding='utf-8') as h:
+            json.dump(payload,h,sort_keys=True,separators=(',',':')); h.write('\n'); h.flush(); os.fsync(h.fileno())
+          PY
+          echo RECOVERY_V2_PRECHECK_AUTHORIZATION_CONSUMED=PASS
+
+      - name: Run guarded compatibility zero-client PRECHECK
+        id: precheck
+        shell: bash
+        env:
+          TRUSTED_MAIN: ${{ steps.trust.outputs.trusted_main }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          test "$(git ls-remote origin refs/heads/main | awk 'NR==1 {print $1}')" = "$TRUSTED_MAIN"
+          task="$RECOVERY_TASK"; session="recovery-v2-precheck-${GITHUB_RUN_ID}"
+          root="/home/runner/_work/_otclient_tibia_re_state/tasks/$task/runtime"
+          token="$root/canonical-lease-token"
+          lease=.github/scripts/tibia-official-client-re-canonical-live-lease
+          worker=.github/scripts/tibia-official-client-re-kasm-bootstrap-worker-compatible.py
+          record="$RUNNER_TEMP/recovery-v2-precheck.json"
+          rm -f "$token" "$record"; mkdir -p "$root"; chmod 700 "$root"
+          active=false
+          # shellcheck disable=SC2317
+          cleanup() { rc=$?; if [[ "$active" == true && -f "$token" ]]; then bash "$lease" release --task-id "$task" --session-id "$session" --token-file "$token" >/dev/null 2>&1 || true; fi; rm -f "$token"; exit "$rc"; }
+          trap cleanup EXIT
+          bash "$lease" acquire --task-id "$task" --session-id "$session" --token-file "$token" --ttl-seconds 300 \
+            --stale-takeover-reason 'owner-approved recovery-v2 compatibility PRECHECK'
+          active=true
+          bash "$lease" validate --task-id "$task" --session-id "$session" --token-file "$token"
+          bash "$lease" guard-run --task-id "$task" --session-id "$session" --token-file "$token" -- \
+            python3 "$worker" preflight "$record"
+          python3 - "$record" "$CANONICAL_STATE/runtime-registration.json" "$EXPECTED_SIZE" "$EXPECTED_SHA" <<'PY'
+          import json,pathlib,sys
+          pre=json.loads(pathlib.Path(sys.argv[1]).read_text()); reg=json.loads(pathlib.Path(sys.argv[2]).read_text())
+          assert pre['candidate_count']==0 and pre['main_window_count']==0
+          assert pre['client_size']==int(sys.argv[3]) and pre['client_sha256']==sys.argv[4]
+          assert pre['boot_id_sha256']==reg['boot_id_sha256'] and pre['display']==reg['display']
+          print('TRACK_A_RECOVERY_V2_COMPAT_PREFLIGHT=PASS')
+          print('PREFLIGHT_FINGERPRINT='+pre['preflight_fingerprint'])
+          PY
+          fingerprint="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["preflight_fingerprint"])' "$record")"
+          bash "$lease" release --task-id "$task" --session-id "$session" --token-file "$token"
+          active=false; rm -f "$token"
+          pass_marker="$root/recovery-v2-precheck-pass.json"
+          python3 - "$pass_marker" "$TRUSTED_MAIN" "$GITHUB_RUN_ID" "$fingerprint" <<'PY'
+          import json,os,pathlib,sys
+          p=pathlib.Path(sys.argv[1]); payload={'schema_version':1,'trusted_main':sys.argv[2],'run_id':sys.argv[3],'preflight_fingerprint':sys.argv[4]}
+          try: fd=os.open(p,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
+          except FileExistsError as exc: raise SystemExit('RECOVERY_V2_PRECHECK_PASS_ALREADY_EXISTS') from exc
+          with os.fdopen(fd,'w',encoding='utf-8') as h:
+            json.dump(payload,h,sort_keys=True,separators=(',',':')); h.write('\n'); h.flush(); os.fsync(h.fileno())
+          PY
+          echo NO_CREDENTIAL_ACCESS=true
+          echo RUNTIME_MUTATION=false
+          trap - EXIT
+
+  live-execute:
+    if: >-
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request &&
+      github.event.issue.number == 975 &&
+      github.event.comment.user.login == github.repository_owner &&
+      github.event.comment.body == '/track-a-same-boot-zero-client-recovery-v2 EXECUTE'
+    name: Trusted-main same-boot recovery v2 and plain Kasm restore
+    runs-on: [otclient, synology]
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact trusted main
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          ref: main
+          fetch-depth: 2
+
+      - name: Prove trusted main and v2 PRECHECK PASS
+        id: trust
+        shell: bash
+        run: |
+          set +x
+          set -Eeuo pipefail
+          test "$RUNNER_NAME" = 'synology-otclient-01'
+          test "$GITHUB_RUN_ATTEMPT" = '1'
+          trusted_main="$(git rev-parse HEAD)"; live_main="$(git ls-remote origin refs/heads/main | awk 'NR==1 {print $1}')"
+          test "$trusted_main" = "$live_main"
+          python3 tests/tools/tibia_runtime_bridge/test_docker_candidate_inventory_compatibility.py
+          python3 tests/tools/tibia_runtime_bridge/test_same_boot_zero_client_recovery_v2_contract.py
+          python3 .github/scripts/test_track_a_agent_runtime_governance.py
+          root="/home/runner/_work/_otclient_tibia_re_state/tasks/$RECOVERY_TASK/runtime"
+          pass_marker="$root/recovery-v2-precheck-pass.json"
+          python3 - "$pass_marker" "$trusted_main" <<'PY'
+          import json,pathlib,sys
+          p=pathlib.Path(sys.argv[1]); d=json.loads(p.read_text())
+          assert d['schema_version']==1 and d['trusted_main']==sys.argv[2]
+          fp=d.get('preflight_fingerprint',''); assert len(fp)==64 and all(c in '0123456789abcdef' for c in fp)
+          print('RECOVERY_V2_PRECHECK_PASS=VERIFIED')
+          PY
+          echo "trusted_main=$trusted_main" >> "$GITHUB_OUTPUT"
+          echo NO_CREDENTIAL_ACCESS=true
+
+      - name: Consume one-shot v2 recovery and restore authorization
+        shell: bash
+        env:
+          TRUSTED_MAIN: ${{ steps.trust.outputs.trusted_main }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          root="/home/runner/_work/_otclient_tibia_re_state/tasks/$RECOVERY_TASK/runtime"; mkdir -p "$root"; chmod 700 "$root"
+          marker="$root/recovery-v2-execute-attempt-consumed.json"
+          python3 - "$marker" "$TRUSTED_MAIN" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" <<'PY'
+          import json,os,pathlib,sys
+          p=pathlib.Path(sys.argv[1]); payload={'schema_version':1,'trusted_main':sys.argv[2],'run_id':sys.argv[3],'run_attempt':int(sys.argv[4])}
+          try: fd=os.open(p,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
+          except FileExistsError as exc: raise SystemExit('RECOVERY_V2_EXECUTE_ALREADY_CONSUMED') from exc
+          with os.fdopen(fd,'w',encoding='utf-8') as h:
+            json.dump(payload,h,sort_keys=True,separators=(',',':')); h.write('\n'); h.flush(); os.fsync(h.fileno())
+          PY
+          echo RECOVERY_V2_EXECUTE_AUTHORIZATION_CONSUMED=PASS
+
+      - name: Invalidate only same-boot zero-client stale registration v2
+        shell: bash
+        env:
+          TRUSTED_MAIN: ${{ steps.trust.outputs.trusted_main }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          test "$(git ls-remote origin refs/heads/main | awk 'NR==1 {print $1}')" = "$TRUSTED_MAIN"
+          task="$RECOVERY_TASK"; session="recovery-v2-${GITHUB_RUN_ID}"
+          root="/home/runner/_work/_otclient_tibia_re_state/tasks/$task/runtime"; token="$root/canonical-lease-token"
+          lease=.github/scripts/tibia-official-client-re-canonical-live-lease
+          invalidator=.github/scripts/tibia-official-client-re-same-boot-zero-client-invalidate-compatible.py
+          worker=.github/scripts/tibia-official-client-re-kasm-bootstrap-worker-compatible.py
+          rm -f "$token"; mkdir -p "$root"; chmod 700 "$root"
+          active=false
+          # shellcheck disable=SC2317
+          cleanup() { rc=$?; if [[ "$active" == true && -f "$token" ]]; then bash "$lease" release --task-id "$task" --session-id "$session" --token-file "$token" >/dev/null 2>&1 || true; fi; rm -f "$token"; exit "$rc"; }
+          trap cleanup EXIT
+          bash "$lease" acquire --task-id "$task" --session-id "$session" --token-file "$token" --ttl-seconds 600 \
+            --stale-takeover-reason 'owner-approved same-boot recovery-v2 after compatible all-container PRECHECK'
+          active=true; bash "$lease" validate --task-id "$task" --session-id "$session" --token-file "$token"
+          TRACK_A_SAME_BOOT_INVALIDATION_GUARDED=1 \
+            bash "$lease" guard-run --task-id "$task" --session-id "$session" --token-file "$token" -- \
+              python3 "$invalidator" --task-id "$task" --session-id "$session" --worker "$worker" \
+                --result "$RUNNER_TEMP/recovery-v2-invalidation.json"
+          bash "$lease" release --task-id "$task" --session-id "$session" --token-file "$token"
+          active=false; rm -f "$token"
+          test ! -e "$CANONICAL_STATE/runtime-registration.json"
+          echo TRACK_A_RECOVERY_V2_REGISTRATION_ABSENT=PASS
+          echo NO_CREDENTIAL_ACCESS=true
+          trap - EXIT
+
+      - name: Create exactly one plain current Kasm canonical client v2
+        shell: bash
+        env:
+          TRUSTED_MAIN: ${{ steps.trust.outputs.trusted_main }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          test "$(git ls-remote origin refs/heads/main | awk 'NR==1 {print $1}')" = "$TRUSTED_MAIN"
+          test ! -e "$CANONICAL_STATE/runtime-registration.json"
+          task="$BOOTSTRAP_TASK"; session="bootstrap-v2-${GITHUB_RUN_ID}"
+          root="/home/runner/_work/_otclient_tibia_re_state/tasks/$task/runtime"; token="$root/canonical-lease-token"
+          lease=.github/scripts/tibia-official-client-re-canonical-live-lease
+          transition=.github/scripts/tibia-official-client-re-canonical-live-transition.py
+          worker=.github/scripts/tibia-official-client-re-kasm-bootstrap-worker-compatible.py
+          probe=.github/scripts/tibia-official-client-re-kasm-existing-runtime-probe-compatible.py
+          chmod 755 "$worker" "$probe"
+          rm -f "$token"; mkdir -p "$root"; chmod 700 "$root"
+          active=false
+          # shellcheck disable=SC2317
+          cleanup() { rc=$?; if [[ "$active" == true && -f "$token" ]]; then bash "$lease" release --task-id "$task" --session-id "$session" --token-file "$token" >/dev/null 2>&1 || true; fi; rm -f "$token"; exit "$rc"; }
+          trap cleanup EXIT
+          bash "$lease" acquire --task-id "$task" --session-id "$session" --token-file "$token" --ttl-seconds 600 \
+            --stale-takeover-reason 'owner-approved plain Kasm restore v2 after same-boot invalidation'
+          active=true; bash "$lease" validate --task-id "$task" --session-id "$session" --token-file "$token"
+          python3 "$transition" kasm-bootstrap \
+            --task-id "$task" --session-id "$session" --token-file "$token" \
+            --worker "$worker" --probe "$probe" --worker-timeout 120
+          bash "$lease" release --task-id "$task" --session-id "$session" --token-file "$token"
+          active=false; rm -f "$token"
+          echo TRACK_A_RECOVERY_V2_KASM_RESTORE=PASS
+          echo NO_CREDENTIAL_ACCESS=true
+          trap - EXIT
+
+      - name: Verify restored canonical exact-current registration v2
+        shell: bash
+        run: |
+          set +x
+          set -Eeuo pipefail
+          python3 - "$CANONICAL_STATE/runtime-registration.json" "$EXPECTED_VERSION" "$EXPECTED_SIZE" "$EXPECTED_SHA" "$BOOTSTRAP_TASK" <<'PY'
+          import json,pathlib,sys
+          d=json.loads(pathlib.Path(sys.argv[1]).read_text())
+          assert d['client_version']==sys.argv[2]
+          assert d['client_size']==int(sys.argv[3])
+          assert d['client_sha256']==sys.argv[4]
+          assert d['state']=='UNKNOWN'
+          assert d['proof_kind']=='existing_runtime_adoption_v1'
+          assert d['candidate_count']==1
+          assert d['inventory_scope']=='all_running_docker_containers' and d['inventory_complete'] is True
+          assert d['source_task']==sys.argv[5]
+          print('TRACK_A_RECOVERY_V2_CANONICAL_RESTORE=PASS')
+          PY
+          echo NO_CREDENTIAL_ACCESS=true

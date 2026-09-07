@@ -92,7 +92,7 @@ class Tests(unittest.TestCase):
         text = INVALIDATOR.read_text(encoding="utf-8")
         self.assertIn("tibia-official-client-re-same-boot-zero-client-invalidate.py", text)
         self.assertIn("tibia-official-client-re-kasm-bootstrap-worker-compatible.py", text)
-        self.assertIn("_base.APPROVED_WORKER = COMPAT_WORKER", text)
+        self.assertIn("_base.APPROVED_WORKER = SCOPED_WORKER", text)
         for forbidden in ("os.replace(", "runtime-registration.json", "docker exec", "TIBIA_TEST_PASSWORD"):
             self.assertNotIn(forbidden, text)
 

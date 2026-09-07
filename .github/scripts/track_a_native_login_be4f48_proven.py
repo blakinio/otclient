@@ -165,6 +165,69 @@ def precheck(vault_dir: Path, bundle: Path, result: Path) -> None:
     })
 
 
+def _docker_stage(command: Sequence[str], failure_code: str, *, timeout: int = 30) -> str:
+    completed = _base._run(command, timeout=timeout)
+    if completed.returncode != 0:
+        raise PhysicalError(failure_code)
+    return completed.stdout
+
+
+def _install_bundle_numeric(bundle: Path) -> None:
+    _base._verify_bundle(bundle)
+    uid, gid = _base._numeric_user()
+    if uid < 1 or gid < 1:
+        raise PhysicalError("helper_install_numeric_identity_invalid")
+
+    _docker_stage(
+        ["docker", "exec", _base.TARGET_CONTAINER, "install", "-d", "-m", "700", _base.TASK_ROOT],
+        "helper_install_prepare_failed",
+    )
+
+    cleanup_paths = list(dict.fromkeys((
+        _base.BRIDGE_SOCKET,
+        _base.AUTH_SOCKET,
+        _base.CHARACTER_SOCKET,
+        *_base.BUNDLE_FILES.values(),
+    )))
+    for target in cleanup_paths:
+        _docker_stage(
+            ["docker", "exec", _base.TARGET_CONTAINER, "rm", "-f", target],
+            "helper_install_cleanup_failed",
+        )
+
+    for name, target in _base.BUNDLE_FILES.items():
+        completed = _base._run(
+            ["docker", "cp", str(bundle / name), f"{_base.TARGET_CONTAINER}:{target}"],
+            timeout=30,
+        )
+        if completed.returncode != 0:
+            raise PhysicalError("helper_bundle_copy_failed")
+
+    owner = f"{uid}:{gid}"
+    for target in _base.BUNDLE_FILES.values():
+        _docker_stage(
+            ["docker", "exec", _base.TARGET_CONTAINER, "chown", owner, target],
+            "helper_install_permissions_failed",
+        )
+        _docker_stage(
+            ["docker", "exec", _base.TARGET_CONTAINER, "chmod", "600", target],
+            "helper_install_permissions_failed",
+        )
+
+    try:
+        manifest = json.loads((bundle / _base.BUNDLE_MANIFEST).read_text(encoding="utf-8"))["files"]
+    except (OSError, KeyError, TypeError, json.JSONDecodeError) as exc:
+        raise PhysicalError("helper_bundle_manifest_invalid") from exc
+    for name, expected in manifest.items():
+        output = _docker_stage(
+            ["docker", "exec", _base.TARGET_CONTAINER, "sha256sum", _base.BUNDLE_FILES[name]],
+            "helper_install_digest_read_failed",
+        )
+        parts = output.split()
+        if not parts or parts[0] != expected:
+            raise PhysicalError("installed_helper_digest_mismatch")
+
+
 def auth_one_shot(vault_dir: Path, result: Path) -> None:
     registration = _base._read_registration()
     manifest = _base._current_manifest()
@@ -222,9 +285,10 @@ def auth_one_shot(vault_dir: Path, result: Path) -> None:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    # Only the corrected ingress-specific seams are replaced. The base worker's
-    # replace() and confirm_unique() stay untouched and therefore cannot recurse.
+    # Only corrected ingress/install seams are replaced. Base replace() and
+    # confirm_unique() remain untouched, preserving the recursion regression fix.
     _base.precheck = precheck
+    _base._install_bundle = _install_bundle_numeric
     _base.auth_one_shot = auth_one_shot
     return int(_base.main(argv))
 

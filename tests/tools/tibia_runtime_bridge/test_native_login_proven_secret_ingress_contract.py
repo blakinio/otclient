@@ -65,15 +65,6 @@ class ProvenSecretIngressContractTests(unittest.TestCase):
         self.assertNotIn("_sidecar_auth_command", text)
         self.assertNotIn("native_login_fd_sidecar.py", text)
 
-    def test_worker_does_not_recursively_override_base_replace_or_confirm(self) -> None:
-        text = WORKER.read_text(encoding="utf-8")
-        self.assertIn("_base.precheck = precheck", text)
-        self.assertIn("_base.auth_one_shot = auth_one_shot", text)
-        self.assertNotIn("_base.replace = replace", text)
-        self.assertNotIn("_base.confirm_unique = confirm_unique", text)
-        self.assertNotIn("def replace(vault_dir", text)
-        self.assertNotIn("def confirm_unique(result", text)
-
     def test_corrected_physical_workflow_has_no_sidecar_critical_path(self) -> None:
         text = WORKFLOW.read_text(encoding="utf-8")
         for forbidden in (
@@ -99,6 +90,32 @@ class ProvenSecretIngressContractTests(unittest.TestCase):
             with self.subTest(required=required):
                 self.assertIn(required, text)
         self.assertNotIn("${{ secrets.", text)
+
+    def test_wrapper_installs_helpers_with_numeric_identity_and_static_stage_failures(self) -> None:
+        text = WORKER.read_text(encoding="utf-8")
+        for required in (
+            "def _install_bundle_numeric(",
+            "_base._numeric_user()",
+            'f"{uid}:{gid}"',
+            "helper_install_prepare_failed",
+            "helper_install_cleanup_failed",
+            "helper_bundle_copy_failed",
+            "helper_install_permissions_failed",
+            "helper_install_digest_read_failed",
+            "installed_helper_digest_mismatch",
+            "_base._install_bundle = _install_bundle_numeric",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, text)
+        for forbidden in (
+            "def replace(",
+            "def confirm_unique(",
+            "_base.replace =",
+            "_base.confirm_unique =",
+            "chown kasm-user:kasm-user",
+            "TASK_ROOT}/*",
+        ):
+            self.assertNotIn(forbidden, text)
 
 
 if __name__ == "__main__":

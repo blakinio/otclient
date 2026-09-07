@@ -114,13 +114,35 @@ class ProvenSecretIngressContractTests(unittest.TestCase):
             with self.subTest(required=required):
                 self.assertIn(required, text)
         for forbidden in (
-            "def replace(",
             "def confirm_unique(",
-            "_base.replace =",
             "_base.confirm_unique =",
             '"docker", "cp"',
             '"chown"',
             "TASK_ROOT}/*",
+        ):
+            self.assertNotIn(forbidden, text)
+
+    def test_wrapper_replacement_restores_physically_proven_kasm_launch_shape(self) -> None:
+        text = WORKER.read_text(encoding="utf-8")
+        for required in (
+            "def replace(",
+            "XAUTHORITY=/home/kasm-user/.Xauthority",
+            "LD_LIBRARY_PATH=",
+            '"sh", "-lc"',
+            "exec ./client",
+            "replacement_instrumented_launch_failed",
+            "replacement_rollback_launch_failed",
+            "replacement_rollback_runtime_not_ready",
+            "credential_plaintext_accessed",
+            "_base.replace = replace",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, text)
+        for forbidden in (
+            '"killall"',
+            '"pkill"',
+            "TIBIA_TEST_EMAIL=",
+            "TIBIA_TEST_PASSWORD=",
         ):
             self.assertNotIn(forbidden, text)
 

@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260907-canonical-kasm-bootstrap-retry-v2-live
-status: ready
+status: blocked
 agent: ChatGPT
 session_id: canonical-kasm-bootstrap-retry-v2-live-20260907
 session_role: implementer
@@ -26,7 +26,7 @@ generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
 bootstrap: PASS
 target_uniqueness: UNKNOWN
-mutation_authorized: true
+mutation_authorized: false
 bootstrap_mode: create_new
 bootstrap_attempt_limit: 1
 credentials_allowed: false
@@ -36,53 +36,40 @@ restart_allowed: false
 character_selection_allowed: false
 gameplay_allowed: false
 gui_input_authorized: false
-process_control_authorized: true
+process_control_authorized: false
 network_payload_capture_allowed: false
 process_memory_access_allowed: false
 physical_action_budget: 1
-physical_action_count: 0
+physical_action_count: 1
 precheck_attempt_limit: 1
+precheck_attempt_count: 1
 execute_attempt_limit: 1
+execute_attempt_count: 1
 implementation_authorized: true
 live_runtime_authorization_source: OWNER_CHAT_20260907_CONTINUE_FULL_CHAIN_AFTER_ZERO_STATE_SURVEY
 parent_task: OTC-20260907-kasm-bin-launch-root-v2
 depends_on:
   - OTC-20260907-canonical-kasm-bootstrap-retry-live
 canonical_scope_contract: TRACK_A_CANONICAL_KASM_RUNTIME_SCOPE_V1
+superseded_by: OTC-20260907-official-linux-entrypoint-bootstrap
+last_physical_run: 34124555199
+last_physical_job: 101750043876
+post_failure_survey_run: 34124687615
+post_failure_survey_job: 101750488697
 ---
 
-# Canonical Kasm bootstrap retry v2 — live admission
+# Canonical Kasm bootstrap retry v2 — consumed live admission
 
-The previous bootstrap retry consumed its one process-creation attempt and failed before registration. Immediate read-only Surveyor run `34122156989`, job `101742448722`, subsequently proved the authoritative registration is ABSENT and the canonical Kasm container contains zero `client` processes. The exact sanitized census marker was `TARGET_NAMESPACE_CLIENTS=0`. This v2 task therefore authorizes one new create-new attempt only after the bin-root launcher correction is merged to trusted `main`.
+This admission is **consumed** and must not be reused. Run `34124555199`, job `101750043876`, consumed the one EXECUTE attempt on trusted `main` after the bin-root/cwd correction. PRECHECK passed, but the exact-current package `client` exited before a ready exact candidate could be established; rollback passed. No credentials were accessed.
 
-This task does **not** authorize another registration invalidation.
+Immediate read-only Surveyor run `34124687615`, job `101750488697`, subsequently proved:
 
-## PRECHECK
+- authoritative canonical registration: `ABSENT`;
+- canonical Kasm target namespace clients: `0`;
+- no credential-bearing attempt occurred.
 
-One owner-triggered PRECHECK may acquire a fresh canonical lease and prove under `guard-run`:
+The direct `packages/Tibia/bin/client` launch hypothesis is therefore closed for this task. A third materially identical direct launch is not authorized.
 
-- authoritative registration is still ABSENT;
-- exactly one canonical container `otclient-track-a-kasmvnc` exists;
-- exact current package identity is present;
-- canonical display `:1` is available;
-- canonical container has zero official-client candidates and zero Tibia main windows.
+The successor task is `OTC-20260907-official-linux-entrypoint-bootstrap`, which changes the launch hypothesis to the current official Linux top-level `Tibia` entrypoint and carries a separate one-shot admission/budget.
 
-PRECHECK creates no process and accesses no credentials.
-
-## EXECUTE
-
-Only after PRECHECK PASS on the exact same trusted `main`, one owner-triggered EXECUTE may consume one process-creation budget and run one scoped `kasm-bootstrap` transaction using the corrected bin-root worker and canonical-Kasm probe.
-
-Success requires one exact-current client and canonical registration with:
-
-- `state: UNKNOWN`;
-- `proof_kind: existing_runtime_adoption_v1`;
-- `candidate_count: 1`;
-- `inventory_scope: canonical_kasm_container`;
-- `inventory_complete: true`.
-
-The worker launch must use the exact executable directory `.../packages/Tibia/bin` as cwd and loader root, matching the physically successful historical Kasm launcher evidence.
-
-On failure, rollback remains mandatory. If the process exits before launch identity is persisted, rollback may report success only when a fresh canonical-Kasm preflight re-proves the original zero-client/zero-window state with unchanged container, boot and exact client fence.
-
-No credential source, auth, login, character selection, GUI input or gameplay is authorized by this task.
+This consumed task does **not** authorize registration invalidation, process creation, process control, credentials, login, character selection, GUI input or gameplay.

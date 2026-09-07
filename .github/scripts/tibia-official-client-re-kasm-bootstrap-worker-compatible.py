@@ -28,6 +28,7 @@ _base = _load_base()
 if _base.TARGET_CONTAINER != CANONICAL_CONTAINER:
     raise RuntimeError("canonical_container_contract_mismatch")
 _original_candidate_rows = _base.candidate_rows
+_original_rollback_launch = _base.rollback_launch
 CLIENT_DIR = str(Path(_base.CLIENT_PATH).parent)
 
 
@@ -162,7 +163,7 @@ def rollback_launch(
 ) -> None:
     """Rollback a launched client or prove a pre-identity early exit is already clean."""
     try:
-        _base.rollback_launch(path, runner=runner, sleeper=sleeper, attempts=attempts)
+        _original_rollback_launch(path, runner=runner, sleeper=sleeper, attempts=attempts)
         return
     except _base.WorkerError as launch_error:
         try:

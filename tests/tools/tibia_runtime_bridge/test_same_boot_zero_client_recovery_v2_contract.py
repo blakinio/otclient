@@ -50,7 +50,10 @@ class Tests(unittest.TestCase):
         precheck = text.split("  live-precheck:", 1)[1].split("  live-execute:", 1)[0]
         execute = text.split("  live-execute:", 1)[1]
         self.assertIn('python3 "$worker" preflight "$record"', precheck)
-        self.assertNotIn("kasm-bootstrap", precheck)
+        # The approved compatibility worker filename contains "kasm-bootstrap";
+        # what PRECHECK must never do is invoke the canonical transition's
+        # mutating kasm-bootstrap operation.
+        self.assertNotIn('python3 "$transition" kasm-bootstrap', precheck)
         self.assertNotIn("invalidate-compatible.py", precheck)
         self.assertIn("pre['candidate_count']==0", precheck)
         self.assertIn("pre['boot_id_sha256']==reg['boot_id_sha256']", precheck)

@@ -28,6 +28,8 @@ _base = _load_base()
 if _base.TARGET_CONTAINER != CANONICAL_CONTAINER:
     raise RuntimeError("canonical_container_contract_mismatch")
 _original_candidate_rows = _base.candidate_rows
+_original_rollback_launch = _base.rollback_launch
+CLIENT_DIR = str(Path(_base.CLIENT_PATH).parent)
 
 
 def exact_candidates(
@@ -45,14 +47,14 @@ _base.exact_candidates = exact_candidates
 
 
 def _launch_command(container_id: str) -> list[str]:
-    """Return the plain exact-client launch shape already proven by the login worker."""
-    launch_script = f"cd {shlex.quote(_base.PACKAGE_DIR)} && exec ./client"
+    """Return the plain exact-client launch shape proven by physical Kasm evidence."""
+    launch_script = f"cd {shlex.quote(CLIENT_DIR)} && exec ./client"
     return [
-        "docker", "exec", "-d", "-u", _base.TARGET_USER, "-w", _base.PACKAGE_DIR,
+        "docker", "exec", "-d", "-u", _base.TARGET_USER, "-w", CLIENT_DIR,
         "-e", f"HOME={_base.HOME_DIR}",
         "-e", f"DISPLAY={_base.TARGET_DISPLAY}",
         "-e", f"XAUTHORITY={_base.HOME_DIR}/.Xauthority",
-        "-e", f"LD_LIBRARY_PATH={_base.PACKAGE_DIR}:{_base.PACKAGE_DIR}/lib",
+        "-e", f"LD_LIBRARY_PATH={CLIENT_DIR}:{CLIENT_DIR}/lib",
         container_id,
         "/usr/bin/env",
         "-u", "RUNNER_TRACKING_ID",
@@ -125,6 +127,7 @@ def launch_from_preflight(
         "process_start_ticks": start,
         "launch_method": _base.LAUNCH_METHOD,
         "bootstrap_helper_residue": False,
+        "client_dir": CLIENT_DIR,
     }
     # Persist the exact launch identity before waiting for GUI readiness so the
     # canonical transition can always execute identity-bound rollback on timeout.
@@ -152,7 +155,30 @@ def launch_from_preflight(
     raise _base.WorkerError("postlaunch_window_not_ready")
 
 
+def rollback_launch(
+    path: Path,
+    runner: Callable[[Sequence[str]], str] = _base.run,
+    sleeper: Callable[[float], None] = time.sleep,
+    attempts: int = 16,
+) -> None:
+    """Rollback a launched client or prove a pre-identity early exit is already clean."""
+    try:
+        _original_rollback_launch(path, runner=runner, sleeper=sleeper, attempts=attempts)
+        return
+    except _base.WorkerError as launch_error:
+        try:
+            saved = _base.read_record(path, _base.PREFLIGHT_SCHEMA)
+            _base._validate_preflight(saved)
+            fresh = _base.collect_preflight(runner)
+        except _base.WorkerError:
+            raise launch_error
+        if fresh != saved:
+            raise _base.WorkerError("rollback_prelaunch_zero_state_unproven") from launch_error
+        return
+
+
 _base.launch_from_preflight = launch_from_preflight
+_base.rollback_launch = rollback_launch
 
 WorkerError = _base.WorkerError
 VER = _base.VER

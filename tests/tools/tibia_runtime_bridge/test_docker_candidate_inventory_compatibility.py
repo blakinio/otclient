@@ -1,17 +1,18 @@
 from __future__ import annotations
 
 import importlib.util
-import json
 from pathlib import Path
 import sys
 import unittest
 
 
 ROOT = Path(__file__).resolve().parents[3]
-PREFILTER = ROOT / "tools/tibia_re_control_center/docker_official_candidate_prefilter.py"
 BOOTSTRAP = ROOT / ".github/scripts/tibia-official-client-re-kasm-bootstrap-worker-compatible.py"
 PROBE = ROOT / ".github/scripts/tibia-official-client-re-kasm-existing-runtime-probe-compatible.py"
 INVALIDATOR = ROOT / ".github/scripts/tibia-official-client-re-same-boot-zero-client-invalidate-compatible.py"
+SCOPE = ROOT / "docs/agents/contracts/TRACK_A_CANONICAL_KASM_RUNTIME_SCOPE_V1.md"
+TARGET = "a" * 64
+FOREIGN = "b" * 64
 
 
 def load(path: Path, name: str):
@@ -25,95 +26,69 @@ def load(path: Path, name: str):
 
 class Tests(unittest.TestCase):
     def setUp(self) -> None:
-        self.prefilter = load(PREFILTER, "candidate_prefilter_tested")
-        self.bootstrap = load(BOOTSTRAP, "candidate_bootstrap_compat_tested")
-        self.probe = load(PROBE, "candidate_probe_compat_tested")
+        self.bootstrap = load(BOOTSTRAP, "canonical_scope_bootstrap_tested")
+        self.probe = load(PROBE, "canonical_scope_probe_tested")
 
-    def test_prefilter_accepts_current_official_process_signatures(self) -> None:
-        cases = (
-            "client /home/kasm-user/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client\n",
-            "Tibia /opt/tibia-package/Tibia/bin/client\n",
-            "foo /x/Tibia/packages/Tibia/bin/client --flag\n",
-        )
-        for index, output in enumerate(cases):
-            with self.subTest(index=index):
-                calls = []
-                def runner(command, output=output):
-                    calls.append(tuple(command))
-                    return output
-                self.assertTrue(self.prefilter.container_requires_deep_scan("a" * 64, runner))
-                self.assertEqual(calls[0][:3], ("docker", "top", "a" * 64))
+    def test_bootstrap_scans_only_canonical_kasm_container(self) -> None:
+        calls: list[str] = []
 
-    def test_prefilter_excludes_harmless_container_without_userspace_exec(self) -> None:
-        calls = []
-        def runner(command):
-            calls.append(tuple(command))
-            if command[:2] == ["docker", "top"]:
-                return "sleep sleep infinity\nnginx nginx -g daemon off;\n"
-            raise AssertionError(f"deep userspace execution must not occur: {command!r}")
-        self.assertEqual([], self.bootstrap.candidate_rows("b" * 64, runner))
-        self.assertEqual(1, len(calls))
-        self.assertEqual(("docker", "top"), calls[0][:2])
+        def deep(container_id, _runner):
+            calls.append(container_id)
+            return []
 
-    def test_hinted_bootstrap_container_remains_fail_closed_when_deep_exec_is_126(self) -> None:
-        calls = []
-        def runner(command):
-            calls.append(tuple(command))
-            if command[:2] == ["docker", "top"]:
-                return "client /home/u/Tibia/packages/Tibia/bin/client\n"
-            raise self.bootstrap.WorkerError("command_failed:docker:126")
-        with self.assertRaisesRegex(self.bootstrap.WorkerError, "command_failed:docker:126"):
-            self.bootstrap.candidate_rows("b" * 64, runner)
-        self.assertTrue(any(call[:2] == ("docker", "exec") for call in calls))
+        self.bootstrap._original_candidate_rows = deep
+        containers = [
+            (TARGET, self.bootstrap._base.TARGET_CONTAINER),
+            (FOREIGN, "unrelated-service"),
+        ]
+        result = self.bootstrap.exact_candidates(containers, lambda _command: "")
+        self.assertEqual([], result)
+        self.assertEqual([TARGET], calls)
 
-    def test_hinted_bootstrap_exact_candidate_keeps_size_sha_start_proof(self) -> None:
-        row = {
-            "readable": True,
-            "pid": 321,
-            "exe": self.bootstrap._base.CLIENT_PATH,
-            "size": self.bootstrap.SIZE,
-            "sha256": self.bootstrap.SHA,
-            "start_ticks": 654,
-            "official_hint": True,
-        }
-        def runner(command):
-            if command[:2] == ["docker", "top"]:
-                return "client /home/u/Tibia/packages/Tibia/bin/client\n"
-            if command[:2] == ["docker", "exec"]:
-                return json.dumps([row]) + "\n"
-            raise AssertionError(command)
-        result = self.bootstrap.candidate_rows("b" * 64, runner)
-        self.assertEqual(1, len(result))
-        self.assertEqual(self.bootstrap.SIZE, result[0]["size"])
-        self.assertEqual(self.bootstrap.SHA, result[0]["sha256"])
-        self.assertEqual(654, result[0]["start_ticks"])
+    def test_bootstrap_rejects_missing_or_duplicate_canonical_container(self) -> None:
+        for containers in (
+            [(FOREIGN, "unrelated-service")],
+            [(TARGET, self.bootstrap._base.TARGET_CONTAINER), (FOREIGN, self.bootstrap._base.TARGET_CONTAINER)],
+        ):
+            with self.subTest(containers=containers):
+                with self.assertRaisesRegex(self.bootstrap.WorkerError, "target_container_count"):
+                    self.bootstrap.exact_candidates(containers, lambda _command: "")
 
-    def test_probe_harmless_container_avoids_shell_and_hinted_failure_stays_closed(self) -> None:
-        calls = []
-        def harmless(command):
-            calls.append(tuple(command))
-            if command[:2] == ["docker", "top"]:
-                return "redis redis-server *:6379\n"
-            raise AssertionError(f"shell must not be required: {command!r}")
-        self.assertEqual([], self.probe.candidate_rows("c" * 64, harmless))
-        self.assertFalse(any(call[:2] == ("docker", "exec") for call in calls))
+    def test_probe_collect_skips_every_noncanonical_container(self) -> None:
+        calls: list[str] = []
+        self.probe._base.docker_containers = lambda _runner: [
+            (TARGET, self.probe._base.TARGET_CONTAINER),
+            (FOREIGN, "unrelated-service"),
+        ]
 
-        def hinted(command):
-            if command[:2] == ["docker", "top"]:
-                return "client /home/u/Tibia-x/bin/client\n"
-            raise self.probe.ProbeError("command_failed:docker:126")
-        with self.assertRaisesRegex(self.probe.ProbeError, "command_failed:docker:126"):
-            self.probe.candidate_rows("c" * 64, hinted)
+        def deep(container_id, _runner):
+            calls.append(container_id)
+            return []
 
-    def test_prefilter_failure_is_inventory_failure_not_absence(self) -> None:
-        def runner(_command):
-            raise RuntimeError("docker top unavailable")
-        with self.assertRaisesRegex(self.bootstrap.WorkerError, "docker_top_failed"):
-            self.bootstrap.candidate_rows("d" * 64, runner)
-        with self.assertRaisesRegex(self.probe.ProbeError, "docker_top_failed"):
-            self.probe.candidate_rows("d" * 64, runner)
+        self.probe._original_candidate_rows = deep
 
-    def test_invalidator_rebinds_only_approved_worker_path(self) -> None:
+        def fake_collect(runner):
+            for container_id, _name in self.probe._base.docker_containers(runner):
+                self.probe._base.candidate_rows(container_id, runner)
+            return {"inventory_scope": "legacy", "candidate_count": 1}
+
+        self.probe._base.collect = fake_collect
+        payload = self.probe.collect(lambda _command: "")
+        self.assertEqual([TARGET], calls)
+        self.assertEqual("canonical_kasm_container", payload["inventory_scope"])
+
+    def test_no_synology_wide_prefilter_or_foreign_exec_dependency_remains(self) -> None:
+        for path in (BOOTSTRAP, PROBE):
+            text = path.read_text(encoding="utf-8")
+            self.assertNotIn("docker_official_candidate_prefilter", text)
+            self.assertNotIn("docker top", text)
+            self.assertIn("TARGET_CONTAINER", text)
+        scope = SCOPE.read_text(encoding="utf-8")
+        self.assertIn("otclient-track-a-kasmvnc", scope)
+        self.assertIn("Other Docker containers on the Synology host are outside", scope)
+        self.assertIn("MUST NOT be executed into", scope)
+
+    def test_invalidator_rebinds_only_approved_scoped_worker_path(self) -> None:
         text = INVALIDATOR.read_text(encoding="utf-8")
         self.assertIn("tibia-official-client-re-same-boot-zero-client-invalidate.py", text)
         self.assertIn("tibia-official-client-re-kasm-bootstrap-worker-compatible.py", text)

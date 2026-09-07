@@ -105,6 +105,7 @@ class Tests(unittest.TestCase):
             "process_control_authorized: true",
             "physical_action_budget: 1",
             "TRACK_A_CANONICAL_KASM_RUNTIME_SCOPE_V1",
+            "inventory_scope: canonical_kasm_container",
         ):
             self.assertIn(required, bootstrap)
 

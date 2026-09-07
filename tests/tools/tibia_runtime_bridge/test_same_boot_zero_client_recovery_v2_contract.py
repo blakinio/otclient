@@ -73,6 +73,7 @@ class Tests(unittest.TestCase):
         self.assertIn("_base._read = _read", text)
         self.assertIn("_base._manifest = _manifest", text)
         self.assertIn("_base._require_kasm_launch_matches_manifest", text)
+        self.assertLess(text.index("lstat()"), text.index("read_text()"))
 
     def test_recovery_and_bootstrap_admissions_remain_narrow(self) -> None:
         recovery = RECOVERY.read_text(encoding="utf-8")
@@ -88,6 +89,7 @@ class Tests(unittest.TestCase):
             "physical_action_budget: 0",
             "precheck_attempt_limit: 1",
             "recovery_attempt_limit: 1",
+            "TRACK_A_CANONICAL_KASM_RUNTIME_SCOPE_V1",
         ):
             self.assertIn(required, recovery)
 
@@ -102,6 +104,7 @@ class Tests(unittest.TestCase):
             "login_allowed: false",
             "process_control_authorized: true",
             "physical_action_budget: 1",
+            "TRACK_A_CANONICAL_KASM_RUNTIME_SCOPE_V1",
         ):
             self.assertIn(required, bootstrap)
 
@@ -114,6 +117,7 @@ class Tests(unittest.TestCase):
             "candidate_count == 0",
             "main_window_count == 0",
             "second official-client process inside the canonical container is forbidden",
+            "supersedes earlier wording",
         ):
             self.assertIn(required, text)
         self.assertNotIn("every running Docker container", text)

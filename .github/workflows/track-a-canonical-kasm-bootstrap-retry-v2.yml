@@ -1,4 +1,4 @@
-name: Track A canonical Kasm bootstrap retry v2
+name: Track A canonical Kasm official Linux entrypoint bootstrap
 
 on:
   pull_request:
@@ -10,8 +10,7 @@ on:
       - .github/workflows/track-a-canonical-kasm-bootstrap-retry-v2.yml
       - tests/tools/tibia_runtime_bridge/test_kasm_bootstrap_launch_readiness.py
       - tests/tools/tibia_runtime_bridge/test_canonical_kasm_bootstrap_retry_v2_contract.py
-      - docs/agents/tasks/active/OTC-20260907-kasm-bin-launch-root-v2.md
-      - docs/agents/tasks/active/OTC-20260907-canonical-kasm-bootstrap-retry-v2-live.md
+      - docs/agents/tasks/active/OTC-20260907-official-linux-entrypoint-bootstrap.md
   issue_comment:
     types: [created]
 
@@ -19,12 +18,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: track-a-canonical-kasm-bootstrap-retry-v2-${{ github.event_name }}
+  group: track-a-canonical-kasm-official-entrypoint-${{ github.event_name }}
   cancel-in-progress: false
 
 env:
   CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime
-  TASK_ID: OTC-20260907-canonical-kasm-bootstrap-retry-v2-live
+  TASK_ID: OTC-20260907-official-linux-entrypoint-bootstrap
   EXPECTED_VERSION: 15.32.be4f48
   EXPECTED_SIZE: '52105824'
   EXPECTED_SHA: 552dcf794c41dae8c3dca10b740cd23e2f2ebcaf82d86576e8a67d924409e4e1
@@ -32,7 +31,7 @@ env:
 jobs:
   contract:
     if: github.event_name == 'pull_request'
-    name: Canonical Kasm bootstrap retry v2 contract
+    name: Canonical Kasm official entrypoint contract
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -43,7 +42,7 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Run deterministic bootstrap retry v2 contracts
+      - name: Run deterministic official-entrypoint bootstrap contracts
         shell: bash
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -66,7 +65,7 @@ jobs:
             .github/scripts/tibia-official-client-re-kasm-existing-runtime-probe-compatible.py
           ruby -e "require 'yaml'; YAML.load_file('.github/workflows/track-a-canonical-kasm-bootstrap-retry-v2.yml'); puts 'YAML_PARSE=PASS'"
           git diff --check "$BASE_SHA"...HEAD
-          echo TRACK_A_CANONICAL_KASM_BOOTSTRAP_RETRY_V2_CONTRACT=PASS
+          echo TRACK_A_CANONICAL_KASM_OFFICIAL_ENTRYPOINT_CONTRACT=PASS
 
   live-precheck:
     if: >-
@@ -74,8 +73,8 @@ jobs:
       github.event.issue.pull_request &&
       github.event.issue.number == 975 &&
       github.event.comment.user.login == github.repository_owner &&
-      github.event.comment.body == '/track-a-canonical-kasm-bootstrap-retry-v2 PRECHECK'
-    name: Trusted-main canonical Kasm bootstrap retry v2 PRECHECK
+      github.event.comment.body == '/track-a-official-linux-entrypoint-bootstrap PRECHECK'
+    name: Trusted-main official Linux entrypoint PRECHECK
     runs-on: [otclient, synology]
     timeout-minutes: 12
     steps:
@@ -86,7 +85,7 @@ jobs:
           ref: main
           fetch-depth: 2
 
-      - name: Prove trusted main and retry v2 admission
+      - name: Prove trusted main and official-entrypoint admission
         id: trust
         shell: bash
         run: |
@@ -105,7 +104,7 @@ jobs:
           echo NO_CREDENTIAL_ACCESS=true
           echo RUNTIME_MUTATION=false
 
-      - name: Consume one-shot retry v2 PRECHECK authorization
+      - name: Consume one-shot official-entrypoint PRECHECK authorization
         shell: bash
         env:
           TRUSTED_MAIN: ${{ steps.trust.outputs.trusted_main }}
@@ -114,18 +113,18 @@ jobs:
           set -Eeuo pipefail
           root="/home/runner/_work/_otclient_tibia_re_state/tasks/$TASK_ID/runtime"
           mkdir -p "$root"; chmod 700 "$root"
-          marker="$root/bootstrap-retry-v2-precheck-attempt-consumed.json"
+          marker="$root/official-entrypoint-precheck-attempt-consumed.json"
           python3 - "$marker" "$TRUSTED_MAIN" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" <<'PY'
           import json,os,pathlib,sys
           p=pathlib.Path(sys.argv[1]); payload={'schema_version':1,'trusted_main':sys.argv[2],'run_id':sys.argv[3],'run_attempt':int(sys.argv[4])}
           try: fd=os.open(p,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
-          except FileExistsError as exc: raise SystemExit('BOOTSTRAP_RETRY_V2_PRECHECK_ALREADY_CONSUMED') from exc
+          except FileExistsError as exc: raise SystemExit('OFFICIAL_ENTRYPOINT_PRECHECK_ALREADY_CONSUMED') from exc
           with os.fdopen(fd,'w',encoding='utf-8') as h:
             json.dump(payload,h,sort_keys=True,separators=(',',':')); h.write('\n'); h.flush(); os.fsync(h.fileno())
           PY
-          echo BOOTSTRAP_RETRY_V2_PRECHECK_AUTHORIZATION_CONSUMED=PASS
+          echo OFFICIAL_ENTRYPOINT_PRECHECK_AUTHORIZATION_CONSUMED=PASS
 
-      - name: Run guarded registration-absent canonical Kasm PRECHECK
+      - name: Run guarded registration-absent official-entrypoint PRECHECK
         shell: bash
         env:
           TRUSTED_MAIN: ${{ steps.trust.outputs.trusted_main }}
@@ -133,18 +132,18 @@ jobs:
           set +x
           set -Eeuo pipefail
           test "$(git ls-remote origin refs/heads/main | awk 'NR==1 {print $1}')" = "$TRUSTED_MAIN"
-          task="$TASK_ID"; session="bootstrap-retry-v2-precheck-${GITHUB_RUN_ID}"
+          task="$TASK_ID"; session="official-entrypoint-precheck-${GITHUB_RUN_ID}"
           root="/home/runner/_work/_otclient_tibia_re_state/tasks/$task/runtime"
           token="$root/canonical-lease-token"
           lease=.github/scripts/tibia-official-client-re-canonical-live-lease
           worker=.github/scripts/tibia-official-client-re-kasm-bootstrap-worker-compatible.py
-          record="$RUNNER_TEMP/bootstrap-retry-v2-precheck.json"
+          record="$RUNNER_TEMP/official-entrypoint-precheck.json"
           rm -f "$token" "$record"; mkdir -p "$root"; chmod 700 "$root"
           active=false
           cleanup() { rc=$?; if [[ "$active" == true && -f "$token" ]]; then bash "$lease" release --task-id "$task" --session-id "$session" --token-file "$token" >/dev/null 2>&1 || true; fi; rm -f "$token"; exit "$rc"; }
           trap cleanup EXIT
           bash "$lease" acquire --task-id "$task" --session-id "$session" --token-file "$token" --ttl-seconds 300 \
-            --stale-takeover-reason 'owner-approved bin-root bootstrap retry v2 PRECHECK after zero-state Surveyor proof'
+            --stale-takeover-reason 'owner-approved exact-current official Linux entrypoint PRECHECK after direct-launch failure and zero-state proof'
           active=true
           bash "$lease" validate --task-id "$task" --session-id "$session" --token-file "$token"
           bash "$lease" guard-run --task-id "$task" --session-id "$session" --token-file "$token" -- \
@@ -157,17 +156,24 @@ jobs:
           assert pre['candidate_count']==0 and pre['main_window_count']==0
           assert pre['client_path'].endswith('/packages/Tibia/bin/client')
           assert pre['client_size']==int(sys.argv[3]) and pre['client_sha256']==sys.argv[4]
-          print('TRACK_A_BOOTSTRAP_RETRY_V2_PREFLIGHT=PASS')
+          launcher=pathlib.PurePosixPath(pre['launcher_path'])
+          assert launcher.name=='Tibia'
+          assert str(launcher.parent)==pre['launcher_dir']
+          assert '/packages/Tibia/' not in pre['launcher_path']
+          assert pre['launcher_size']>0
+          assert len(pre['launcher_sha256'])==64
+          assert pre['launcher_selection'] in ('desktop','unique')
+          print('TRACK_A_OFFICIAL_ENTRYPOINT_PREFLIGHT=PASS')
           PY
           fingerprint="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["preflight_fingerprint"])' "$record")"
           bash "$lease" release --task-id "$task" --session-id "$session" --token-file "$token"
           active=false; rm -f "$token"
-          pass_marker="$root/bootstrap-retry-v2-precheck-pass.json"
+          pass_marker="$root/official-entrypoint-precheck-pass.json"
           python3 - "$pass_marker" "$TRUSTED_MAIN" "$GITHUB_RUN_ID" "$fingerprint" <<'PY'
           import json,os,pathlib,sys
           p=pathlib.Path(sys.argv[1]); payload={'schema_version':1,'trusted_main':sys.argv[2],'run_id':sys.argv[3],'preflight_fingerprint':sys.argv[4]}
           try: fd=os.open(p,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
-          except FileExistsError as exc: raise SystemExit('BOOTSTRAP_RETRY_V2_PRECHECK_PASS_ALREADY_EXISTS') from exc
+          except FileExistsError as exc: raise SystemExit('OFFICIAL_ENTRYPOINT_PRECHECK_PASS_ALREADY_EXISTS') from exc
           with os.fdopen(fd,'w',encoding='utf-8') as h:
             json.dump(payload,h,sort_keys=True,separators=(',',':')); h.write('\n'); h.flush(); os.fsync(h.fileno())
           PY
@@ -181,8 +187,8 @@ jobs:
       github.event.issue.pull_request &&
       github.event.issue.number == 975 &&
       github.event.comment.user.login == github.repository_owner &&
-      github.event.comment.body == '/track-a-canonical-kasm-bootstrap-retry-v2 EXECUTE'
-    name: Trusted-main canonical Kasm bootstrap retry v2 EXECUTE
+      github.event.comment.body == '/track-a-official-linux-entrypoint-bootstrap EXECUTE'
+    name: Trusted-main official Linux entrypoint EXECUTE
     runs-on: [otclient, synology]
     timeout-minutes: 20
     steps:
@@ -205,17 +211,17 @@ jobs:
           test "$trusted_main" = "$live_main"
           test ! -e "$CANONICAL_STATE/runtime-registration.json"
           root="/home/runner/_work/_otclient_tibia_re_state/tasks/$TASK_ID/runtime"
-          python3 - "$root/bootstrap-retry-v2-precheck-pass.json" "$trusted_main" <<'PY'
+          python3 - "$root/official-entrypoint-precheck-pass.json" "$trusted_main" <<'PY'
           import json,pathlib,sys
           d=json.loads(pathlib.Path(sys.argv[1]).read_text())
           assert d['schema_version']==1 and d['trusted_main']==sys.argv[2]
           fp=d.get('preflight_fingerprint',''); assert len(fp)==64 and all(c in '0123456789abcdef' for c in fp)
-          print('BOOTSTRAP_RETRY_V2_PRECHECK_PASS=VERIFIED')
+          print('OFFICIAL_ENTRYPOINT_PRECHECK_PASS=VERIFIED')
           PY
           echo "trusted_main=$trusted_main" >> "$GITHUB_OUTPUT"
           echo NO_CREDENTIAL_ACCESS=true
 
-      - name: Consume one-shot retry v2 EXECUTE authorization
+      - name: Consume one-shot official-entrypoint EXECUTE authorization
         shell: bash
         env:
           TRUSTED_MAIN: ${{ steps.trust.outputs.trusted_main }}
@@ -223,18 +229,18 @@ jobs:
           set +x
           set -Eeuo pipefail
           root="/home/runner/_work/_otclient_tibia_re_state/tasks/$TASK_ID/runtime"; mkdir -p "$root"; chmod 700 "$root"
-          marker="$root/bootstrap-retry-v2-execute-attempt-consumed.json"
+          marker="$root/official-entrypoint-execute-attempt-consumed.json"
           python3 - "$marker" "$TRUSTED_MAIN" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" <<'PY'
           import json,os,pathlib,sys
           p=pathlib.Path(sys.argv[1]); payload={'schema_version':1,'trusted_main':sys.argv[2],'run_id':sys.argv[3],'run_attempt':int(sys.argv[4])}
           try: fd=os.open(p,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
-          except FileExistsError as exc: raise SystemExit('BOOTSTRAP_RETRY_V2_EXECUTE_ALREADY_CONSUMED') from exc
+          except FileExistsError as exc: raise SystemExit('OFFICIAL_ENTRYPOINT_EXECUTE_ALREADY_CONSUMED') from exc
           with os.fdopen(fd,'w',encoding='utf-8') as h:
             json.dump(payload,h,sort_keys=True,separators=(',',':')); h.write('\n'); h.flush(); os.fsync(h.fileno())
           PY
-          echo BOOTSTRAP_RETRY_V2_EXECUTE_AUTHORIZATION_CONSUMED=PASS
+          echo OFFICIAL_ENTRYPOINT_EXECUTE_AUTHORIZATION_CONSUMED=PASS
 
-      - name: Create exactly one plain exact-current client in canonical Kasm
+      - name: Create exactly one exact-current client through official Linux entrypoint
         shell: bash
         env:
           TRUSTED_MAIN: ${{ steps.trust.outputs.trusted_main }}
@@ -243,7 +249,7 @@ jobs:
           set -Eeuo pipefail
           test "$(git ls-remote origin refs/heads/main | awk 'NR==1 {print $1}')" = "$TRUSTED_MAIN"
           test ! -e "$CANONICAL_STATE/runtime-registration.json"
-          task="$TASK_ID"; session="bootstrap-retry-v2-${GITHUB_RUN_ID}"
+          task="$TASK_ID"; session="official-entrypoint-${GITHUB_RUN_ID}"
           root="/home/runner/_work/_otclient_tibia_re_state/tasks/$task/runtime"; token="$root/canonical-lease-token"
           lease=.github/scripts/tibia-official-client-re-canonical-live-lease
           transition=.github/scripts/tibia-official-client-re-canonical-live-transition-scoped.py
@@ -255,7 +261,7 @@ jobs:
           cleanup() { rc=$?; if [[ "$active" == true && -f "$token" ]]; then bash "$lease" release --task-id "$task" --session-id "$session" --token-file "$token" >/dev/null 2>&1 || true; fi; rm -f "$token"; exit "$rc"; }
           trap cleanup EXIT
           bash "$lease" acquire --task-id "$task" --session-id "$session" --token-file "$token" --ttl-seconds 600 \
-            --stale-takeover-reason 'owner-approved canonical Kasm bin-root bootstrap retry v2 after zero-state Surveyor proof'
+            --stale-takeover-reason 'owner-approved exact-current official Linux entrypoint bootstrap after direct-launch hypothesis was disproven'
           active=true
           bash "$lease" validate --task-id "$task" --session-id "$session" --token-file "$token"
           python3 "$transition" kasm-bootstrap \
@@ -263,7 +269,7 @@ jobs:
             --worker "$worker" --probe "$probe" --worker-timeout 180
           bash "$lease" release --task-id "$task" --session-id "$session" --token-file "$token"
           active=false; rm -f "$token"
-          echo TRACK_A_CANONICAL_KASM_BOOTSTRAP_RETRY_V2=PASS
+          echo TRACK_A_CANONICAL_KASM_OFFICIAL_ENTRYPOINT_BOOTSTRAP=PASS
           echo NO_CREDENTIAL_ACCESS=true
           trap - EXIT
 
@@ -273,7 +279,7 @@ jobs:
           set +x
           set -Eeuo pipefail
           probe=.github/scripts/tibia-official-client-re-kasm-existing-runtime-probe-compatible.py
-          current="$RUNNER_TEMP/bootstrap-retry-v2-current.json"
+          current="$RUNNER_TEMP/official-entrypoint-current.json"
           python3 "$probe" probe "$current"
           python3 - "$CANONICAL_STATE/runtime-registration.json" "$current" "$EXPECTED_VERSION" "$EXPECTED_SIZE" "$EXPECTED_SHA" "$TASK_ID" <<'PY'
           import json,pathlib,sys
@@ -294,6 +300,6 @@ jobs:
           assert cur['main_window_count']==1
           assert cur['inventory_scope']=='canonical_kasm_container'
           assert cur['inventory_complete'] is True
-          print('TRACK_A_CANONICAL_KASM_BOOTSTRAP_RETRY_V2_REGISTRATION=PASS')
+          print('TRACK_A_CANONICAL_KASM_OFFICIAL_ENTRYPOINT_REGISTRATION=PASS')
           print('NO_CREDENTIAL_ACCESS=true')
           PY

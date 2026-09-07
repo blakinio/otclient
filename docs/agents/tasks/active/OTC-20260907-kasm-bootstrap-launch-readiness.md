@@ -44,7 +44,6 @@ reuses:
   - canonical Kasm scope contract
   - canonical live lease and scoped transition
   - existing identity-bound bootstrap rollback
-implementation_authorized: true
 depends_on:
   - OTC-20260907-same-boot-zero-client-bootstrap-v2-live
 blocks:

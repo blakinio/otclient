@@ -119,6 +119,10 @@ class KasmZeroClientStageDiagnosticContractTests(unittest.TestCase):
         ):
             with self.subTest(required=required):
                 self.assertIn(required, text)
+        # The wrapper must name/import the approved bootstrap worker, but it may
+        # invoke only that worker's read-only inspection primitives. Ban the
+        # actual mutation entrypoints and process-control forms instead of the
+        # worker filename itself.
         for forbidden in (
             "TIBIA_TEST_EMAIL",
             "TIBIA_TEST_PASSWORD",
@@ -128,7 +132,10 @@ class KasmZeroClientStageDiagnosticContractTests(unittest.TestCase):
             '"-TERM"',
             '"-KILL"',
             '"docker", "exec", "-d"',
-            "kasm-bootstrap",
+            "launch_from_preflight(",
+            "rollback_launch(",
+            "collect_preflight(",
+            "write_record(",
         ):
             self.assertNotIn(forbidden, text)
 

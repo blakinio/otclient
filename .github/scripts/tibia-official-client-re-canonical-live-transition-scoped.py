@@ -2,10 +2,11 @@
 """Canonical transition shim admitting the corrected Kasm-only inventory scope."""
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import stat
 import sys
 from types import ModuleType
@@ -15,6 +16,7 @@ BASE_PATH = Path(__file__).with_name("tibia-official-client-re-canonical-live-tr
 CANONICAL_SCOPE = "canonical_kasm_container"
 LEGACY_SCOPE = "all_running_docker_containers"
 ALLOWED_SCOPES = {CANONICAL_SCOPE, LEGACY_SCOPE}
+OFFICIAL_ENTRYPOINT_LAUNCH_METHOD = "docker_exec_detached_official_linux_entrypoint"
 
 
 def _load_base() -> ModuleType:
@@ -30,6 +32,16 @@ def _load_base() -> ModuleType:
 _base = _load_base()
 _original_read = _base._read
 _original_manifest = _base._manifest
+_original_read_kasm_bootstrap_record = _base._read_kasm_bootstrap_record
+_original_require_kasm_launch_bound_to_preflight = _base._require_kasm_launch_bound_to_preflight
+KASM_CLIENT_DIR = str(PurePosixPath(_base.KASM_CLIENT_PATH).parent)
+_LAUNCHER_FIELDS = {
+    "launcher_path",
+    "launcher_dir",
+    "launcher_size",
+    "launcher_sha256",
+    "launcher_selection",
+}
 
 
 def _hex64(value: Any) -> bool:
@@ -38,6 +50,146 @@ def _hex64(value: Any) -> bool:
         and len(value) == 64
         and all(char in "0123456789abcdef" for char in value.lower())
     )
+
+
+def _launcher_fields_present(data: dict[str, Any]) -> bool:
+    return any(field in data for field in _LAUNCHER_FIELDS)
+
+
+def _validate_launcher_fields(data: dict[str, Any]) -> None:
+    path = data.get("launcher_path")
+    directory = data.get("launcher_dir")
+    size = data.get("launcher_size")
+    sha = data.get("launcher_sha256")
+    selection = data.get("launcher_selection")
+    if not isinstance(path, str) or not isinstance(directory, str):
+        raise _base.E("kasm_bootstrap_record_invalid")
+    launcher = PurePosixPath(path)
+    package = PurePosixPath(_base.KASM_PACKAGE_DIR)
+    if (
+        not launcher.is_absolute()
+        or launcher.name != "Tibia"
+        or str(launcher.parent) != directory
+        or launcher == package
+        or package in launcher.parents
+    ):
+        raise _base.E("kasm_bootstrap_record_invalid")
+    if not isinstance(size, int) or size < 1 or not _hex64(sha):
+        raise _base.E("kasm_bootstrap_record_invalid")
+    if selection not in {"desktop", "unique"}:
+        raise _base.E("kasm_bootstrap_record_invalid")
+
+
+def _read_kasm_bootstrap_record(path: Path, expected_schema: str) -> dict[str, Any]:
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        raise _base.E("kasm_bootstrap_record_invalid", str(exc)) from exc
+    if not isinstance(data, dict) or data.get("schema") != expected_schema:
+        raise _base.E("kasm_bootstrap_record_invalid")
+
+    if expected_schema == _base.KASM_PREFLIGHT_SCHEMA:
+        if not _launcher_fields_present(data):
+            return _original_read_kasm_bootstrap_record(path, expected_schema)
+        required = {
+            "schema", "container_name", "container_id", "display", "package_dir",
+            "client_path", "client_size", "client_sha256", "boot_id_sha256",
+            "candidate_count", "main_window_count", "preflight_fingerprint",
+            *_LAUNCHER_FIELDS,
+        }
+        if set(data) != required:
+            raise _base.E("kasm_bootstrap_record_invalid")
+        expected = {
+            "container_name": _base.KASM_TARGET_CONTAINER,
+            "display": _base.KASM_TARGET_DISPLAY,
+            "package_dir": _base.KASM_PACKAGE_DIR,
+            "client_path": _base.KASM_CLIENT_PATH,
+            "client_size": _base.SIZE,
+            "client_sha256": _base.SHA,
+            "candidate_count": 0,
+            "main_window_count": 0,
+        }
+        if any(data.get(key) != value for key, value in expected.items()):
+            raise _base.E("kasm_bootstrap_record_invalid")
+        if (
+            not _hex64(data.get("container_id"))
+            or not _hex64(data.get("boot_id_sha256"))
+            or not _hex64(data.get("preflight_fingerprint"))
+        ):
+            raise _base.E("kasm_bootstrap_record_invalid")
+        _validate_launcher_fields(data)
+        unsigned = dict(data)
+        fingerprint = unsigned.pop("preflight_fingerprint")
+        calculated = hashlib.sha256(
+            json.dumps(unsigned, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
+        if fingerprint != calculated:
+            raise _base.E("kasm_bootstrap_record_invalid")
+        return data
+
+    if expected_schema == _base.KASM_LAUNCH_SCHEMA:
+        official_entrypoint = (
+            _launcher_fields_present(data)
+            or "client_dir" in data
+            or data.get("launch_method") == OFFICIAL_ENTRYPOINT_LAUNCH_METHOD
+        )
+        if not official_entrypoint:
+            return _original_read_kasm_bootstrap_record(path, expected_schema)
+        required = {
+            "schema", "preflight_fingerprint", "container_name", "container_id", "display",
+            "package_dir", "client_path", "client_size", "client_sha256", "pid",
+            "process_start_ticks", "launch_method", "bootstrap_helper_residue", "client_dir",
+            *_LAUNCHER_FIELDS,
+        }
+        if set(data) != required:
+            raise _base.E("kasm_bootstrap_record_invalid")
+        expected = {
+            "container_name": _base.KASM_TARGET_CONTAINER,
+            "display": _base.KASM_TARGET_DISPLAY,
+            "package_dir": _base.KASM_PACKAGE_DIR,
+            "client_path": _base.KASM_CLIENT_PATH,
+            "client_size": _base.SIZE,
+            "client_sha256": _base.SHA,
+            "launch_method": OFFICIAL_ENTRYPOINT_LAUNCH_METHOD,
+            "bootstrap_helper_residue": False,
+            "client_dir": KASM_CLIENT_DIR,
+        }
+        if any(data.get(key) != value for key, value in expected.items()):
+            raise _base.E("kasm_bootstrap_record_invalid")
+        if not _hex64(data.get("container_id")) or not _hex64(data.get("preflight_fingerprint")):
+            raise _base.E("kasm_bootstrap_record_invalid")
+        for key in ("pid", "process_start_ticks"):
+            if not isinstance(data.get(key), int) or data[key] < 1:
+                raise _base.E("kasm_bootstrap_record_invalid")
+        _validate_launcher_fields(data)
+        return data
+
+    return _original_read_kasm_bootstrap_record(path, expected_schema)
+
+
+def _require_kasm_launch_bound_to_preflight(
+    preflight: dict[str, Any], launch: dict[str, Any]
+) -> None:
+    preflight_official = _launcher_fields_present(preflight)
+    launch_official = (
+        _launcher_fields_present(launch)
+        or "client_dir" in launch
+        or launch.get("launch_method") == OFFICIAL_ENTRYPOINT_LAUNCH_METHOD
+    )
+    if preflight_official != launch_official:
+        raise _base.E("kasm_bootstrap_launch_preflight_mismatch")
+    _original_require_kasm_launch_bound_to_preflight(preflight, launch)
+    if not launch_official:
+        return
+    _validate_launcher_fields(preflight)
+    _validate_launcher_fields(launch)
+    if launch.get("launch_method") != OFFICIAL_ENTRYPOINT_LAUNCH_METHOD:
+        raise _base.E("kasm_bootstrap_launch_preflight_mismatch")
+    if launch.get("client_dir") != KASM_CLIENT_DIR:
+        raise _base.E("kasm_bootstrap_launch_preflight_mismatch")
+    for key in _LAUNCHER_FIELDS:
+        if launch.get(key) != preflight.get(key):
+            raise _base.E("kasm_bootstrap_launch_preflight_mismatch")
 
 
 def _read() -> dict[str, Any] | None:
@@ -168,6 +320,8 @@ def _require_kasm_launch_matches_manifest(launch: dict[str, Any], manifest: dict
 
 _base._read = _read
 _base._manifest = _manifest
+_base._read_kasm_bootstrap_record = _read_kasm_bootstrap_record
+_base._require_kasm_launch_bound_to_preflight = _require_kasm_launch_bound_to_preflight
 _base._require_kasm_launch_matches_manifest = _require_kasm_launch_matches_manifest
 
 

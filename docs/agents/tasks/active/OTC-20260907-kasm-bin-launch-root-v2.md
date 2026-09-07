@@ -30,9 +30,9 @@ physical_action_budget: 0
 implementation_authorized: true
 owned_paths:
   - .github/scripts/tibia-official-client-re-kasm-bootstrap-worker-compatible.py
-  - .github/workflows/track-a-canonical-kasm-bootstrap-retry.yml
+  - .github/workflows/track-a-canonical-kasm-bootstrap-retry-v2.yml
   - tests/tools/tibia_runtime_bridge/test_kasm_bootstrap_launch_readiness.py
-  - tests/tools/tibia_runtime_bridge/test_canonical_kasm_bootstrap_retry_contract.py
+  - tests/tools/tibia_runtime_bridge/test_canonical_kasm_bootstrap_retry_v2_contract.py
   - docs/agents/tasks/active/OTC-20260907-kasm-bin-launch-root-v2.md
   - docs/agents/tasks/active/OTC-20260907-canonical-kasm-bootstrap-retry-v2-live.md
 modules_touched:

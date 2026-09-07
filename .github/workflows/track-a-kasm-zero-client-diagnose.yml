@@ -1,0 +1,177 @@
+name: Track A Kasm zero-client diagnostic
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+    paths:
+      - .github/scripts/track_a_kasm_zero_client_diagnose.py
+      - .github/workflows/track-a-kasm-zero-client-diagnose.yml
+      - tests/tools/tibia_runtime_bridge/test_kasm_zero_client_diagnostic_contract.py
+      - docs/agents/tasks/active/OTC-20260907-same-boot-recovery-diagnostics.md
+      - docs/agents/tasks/active/OTC-20260907-same-boot-zero-client-diagnostic-live.md
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-kasm-zero-client-diagnostic-${{ github.event_name }}
+  cancel-in-progress: false
+
+jobs:
+  contract:
+    if: github.event_name == 'pull_request'
+    name: Kasm zero-client diagnostic contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Run deterministic diagnostic contract
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -Eeuo pipefail
+          test "$(git rev-parse HEAD)" = "$HEAD_SHA"
+          python3 tests/tools/tibia_runtime_bridge/test_kasm_zero_client_diagnostic_contract.py
+          python3 -m py_compile .github/scripts/track_a_kasm_zero_client_diagnose.py
+          python3 .github/scripts/test_track_a_agent_runtime_governance.py \
+            --changed-from "$BASE_SHA" --expected-branch "$HEAD_BRANCH"
+          python3 .github/scripts/audit_track_a_selfhosted_pr_boundary.py --base "$BASE_SHA"
+          ruby -e "require 'yaml'; YAML.load_file('.github/workflows/track-a-kasm-zero-client-diagnose.yml'); puts 'YAML_PARSE=PASS'"
+          git diff --check "$BASE_SHA"...HEAD
+          echo TRACK_A_KASM_ZERO_CLIENT_DIAGNOSTIC_CONTRACT=PASS
+
+  live-diagnostic:
+    if: >-
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request &&
+      github.event.issue.number == 975 &&
+      github.event.comment.user.login == github.repository_owner &&
+      github.event.comment.body == '/track-a-same-boot-zero-client-diagnose RUN'
+    name: Trusted-main guarded Kasm zero-client diagnostic
+    runs-on: [otclient, synology]
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact trusted main
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          ref: main
+          fetch-depth: 2
+
+      - name: Prove trusted main and diagnostic admission
+        id: trust
+        shell: bash
+        run: |
+          set +x
+          set -Eeuo pipefail
+          test "$RUNNER_NAME" = 'synology-otclient-01'
+          test "$GITHUB_RUN_ATTEMPT" = '1'
+          trusted_main="$(git rev-parse HEAD)"
+          live_main="$(git ls-remote origin refs/heads/main | awk 'NR==1 {print $1}')"
+          test "$trusted_main" = "$live_main"
+          python3 tests/tools/tibia_runtime_bridge/test_kasm_zero_client_diagnostic_contract.py
+          python3 .github/scripts/test_track_a_agent_runtime_governance.py
+          python3 - <<'PY'
+          import importlib.util
+          import pathlib
+          import sys
+
+          root = pathlib.Path('.')
+          path = root / '.github/scripts/test_track_a_agent_runtime_governance.py'
+          spec = importlib.util.spec_from_file_location('zero_client_diagnostic_governance', path)
+          assert spec and spec.loader
+          governance = importlib.util.module_from_spec(spec)
+          sys.modules[spec.name] = governance
+          spec.loader.exec_module(governance)
+          task = root / 'docs/agents/tasks/active/OTC-20260907-same-boot-zero-client-diagnostic-live.md'
+          assert governance.validate_track_a_task(task)
+          values = governance.parse_frontmatter(task)
+          required = {
+              'runtime_access': 'canonical_recovery',
+              'runtime_owner_task': 'OTC-20260907-same-boot-zero-client-diagnostic-live',
+              'runtime_namespace': 'canonical-live-runtime',
+              'canonical_registration': 'PRESENT',
+              'canonical_lease_generation': 'UNKNOWN',
+              'registration_lease_generation': '55',
+              'gate_a': 'REQUIRED_NOT_PROVEN',
+              'generation_rebind': 'NOT_APPLICABLE',
+              'gate_b': 'NOT_APPLICABLE',
+              'bootstrap': 'NOT_APPLICABLE',
+              'target_uniqueness': 'UNKNOWN',
+              'mutation_authorized': 'false',
+              'recovery_mode': 'same_boot_zero_client_invalidation_v1',
+              'same_boot_zero_client_contract': 'TRACK_A_SAME_BOOT_ZERO_CLIENT_INVALIDATION_V1',
+              'credentials_allowed': 'false',
+              'login_allowed': 'false',
+              'process_control_authorized': 'false',
+              'physical_action_budget': '0',
+              'diagnostic_attempt_limit': '1',
+          }
+          for field, expected in required.items():
+              if values.get(field) != expected:
+                  raise SystemExit(f'DIAGNOSTIC_ADMISSION_REFUSED:{field}={values.get(field)!r}')
+          source = values.get('live_runtime_authorization_source', '').strip()
+          if not source or source.upper() in {'NONE', 'UNKNOWN', 'NOT_APPLICABLE'}:
+              raise SystemExit('DIAGNOSTIC_ADMISSION_REFUSED:authorization_source')
+          print('TRACK_A_KASM_ZERO_CLIENT_DIAGNOSTIC_ADMISSION=PASS')
+          PY
+          echo "trusted_main=$trusted_main" >> "$GITHUB_OUTPUT"
+          echo NO_CREDENTIAL_ACCESS=true
+          echo RUNTIME_MUTATION=false
+
+      - name: Run one guarded read-only preflight diagnostic
+        shell: bash
+        env:
+          TRUSTED_MAIN: ${{ steps.trust.outputs.trusted_main }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          test "$(git ls-remote origin refs/heads/main | awk 'NR==1 {print $1}')" = "$TRUSTED_MAIN"
+          task='OTC-20260907-same-boot-zero-client-diagnostic-live'
+          session="zero-client-diagnostic-${GITHUB_RUN_ID}"
+          token_root="/home/runner/_work/_otclient_tibia_re_state/tasks/$task/runtime"
+          token="$token_root/canonical-lease-token"
+          lease=.github/scripts/tibia-official-client-re-canonical-live-lease
+          diagnostic=.github/scripts/track_a_kasm_zero_client_diagnose.py
+          mkdir -p "$token_root"
+          chmod 700 "/home/runner/_work/_otclient_tibia_re_state/tasks/$task" "$token_root" 2>/dev/null || true
+          rm -f "$token"
+          active=false
+          cleanup() {
+            rc=$?
+            if [[ "$active" == true && -f "$token" ]]; then
+              bash "$lease" release --task-id "$task" --session-id "$session" --token-file "$token" >/dev/null 2>&1 || true
+            fi
+            rm -f "$token"
+            exit "$rc"
+          }
+          trap cleanup EXIT
+          bash "$lease" acquire --task-id "$task" --session-id "$session" --token-file "$token" --ttl-seconds 300 \
+            --stale-takeover-reason 'owner-approved read-only zero-client preflight diagnostic'
+          active=true
+          bash "$lease" validate --task-id "$task" --session-id "$session" --token-file "$token"
+          set +e
+          TRACK_A_ZERO_CLIENT_DIAGNOSTIC_GUARDED=1 \
+            bash "$lease" guard-run --task-id "$task" --session-id "$session" --token-file "$token" -- \
+              python3 "$diagnostic"
+          diagnostic_rc=$?
+          set -e
+          bash "$lease" release --task-id "$task" --session-id "$session" --token-file "$token"
+          active=false
+          rm -f "$token"
+          echo NO_CREDENTIAL_ACCESS=true
+          echo RUNTIME_MUTATION=false
+          trap - EXIT
+          exit "$diagnostic_rc"

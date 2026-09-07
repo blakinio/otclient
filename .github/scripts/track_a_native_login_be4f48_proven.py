@@ -6,6 +6,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import shlex
 import stat
 import struct
 import subprocess
@@ -272,6 +273,168 @@ def _install_bundle_user_owned(bundle: Path) -> None:
             raise PhysicalError("installed_helper_digest_mismatch")
 
 
+def _launcher_env(*, instrumented: bool) -> list[str]:
+    env_args = [
+        "-e", "HOME=/home/kasm-user",
+        "-e", f"DISPLAY={_base.TARGET_DISPLAY}",
+        "-e", "XAUTHORITY=/home/kasm-user/.Xauthority",
+        "-e", f"LD_LIBRARY_PATH={_base.PACKAGE_DIR}:{_base.PACKAGE_DIR}/lib",
+    ]
+    if instrumented:
+        env_args.extend([
+            "-e", f"LD_PRELOAD={_base.BRIDGE_SO}:{_base.AUTH_SO}:{_base.CHARACTER_SO}",
+            "-e", f"OTCLIENT_TIBIA_RE_SOCKET={_base.BRIDGE_SOCKET}",
+            "-e", f"OTCLIENT_TIBIA_RE_AUTH_SOCKET={_base.AUTH_SOCKET}",
+            "-e", f"OTCLIENT_TIBIA_RE_CHARACTER_SOCKET={_base.CHARACTER_SOCKET}",
+            "-e", f"OTCLIENT_TIBIA_RE_BINARY_SHA256={_base.EXPECTED_SHA}",
+            "-e", f"OTCLIENT_TIBIA_RE_CLIENT_VERSION={_base.EXPECTED_VERSION}",
+            "-e", f"OTCLIENT_TIBIA_RE_TARGETS={_base._profile_targets()}",
+        ])
+    return env_args
+
+
+def _launch_exact_client(*, instrumented: bool) -> subprocess.CompletedProcess[str]:
+    legacy_email, legacy_password = _base._legacy_credential_env_names()
+    command = [
+        "docker", "exec", "-d", "-u", _base.TARGET_USER, "-w", _base.PACKAGE_DIR,
+        *_launcher_env(instrumented=instrumented),
+        _base.TARGET_CONTAINER,
+        "/usr/bin/env",
+        "-u", "RUNNER_TRACKING_ID",
+        "-u", legacy_email,
+        "-u", legacy_password,
+        "-u", "TRACK_A_CANONICAL_LEASE_TOKEN",
+        "-u", "TRACK_A_CANONICAL_LEASE_TOKEN_FILE",
+    ]
+    if not instrumented:
+        command.extend([
+            "-u", "LD_PRELOAD",
+            "-u", "OTCLIENT_TIBIA_RE_SOCKET",
+            "-u", "OTCLIENT_TIBIA_RE_AUTH_SOCKET",
+            "-u", "OTCLIENT_TIBIA_RE_CHARACTER_SOCKET",
+            "-u", "OTCLIENT_TIBIA_RE_BINARY_SHA256",
+            "-u", "OTCLIENT_TIBIA_RE_CLIENT_VERSION",
+            "-u", "OTCLIENT_TIBIA_RE_TARGETS",
+        ])
+    launch_script = f"cd {shlex.quote(_base.PACKAGE_DIR)} && exec ./client"
+    command.extend(["sh", "-lc", launch_script])
+    return _base._run(command, timeout=20)
+
+
+def _wait_exact_runtime(old_pid: int, old_start: int, *, seconds: float = 30.0) -> dict[str, Any]:
+    deadline = time.monotonic() + seconds
+    last_error: Exception | None = None
+    while time.monotonic() < deadline:
+        try:
+            manifest = _base._current_manifest()
+            if manifest.get("pid") != old_pid and manifest.get("process_start_ticks") != old_start:
+                return manifest
+        except Exception as exc:
+            last_error = exc
+        time.sleep(0.5)
+    raise PhysicalError("replacement_rollback_runtime_not_ready") from last_error
+
+
+def _stop_failed_replacement_if_present(old_pid: int, old_start: int, uid: int) -> None:
+    try:
+        manifest = _base._current_manifest()
+    except PhysicalError:
+        return
+    pid = int(manifest.get("pid", -1))
+    start = int(manifest.get("process_start_ticks", -1))
+    if pid == old_pid or start == old_start:
+        return
+    if not _base.same_numeric_uid(pid, uid):
+        raise PhysicalError("replacement_failed_candidate_uid_mismatch")
+    stopped = _base._run([
+        "docker", "exec", "-u", _base.TARGET_USER, _base.TARGET_CONTAINER,
+        "kill", "-TERM", str(pid),
+    ])
+    if stopped.returncode != 0:
+        raise PhysicalError("replacement_failed_candidate_SIGTERM_failed")
+    _base._wait_pid_gone(pid)
+
+
+def _rollback_exact_client(old_pid: int, old_start: int, uid: int, result: Path) -> None:
+    _stop_failed_replacement_if_present(old_pid, old_start, uid)
+    launch = _launch_exact_client(instrumented=False)
+    if launch.returncode != 0:
+        raise PhysicalError("replacement_rollback_launch_failed")
+    rollback = _wait_exact_runtime(old_pid, old_start)
+    if not _base.same_numeric_uid(int(rollback["pid"]), uid):
+        raise PhysicalError("replacement_rollback_uid_mismatch")
+    _base._write_json(result, {
+        "schema": "otclient.track-a.native-login-replacement.v1",
+        "exact_current": True,
+        "instrumented_ready": False,
+        "rollback_exact_current": True,
+        "rollback_registration_recovery_required": True,
+        "pid": rollback["pid"],
+        "process_start_ticks": rollback["process_start_ticks"],
+        "boot_id_sha256": rollback["boot_id_sha256"],
+        "candidate_fingerprint": rollback["candidate_fingerprint"],
+        "helpers_ready": False,
+        "credential_plaintext_accessed": False,
+        "secret_attempt_count": 0,
+    })
+
+
+def replace(vault_dir: Path, bundle: Path, result: Path) -> None:
+    _base._vault_precheck(vault_dir)
+    _base._verify_bundle(bundle)
+    registration = _base._read_registration()
+    manifest = _base._current_manifest()
+    _base._require_manifest_matches_registration(manifest, registration)
+    uid, _gid = _base._numeric_user()
+    if not _base.same_numeric_uid(int(registration["pid"]), uid):
+        raise PhysicalError("same_numeric_uid_failed")
+
+    _install_bundle_user_owned(bundle)
+    old_pid = int(registration["pid"])
+    old_start = int(registration["process_start_ticks"])
+    stopped = _base._run([
+        "docker", "exec", "-u", _base.TARGET_USER, _base.TARGET_CONTAINER,
+        "kill", "-TERM", str(old_pid),
+    ])
+    if stopped.returncode != 0:
+        raise PhysicalError("exact_registered_SIGTERM_failed")
+    _base._wait_pid_gone(old_pid)
+
+    # Fail closed if another exact-current process appeared before replacement.
+    try:
+        unexpected = _base._current_manifest()
+    except PhysicalError:
+        unexpected = None
+    if unexpected is not None:
+        raise PhysicalError("post_SIGTERM_exact_client_still_present")
+
+    launch = _launch_exact_client(instrumented=True)
+    if launch.returncode != 0:
+        _rollback_exact_client(old_pid, old_start, uid, result)
+        raise PhysicalError("replacement_instrumented_launch_failed")
+
+    try:
+        replacement = _base._wait_replacement(old_pid, old_start)
+    except PhysicalError as exc:
+        _rollback_exact_client(old_pid, old_start, uid, result)
+        raise PhysicalError("replacement_instrumented_runtime_not_ready_rollback_restored") from exc
+
+    _base._write_json(result, {
+        "schema": "otclient.track-a.native-login-replacement.v1",
+        "exact_current": True,
+        "instrumented_ready": True,
+        "rollback_exact_current": False,
+        "rollback_registration_recovery_required": False,
+        "pid": replacement["pid"],
+        "process_start_ticks": replacement["process_start_ticks"],
+        "boot_id_sha256": replacement["boot_id_sha256"],
+        "candidate_fingerprint": replacement["candidate_fingerprint"],
+        "helpers_ready": True,
+        "credential_plaintext_accessed": False,
+        "secret_attempt_count": 0,
+    })
+
+
 def auth_one_shot(vault_dir: Path, result: Path) -> None:
     registration = _base._read_registration()
     manifest = _base._current_manifest()
@@ -329,10 +492,11 @@ def auth_one_shot(vault_dir: Path, result: Path) -> None:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    # Only corrected ingress/install seams are replaced. Base replace() and
-    # confirm_unique() remain untouched, preserving the recursion regression fix.
+    # Override only the corrected install/replacement/ingress seams. Character
+    # confirmation remains the base implementation, preserving its recursion fix.
     _base.precheck = precheck
     _base._install_bundle = _install_bundle_user_owned
+    _base.replace = replace
     _base.auth_one_shot = auth_one_shot
     return int(_base.main(argv))
 

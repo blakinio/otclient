@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 from pathlib import Path
 import sys
 from types import ModuleType
@@ -44,6 +45,7 @@ def collect(runner: Callable[[Sequence[str]], str] = _base.run) -> dict[str, Any
     finally:
         _base.candidate_rows = original
     payload["inventory_scope"] = "canonical_kasm_container"
+    payload["inventory_complete"] = True
     return payload
 
 
@@ -63,7 +65,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     output = Path(argv[1])
     try:
         payload = collect()
-        output.write_text(__import__("json").dumps(payload, sort_keys=True, separators=(",", ":")) + "\n")
+        output.write_text(json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n")
         output.chmod(0o600)
         print("TRACK_A_KASM_EXISTING_RUNTIME_PROBE=PASS")
         return 0

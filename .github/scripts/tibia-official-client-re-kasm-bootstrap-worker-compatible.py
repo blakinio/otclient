@@ -64,7 +64,7 @@ def consider(path):
     if resolved.name!='Tibia' or package in resolved.parents:
         return
     parent=resolved.parent
-    support=sum((parent/'qt.conf').is_file(), (parent/'lib').is_dir(), (parent/'plugins').is_dir())
+    support=int((parent/'qt.conf').is_file())+int((parent/'lib').is_dir())+int((parent/'plugins').is_dir())
     if support < 2:
         return
     key=str(resolved)

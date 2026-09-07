@@ -103,6 +103,25 @@ Only after this corrective PR is reviewed, exact-head green and merged to curren
 
 A successful EXECUTE must leave exactly one exact-current registered client and no conflicting launcher residue. Any failure must rollback only task-created exact identities and re-prove the original zero-client state.
 
+## Implementation checkpoint
+
+PR #982 implements only the scoped transition compatibility required by the #981 official-entrypoint worker. The historical record reader remains the fallback for legacy records; launcher-bound PRECHECK and LAUNCH records use exact key sets; the complete launcher-bound preflight fingerprint is recomputed; the launch method, `client_dir`, and every launcher identity field are bound back to PRECHECK; partial, mixed, drifted, unknown-key and wrong-method records remain fail-closed. Track B #284 is untouched.
+
+Two PR-head validation failures were investigated and corrected rather than retried blindly:
+
+- the legacy same-boot contract initially failed because a static registration-file safety test saw a new `read_text()` before the scoped registration reader's `lstat()`; the bootstrap-record reader was changed to `open()` plus `json.load()` so the historical registration read-order invariant remains intact;
+- general CI then failed only because the rewritten workflow lacked a final newline; the file termination was corrected without changing runtime semantics.
+
+The resulting reviewed implementation head `36374fa2fe7cce7a5c766943ddd6f8fe56fdd358` completed all exact-head validation successfully:
+
+- Track A canonical Kasm official Linux entrypoint bootstrap run `34136148307`: success;
+- Track A same-boot zero-client recovery v2 run `34136148340`: success;
+- Track A agent runtime governance run `34136148297`: success;
+- Track A self-hosted PR boundary run `34136148319`: success;
+- CI run `34136148570`: success, including `CI / Required` job `101787885991`, syntax/workflow validation, Lua syntax, and informational static analysis.
+
+At the Ready transition PR #982 was mergeable, had no submitted reviews, no unresolved review threads, and no requested changes. The task-record update containing this checkpoint is documentation-only and must itself receive exact-head validation before merge.
+
 ## Next action
 
-Implement and deterministically test the scoped transition compatibility, merge the corrective PR only on exact-head green evidence, then run the fresh one-shot PRECHECK followed by EXECUTE if PRECHECK passes.
+After the documentation-only task-record head is exact-head green, re-check PR #982 changed paths and review state, squash-merge #982 to trusted `main`, refresh current `main`, then issue exactly one fresh `/track-a-official-entrypoint-transition-compat-bootstrap PRECHECK` on PR #975. Issue EXECUTE only if that PRECHECK passes on the same trusted main.

@@ -1,0 +1,357 @@
+name: Track A worldmap v18 native single-character confirmation
+
+on:
+  push:
+    branches:
+      - runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation
+    paths:
+      - .github/workflows/track-a-worldmap-server-delivery-causal-validation-v18.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: track-a-worldmap-v18-native-single-character-confirmation
+  cancel-in-progress: false
+
+env:
+  HEAD_BRANCH: runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation
+  ARM_SUBJECT: 'ci(track-a): arm v18 native single-character confirmation'
+  TASK_PATH: docs/agents/tasks/active/OTC-20260817-track-a-worldmap-server-delivery-causal-validation.md
+
+jobs:
+  static-v18:
+    name: Static v18 native confirmation composition
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Exact merge composition and embedded-generator fence
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git init -q "$RUNNER_TEMP/repo"; cd "$RUNNER_TEMP/repo"
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch -q --no-tags origin \
+            "+refs/heads/main:refs/remotes/origin/main" \
+            "+refs/heads/$HEAD_BRANCH:refs/remotes/origin/task-head" \
+            "+refs/pull/475/merge:refs/remotes/pull/475/merge"
+          main_sha="$(git rev-parse refs/remotes/origin/main)"; head_sha="$(git rev-parse refs/remotes/origin/task-head)"
+          [[ "$(git log -1 --format=%s "$head_sha")" == "$ARM_SUBJECT" ]]
+          git checkout -q --detach refs/remotes/pull/475/merge
+          [[ "$(git rev-parse HEAD^1)" == "$main_sha" && "$(git rev-parse HEAD^2)" == "$head_sha" ]]
+          grep -Fq 'phase: baseline_native_single_character_confirmation_v18_world_entry_screenshot' "$TASK_PATH"
+          grep -Fq 'baseline_ephemeral_login_max: 8' "$TASK_PATH"
+          grep -Fq 'baseline_ephemeral_login_consumed: 7' "$TASK_PATH"
+          grep -Fq 'eighth_baseline_login_attempt_authorized: true' "$TASK_PATH"
+          echo "WORLDMAP_V18_STATIC_MAIN=$main_sha"
+          echo "WORLDMAP_V18_STATIC_HEAD=$head_sha"
+
+          python3 -m py_compile \
+            .github/scripts/track-a-worldmap-native-single-confirm-v18-repair.py \
+            .github/scripts/track-a-worldmap-causal-xwd-to-png.py
+          python3 .github/scripts/track-a-worldmap-causal-gdb-env-repair.py .github/scripts/track-a-worldmap-causal-ephemeral-baseline.sh "$RUNNER_TEMP/v18-gdb.sh"
+          python3 .github/scripts/track-a-worldmap-causal-ui-geometry-repair.py "$RUNNER_TEMP/v18-gdb.sh" "$RUNNER_TEMP/v18-v2.sh"
+          python3 .github/scripts/track-a-worldmap-causal-ui-field-discriminator-v3-repair.py "$RUNNER_TEMP/v18-v2.sh" "$RUNNER_TEMP/v18-v3.sh"
+          python3 .github/scripts/track-a-worldmap-causal-ui-field-discriminator-v4-repair.py "$RUNNER_TEMP/v18-v3.sh" "$RUNNER_TEMP/v18-v4.sh"
+          python3 .github/scripts/track-a-worldmap-causal-ui-field-final-roi-v5-repair.py "$RUNNER_TEMP/v18-v4.sh" "$RUNNER_TEMP/v18-v5.sh"
+          python3 .github/scripts/track-a-worldmap-causal-baseline-login-v6-repair.py "$RUNNER_TEMP/v18-v5.sh" "$RUNNER_TEMP/v18-v6.sh"
+          python3 .github/scripts/track-a-worldmap-causal-character-selection-v7-repair.py "$RUNNER_TEMP/v18-v6.sh" "$RUNNER_TEMP/v18-v7.sh"
+          python3 .github/scripts/track-a-worldmap-causal-auth-submit-v9-anchor-adapter.py .github/scripts/track-a-worldmap-causal-auth-submit-v9-repair.py "$RUNNER_TEMP/v18-v7.sh" "$RUNNER_TEMP/v18-v9.sh"
+          python3 .github/scripts/track-a-worldmap-causal-press-cancel-v10-repair.py "$RUNNER_TEMP/v18-v9.sh" "$RUNNER_TEMP/v18-v10.sh"
+          python3 .github/scripts/track-a-worldmap-causal-auth-state-v11-repair.py "$RUNNER_TEMP/v18-v10.sh" "$RUNNER_TEMP/v18-v11.sh"
+          python3 .github/scripts/track-a-worldmap-causal-transport-visual-v12-repair.py "$RUNNER_TEMP/v18-v11.sh" "$RUNNER_TEMP/v18-v12.sh"
+          python3 .github/scripts/track-a-worldmap-causal-pinned-login-v13-repair.py "$RUNNER_TEMP/v18-v12.sh" "$RUNNER_TEMP/v18-v13.sh"
+          python3 .github/scripts/track-a-worldmap-causal-character-activation-v14-repair.py "$RUNNER_TEMP/v18-v13.sh" "$RUNNER_TEMP/v18-v14.sh"
+          python3 .github/scripts/track-a-worldmap-native-single-confirm-v18-repair.py "$RUNNER_TEMP/v18-v14.sh" "$RUNNER_TEMP/v18-auth.sh"
+          python3 .github/scripts/track-a-worldmap-causal-map-screenshot-v8-repair.py "$RUNNER_TEMP/v18-auth.sh" "$RUNNER_TEMP/v18.sh"
+          bash -n "$RUNNER_TEMP/v18.sh"
+
+          python3 - "$RUNNER_TEMP/v18.sh" "$RUNNER_TEMP/gdb-generator.py" <<'PY'
+          from pathlib import Path
+          import sys
+          helper=Path(sys.argv[1]).read_text()
+          start='python3 - "$GCMD" "$PID" "$bias" "$EVENTS" "$STRIPS" <<\'PY\'\n'
+          a=helper.find(start); assert a>=0; a+=len(start)
+          b=helper.find('\nPY\nchmod 600 "$GCMD"',a); assert b>a
+          src=helper[a:b]
+          compile(src,'<v18-embedded-gdb-generator>','exec')
+          Path(sys.argv[2]).write_text(src)
+          print('WORLDMAP_V18_EMBEDDED_GENERATOR_COMPILE=PASS')
+          PY
+          python3 "$RUNNER_TEMP/gdb-generator.py" "$RUNNER_TEMP/generated.gdb" 12345 0 "$RUNNER_TEMP/events" "$RUNNER_TEMP/strips"
+          test -s "$RUNNER_TEMP/generated.gdb"
+          for marker in \
+            'WORLDMAP_V18_POSTAUTH_CHARSEL_INSTANCE_COUNT=' \
+            'WORLDMAP_V18_NATIVE_CHARACTER_LIST_COUNT=' \
+            'WORLDMAP_V18_NATIVE_SELECTION_INDEX=0' \
+            'WORLDMAP_V18_QT_THREAD_AFFINITY=PASS' \
+            'WORLDMAP_V18_CONST_SELECTION_VIEW=PASS' \
+            'WORLDMAP_V18_NATIVE_CHARACTER_CONFIRMATION_QMETA=PASS' \
+            'WORLDMAP_V18_SEMANTIC_RESULT=PASS'; do grep -Fq "$marker" "$RUNNER_TEMP/generated.gdb"; done
+          ! grep -Fq "M(0xd47300,'RequestCharacterLogin')" "$RUNNER_TEMP/generated.gdb"
+          ! grep -Fq "M(0xd47130,'CharacterSelectionConfirmed')" "$RUNNER_TEMP/generated.gdb"
+          ! grep -Fq 'WORLDMAP_V14_CHARACTER_ATTEMPT=' "$RUNNER_TEMP/v18.sh"
+          ! grep -Fq 'Invalid Monk' "$RUNNER_TEMP/v18.sh"
+          ! grep -Fq '"$XWD" -root' "$RUNNER_TEMP/v18.sh"
+          ! grep -Eiq 'tesseract|ocrmypdf' "$RUNNER_TEMP/v18.sh"
+          echo 'WORLDMAP_V18_STATIC_COMPOSITION=PASS'
+          echo 'WORLDMAP_V18_STATIC_CLIENT_EXECUTED=false'
+
+      - name: Exact-SHA const selection-view ownership proof
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends curl python3-pyelftools python3-capstone
+          r="$RUNNER_TEMP/qproof"; mkdir -p "$r/bin" "$r/state" "$r/client"; cd "$r/bin"
+          curl -fsSL -o wgcf https://github.com/ViRb3/wgcf/releases/download/v2.2.32/wgcf_2.2.32_linux_amd64
+          echo '2ff97f2201972ce582a424455d50a3719a380eef0cd1f3144f7779348e122a2c  wgcf' | sha256sum -c -
+          curl -fsSL -o wp.tgz https://github.com/windtf/wireproxy/releases/download/v1.1.3/wireproxy_linux_amd64.tar.gz
+          echo 'e88c1d090740373fc606c1bafd81d9a5eadc642cce5667616e20e9d7a444f51c  wp.tgz' | sha256sum -c -
+          mkdir x; tar -xzf wp.tgz -C x; cp "$(find x -type f -name wireproxy -print -quit)" wireproxy; chmod 755 wgcf wireproxy
+          cd "$r/state"; "$r/bin/wgcf" register --accept-tos >/dev/null; "$r/bin/wgcf" generate >/dev/null
+          printf 'WGConfig = %s\n\n[Socks5]\nBindAddress = 127.0.0.1:25344\n' "$r/state/wgcf-profile.conf" >w.conf
+          nohup "$r/bin/wireproxy" -c w.conf >"$r/wp.log" 2>&1 </dev/null &
+          for _ in $(seq 1 30); do curl --socks5-hostname 127.0.0.1:25344 -fsS --max-time 10 https://www.cloudflare.com/cdn-cgi/trace >"$r/trace" 2>/dev/null && break; sleep 2; done
+          grep -Eq '^warp=(on|plus)$' "$r/trace"
+          u=https://static.tibia.com/launcher/tibiaclient-linux-current/bin/client.lzma
+          curl --socks5-hostname 127.0.0.1:25344 --compressed -fL -A 'Mozilla/5.0 (X11; Linux x86_64)' -e "$u" -H 'Accept: */*' "$u" -o "$r/client/client.lzma"
+          echo '496c5b3517c0996a1bbd0e76a7738d450f79d0bf4fef140a807044776042dc9b  '"$r"'/client/client.lzma' | sha256sum -c -
+          python3 - "$r/client/client.lzma" "$r/client/client" <<'PY'
+          import hashlib,lzma,pathlib,sys
+          from elftools.elf.elffile import ELFFile
+          from capstone import Cs,CS_ARCH_X86,CS_MODE_64
+          from capstone.x86_const import X86_OP_MEM,X86_REG_R14
+          src=pathlib.Path(sys.argv[1]);out=pathlib.Path(sys.argv[2]);b=src.read_bytes();q=b[32];lc=q%9;z=q//9;lp=z%5;pb=z//5;ds=int.from_bytes(b[33:37],'little')
+          raw=lzma.decompress(b[45:],format=lzma.FORMAT_RAW,filters=[{'id':lzma.FILTER_LZMA1,'dict_size':ds,'lc':lc,'lp':lp,'pb':pb}])
+          assert len(raw)==51965216 and hashlib.sha256(raw).hexdigest()=='e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe'
+          out.write_bytes(raw)
+          with out.open('rb') as fh:
+            elf=ELFFile(fh);secs=[(s.name,int(s['sh_offset']),int(s['sh_size']),int(s['sh_addr']),int(s['sh_flags'])) for s in elf.iter_sections()]
+          def vo(va):
+            for n,o,z,v,fl in secs:
+              if v<=va<v+z:return o+(va-v)
+            raise ValueError(hex(va))
+          md=Cs(CS_ARCH_X86,CS_MODE_64);md.detail=True
+          ins=list(md.disasm(raw[vo(0x856550):vo(0x85684e)],0x856550))
+          assert any(x.address==0x856554 and x.mnemonic=='mov' and 'rsi' in x.op_str and 'r14' in x.op_str for x in ins[:8])
+          refs=[];repurpose=None
+          for x in ins:
+            if x.address>0x856554:
+              dst=x.op_str.split(',',1)[0].strip() if x.op_str else ''
+              if dst in ('r14','r14d','r14w','r14b'):
+                repurpose=x.address;break
+            for op in x.operands:
+              if op.type==X86_OP_MEM and op.mem.base==X86_REG_R14:refs.append((x.address,op.mem.disp))
+          print('WORLDMAP_V18_CONST_ALIAS_REFS='+','.join(f'0x{a:x}:+0x{d:x}' for a,d in refs))
+          print('WORLDMAP_V18_R14_REPURPOSE=0x%x'%repurpose)
+          assert [d for _,d in refs]==[8,16]
+          wrapper=list(md.disasm(raw[vo(0xd46900):vo(0xd4691b)],0xd46900))
+          assert wrapper[0].mnemonic=='mov' and '[r12 + 8]' in wrapper[0].op_str and 'rsi' in wrapper[0].op_str
+          assert wrapper[-1].mnemonic=='jmp' and '0x856550' in wrapper[-1].op_str
+          print('WORLDMAP_V18_CONST_QLIST_HEADER_READ=false')
+          print('WORLDMAP_V18_CONST_QLIST_CALLEE_OWNERSHIP=false')
+          print('WORLDMAP_V18_CONST_QLIST_SELECTION_VIEW=PASS')
+          PY
+
+  physical-v18:
+    name: Physical baseline v18 native confirmation and screenshot
+    needs: static-v18
+    runs-on: [otclient, synology]
+    timeout-minutes: 45
+    steps:
+      - name: Checkout task branch
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ env.HEAD_BRANCH }}
+          persist-credentials: true
+          fetch-depth: 0
+
+      - name: Exact current-main merge checkout
+        shell: bash
+        run: |
+          set +x; set -Eeuo pipefail
+          git fetch --no-tags --prune origin \
+            "+refs/heads/main:refs/remotes/origin/main" \
+            "+refs/heads/$HEAD_BRANCH:refs/remotes/origin/task-head" \
+            "+refs/pull/475/merge:refs/remotes/pull/475/merge"
+          main_sha="$(git rev-parse refs/remotes/origin/main)"; head_sha="$(git rev-parse refs/remotes/origin/task-head)"
+          [[ "$(git log -1 --format=%s "$head_sha")" == "$ARM_SUBJECT" ]] || exit 97
+          git checkout -q -f --detach refs/remotes/pull/475/merge; git clean -ffdx
+          [[ "$(git rev-parse HEAD^1)" == "$main_sha" && "$(git rev-parse HEAD^2)" == "$head_sha" ]] || exit 98
+          printf '%s\n' "$head_sha" >"$RUNNER_TEMP/v18-arm-head"
+          echo "WORLDMAP_V18_CURRENT_MAIN=$main_sha"
+          echo "WORLDMAP_V18_HEAD_SHA=$head_sha"
+
+      - name: Authority and fresh no-client inventory
+        shell: bash
+        run: |
+          set +x; set -Eeuo pipefail
+          grep -Fq 'baseline_ephemeral_login_max: 8' "$TASK_PATH"
+          grep -Fq 'baseline_ephemeral_login_consumed: 7' "$TASK_PATH"
+          grep -Fq 'eighth_baseline_login_attempt_authorized: true' "$TASK_PATH"
+          grep -Fq 'coordinate_character_selection_control: forbidden' "$TASK_PATH"
+          python3 - <<'PY'
+          from pathlib import Path
+          import os,hashlib
+          SIZE=51965216; SHA='e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe'
+          marks=(b'OTCLIENT_TIBIA_RE_EPHEMERAL_RUNTIME=worldmap-causal-baseline-ephemeral-v1',b'OTCLIENT_TIBIA_RE_EPHEMERAL_RUNTIME=worldmap-causal-patched-ephemeral-v1')
+          found=[];clients=[]
+          def digest(p):
+              h=hashlib.sha256()
+              with p.open('rb',buffering=0) as f:
+                  for b in iter(lambda:f.read(1<<20),b''):h.update(b)
+              return h.hexdigest()
+          for p in Path('/proc').iterdir():
+              if not p.name.isdigit():continue
+              try:
+                  env=set((p/'environ').read_bytes().split(b'\0'));exe=Path(os.readlink(p/'exe'));st=exe.stat();cmd=(p/'cmdline').read_bytes().replace(b'\0',b' ').decode(errors='replace')
+              except (OSError,PermissionError):continue
+              if any(m in env for m in marks):found.append(int(p.name))
+              hinted='CipSoft GmbH/Tibia/packages/Tibia' in cmd or '/Tibia/packages/Tibia/' in str(exe)
+              if hinted or st.st_size==SIZE:
+                  try:sha=digest(exe)
+                  except OSError:continue
+                  if hinted or (st.st_size==SIZE and sha==SHA):clients.append(int(p.name))
+          print('WORLDMAP_V18_TASK_NAMESPACE_PROCESS_COUNT='+str(len(set(found))))
+          print('WORLDMAP_V18_OFFICIAL_CLIENT_CANDIDATE_COUNT='+str(len(set(clients))))
+          if found or clients:raise SystemExit('WORLDMAP_V18_ERROR=target_not_unique')
+          print('WORLDMAP_V18_TARGET_UNIQUENESS=PROVEN')
+          PY
+
+      - name: Compose exact v18 helper
+        id: compose
+        shell: bash
+        run: |
+          set +x; set -Eeuo pipefail
+          python3 .github/scripts/track-a-worldmap-causal-gdb-env-repair.py .github/scripts/track-a-worldmap-causal-ephemeral-baseline.sh "$RUNNER_TEMP/v18-gdb.sh"
+          python3 .github/scripts/track-a-worldmap-causal-ui-geometry-repair.py "$RUNNER_TEMP/v18-gdb.sh" "$RUNNER_TEMP/v18-v2.sh"
+          python3 .github/scripts/track-a-worldmap-causal-ui-field-discriminator-v3-repair.py "$RUNNER_TEMP/v18-v2.sh" "$RUNNER_TEMP/v18-v3.sh"
+          python3 .github/scripts/track-a-worldmap-causal-ui-field-discriminator-v4-repair.py "$RUNNER_TEMP/v18-v3.sh" "$RUNNER_TEMP/v18-v4.sh"
+          python3 .github/scripts/track-a-worldmap-causal-ui-field-final-roi-v5-repair.py "$RUNNER_TEMP/v18-v4.sh" "$RUNNER_TEMP/v18-v5.sh"
+          python3 .github/scripts/track-a-worldmap-causal-baseline-login-v6-repair.py "$RUNNER_TEMP/v18-v5.sh" "$RUNNER_TEMP/v18-v6.sh"
+          python3 .github/scripts/track-a-worldmap-causal-character-selection-v7-repair.py "$RUNNER_TEMP/v18-v6.sh" "$RUNNER_TEMP/v18-v7.sh"
+          python3 .github/scripts/track-a-worldmap-causal-auth-submit-v9-anchor-adapter.py .github/scripts/track-a-worldmap-causal-auth-submit-v9-repair.py "$RUNNER_TEMP/v18-v7.sh" "$RUNNER_TEMP/v18-v9.sh"
+          python3 .github/scripts/track-a-worldmap-causal-press-cancel-v10-repair.py "$RUNNER_TEMP/v18-v9.sh" "$RUNNER_TEMP/v18-v10.sh"
+          python3 .github/scripts/track-a-worldmap-causal-auth-state-v11-repair.py "$RUNNER_TEMP/v18-v10.sh" "$RUNNER_TEMP/v18-v11.sh"
+          python3 .github/scripts/track-a-worldmap-causal-transport-visual-v12-repair.py "$RUNNER_TEMP/v18-v11.sh" "$RUNNER_TEMP/v18-v12.sh"
+          python3 .github/scripts/track-a-worldmap-causal-pinned-login-v13-repair.py "$RUNNER_TEMP/v18-v12.sh" "$RUNNER_TEMP/v18-v13.sh"
+          python3 .github/scripts/track-a-worldmap-causal-character-activation-v14-repair.py "$RUNNER_TEMP/v18-v13.sh" "$RUNNER_TEMP/v18-v14.sh"
+          python3 .github/scripts/track-a-worldmap-native-single-confirm-v18-repair.py "$RUNNER_TEMP/v18-v14.sh" "$RUNNER_TEMP/v18-auth.sh"
+          python3 .github/scripts/track-a-worldmap-causal-map-screenshot-v8-repair.py "$RUNNER_TEMP/v18-auth.sh" "$RUNNER_TEMP/v18.sh"
+          bash -n "$RUNNER_TEMP/v18.sh";chmod 700 "$RUNNER_TEMP/v18.sh"
+          echo "helper=$RUNNER_TEMP/v18.sh" >>"$GITHUB_OUTPUT"
+          echo 'WORLDMAP_V18_PHYSICAL_COMPOSITION=PASS'
+
+      - name: Repeat mandatory pre-secret gates
+        shell: bash
+        env:
+          HELPER: ${{ steps.compose.outputs.helper }}
+        run: |
+          set +x;set -Eeuo pipefail
+          control="$RUNNER_TEMP/worldmap-baseline-control";mkdir -p "$control";chmod 700 "$control"
+          rm -f "$control"/helper.pid "$control"/helper.log "$control"/presecret.ready "$control"/credentials.fifo "$control"/result "$control"/result.* 2>/dev/null||true
+          nohup setsid env -i HOME="$HOME" PATH="$PATH" RUNNER_NAME="$RUNNER_NAME" RUNNER_TEMP="$RUNNER_TEMP" GITHUB_REPOSITORY="$GITHUB_REPOSITORY" GITHUB_WORKSPACE="$GITHUB_WORKSPACE" bash "$HELPER" >"$control/helper.log" 2>&1 </dev/null &
+          pid=$!;printf '%s\n' "$pid">"$control/helper.pid";chmod 600 "$control/helper.pid" "$control/helper.log"
+          ready=0
+          for _ in $(seq 1 1800);do
+            if [[ -f "$control/result" ]];then rc="$(tr -cd '0-9'<"$control/result")";cat "$control/helper.log";exit "${rc:-95}";fi
+            if [[ -f "$control/presecret.ready" && -p "$control/credentials.fifo" ]]&&grep -Fq 'WORLDMAP_V13_PINNED_LOGIN_CONTROL=PROVEN_FROM_V10_EXACT_GEOMETRY' "$control/helper.log";then ready=1;break;fi
+            kill -0 "$pid" 2>/dev/null||{ cat "$control/helper.log";exit 94;};sleep .5
+          done
+          [[ "$ready" == 1 ]]
+          ! grep -azq '^TIBIA_TEST_EMAIL=' "/proc/$pid/environ"
+          ! grep -azq '^TIBIA_TEST_PASSWORD=' "/proc/$pid/environ"
+          for marker in \
+            'WORLDMAP_BASELINE_GDB_ATTACH=PASS' \
+            'WORLDMAP_BASELINE_PRE_STORAGE_OBSERVER=ARMED' \
+            'WORLDMAP_BASELINE_UI_WINDOW_XRES_OWNER=MANIFEST_PROVEN' \
+            'WORLDMAP_BASELINE_EMAIL_FIELD_EDITABLE=PASS' \
+            'WORLDMAP_BASELINE_PASSWORD_FIELD_EDITABLE=PASS' \
+            'WORLDMAP_BASELINE_LOGIN_FORM=PROVEN_EDITABLE_FIELDS' \
+            'WORLDMAP_BASELINE_PRESECRET_READY=true' \
+            'WORLDMAP_V13_PINNED_LOGIN_CONTROL=PROVEN_FROM_V10_EXACT_GEOMETRY';do grep -Fq "$marker" "$control/helper.log";done
+          ! grep -Fq 'WORLDMAP_BASELINE_LOGIN_SUBMITTED=true' "$control/helper.log"
+          echo 'WORLDMAP_V18_PRESECRET_GATE=PASS'
+
+      - name: Protected handoff, native confirmation and structural capture
+        shell: bash
+        env:
+          TIBIA_TEST_EMAIL: ${{ secrets.TIBIA_TEST_EMAIL }}
+          TIBIA_TEST_PASSWORD: ${{ secrets.TIBIA_TEST_PASSWORD }}
+        run: |
+          set +x;set -Eeuo pipefail
+          control="$RUNNER_TEMP/worldmap-baseline-control";pid="$(tr -cd '0-9'<"$control/helper.pid")"
+          [[ "$pid" =~ ^[1-9][0-9]*$ ]]&&kill -0 "$pid"
+          exec 9>"$control/credentials.fifo";printf '%s\0%s\0' "$TIBIA_TEST_EMAIL" "$TIBIA_TEST_PASSWORD">&9;exec 9>&-
+          unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
+          done_flag=0
+          for _ in $(seq 1 1800);do [[ -f "$control/result" ]]&&{ done_flag=1;break;};sleep .5;done
+          [[ "$done_flag" == 1 ]]||{ cat "$control/helper.log";exit 88;}
+          rc="$(tr -cd '0-9'<"$control/result")";cat "$control/helper.log"
+          if grep -Fq 'WORLDMAP_BASELINE_LOGIN_SUBMITTED=true' "$control/helper.log";then echo 'WORLDMAP_BASELINE_LOGIN_BUDGET_CONSUMED=8';else echo 'WORLDMAP_BASELINE_LOGIN_BUDGET_CONSUMED=7';fi
+          [[ "${rc:-UNKNOWN}" == 0 ]]||exit "${rc:-87}"
+          for marker in \
+            'WORLDMAP_BASELINE_SECRET_FIELD_OCCUPANCY=PASS' \
+            'WORLDMAP_BASELINE_LOGIN_SUBMITTED=true' \
+            'WORLDMAP_BASELINE_LOGIN_TRANSPORT_ACTIVITY=PASS' \
+            'WORLDMAP_BASELINE_POST_LOGIN_UI_TRANSITION=PASS' \
+            'WORLDMAP_V18_POSTAUTH_CHARSEL_INSTANCE_COUNT=1' \
+            'WORLDMAP_V18_RUNTIME_ADDRESS_PROVEN=PASS' \
+            'WORLDMAP_V18_NATIVE_CHARACTER_LIST_COUNT=1' \
+            'WORLDMAP_V18_NATIVE_CHARACTER_LIST_DISCOVERY=PASS' \
+            'WORLDMAP_V18_NATIVE_SELECTION_INDEX=0' \
+            'WORLDMAP_V18_QT_THREAD_AFFINITY=PASS' \
+            'WORLDMAP_V18_CONST_SELECTION_VIEW=PASS' \
+            'WORLDMAP_V18_NATIVE_CHARACTER_CONFIRMATION_QMETA=PASS' \
+            'WORLDMAP_V18_SEMANTIC_RESULT=PASS' \
+            'WORLDMAP_BASELINE_STRUCTURAL_IN_GAME=PASS' \
+            'WORLDMAP_BASELINE_MAP_SCREENSHOT=PASS' \
+            'WORLDMAP_BASELINE_TRANSPORT_CONFINEMENT=PASS' \
+            'WORLDMAP_BASELINE_PHYSICAL_CAPTURE=PASS' \
+            'WORLDMAP_BASELINE_ORIGINAL_SOURCE_REHASH=PASS' \
+            'WORLDMAP_BASELINE_CLEANUP=COMPLETE';do grep -Fq "$marker" "$control/helper.log";done
+          grep -F '^WORLDMAP_BASELINE_STRUCTURAL_SUMMARY=' "$control/helper.log"|tail -1>"$RUNNER_TEMP/v18-baseline-summary-line"
+          grep -E '^WORLDMAP_V18_(POSTAUTH_CHARSEL_INSTANCE_COUNT|RUNTIME_ADDRESS_PROVEN|NATIVE_CHARACTER_LIST_COUNT|NATIVE_CHARACTER_LIST_DISCOVERY|NATIVE_SELECTION_INDEX|QT_THREAD_AFFINITY|SELECTED_LOGIN_DATA_BEFORE|CONST_SELECTION_VIEW|SELECTED_LOGIN_DATA_AFTER|NATIVE_CHARACTER_CONFIRMATION_QMETA|SEMANTIC_RESULT)=' "$control/helper.log">"$RUNNER_TEMP/v18-semantic-summary.txt"
+          screenshot="$RUNNER_TEMP/worldmap-baseline-evidence/map-world-entry.png";[[ -s "$screenshot" ]]
+          echo 'WORLDMAP_PHYSICAL_BASELINE_V18_CAPTURE=PASS'
+
+      - name: Persist real map screenshot and structural evidence
+        if: success()
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          arm="$(cat "$RUNNER_TEMP/v18-arm-head")"
+          git fetch -q origin "+refs/heads/$HEAD_BRANCH:refs/remotes/origin/task-head"
+          [[ "$(git rev-parse refs/remotes/origin/task-head)" == "$arm" ]]
+          git checkout -q -B "$HEAD_BRANCH" refs/remotes/origin/task-head
+          dir=docs/agents/evidence/OTC-20260817-track-a-worldmap-server-delivery-causal-validation;mkdir -p "$dir"
+          cp "$RUNNER_TEMP/worldmap-baseline-evidence/map-world-entry.png" "$dir/map-world-entry-v18.png"
+          cp "$RUNNER_TEMP/v18-baseline-summary-line" "$dir/v18-baseline-structural-summary.txt"
+          cp "$RUNNER_TEMP/v18-semantic-summary.txt" "$dir/v18-native-semantic-summary.txt"
+          git config user.name 'github-actions[bot]';git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add "$dir/map-world-entry-v18.png" "$dir/v18-baseline-structural-summary.txt" "$dir/v18-native-semantic-summary.txt"
+          git commit -m 'evidence(track-a): persist v18 native world entry screenshot'
+          git push origin HEAD:"$HEAD_BRANCH"
+          echo 'WORLDMAP_V18_SCREENSHOT_PERSISTED=PASS'
+
+      - name: Exact cleanup fence
+        if: always()
+        shell: bash
+        run: |
+          set +x;set -Eeuo pipefail
+          control="$RUNNER_TEMP/worldmap-baseline-control"
+          if [[ -r "$control/helper.pid" ]];then pid="$(tr -cd '0-9'<"$control/helper.pid")";if [[ "$pid" =~ ^[1-9][0-9]*$ ]]&&kill -0 "$pid" 2>/dev/null;then kill -TERM "$pid" 2>/dev/null||true;sleep 1;kill -KILL "$pid" 2>/dev/null||true;fi;fi
+          python3 - <<'PY'
+          from pathlib import Path
+          marks=(b'OTCLIENT_TIBIA_RE_EPHEMERAL_RUNTIME=worldmap-causal-baseline-ephemeral-v1',b'OTCLIENT_TIBIA_RE_EPHEMERAL_RUNTIME=worldmap-causal-patched-ephemeral-v1')
+          found=[]
+          for p in Path('/proc').iterdir():
+              if not p.name.isdigit():continue
+              try:env=set((p/'environ').read_bytes().split(b'\0'))
+              except OSError:continue
+              if any(m in env for m in marks):found.append(int(p.name))
+          print('WORLDMAP_FINAL_NAMESPACE_PROCESS_COUNT='+str(len(found)))
+          if found:raise SystemExit(1)
+          print('WORLDMAP_FINAL_CLEANUP_FENCE=PASS')
+          PY

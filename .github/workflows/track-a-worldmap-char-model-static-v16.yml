@@ -1,0 +1,101 @@
+name: Track A native character model surface v16
+
+on:
+  push:
+    branches:
+      - runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation
+    paths:
+      - .github/workflows/track-a-worldmap-char-model-static-v16.yml
+
+permissions:
+  contents: read
+
+jobs:
+  recover:
+    name: Exact-SHA character model and QMeta surface
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Fetch exact client and decode character model surface
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends curl python3-pyelftools
+          r="$RUNNER_TEMP/cm"; mkdir -p "$r/bin" "$r/state" "$r/client"; cd "$r/bin"
+          curl -fsSL -o wgcf https://github.com/ViRb3/wgcf/releases/download/v2.2.32/wgcf_2.2.32_linux_amd64
+          echo '2ff97f2201972ce582a424455d50a3719a380eef0cd1f3144f7779348e122a2c  wgcf' | sha256sum -c -
+          curl -fsSL -o wp.tgz https://github.com/windtf/wireproxy/releases/download/v1.1.3/wireproxy_linux_amd64.tar.gz
+          echo 'e88c1d090740373fc606c1bafd81d9a5eadc642cce5667616e20e9d7a444f51c  wp.tgz' | sha256sum -c -
+          mkdir x; tar -xzf wp.tgz -C x; cp "$(find x -type f -name wireproxy -print -quit)" wireproxy; chmod 755 wgcf wireproxy
+          cd "$r/state"; "$r/bin/wgcf" register --accept-tos >/dev/null; "$r/bin/wgcf" generate >/dev/null
+          printf 'WGConfig = %s\n\n[Socks5]\nBindAddress = 127.0.0.1:25344\n' "$r/state/wgcf-profile.conf" >w.conf
+          nohup "$r/bin/wireproxy" -c w.conf >"$r/wp.log" 2>&1 </dev/null &
+          for _ in $(seq 1 30); do curl --socks5-hostname 127.0.0.1:25344 -fsS --max-time 10 https://www.cloudflare.com/cdn-cgi/trace >"$r/trace" 2>/dev/null && break; sleep 2; done
+          grep -Eq '^warp=(on|plus)$' "$r/trace"
+          u=https://static.tibia.com/launcher/tibiaclient-linux-current/bin/client.lzma
+          curl --socks5-hostname 127.0.0.1:25344 --compressed -fL -A 'Mozilla/5.0 (X11; Linux x86_64)' -e "$u" -H 'Accept: */*' "$u" -o "$r/client/client.lzma"
+          echo '496c5b3517c0996a1bbd0e76a7738d450f79d0bf4fef140a807044776042dc9b  '"$r"'/client/client.lzma' | sha256sum -c -
+          python3 - "$r/client/client.lzma" "$r/client/client" <<'PY'
+          import hashlib,lzma,pathlib,struct,sys,re
+          from elftools.elf.elffile import ELFFile
+          src=pathlib.Path(sys.argv[1]); out=pathlib.Path(sys.argv[2]); b=src.read_bytes(); q=b[32];lc=q%9;z=q//9;lp=z%5;pb=z//5;ds=int.from_bytes(b[33:37],'little')
+          raw=lzma.decompress(b[45:],format=lzma.FORMAT_RAW,filters=[{'id':lzma.FILTER_LZMA1,'dict_size':ds,'lc':lc,'lp':lp,'pb':pb}])
+          assert len(raw)==51965216 and hashlib.sha256(raw).hexdigest()=='e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe'
+          out.write_bytes(raw)
+          with out.open('rb') as fh:
+            elf=ELFFile(fh); secs=[(s.name,int(s['sh_offset']),int(s['sh_size']),int(s['sh_addr']),int(s['sh_flags'])) for s in elf.iter_sections()]
+          def vo(va):
+            for n,o,z,v,fl in secs:
+              if v<=va<v+z:return o+(va-v)
+            raise ValueError(hex(va))
+          def offva(off):
+            for n,o,z,v,fl in secs:
+              if o<=off<o+z:return v+(off-o),n
+            return None,None
+          def u32(va):return struct.unpack_from('<I',raw,vo(va))[0]
+          s=0x1ca3b34; m=0x1ca36e0
+          h=[u32(m+i*4) for i in range(14)]
+          rev,ci,cic,cid,mc,mdo,pc,pdo,ec,edo,cc,cdo,flags,sc=h
+          def qs(idx):
+            e=s+idx*8; rel=u32(e); ln=u32(e+4)
+            if ln>65536 or rel>(1<<24): return f'<bad#{idx}>'
+            try:return raw[vo(s+rel):vo(s+rel)+ln].decode('utf8','replace')
+            except:return f'<bad#{idx}>'
+          print('WORLDMAP_V16_CHARSEL_QMETA_BEGIN')
+          print('CLASS='+qs(ci))
+          print(f'REVISION={rev} METHOD_COUNT={mc} METHOD_DATA={mdo} PROPERTY_COUNT={pc} PROPERTY_DATA={pdo} ENUM_COUNT={ec} ENUM_DATA={edo} SIGNAL_COUNT={sc}')
+          for i in range(mc):
+            base=m+(mdo+i*6)*4; row=[u32(base+j*4) for j in range(6)]; argc=row[1]; po=row[2]
+            vals=[u32(m+(po+j)*4) for j in range(1+2*argc)]
+            types=vals[:argc+1]; names=vals[argc+1:]
+            def dt(x):
+              if x&0x80000000:return qs(x&0x7fffffff)
+              return f'metatype#{x}'
+            print(f'METHOD_INDEX={i};NAME={qs(row[0])};ARGC={argc};TYPES={"|".join(dt(x) for x in types)};ARGNAMES={"|".join(qs(x) for x in names)};FLAGS=0x{row[4]:x};REV={row[5]}')
+          print('WORLDMAP_V16_CHARSEL_QMETA_END')
+          # Inventory exact strings/types relevant to native character model. Print only static names/addresses.
+          terms=[b'TCharacterLoginData',b'TCharacterList',b'TCharacter',b'CharacterSelection',b'characterList',b'characterlist',b'selectedCharacter',b'currentCharacter']
+          print('WORLDMAP_V16_CHARACTER_TYPE_STRINGS_BEGIN')
+          for term in terms:
+            hits=[]; start=0
+            while True:
+              p=raw.find(term,start)
+              if p<0:break
+              va,sec=offva(p); hits.append((va,sec,p)); start=p+1
+            print(term.decode(errors='replace')+'='+','.join(f'va=0x{va:x}@{sec}' for va,sec,_ in hits if va is not None))
+          print('WORLDMAP_V16_CHARACTER_TYPE_STRINGS_END')
+          # Printable strings in a bounded static neighborhood around CHARSEL metadata/string data.
+          for label,lo,hi in [('CHARSEL_STRINGS',0x1ca3000,0x1ca5000),('CHARACTER_TYPES',0x1ce5000,0x1ce8000)]:
+            chunk=raw[vo(lo):vo(hi)]
+            vals=[]
+            for mm in re.finditer(rb'[ -~]{4,160}',chunk):
+              ss=mm.group().decode('ascii','replace')
+              if re.search(r'(character|select|login|world|account|model|current|confirm)',ss,re.I): vals.append((lo+mm.start(),ss))
+            print('WORLDMAP_V16_'+label+'_BEGIN')
+            for va,ss in vals[:300]: print(f'0x{va:x} {ss}')
+            print('WORLDMAP_V16_'+label+'_END')
+          print('WORLDMAP_V16_CHAR_MODEL_STATIC=PASS')
+          print('WORLDMAP_V16_CLIENT_EXECUTED=false')
+          print('WORLDMAP_V16_SECRET_USED=false')
+          PY

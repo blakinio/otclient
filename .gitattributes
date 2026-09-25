@@ -6,4 +6,6 @@
 *.ot* eol=lf 
 *.cpp eol=lf 
 *.h   eol=lf 
+tools/tibia-global-login-lab/scripts/*.sh text eol=lf
+.github/workflows/tibia-global-login-lab.yml text eol=lf
 oteryn-client/tools/canary-protocol-index/generated/*.json text eol=lf

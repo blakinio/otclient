@@ -183,8 +183,8 @@ void Protocol::recv()
 
     // first update message header size
     int headerSize = 2; // 2 bytes for message size
-    if (m_checksumEnabled)
-        headerSize += 4; // 4 bytes for checksum
+    if (m_checksumEnabled || m_sequencedPackets)
+        headerSize += 4; // 4 bytes for checksum/sequence
     if (g_game.getClientVersion() >= 1405) {
         headerSize += 1; // 1 bytes for padding size
     } else if (m_xteaEncryptionEnabled) {
@@ -442,8 +442,8 @@ void Protocol::onProxyPacket(const std::shared_ptr<std::vector<uint8_t>>& packet
 
         // first update message header size
         int headerSize = 2; // 2 bytes for message size
-        if (self->m_checksumEnabled)
-            headerSize += 4; // 4 bytes for checksum
+        if (self->m_checksumEnabled || self->m_sequencedPackets)
+            headerSize += 4; // 4 bytes for checksum/sequence
         if (g_game.getClientVersion() >= 1405) {
             headerSize += 1; // 1 bytes for padding size
         } else if (self->m_xteaEncryptionEnabled) {

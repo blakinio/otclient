@@ -49,7 +49,15 @@ void ProtocolGame::onConnect()
 
     m_localPlayer = g_game.getLocalPlayer();
 
-    if (g_game.getFeature(Otc::GameProtocolChecksum))
+    const bool currentTibiaGlobalLoginTransport =
+        g_game.getClientVersion() == 1532 &&
+        g_game.getProtocolVersion() == 1532 &&
+        g_game.getFeature(Otc::GameSessionKey) &&
+        g_game.getFeature(Otc::GameSequencedPackets);
+
+    if (currentTibiaGlobalLoginTransport)
+        enabledSequencedPackets();
+    else if (g_game.getFeature(Otc::GameProtocolChecksum))
         enableChecksum();
 
     if (!g_game.getFeature(Otc::GameChallengeOnLogin))
@@ -67,13 +75,35 @@ void ProtocolGame::onRecv(const InputMessagePtr& inputMessage)
         m_firstRecv = false;
 
         if (g_game.getClientVersion() >= 1405) {
-            inputMessage->getU8(); // padding
+            // Protocol::xteaDecrypt already consumes the modern padding-count
+            // byte when XTEA is active. Only consume it here for an unencrypted
+            // first message.
+            if (!isXteaEncryptionEnabled())
+                inputMessage->getU8();
         } else if (g_game.getFeature(Otc::GameMessageSizeCheck)) {
             const int size = inputMessage->getU16();
             if (size != inputMessage->getUnreadSize()) {
                 g_logger.traceError("invalid message size");
                 return;
             }
+        }
+
+        const bool currentTibiaGlobalLoginTransport =
+            g_game.getClientVersion() == 1532 &&
+            g_game.getProtocolVersion() == 1532 &&
+            g_game.getFeature(Otc::GameSessionKey) &&
+            g_game.getFeature(Otc::GameSequencedPackets);
+
+        if (currentTibiaGlobalLoginTransport &&
+            inputMessage->getUnreadSize() > 0 &&
+            inputMessage->peekU8() == 0x34) {
+            // CURRENT_TIBIA_GLOBAL_OPAQUE_FALLBACK_0X34: trusted-main exact
+            // client evidence classifies this first current response as an
+            // UNKNOWN_FALLBACK dispatch with no concrete GameserverMessage
+            // type. Never reinterpret it as the legacy opcode-52 payload.
+            inputMessage->skipBytes(static_cast<uint16_t>(inputMessage->getUnreadSize()));
+            recv();
+            return;
         }
     }
 

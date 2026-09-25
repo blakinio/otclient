@@ -23,6 +23,7 @@
 #include <framework/net/outputmessage.h>
 
 #include "client/game.h"
+#include "client/tibiagloballoginwire.h"
 #include "framework/util/crypt.h"
 
 OutputMessage::OutputMessage() {
@@ -114,6 +115,34 @@ void OutputMessage::addPaddingBytes(const int bytes, const uint8_t byte)
 
 void OutputMessage::encryptRsa()
 {
+    const bool currentTibiaGlobalLogin =
+        g_game.getClientVersion() == 1532 &&
+        g_game.getProtocolVersion() == 1532 &&
+        g_game.getFeature(Otc::GameClientVersion) &&
+        g_game.getFeature(Otc::GamePreviewState) &&
+        g_game.getFeature(Otc::GameSessionKey) &&
+        g_game.getFeature(Otc::GameSequencedPackets);
+
+    if (currentTibiaGlobalLogin) {
+        // CURRENT_TIBIA_GLOBAL_LOGIN_TRANSCODE: the legacy builder still owns
+        // the authorized runtime values, but exact-current 15.32 sends them in
+        // the promoted protobuf envelope rather than a fixed RSA block.
+        const auto legacyView = getBuffer();
+        const auto typed = otclient::tibia_global_login::transcodeLegacy1532(
+            std::span<const uint8_t>(
+                reinterpret_cast<const uint8_t*>(legacyView.data()),
+                legacyView.size()),
+            g_game.getFeature(Otc::GameChallengeOnLogin));
+        if (typed.empty())
+            throw stdext::exception("current Tibia Global login transcode failed");
+
+        reset();
+        addBytes(std::string_view(
+            reinterpret_cast<const char*>(typed.data()),
+            typed.size()));
+        return;
+    }
+
     const int size = g_crypt.rsaGetSize();
     if (m_messageSize < size)
         throw stdext::exception("insufficient bytes in buffer to encrypt");

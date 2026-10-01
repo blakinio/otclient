@@ -8,7 +8,11 @@ return {
             { name = 'v15.24-linux.zip', browser_download_url = 'https://example.invalid/linux.zip' },
             { name = 'v15.24-macos-client.zip', browser_download_url = 'https://example.invalid/macos.zip' },
             { name = 'v15.24.app.zip', browser_download_url = 'https://example.invalid/app.zip' },
-            { name = 'v15.24-client.zip', browser_download_url = 'https://example.invalid/client.zip' },
+            {
+                name = 'v15.24-client.zip',
+                browser_download_url = 'https://example.invalid/client.zip',
+                digest = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+            },
             { name = 'SHA256SUMS.txt', browser_download_url = 'https://example.invalid/SHA256SUMS.txt' }
         }
     },

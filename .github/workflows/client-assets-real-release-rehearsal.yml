@@ -1,0 +1,391 @@
+name: Client assets real-release rehearsal
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - reopened
+      - synchronize
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: client-assets-real-release-rehearsal-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  rehearsal:
+    name: Install and load real release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      VCPKG_BINARY_CACHE_ACCESS: read
+      VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json,read;nugettimeout,600"
+      VCPKG_NUGET_REPOSITORY: https://github.com/${{ github.repository }}.git
+      VCPKG_NUGET_API_KEY: ${{ github.token }}
+      CLIENT_VERSION: "1525"
+      CLIENT_LABEL: "15.25"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Resolve configured release
+        shell: bash
+        env:
+          GH_API_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          releases="${RUNNER_TEMP}/client-releases.json"
+          curl --fail --silent --show-error --location \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${GH_API_TOKEN}" \
+            -H "X-GitHub-Api-Version: 2026-03-10" \
+            "https://api.github.com/repos/dudantas/tibia-client/releases?per_page=100" \
+            --output "${releases}"
+
+          python3 - "${releases}" <<'PY'
+          import json
+          import os
+          import re
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as handle:
+              releases = json.load(handle)
+
+          wanted = os.environ["CLIENT_LABEL"].lower()
+          release = next((item for item in releases if wanted in str(item.get("tag_name", "")).lower()
+                          or wanted in str(item.get("name", "")).lower()), None)
+          if release is None:
+              raise SystemExit(f"No configured release found for {wanted}")
+
+          tag = str(release.get("tag_name", ""))
+          name = str(release.get("name", ""))
+          match = re.search(r"\d+\.\d+", tag.lower()) or re.search(r"\d+\.\d+", name.lower())
+          label = match.group(0) if match else ""
+
+          def is_archive(value):
+              value = value.lower()
+              return value.endswith(".zip") or value.endswith(".rar")
+
+          def is_mac(value):
+              value = value.lower()
+              return value.endswith(".app.zip") or "macos" in value or re.search(r"(?<![a-z])mac(?![a-z])", value)
+
+          selected = None
+          selected_score = 0
+          for asset in release.get("assets") or []:
+              asset_name = str(asset.get("name", "")).lower()
+              if not asset.get("browser_download_url") or not is_archive(asset_name) or is_mac(asset_name):
+                  continue
+              score = 0
+              if tag and tag.lower() in asset_name:
+                  score += 4
+              if label and label in asset_name:
+                  score += 2
+              if score == 0:
+                  continue
+              if "client" in asset_name:
+                  score += 1
+              if "original" in asset_name or "linux" in asset_name:
+                  score -= 1
+              score = max(score, 0)
+              if score > selected_score:
+                  selected = asset
+                  selected_score = score
+
+          if selected:
+              archive_url = str(selected["browser_download_url"])
+              archive_name = str(selected.get("name", ""))
+              archive_digest = str(selected.get("digest") or "")
+              archive_size = str(selected.get("size") or "")
+              source = "release-asset"
+          else:
+              archive_url = f"https://codeload.github.com/dudantas/tibia-client/zip/refs/tags/{tag}"
+              archive_name = f"{tag}.zip"
+              archive_digest = ""
+              archive_size = ""
+              source = "codeload-fallback"
+
+          values = {
+              "RELEASE_TAG": tag,
+              "RELEASE_NAME": name,
+              "ARCHIVE_URL": archive_url,
+              "ARCHIVE_NAME": archive_name,
+              "ARCHIVE_DIGEST": archive_digest,
+              "ARCHIVE_SIZE": archive_size,
+              "ARCHIVE_SOURCE_KIND": source,
+          }
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as output:
+              for key, value in values.items():
+                  output.write(f"{key}={value}\n")
+
+          for key, value in values.items():
+              print(f"{key.lower()}={value or '<none>'}")
+          PY
+
+      - name: Verify upstream manifest identifier
+        shell: bash
+        run: |
+          set -euo pipefail
+          raw="https://raw.githubusercontent.com/dudantas/tibia-client/${RELEASE_TAG}"
+          curl --fail --silent --show-error --location \
+            "${raw}/assets.json" --output "${RUNNER_TEMP}/assets.json"
+          curl --fail --silent --show-error --location \
+            "${raw}/assets.json.sha256" --output "${RUNNER_TEMP}/assets.json.sha256"
+
+          expected="$(tr -d '[:space:]' < "${RUNNER_TEMP}/assets.json.sha256")"
+          actual="$(sha256sum "${RUNNER_TEMP}/assets.json" | awk '{print $1}')"
+          printf 'manifest_expected_sha256=%s\n' "${expected}"
+          printf 'manifest_actual_sha256=%s\n' "${actual}"
+          test -n "${expected}"
+          test "${actual}" = "${expected}"
+
+      - name: Get vcpkg baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          vcpkg_commit_id="$(grep '.builtin-baseline' vcpkg.json | awk -F: '{print $2}' | tr -d '," ')"
+          test -n "${vcpkg_commit_id}"
+          echo "VCPKG_GIT_COMMIT_ID=${vcpkg_commit_id}" >> "${GITHUB_ENV}"
+
+      - name: Install build and runtime dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            autoconf autoconf-archive automake ccache gcc-14 g++-14 \
+            libgl1-mesa-dev libgl1-mesa-dri libglu1-mesa-dev libltdl-dev \
+            libtool libtool-bin libx11-dev libxcursor-dev libxi-dev \
+            libxinerama-dev libxrandr-dev linux-libc-dev make mono-complete \
+            ninja-build perl pkg-config python3 unzip xauth xdotool xvfb
+          sudo ln -sf /usr/bin/ninja /usr/bin/ninja-build
+          echo "CC=gcc-14" >> "${GITHUB_ENV}"
+          echo "CXX=g++-14" >> "${GITHUB_ENV}"
+
+      - name: CCache
+        uses: hendrikmuhs/ccache-action@d62db5f07c26379fc4b4e0916f098a92573c3b03  # v1.2.23
+        with:
+          max-size: "1G"
+          key: ccache-client-assets-real-release
+          restore-keys: |
+            ccache-linux
+
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@b1a0dd252f06b9e25b3c022a9a03bd7a427fb6a2  # v11.6
+        with:
+          vcpkgGitURL: "https://github.com/microsoft/vcpkg.git"
+          vcpkgGitCommitId: ${{ env.VCPKG_GIT_COMMIT_ID }}
+
+      - name: Setup NuGet for vcpkg
+        shell: bash
+        env:
+          NUGET_AUTH_TOKEN: ${{ env.VCPKG_NUGET_API_KEY }}
+        run: |
+          set -euo pipefail
+          unset VCPKG_FORCE_SYSTEM_BINARIES
+          nuget_path="$(vcpkg fetch nuget 2>&1 | grep -E '^/' | tail -n 1)"
+          test -n "${nuget_path}"
+          test -f "${nuget_path}"
+          feed="https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json"
+          mono "${nuget_path}" sources remove -name GitHubPackages >/dev/null 2>&1 || true
+          mono "${nuget_path}" sources add \
+            -source "${feed}" -storepasswordincleartext -name GitHubPackages \
+            -username "${{ github.repository_owner }}" -password "${NUGET_AUTH_TOKEN}"
+          mono "${nuget_path}" setapikey "${NUGET_AUTH_TOKEN}" -source "${feed}"
+
+      - name: Build Linux client
+        uses: lukka/run-cmake@5d55ea7949e25f69f0ecb516d8d572297e03a956  # v10.9
+        with:
+          configurePreset: linux-release
+          buildPreset: linux-release
+          configurePresetAdditionalArgs: "['-DTOGGLE_BIN_FOLDER=ON', '-DOPTIONS_ENABLE_IPO=OFF']"
+
+      - name: Prepare clean runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          runtime="${GITHUB_WORKSPACE}/build/linux-release/bin"
+          test -x "${runtime}/otclient"
+          rm -rf "${runtime}/data/things/${CLIENT_VERSION}" \
+            "${runtime}/data/sounds/${CLIENT_VERSION}" "${runtime}/downloads"
+          rm -f "${runtime}/otclient.log" "${runtime}/rehearsal-stdout.log" \
+            "${runtime}/rehearsal-stderr.log" "${runtime}/rehearsal-exit-code.txt"
+
+          cat > "${runtime}/otclientrc.lua" <<'LUA'
+          local version = 1525
+          local function report(key, value)
+            g_logger.info(string.format('[rehearsal] %s=%s', key, tostring(value)))
+          end
+
+          scheduleEvent(function()
+            report('request_version', version)
+            modules.client_assets.ensureClientVersion(version, function(ok, message)
+              report('install_ok', ok)
+              report('install_message', message or '')
+              report('installer_reports_installed', modules.client_assets.isClientVersionInstalled(version))
+              report('marker_exists', g_resources.fileExists(string.format('/data/things/%d/.client-assets-complete', version)))
+              if not ok then
+                g_app.exit()
+                return
+              end
+
+              local versionOk, versionError = pcall(function()
+                g_game.setClientVersion(version)
+                g_game.setProtocolVersion(g_game.getClientProtocolVersion(version))
+              end)
+              report('version_set_ok', versionOk)
+              if not versionOk then
+                report('version_error', versionError)
+              end
+
+              scheduleEvent(function()
+                report('runtime_loaded', modules.game_things.isLoaded())
+                report('client_version', g_game.getClientVersion())
+                g_app.exit()
+              end, 3000)
+            end)
+          end, 1000)
+          LUA
+
+          cat > "${runtime}/run-rehearsal.sh" <<'BASH'
+          #!/usr/bin/env bash
+          set -uo pipefail
+          export LIBGL_ALWAYS_SOFTWARE=1
+          ./otclient >rehearsal-stdout.log 2>rehearsal-stderr.log &
+          client_pid=$!
+
+          prompt_seen=false
+          for _ in $(seq 1 180); do
+            if grep -Fq "[rehearsal] request_version=1525" otclient.log 2>/dev/null; then
+              prompt_seen=true
+              break
+            fi
+            if ! kill -0 "${client_pid}" 2>/dev/null; then
+              wait "${client_pid}"
+              exit $?
+            fi
+            sleep 1
+          done
+
+          if [[ "${prompt_seen}" != true ]]; then
+            echo "Rehearsal prompt marker was not observed." >&2
+            kill "${client_pid}" 2>/dev/null || true
+            wait "${client_pid}" 2>/dev/null || true
+            exit 41
+          fi
+
+          sleep 2
+          window_id="$(xdotool search --onlyvisible --name OTClient 2>/dev/null | head -n 1 || true)"
+          if [[ -z "${window_id}" ]]; then
+            echo "OTClient window was not found under Xvfb." >&2
+            kill "${client_pid}" 2>/dev/null || true
+            wait "${client_pid}" 2>/dev/null || true
+            exit 42
+          fi
+
+          xdotool windowfocus "${window_id}" 2>/dev/null || true
+          xdotool key --window "${window_id}" Return
+          wait "${client_pid}"
+          BASH
+          chmod +x "${runtime}/run-rehearsal.sh"
+
+      - name: Run installer and fresh runtime load
+        shell: bash
+        run: |
+          set -euo pipefail
+          runtime="${GITHUB_WORKSPACE}/build/linux-release/bin"
+          cd "${runtime}"
+          set +e
+          timeout 100m xvfb-run --auto-servernum ./run-rehearsal.sh
+          status=$?
+          set -e
+          printf '%s\n' "${status}" > rehearsal-exit-code.txt
+
+      - name: Report text-only evidence
+        if: always()
+        shell: bash
+        run: |
+          runtime="${GITHUB_WORKSPACE}/build/linux-release/bin"
+          printf 'release_tag=%s\narchive_source_kind=%s\narchive_name=%s\narchive_url=%s\n' \
+            "${RELEASE_TAG:-<unset>}" "${ARCHIVE_SOURCE_KIND:-<unset>}" \
+            "${ARCHIVE_NAME:-<unset>}" "${ARCHIVE_URL:-<unset>}"
+          printf 'archive_digest=%s\narchive_size=%s\n' \
+            "${ARCHIVE_DIGEST:-<none>}" "${ARCHIVE_SIZE:-<unknown>}"
+          grep -E '\[rehearsal\]|\[client_assets\]' "${runtime}/otclient.log" 2>/dev/null || true
+          tail -n 200 "${runtime}/rehearsal-stdout.log" 2>/dev/null || true
+          tail -n 200 "${runtime}/rehearsal-stderr.log" 2>/dev/null || true
+          find "${runtime}/data/things/${CLIENT_VERSION}" -maxdepth 1 -type f \
+            -printf '%f %s bytes\n' 2>/dev/null | sort | head -n 200 || true
+          find "${runtime}/data/sounds/${CLIENT_VERSION}" -maxdepth 1 -type f \
+            -printf '%f %s bytes\n' 2>/dev/null | sort | head -n 200 || true
+
+      - name: Enforce runtime and integrity gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          runtime="${GITHUB_WORKSPACE}/build/linux-release/bin"
+          things="${runtime}/data/things/${CLIENT_VERSION}"
+          sounds="${runtime}/data/sounds/${CLIENT_VERSION}"
+
+          test "$(cat "${runtime}/rehearsal-exit-code.txt")" = "0"
+          grep -Fq "[rehearsal] install_ok=true" "${runtime}/otclient.log"
+          grep -Fq "[rehearsal] installer_reports_installed=true" "${runtime}/otclient.log"
+          grep -Fq "[rehearsal] marker_exists=true" "${runtime}/otclient.log"
+          grep -Fq "[rehearsal] version_set_ok=true" "${runtime}/otclient.log"
+          grep -Fq "[rehearsal] runtime_loaded=true" "${runtime}/otclient.log"
+          grep -Fq "Downloading asset archive for client ${CLIENT_LABEL} from ${ARCHIVE_URL}." \
+            "${runtime}/otclient.log"
+          test -f "${things}/.client-assets-complete"
+          test -f "${things}/catalog-content.json"
+          test -f "${things}/assets.json.sha256"
+
+          expected="$(tr -d '[:space:]' < "${RUNNER_TEMP}/assets.json.sha256")"
+          installed="$(tr -d '[:space:]' < "${things}/assets.json.sha256")"
+          test "${installed}" = "${expected}"
+
+          python3 - "${things}" "${sounds}" <<'PY'
+          import json
+          import os
+          import sys
+
+          things, sounds = sys.argv[1:3]
+          with open(os.path.join(things, "catalog-content.json"), encoding="utf-8") as handle:
+              catalog = json.load(handle)
+
+          required = {"appearances": False, "staticdata": False}
+          missing = []
+          for entry in catalog:
+              kind = entry.get("type")
+              if kind in {"appearances", "staticdata", "proficiencies"}:
+                  filename = entry.get("file")
+                  if not isinstance(filename, str) or not os.path.isfile(os.path.join(things, filename)):
+                      missing.append(f"{kind}:{filename}")
+                  if kind in required:
+                      required[kind] = True
+
+          if missing:
+              raise SystemExit("Missing required catalog files: " + ", ".join(missing))
+          if not all(required.values()):
+              raise SystemExit(f"Catalog lacks required entry types: {required}")
+          if not os.path.isdir(sounds):
+              raise SystemExit("Sound destination is missing")
+          print(f"catalog_entries={len(catalog)}")
+          PY
+
+          pattern="Verified (downloaded asset archive SHA-256|archive contents against assets manifest SHA-256)"
+          if ! grep -Eq "${pattern}" "${runtime}/otclient.log"; then
+            echo "Runtime passed without independent archive/content SHA-256 verification evidence." >&2
+            exit 43
+          fi
+
+          echo "runtime_rehearsal=pass"
+          echo "production_integrity_gate=pass"

@@ -1,0 +1,82 @@
+name: Track A worldmap v22 guarded native on-connect
+on:
+  push:
+    branches: [runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation]
+    paths: [.github/workflows/track-a-worldmap-server-delivery-causal-validation-v22.yml]
+permissions: {contents: write}
+concurrency: {group: track-a-worldmap-v22, cancel-in-progress: false}
+env:
+  BRANCH: runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation
+  SUBJECT: 'ci(track-a): arm v22 guarded native on-connect'
+  AUTH: docs/agents/evidence/OTC-20260817-track-a-worldmap-server-delivery-causal-validation/20260818-v22-runtime-authority.md
+  EVID: docs/agents/evidence/OTC-20260817-track-a-worldmap-server-delivery-causal-validation
+jobs:
+  static:
+    runs-on: ubuntu-24.04
+    outputs: {need: '${{ steps.g.outputs.need }}'}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {ref: '${{ env.BRANCH }}', persist-credentials: false, fetch-depth: 0}
+      - id: g
+        shell: bash
+        run: |
+          set -Eeuo pipefail;[[ "$(git log -1 --format=%s)" == "$SUBJECT" ]]
+          if [[ -s "$EVID/map-world-entry-v20.png" || -s "$EVID/map-world-entry-v21.png" ]];then echo need=false>>"$GITHUB_OUTPUT";echo WORLDMAP_V22_PRIOR_SCREENSHOT=PASS;exit 0;fi
+          grep -Fq 'BASELINE_LOGIN_MAX=12' "$AUTH";grep -Fq 'TWELFTH_BASELINE_LOGIN_ATTEMPT_AUTHORIZED=true' "$AUTH";echo need=true>>"$GITHUB_OUTPUT";echo WORLDMAP_V22_AUTHORITY=PASS
+      - if: steps.g.outputs.need == 'true'
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git fetch -q origin "+refs/heads/main:refs/remotes/origin/main" "+refs/heads/$BRANCH:refs/remotes/origin/task" "+refs/pull/475/merge:refs/remotes/pr/merge";m=$(git rev-parse refs/remotes/origin/main);h=$(git rev-parse refs/remotes/origin/task);[[ "$(git log -1 --format=%s "$h")" == "$SUBJECT" ]];git checkout -q --detach refs/remotes/pr/merge;[[ "$(git rev-parse HEAD^1)" == "$m" && "$(git rev-parse HEAD^2)" == "$h" ]]
+          R=$RUNNER_TEMP
+          python3 .github/scripts/track-a-worldmap-causal-gdb-env-repair.py .github/scripts/track-a-worldmap-causal-ephemeral-baseline.sh $R/a
+          python3 .github/scripts/track-a-worldmap-causal-ui-geometry-repair.py $R/a $R/b;python3 .github/scripts/track-a-worldmap-causal-ui-field-discriminator-v3-repair.py $R/b $R/c;python3 .github/scripts/track-a-worldmap-causal-ui-field-discriminator-v4-repair.py $R/c $R/d;python3 .github/scripts/track-a-worldmap-causal-ui-field-final-roi-v5-repair.py $R/d $R/e;python3 .github/scripts/track-a-worldmap-causal-baseline-login-v6-repair.py $R/e $R/f;python3 .github/scripts/track-a-worldmap-causal-character-selection-v7-repair.py $R/f $R/g;python3 .github/scripts/track-a-worldmap-causal-auth-submit-v9-anchor-adapter.py .github/scripts/track-a-worldmap-causal-auth-submit-v9-repair.py $R/g $R/h;python3 .github/scripts/track-a-worldmap-causal-press-cancel-v10-repair.py $R/h $R/i;python3 .github/scripts/track-a-worldmap-causal-auth-state-v11-repair.py $R/i $R/j;python3 .github/scripts/track-a-worldmap-causal-transport-visual-v12-repair.py $R/j $R/k;python3 .github/scripts/track-a-worldmap-causal-pinned-login-v13-repair.py $R/k $R/l;python3 .github/scripts/track-a-worldmap-causal-character-activation-v14-repair.py $R/l $R/n;python3 .github/scripts/track-a-worldmap-native-single-confirm-v18-repair.py $R/n $R/o;python3 .github/scripts/track-a-worldmap-native-game-login-v19-repair.py $R/o $R/p;python3 .github/scripts/track-a-worldmap-real-impl-game-login-v20-repair.py $R/p $R/q;python3 .github/scripts/track-a-worldmap-gameclient-connect-v21-repair.py $R/q $R/r;python3 .github/scripts/track-a-worldmap-onconnect-v22-repair.py $R/r $R/s;python3 .github/scripts/track-a-worldmap-causal-map-screenshot-v8-repair.py $R/s $R/z;bash -n $R/z
+          ! grep -Fq 'Invalid Monk' $R/z;grep -Fq 'WORLDMAP_V22_POST_ONCONNECT_IMPL_COUNT=' $R/z;grep -Fq 'WORLDMAP_BASELINE_MAP_SCREENSHOT=PASS' $R/z;echo WORLDMAP_V22_STATIC=PASS
+  physical:
+    needs: static
+    if: needs.static.outputs.need == 'true'
+    runs-on: [otclient, synology]
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {ref: '${{ env.BRANCH }}', persist-credentials: true, fetch-depth: 0}
+      - id: comp
+        shell: bash
+        run: |
+          set +x;set -Eeuo pipefail;[[ "$(git log -1 --format=%s)" == "$SUBJECT" ]];[[ ! -s "$EVID/map-world-entry-v20.png" && ! -s "$EVID/map-world-entry-v21.png" ]];grep -Fq 'TWELFTH_BASELINE_LOGIN_ATTEMPT_AUTHORIZED=true' "$AUTH"
+          python3 - <<'PY'
+          from pathlib import Path
+          marks=(b'OTCLIENT_TIBIA_RE_EPHEMERAL_RUNTIME=worldmap-causal-baseline-ephemeral-v1',b'OTCLIENT_TIBIA_RE_EPHEMERAL_RUNTIME=worldmap-causal-patched-ephemeral-v1');f=[]
+          for p in Path('/proc').iterdir():
+            if not p.name.isdigit():continue
+            try:e=set((p/'environ').read_bytes().split(b'\0'))
+            except:continue
+            if any(m in e for m in marks):f.append(p.name)
+          print('WORLDMAP_V22_PRE_NAMESPACE_COUNT='+str(len(f)));assert not f
+          PY
+          R=$RUNNER_TEMP;python3 .github/scripts/track-a-worldmap-causal-gdb-env-repair.py .github/scripts/track-a-worldmap-causal-ephemeral-baseline.sh $R/a;python3 .github/scripts/track-a-worldmap-causal-ui-geometry-repair.py $R/a $R/b;python3 .github/scripts/track-a-worldmap-causal-ui-field-discriminator-v3-repair.py $R/b $R/c;python3 .github/scripts/track-a-worldmap-causal-ui-field-discriminator-v4-repair.py $R/c $R/d;python3 .github/scripts/track-a-worldmap-causal-ui-field-final-roi-v5-repair.py $R/d $R/e;python3 .github/scripts/track-a-worldmap-causal-baseline-login-v6-repair.py $R/e $R/f;python3 .github/scripts/track-a-worldmap-causal-character-selection-v7-repair.py $R/f $R/g;python3 .github/scripts/track-a-worldmap-causal-auth-submit-v9-anchor-adapter.py .github/scripts/track-a-worldmap-causal-auth-submit-v9-repair.py $R/g $R/h;python3 .github/scripts/track-a-worldmap-causal-press-cancel-v10-repair.py $R/h $R/i;python3 .github/scripts/track-a-worldmap-causal-auth-state-v11-repair.py $R/i $R/j;python3 .github/scripts/track-a-worldmap-causal-transport-visual-v12-repair.py $R/j $R/k;python3 .github/scripts/track-a-worldmap-causal-pinned-login-v13-repair.py $R/k $R/l;python3 .github/scripts/track-a-worldmap-causal-character-activation-v14-repair.py $R/l $R/n;python3 .github/scripts/track-a-worldmap-native-single-confirm-v18-repair.py $R/n $R/o;python3 .github/scripts/track-a-worldmap-native-game-login-v19-repair.py $R/o $R/p;python3 .github/scripts/track-a-worldmap-real-impl-game-login-v20-repair.py $R/p $R/q;python3 .github/scripts/track-a-worldmap-gameclient-connect-v21-repair.py $R/q $R/r;python3 .github/scripts/track-a-worldmap-onconnect-v22-repair.py $R/r $R/s;python3 .github/scripts/track-a-worldmap-causal-map-screenshot-v8-repair.py $R/s $R/z;bash -n $R/z;chmod 700 $R/z;echo helper=$R/z>>"$GITHUB_OUTPUT"
+      - shell: bash
+        env: {H: '${{ steps.comp.outputs.helper }}'}
+        run: |
+          set +x;set -Eeuo pipefail;c=$RUNNER_TEMP/worldmap-baseline-control;mkdir -p $c;chmod 700 $c;rm -f $c/{helper.pid,helper.log,presecret.ready,credentials.fifo,result,result.*} 2>/dev/null||true;nohup setsid env -i HOME="$HOME" PATH="$PATH" RUNNER_NAME="$RUNNER_NAME" RUNNER_TEMP="$RUNNER_TEMP" GITHUB_REPOSITORY="$GITHUB_REPOSITORY" GITHUB_WORKSPACE="$GITHUB_WORKSPACE" bash "$H">$c/helper.log 2>&1 </dev/null & p=$!;echo $p>$c/helper.pid;ready=0;for _ in $(seq 1 1800);do [[ -f $c/result ]]&&{ cat $c/helper.log;exit 95;};[[ -f $c/presecret.ready && -p $c/credentials.fifo ]]&&{ ready=1;break;};kill -0 $p 2>/dev/null||{ cat $c/helper.log;exit 94;};sleep .5;done;[[ $ready == 1 ]];! grep -azq '^TIBIA_TEST_' /proc/$p/environ;grep -Fq 'WORLDMAP_BASELINE_PRESECRET_READY=true' $c/helper.log;echo WORLDMAP_V22_PRESECRET=PASS
+      - shell: bash
+        env: {TIBIA_TEST_EMAIL: '${{ secrets.TIBIA_TEST_EMAIL }}', TIBIA_TEST_PASSWORD: '${{ secrets.TIBIA_TEST_PASSWORD }}'}
+        run: |
+          set +x;set -Eeuo pipefail;c=$RUNNER_TEMP/worldmap-baseline-control;exec 9>$c/credentials.fifo;printf '%s\0%s\0' "$TIBIA_TEST_EMAIL" "$TIBIA_TEST_PASSWORD">&9;exec 9>&-;unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD;for _ in $(seq 1 1800);do [[ -f $c/result ]]&&break;sleep .5;done;rc=$(tr -cd 0-9<$c/result);cat $c/helper.log;echo WORLDMAP_BASELINE_LOGIN_BUDGET_CONSUMED=12;[[ ${rc:-9} == 0 ]];grep -Fq 'WORLDMAP_V22_POST_ONCONNECT_IMPL_COUNT=' $c/helper.log;grep -Fq 'WORLDMAP_BASELINE_STRUCTURAL_IN_GAME=PASS' $c/helper.log;grep -Fq 'WORLDMAP_BASELINE_MAP_SCREENSHOT=PASS' $c/helper.log;[[ -s $RUNNER_TEMP/worldmap-baseline-evidence/map-world-entry.png ]];grep -E '^WORLDMAP_V22_' $c/helper.log>$RUNNER_TEMP/v22.txt||true;grep -F '^WORLDMAP_BASELINE_STRUCTURAL_SUMMARY=' $c/helper.log|tail -1>$RUNNER_TEMP/v22struct.txt
+      - if: success()
+        shell: bash
+        run: |
+          set -Eeuo pipefail;git fetch -q origin "+refs/heads/$BRANCH:refs/remotes/origin/task";git checkout -q -B "$BRANCH" refs/remotes/origin/task;cp $RUNNER_TEMP/worldmap-baseline-evidence/map-world-entry.png $EVID/map-world-entry-v22.png;cp $RUNNER_TEMP/v22.txt $EVID/v22-native-summary.txt;cp $RUNNER_TEMP/v22struct.txt $EVID/v22-structural-summary.txt;git config user.name 'github-actions[bot]';git config user.email '41898282+github-actions[bot]@users.noreply.github.com';git add $EVID/{map-world-entry-v22.png,v22-native-summary.txt,v22-structural-summary.txt};git commit -m 'evidence(track-a): persist v22 native world entry screenshot';git push origin HEAD:$BRANCH
+      - if: always()
+        shell: bash
+        run: |
+          set +e;c=$RUNNER_TEMP/worldmap-baseline-control;[[ -f $c/helper.pid ]]&&kill -TERM $(cat $c/helper.pid) 2>/dev/null;sleep 1;python3 - <<'PY'
+          from pathlib import Path
+          m=b'OTCLIENT_TIBIA_RE_EPHEMERAL_RUNTIME=worldmap-causal-baseline-ephemeral-v1';f=[]
+          for p in Path('/proc').iterdir():
+            if p.name.isdigit():
+              try:
+                if m in (p/'environ').read_bytes():f.append(p.name)
+              except:pass
+          print('WORLDMAP_FINAL_NAMESPACE_PROCESS_COUNT='+str(len(f)));raise SystemExit(1 if f else 0)
+          PY

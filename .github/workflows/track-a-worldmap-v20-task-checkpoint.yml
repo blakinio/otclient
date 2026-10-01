@@ -1,0 +1,56 @@
+name: Track A v20 downstream game-login checkpoint
+
+on:
+  push:
+    branches:
+      - runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation
+    paths:
+      - .github/workflows/track-a-worldmap-v20-task-checkpoint.yml
+
+permissions:
+  contents: write
+
+jobs:
+  checkpoint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation
+          persist-credentials: true
+          fetch-depth: 0
+      - name: Persist v19 terminal discriminator and v20 authority
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          f=docs/agents/tasks/active/OTC-20260817-track-a-worldmap-server-delivery-causal-validation.md
+          python3 - "$f" <<'PY'
+          from pathlib import Path
+          import sys
+          p=Path(sys.argv[1]);s=p.read_text()
+          reps={
+            'phase: baseline_native_game_login_v19_world_entry_screenshot':'phase: baseline_real_impl_game_login_v20_world_entry_screenshot',
+            'ninth_baseline_login_attempt_authorized: true':'ninth_baseline_login_attempt_authorized: true\ntenth_baseline_login_attempt_authorized: true',
+            'baseline_ephemeral_login_max: 9':'baseline_ephemeral_login_max: 10',
+            'baseline_ephemeral_login_consumed: 8':'baseline_ephemeral_login_consumed: 9',
+            'ci_check_generation: v19_downstream_game_login':'ci_check_generation: v20_real_impl_game_login',
+          }
+          for a,b in reps.items():
+            if s.count(a)!=1:raise SystemExit(f'anchor {a!r} count={s.count(a)}')
+            s=s.replace(a,b,1)
+          s=s.replace('updated: 2026-08-18T00:45:00+02:00','updated: 2026-08-18T01:15:00+02:00',1)
+          s=s.replace('owner_authorization_scope: exactly one additional sequential baseline login attempt for v19 after v18 consumed the eighth attempt; reuse the already-proven legitimate account-login and native single-character confirmation path unchanged; observe the exact downstream native game-login state-machine events; only if the v18 character confirmation has built controller-owned TCharacterLoginData and emitted requestCharacterLogin but the connected authentication transition does not fire, v19 may invoke the original TAuthenticationProcessController QMeta method requestCharacterGameserverLogin() on its unique live post-auth object after runtime-address and Qt-thread-affinity proof; no auth/session fabrication, no packet synthesis, no coordinate/OCR character control; completion remains FullMap plus >=10 strips plus post-structural screenshot; no parallel session',
+            'owner_authorization_scope: exactly one additional sequential baseline login attempt for v20 after v19 consumed the ninth attempt; reuse legitimate account login plus the physically proven native single-character confirmation unchanged; observe real implementation entrypoints rather than QMeta thunks; if requestCharacterGameserverLogin signal is proven and the real onStartGameServerLoginStateEntered implementation remains absent, v20 may invoke only the original AUTH QMeta method 27 on its unique live post-auth object after exact runtime-address and Qt-thread-affinity proof; no auth/session fabrication, no packet synthesis, no coordinate/OCR character control; completion remains FullMap plus >=10 strips plus post-structural screenshot; no parallel session',1)
+          marker='# Checkpoint\n'
+          if marker not in s:raise SystemExit('checkpoint marker missing')
+          head=s.split(marker,1)[0]
+          checkpoint='''# Checkpoint\n\n```yaml\ncheckpoint_version: 31\nstatus: implementing\nphase: baseline_real_impl_game_login_v20_world_entry_screenshot\nbaseline_login_max: 10\nbaseline_login_consumed: 9\npatched_login_consumed: 0\nlast_completed_step: v19 physically proved native character signal=1 and requestCharacterGameserverLogin signal=2 with scheduler locking restored; no explicit abort/login-error occurred, but thunk-level StartGameServerLogin/Connect events and FullMap remained zero; static v20 maps StartGameServerLogin case 0xcfb122 to real implementation 0x767440 and connect thunk 0xd06660 to 0x6ef1d0\nblockers: []\nnext_action: execute one v20 run with real implementation breakpoints; invoke original AUTH QMeta method 27 only if signal5 is proven but real start-game-login implementation is absent, then require FullMap plus screenshot\n```\n'''
+          p.write_text(head+checkpoint)
+          print('WORLDMAP_V20_TASK_CHECKPOINT_TRANSFORM=PASS')
+          PY
+          grep -Fq 'phase: baseline_real_impl_game_login_v20_world_entry_screenshot' "$f"
+          grep -Fq 'baseline_ephemeral_login_max: 10' "$f"
+          grep -Fq 'baseline_ephemeral_login_consumed: 9' "$f"
+          grep -Fq 'tenth_baseline_login_attempt_authorized: true' "$f"
+          git config user.name 'github-actions[bot]';git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add "$f";git commit -m 'task(track-a): persist v20 10/9 runtime authority';git push origin HEAD:runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation

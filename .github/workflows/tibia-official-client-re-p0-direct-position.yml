@@ -1,0 +1,270 @@
+name: Track A P0 direct player position
+
+on:
+  push:
+    branches:
+      - research/OTC-20260815-track-a-p0-direct-position
+    paths:
+      - .github/workflows/tibia-official-client-re-p0-direct-position.yml
+      - .github/scripts/tibia-official-client-re-p0-direct-position.py
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-p0-direct-position-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  hosted-static-position-re:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      EXPECTED_HEAD_BRANCH: research/OTC-20260815-track-a-p0-direct-position
+      EXPECTED_CLIENT_VERSION: 15.32.df7b29
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+      EXPECTED_CLIENT_SIZE: '51965216'
+      EXPECTED_TPLAYERDATA_PRIMARY_VPTR_OFFSET: '0x308ca70'
+      PACKAGE_BASE_URL: https://static.tibia.com/launcher/tibiaclient-linux-current
+    steps:
+      - name: Checkout exact Draft head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+
+      - name: Verify hosted no-runtime boundary
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$GITHUB_REF_NAME" == "$EXPECTED_HEAD_BRANCH" ]]
+          [[ "$RUNNER_OS" == Linux ]]
+          [[ "$RUNNER_ARCH" == X64 ]]
+          [[ "${RUNNER_ENVIRONMENT:-}" == github-hosted ]]
+          python3 -m py_compile .github/scripts/tibia-official-client-re-p0-direct-position.py
+          command -v objdump
+          command -v getent
+          echo TRACK_A_P0_EXECUTION_CLASS=github_hosted
+          echo TRACK_A_P0_RUNTIME_ACCESS=none
+          echo TRACK_A_P0_SYNOLOGY_EXECUTION=false
+          echo TRACK_A_P0_PHYSICAL_E2E=false
+
+      - name: Materialize exact bin/client from official package manifest
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          out=artifacts/p0-hosted-static
+          mkdir -p "$out"
+          manifest="$RUNNER_TEMP/package.json"
+          version_file="$RUNNER_TEMP/package.json.version"
+          packed="$RUNNER_TEMP/client.lzma"
+          client="$RUNNER_TEMP/tibia-static-client"
+          selected="$RUNNER_TEMP/selected-client-entry.json"
+          resolve_ip=''
+
+          qnam_fetch() {
+            local url="$1" output="$2"
+            local -a args=(
+              --fail --silent --show-error --location
+              --connect-timeout 20 --max-time 180
+              --compressed
+              --user-agent ''
+            )
+            if [[ -n "$resolve_ip" ]]; then
+              args+=(--resolve "static.tibia.com:443:$resolve_ip")
+            fi
+            curl "${args[@]}" "$url" --output "$output"
+          }
+
+          version_url="$PACKAGE_BASE_URL/package.json.version"
+          if ! qnam_fetch "$version_url" "$version_file"; then
+            echo P0_HOSTED_QNAM_DOMAIN_FETCH=FAILED | tee "$out/input-status.txt"
+            mapfile -t ips < <(getent ahostsv4 static.tibia.com | awk '{print $1}' | sort -u | head -n 2)
+            printf 'P0_HOSTED_STATIC_TIBIA_IPV4_COUNT=%s\n' "${#ips[@]}" | tee -a "$out/input-status.txt"
+            recovered=false
+            for ip in "${ips[@]}"; do
+              [[ "$ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || continue
+              rm -f "$version_file"
+              resolve_ip="$ip"
+              if qnam_fetch "$version_url" "$version_file"; then
+                echo P0_HOSTED_QNAM_RESOLVED_FETCH=SUCCESS | tee -a "$out/input-status.txt"
+                recovered=true
+                break
+              fi
+              echo P0_HOSTED_QNAM_RESOLVED_FETCH=FAILED | tee -a "$out/input-status.txt"
+            done
+            if [[ "$recovered" != true ]]; then
+              {
+                echo P0_HOSTED_INPUT_STATUS=INPUT_BLOCKED
+                echo P0_HOSTED_INPUT_REASON=launcher_equivalent_package_version_fetch_failed
+                echo "P0_HOSTED_INPUT_URL=$version_url"
+              } | tee -a "$out/input-status.txt"
+              exit 3
+            fi
+          else
+            echo P0_HOSTED_QNAM_DOMAIN_FETCH=SUCCESS | tee "$out/input-status.txt"
+          fi
+
+          version="$(tr -d '\r\n' < "$version_file")"
+          echo "P0_HOSTED_PACKAGE_VERSION=$version" | tee -a "$out/input-status.txt"
+          if [[ "$version" != "$EXPECTED_CLIENT_VERSION" ]]; then
+            {
+              echo P0_HOSTED_INPUT_STATUS=INPUT_BLOCKED
+              echo P0_HOSTED_INPUT_REASON=package_version_mismatch
+              echo "P0_HOSTED_EXPECTED_VERSION=$EXPECTED_CLIENT_VERSION"
+            } | tee -a "$out/input-status.txt"
+            exit 3
+          fi
+
+          if ! qnam_fetch "$PACKAGE_BASE_URL/package.json" "$manifest"; then
+            {
+              echo P0_HOSTED_INPUT_STATUS=INPUT_BLOCKED
+              echo P0_HOSTED_INPUT_REASON=package_manifest_download_failed_after_version_success
+            } | tee -a "$out/input-status.txt"
+            exit 3
+          fi
+
+          python3 - "$manifest" "$selected" "$EXPECTED_CLIENT_VERSION" <<'PY'
+          import json,sys
+          manifest_path, selected_path, expected_version = sys.argv[1:]
+          data=json.load(open(manifest_path,encoding='utf-8'))
+          if data.get('version') != expected_version:
+              raise SystemExit(f"P0_HOSTED_INPUT_BLOCKED=manifest_version:{data.get('version')!r}")
+          matches=[x for x in data.get('files',[]) if x.get('localfile') == 'bin/client']
+          if len(matches) != 1:
+              raise SystemExit(f'P0_HOSTED_INPUT_BLOCKED=bin_client_entry_count:{len(matches)}')
+          e=matches[0]
+          required=('url','packedhash','packedsize','unpackedhash','unpackedsize')
+          missing=[k for k in required if not e.get(k)]
+          if missing:
+              raise SystemExit(f'P0_HOSTED_INPUT_BLOCKED=missing_entry_fields:{missing}')
+          json.dump(e,open(selected_path,'w',encoding='utf-8'),sort_keys=True)
+          print('P0_HOSTED_MANIFEST_BIN_CLIENT_FOUND=true')
+          print(f"P0_HOSTED_MANIFEST_CLIENT_URL={e['url']}")
+          print(f"P0_HOSTED_MANIFEST_PACKED_SIZE={e['packedsize']}")
+          print(f"P0_HOSTED_MANIFEST_UNPACKED_SIZE={e['unpackedsize']}")
+          print(f"P0_HOSTED_MANIFEST_UNPACKED_SHA256={e['unpackedhash']}")
+          PY
+
+          readarray -t entry < <(python3 - "$selected" <<'PY'
+          import json,sys
+          e=json.load(open(sys.argv[1],encoding='utf-8'))
+          for k in ('url','packedhash','packedsize','unpackedhash','unpackedsize'):
+              print(e[k])
+          PY
+          )
+          rel_url="${entry[0]}"
+          packed_hash="${entry[1]}"
+          packed_size="${entry[2]}"
+          unpacked_hash="${entry[3]}"
+          unpacked_size="${entry[4]}"
+
+          case "$rel_url" in
+            http://*|https://*) client_url="$rel_url" ;;
+            *) client_url="$PACKAGE_BASE_URL/$rel_url" ;;
+          esac
+
+          if ! qnam_fetch "$client_url" "$packed"; then
+            {
+              echo P0_HOSTED_INPUT_STATUS=INPUT_BLOCKED
+              echo P0_HOSTED_INPUT_REASON=packed_client_download_failed
+              echo "P0_HOSTED_INPUT_RELATIVE_URL=$rel_url"
+            } | tee -a "$out/input-status.txt"
+            exit 3
+          fi
+
+          actual_packed_size="$(stat -c '%s' "$packed")"
+          actual_packed_hash="$(sha256sum "$packed" | awk '{print $1}')"
+          [[ "$actual_packed_size" == "$packed_size" ]] || { echo P0_HOSTED_INPUT_BLOCKED=packed_size_mismatch; exit 3; }
+          [[ "$actual_packed_hash" == "$packed_hash" ]] || { echo P0_HOSTED_INPUT_BLOCKED=packed_hash_mismatch; exit 3; }
+
+          python3 - "$packed" "$client" <<'PY'
+          import lzma,sys
+          src,dst=sys.argv[1:]
+          data=open(src,'rb').read()
+          attempts=[('raw',data)]
+          if len(data) > 32:
+              attempts.append(('skip32',data[32:]))
+          errors=[]
+          for label,payload in attempts:
+              try:
+                  decoded=lzma.decompress(payload)
+              except lzma.LZMAError as exc:
+                  errors.append(f'{label}:{exc}')
+                  continue
+              open(dst,'wb').write(decoded)
+              print(f'P0_HOSTED_LZMA_MODE={label}')
+              break
+          else:
+              raise SystemExit('P0_HOSTED_INPUT_BLOCKED=lzma_decode_failed:' + '|'.join(errors))
+          PY
+
+          size="$(stat -c '%s' "$client")"
+          sha="$(sha256sum "$client" | awk '{print $1}')"
+          {
+            echo "P0_HOSTED_INPUT_SIZE=$size"
+            echo "P0_HOSTED_INPUT_SHA256=$sha"
+            echo "P0_HOSTED_MANIFEST_UNPACKED_SIZE=$unpacked_size"
+            echo "P0_HOSTED_MANIFEST_UNPACKED_SHA256=$unpacked_hash"
+            echo "P0_HOSTED_EXPECTED_SIZE=$EXPECTED_CLIENT_SIZE"
+            echo "P0_HOSTED_EXPECTED_SHA256=$EXPECTED_CLIENT_SHA256"
+          } | tee -a "$out/input-status.txt"
+
+          [[ "$size" == "$unpacked_size" ]] || { echo P0_HOSTED_INPUT_BLOCKED=manifest_unpacked_size_mismatch; exit 3; }
+          [[ "$sha" == "$unpacked_hash" ]] || { echo P0_HOSTED_INPUT_BLOCKED=manifest_unpacked_hash_mismatch; exit 3; }
+          [[ "$size" == "$EXPECTED_CLIENT_SIZE" ]] || { echo P0_HOSTED_INPUT_BLOCKED=exact_client_size_mismatch; exit 3; }
+          [[ "$sha" == "$EXPECTED_CLIENT_SHA256" ]] || { echo P0_HOSTED_INPUT_BLOCKED=exact_client_sha_mismatch; exit 3; }
+
+          echo P0_HOSTED_INPUT_STATUS=EXACT_FENCE_VERIFIED | tee -a "$out/input-status.txt"
+          echo "TRACK_A_P0_CLIENT=$client" >> "$GITHUB_ENV"
+
+      - name: Analyze TPlayerData and playerPosition code site
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          out=artifacts/p0-hosted-static
+          python3 .github/scripts/tibia-official-client-re-p0-direct-position.py \
+            --static-only \
+            --client "$TRACK_A_P0_CLIENT" \
+            --expected-sha256 "$EXPECTED_CLIENT_SHA256" \
+            --expected-size "$EXPECTED_CLIENT_SIZE" \
+            --vptr-offset "$EXPECTED_TPLAYERDATA_PRIMARY_VPTR_OFFSET" \
+            --static-vtable-slots 32 \
+            --static-xref-limit 64 \
+            --static-disasm-limit 24 \
+            | tee "$out/static-elf-re.txt"
+
+          objdump -d -Mintel --no-show-raw-insn \
+            --start-address=0x836500 --stop-address=0x836a00 \
+            "$TRACK_A_P0_CLIENT" > "$out/player-position-disasm.txt"
+
+          grep -Fxq 'TRACK_A_P0_EXACT_CLIENT_FENCE=true' "$out/static-elf-re.txt"
+          grep -Fxq 'TRACK_A_P0_STATIC_PROBE_COMPLETE=true' "$out/static-elf-re.txt"
+          grep -Eq '^ *8367c1:' "$out/player-position-disasm.txt"
+          grep -Eiq '1cdde3f' "$out/player-position-disasm.txt"
+          echo TRACK_A_P0_HOSTED_STATIC_RE_COMPLETE=true | tee "$out/result.txt"
+
+      - name: Remove proprietary input before upload
+        if: always()
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          rm -f \
+            "$RUNNER_TEMP/tibia-static-client" \
+            "$RUNNER_TEMP/client.lzma" \
+            "$RUNNER_TEMP/package.json" \
+            "$RUNNER_TEMP/package.json.version" \
+            "$RUNNER_TEMP/selected-client-entry.json"
+          test ! -e "$RUNNER_TEMP/tibia-static-client"
+          test ! -e "$RUNNER_TEMP/client.lzma"
+          test ! -e "$RUNNER_TEMP/package.json"
+
+      - name: Upload sanitized derived evidence only
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: track-a-p0-hosted-static-${{ github.run_id }}
+          path: artifacts/p0-hosted-static/**
+          if-no-files-found: error
+          retention-days: 7

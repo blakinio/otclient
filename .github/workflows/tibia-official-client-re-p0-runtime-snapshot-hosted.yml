@@ -1,0 +1,57 @@
+name: Track A P0 runtime snapshot helper hosted
+
+on:
+  push:
+    branches:
+      - research/OTC-20260815-track-a-p0-direct-position
+    paths:
+      - .github/scripts/tibia-official-client-re-p0-runtime-snapshot.py
+      - .github/scripts/test_tibia_official_client_re_p0_runtime_snapshot.py
+      - .github/workflows/tibia-official-client-re-p0-runtime-snapshot-hosted.yml
+      - docs/agents/tasks/active/OTC-20260815-track-a-p0-direct-position.md
+      - docs/agents/evidence/OTC-20260815-track-a-p0-direct-position/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-p0-runtime-snapshot-hosted-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Deterministic read-only helper validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact Draft head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+
+      - name: Validate helper syntax and deterministic fixtures
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$GITHUB_REF_NAME" == research/OTC-20260815-track-a-p0-direct-position ]]
+          python3 -m py_compile \
+            .github/scripts/tibia-official-client-re-p0-runtime-snapshot.py \
+            .github/scripts/test_tibia_official_client_re_p0_runtime_snapshot.py
+          python3 .github/scripts/test_tibia_official_client_re_p0_runtime_snapshot.py
+
+      - name: Enforce no process-memory write surface
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          helper=.github/scripts/tibia-official-client-re-p0-runtime-snapshot.py
+          if grep -Eq 'os\.pwrite|O_RDWR|O_WRONLY|process_vm_writev|ptrace.*POKE' "$helper"; then
+            echo 'TRACK_A_P0_RUNTIME_SNAPSHOT_ERROR=process_memory_write_surface_detected' >&2
+            exit 1
+          fi
+          grep -Fq 'os.O_RDONLY | os.O_CLOEXEC' "$helper"
+          grep -Fq '"process_memory_writes": 0' "$helper"
+          grep -Fq '"semantic_player_xyz_proven": False' "$helper"
+          echo TRACK_A_P0_RUNTIME_SNAPSHOT_HOSTED_VALIDATION=PASS
+          echo TRACK_A_P0_RUNTIME_ACCESS=none
+          echo TRACK_A_P0_PHYSICAL_E2E=false

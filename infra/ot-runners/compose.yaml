@@ -1,0 +1,57 @@
+name: ot-runners
+
+x-runner-common: &runner-common
+  build:
+    context: .
+    dockerfile: Dockerfile
+  restart: unless-stopped
+  environment:
+    GITHUB_RUNNER_PAT: ${GITHUB_RUNNER_PAT:?set GITHUB_RUNNER_PAT in .env}
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  cap_add:
+    - CHOWN
+    - SETGID
+    - SETUID
+  pids_limit: 1024
+
+services:
+  otclient-runner:
+    <<: *runner-common
+    container_name: otclient-runner
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: otclient-tibia-re
+    environment:
+      GITHUB_RUNNER_PAT: ${GITHUB_RUNNER_PAT:?set GITHUB_RUNNER_PAT in .env}
+      GITHUB_REPOSITORY: blakinio/otclient
+      RUNNER_NAME: ${OTCLIENT_RUNNER_NAME:-synology-otclient-01}
+      RUNNER_LABELS: otclient,ot,synology,tibia-re
+    volumes:
+      - otclient_runner_state:/runner-state
+      - otclient_runner_work:/home/runner/_work
+
+  ots-runner:
+    <<: *runner-common
+    container_name: ots-runner
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: base
+    environment:
+      GITHUB_RUNNER_PAT: ${GITHUB_RUNNER_PAT:?set GITHUB_RUNNER_PAT in .env}
+      GITHUB_REPOSITORY: blakinio/Otheryn
+      RUNNER_NAME: ${OTS_RUNNER_NAME:-synology-ots-01}
+      RUNNER_LABELS: ots,otheryn,ot,synology
+    volumes:
+      - ots_runner_state:/runner-state
+      - ots_runner_work:/home/runner/_work
+
+volumes:
+  otclient_runner_state:
+  otclient_runner_work:
+  ots_runner_state:
+  ots_runner_work:
